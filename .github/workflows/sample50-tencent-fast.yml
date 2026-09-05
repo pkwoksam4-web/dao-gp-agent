@@ -1,0 +1,109 @@
+name: Sample50 Tencent adjusted fast collector
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [sample50-tencent-fast]
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Fetch Tencent QFQ adjusted OHLC concurrently
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          python - <<'PY'
+          import concurrent.futures, hashlib, json, pathlib, time, traceback, urllib.parse, urllib.request
+          from datetime import datetime, timezone
+
+          OUT=pathlib.Path('artifact')
+          SYMBOLS=[
+            '600737.SH','002646.SZ','300465.SZ','002003.SZ','688200.SH','688125.SH','601162.SH','605068.SH','300152.SZ','002236.SZ',
+            '300827.SZ','600232.SH','300633.SZ','002318.SZ','600249.SH','300561.SZ','300246.SZ','603323.SH','300687.SZ','600386.SH',
+            '300775.SZ','002016.SZ','002627.SZ','600629.SH','002938.SZ','603583.SH','603901.SH','002662.SZ','600594.SH','300434.SZ',
+            '601225.SH','600592.SH','603170.SH','002001.SZ','300565.SZ','002693.SZ','600131.SH','300864.SZ','603123.SH','002230.SZ',
+            '002069.SZ','688277.SH','301327.SZ','002158.SZ','688455.SH','002658.SZ','601890.SH','605365.SH','600641.SH','600377.SH']
+          WINDOWS=[
+            ('2020-06-01','2021-12-31'),
+            ('2022-01-01','2023-12-31'),
+            ('2024-01-01','2025-12-31'),
+            ('2026-01-01','2026-04-17')]
+          UA='Mozilla/5.0'
+
+          def tsymbol(sym):
+            code,ex=sym.split('.')
+            return ('sh' if ex=='SH' else 'sz')+code
+
+          def one(task):
+            sym,start,end=task
+            ts=tsymbol(sym)
+            param=f'{ts},day,{start},{end},2000,qfq'
+            url='https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?'+urllib.parse.urlencode({'param':param})
+            last=None
+            for attempt in (1,2):
+              try:
+                req=urllib.request.Request(url,headers={'User-Agent':UA,'Referer':'https://gu.qq.com/'})
+                with urllib.request.urlopen(req,timeout=10) as r:
+                  body=r.read()
+                  data=json.loads(body.decode('utf-8-sig'))
+                  node=(data.get('data') or {}).get(ts) or {}
+                  rows=node.get('qfqday') or node.get('day') or []
+                  return {'symbol':sym,'provider_symbol':ts,'start':start,'end':end,'ok':True,'http_status':r.status,
+                          'content_type':r.headers.get('Content-Type'),'bytes':len(body),'sha256':hashlib.sha256(body).hexdigest(),
+                          'row_count':len(rows),'rows':rows,'attempt':attempt,'url':url}
+              except Exception as e:
+                last={'symbol':sym,'provider_symbol':ts,'start':start,'end':end,'ok':False,'error_type':type(e).__name__,
+                      'error':str(e),'attempt':attempt,'url':url,'rows':[]}
+                time.sleep(.25*attempt)
+            return last
+
+          tasks=[(s,a,b) for s in SYMBOLS for a,b in WINDOWS]
+          got=[]
+          with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
+            for i,r in enumerate(ex.map(one,tasks),1):
+              got.append(r)
+              if i%20==0: print(f'{i}/{len(tasks)} requests complete',flush=True)
+
+          bysym={s:[] for s in SYMBOLS}
+          for r in got: bysym[r['symbol']].append(r)
+          manifest={'artifact':'SAMPLE50_TENCENT_QFQ_ADJUSTED_FAST_V1','created_at_utc':datetime.now(timezone.utc).isoformat(),
+                    'formal_window':['2020-06-01','2026-04-17'],'provider':'Tencent ifzq fqkline qfq','sample_n':50,'symbols':[]}
+          for idx,sym in enumerate(SYMBOLS,1):
+            sdir=OUT/sym; sdir.mkdir(parents=True,exist_ok=True)
+            date_rows={}
+            windows=[]
+            for wi,r in enumerate(sorted(bysym[sym],key=lambda x:x['start']),1):
+              rows=r.pop('rows',[])
+              (sdir/f'{wi:02d}_{r["start"]}_{r["end"]}.json').write_text(json.dumps(rows,ensure_ascii=False),encoding='utf-8')
+              for row in rows:
+                if isinstance(row,list) and len(row)>=5:
+                  d=str(row[0])[:10]
+                  if '2020-06-01'<=d<='2026-04-17': date_rows[d]=row
+              windows.append(r)
+            ordered=[date_rows[d] for d in sorted(date_rows)]
+            (sdir/'normalized.json').write_text(json.dumps(ordered,ensure_ascii=False,indent=2),encoding='utf-8')
+            manifest['symbols'].append({'sample_order':idx,'symbol':sym,'normalized_row_count':len(ordered),
+              'first_date':ordered[0][0] if ordered else None,'last_date':ordered[-1][0] if ordered else None,'windows':windows})
+          manifest['summary']={
+            'symbols_with_rows':sum(s['normalized_row_count']>0 for s in manifest['symbols']),
+            'all_windows_transport_ok':sum(all(w.get('ok') for w in s['windows']) for s in manifest['symbols']),
+            'rows_total':sum(s['normalized_row_count'] for s in manifest['symbols']),
+            'failed_requests':sum(not r.get('ok') for r in got)}
+          (OUT/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(manifest['summary'],ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload Tencent adjusted evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample50-tencent-qfq-adjusted-fast
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 90
