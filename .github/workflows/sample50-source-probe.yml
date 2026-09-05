@@ -1,0 +1,32 @@
+name: GP Sample50 source probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/sample50_probe.py'
+      - 'scripts/run_probe.py'
+      - '.github/workflows/sample50-source-probe.yml'
+  pull_request:
+    paths:
+      - 'scripts/sample50_probe.py'
+      - 'scripts/run_probe.py'
+      - '.github/workflows/sample50-source-probe.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe 300592 source semantics
+        env:
+          PROBE_SYMBOL: 300592.SZ
+          PROBE_OUT: artifact
+        run: python scripts/run_probe.py
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sample50-source-probe-300592
+          path: artifact/
+          if-no-files-found: error
