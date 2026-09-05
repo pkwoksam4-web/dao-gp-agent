@@ -1,0 +1,91 @@
+name: GP PIT-ST 847 sharded materialization V480
+
+on:
+  push:
+    branches:
+      - gp/pit-st-v480-sharded
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_pit_st_collector_v480.py test_pit_st_shard_v480.py test_merge_pit_st_shards_v480.py
+
+  collect:
+    needs: tests
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BaoStock
+        run: python -m pip install --upgrade pip baostock==0.9.3
+      - name: Collect shard
+        shell: bash
+        run: |
+          mkdir -p results_shard_${{ matrix.shard }}
+          set +e
+          python scripts/pit_st_collector_v480.py \
+            --scope data/pit_st_scope_v480.txt \
+            --out-dir results_shard_${{ matrix.shard }} \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 4 \
+            > >(tee results_shard_${{ matrix.shard }}/collector.stdout.log) \
+            2> >(tee results_shard_${{ matrix.shard }}/collector.stderr.log >&2)
+          rc=$?
+          echo "$rc" > results_shard_${{ matrix.shard }}/collector_exit_code.txt
+          exit 0
+      - name: Upload shard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-pit-st-v480-shard-${{ matrix.shard }}
+          path: results_shard_${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  merge:
+    needs: collect
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-pit-st-v480-shard-*
+          path: downloaded_shards
+          merge-multiple: false
+      - name: Merge and audit partition
+        shell: bash
+        run: |
+          python scripts/merge_pit_st_shards_v480.py \
+            --root downloaded_shards \
+            --scope data/pit_st_scope_v480.txt \
+            --out-dir merged_v480 | tee merge.stdout.log
+          cp merge.stdout.log merged_v480/
+      - name: Upload merged V4.80 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: merged_v480/
+          if-no-files-found: warn
+          retention-days: 30
