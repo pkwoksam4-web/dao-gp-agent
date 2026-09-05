@@ -22,7 +22,7 @@ jobs:
               --header 'User-Agent: Mozilla/5.0' \
               --header 'Referer: https://finance.sina.com.cn/' \
               --output artifact/raw-body \
-              --write-out '%{http_code} %{content_type}' \
+              --write-out '%{http_code} %{content_type}\n' \
               'https://finance.sina.com.cn/realstock/company/sz300592/qfq.js'
           )
           timestamp="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
