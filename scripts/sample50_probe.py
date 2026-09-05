@@ -32,11 +32,12 @@ def report_url(symbol: str, report_name: str) -> str:
         'filter': f'(SECURITY_CODE="{code}")',
         'pageNumber': 1,
         'pageSize': 500,
-        'sortColumns': 'EX_DIVIDEND_DATE' if report_name == 'RPT_SHAREBONUS_DET' else 'NOTICE_DATE',
-        'sortTypes': -1,
         'source': 'WEB',
         'client': 'WEB',
     }
+    if report_name == 'RPT_SHAREBONUS_DET':
+        params['sortColumns'] = 'EX_DIVIDEND_DATE'
+        params['sortTypes'] = -1
     return 'https://datacenter-web.eastmoney.com/api/data/v1/get?' + urlencode(params)
 
 
@@ -48,6 +49,7 @@ def eastmoney_kline_url(symbol: str) -> str:
         'beg': FORMAL_BEG,
         'end': FORMAL_END,
         'lmt': 5000,
+        'ut': '7eea3edcaed734bea9cbfc24409ed989',
         'fields1': 'f1,f2,f3,f4,f5,f6',
         'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
     }
