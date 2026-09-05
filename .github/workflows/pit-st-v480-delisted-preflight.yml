@@ -1,0 +1,56 @@
+name: GP PIT-ST delisted preflight V480
+
+on:
+  push:
+    branches:
+      - gp/pit-st-v480-delisted-preflight
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BaoStock
+        run: python -m pip install --upgrade pip baostock==0.9.3
+      - name: Query delisted controls
+        shell: bash
+        run: |
+          mkdir -p preflight_v480
+          PYTHONPATH=scripts python - <<'PY'
+          import json
+          import baostock as bs
+          from pit_st_collector_v480 import query_rows, query_basic, audit_materialized_rows
+
+          symbols=['002359.SZ','600634.SH']
+          lg=bs.login()
+          out={'login_error_code':str(lg.error_code),'login_error_msg':str(lg.error_msg or ''),'symbols':{}}
+          if str(lg.error_code)!='0':
+              raise SystemExit(f'login failed {lg.error_code} {lg.error_msg}')
+          try:
+              for symbol in symbols:
+                  rows,ec,em=query_rows(bs,symbol)
+                  audit=audit_materialized_rows(symbol,rows,ec,em)
+                  basic=query_basic(bs,symbol)
+                  out['symbols'][symbol]={
+                    'audit':audit,
+                    'basic':basic,
+                    'first_rows':rows[:5],
+                    'last_rows':rows[-5:],
+                  }
+          finally:
+              bs.logout()
+          open('preflight_v480/DELISTED_PIT_ST_PREFLIGHT_V480.json','w',encoding='utf-8').write(json.dumps(out,ensure_ascii=False,indent=2))
+          print(json.dumps({s:{'rows':out['symbols'][s]['audit']['rows'],'status':out['symbols'][s]['audit']['status'],'first':out['symbols'][s]['audit']['first_date'],'last':out['symbols'][s]['audit']['last_date'],'basic':out['symbols'][s]['basic']} for s in symbols},ensure_ascii=False))
+          PY
+      - name: Upload preflight artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-pit-st-v480-delisted-preflight
+          path: preflight_v480/
+          retention-days: 30
