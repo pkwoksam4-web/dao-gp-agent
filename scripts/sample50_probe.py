@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 FORMAL_BEG='20200601'
 FORMAL_END='20260417'
+SOHU_SOURCE_BEG='20180101'
 
 
 def pure_code(symbol: str) -> str:
@@ -24,13 +25,13 @@ def eastmoney_secid(symbol: str) -> str:
     return ('0' if exch == 'SZ' else '1') + '.' + code
 
 
-def report_url(symbol: str, report_name: str) -> str:
+def report_url(symbol: str, report_name: str, page_number: int = 1) -> str:
     code = pure_code(symbol)
     params = {
         'reportName': report_name,
         'columns': 'ALL',
         'filter': f'(SECURITY_CODE="{code}")',
-        'pageNumber': 1,
+        'pageNumber': int(page_number),
         'pageSize': 500,
         'source': 'WEB',
         'client': 'WEB',
@@ -60,7 +61,7 @@ def sohu_history_url(symbol: str) -> str:
     code = pure_code(symbol)
     params = {
         'code': f'cn_{code}',
-        'start': FORMAL_BEG,
+        'start': SOHU_SOURCE_BEG,
         'end': FORMAL_END,
         'stat': 1,
         'order': 'D',
