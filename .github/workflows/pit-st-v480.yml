@@ -1,0 +1,66 @@
+name: GP PIT-ST 847 materialization V480
+
+on:
+  push:
+    branches:
+      - gp/pit-st-v480
+  workflow_dispatch:
+
+jobs:
+  pit-st-v480:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install BaoStock
+        run: python -m pip install --upgrade pip baostock==0.9.3
+
+      - name: Unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_pit_st_collector_v480.py
+
+      - name: Materialize PIT-ST 847
+        id: collect
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p results_v480
+          set +e
+          python scripts/pit_st_collector_v480.py \
+            --scope data/pit_st_scope_v480.txt \
+            --out-dir results_v480 \
+            > >(tee results_v480/collector.stdout.log) \
+            2> >(tee results_v480/collector.stderr.log >&2)
+          rc=$?
+          echo "$rc" > results_v480/collector_exit_code.txt
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Copy scope provenance
+        if: always()
+        run: cp data/pit_st_scope_v480.meta.json results_v480/ || true
+
+      - name: Upload V4.80 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-pit-st-v480
+          path: results_v480/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail workflow if collector failed
+        if: always()
+        shell: bash
+        run: |
+          rc="$(cat results_v480/collector_exit_code.txt 2>/dev/null || echo 99)"
+          echo "collector exit code: $rc"
+          test "$rc" = "0"
