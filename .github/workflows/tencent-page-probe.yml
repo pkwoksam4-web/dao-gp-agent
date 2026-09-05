@@ -1,0 +1,49 @@
+name: Tencent qfq pagination probe
+
+on:
+  push:
+    branches: [sample50-batch-probe]
+    paths: [.github/workflows/tencent-page-probe.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe pagination forms
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.parse, urllib.request, pathlib
+          out=pathlib.Path('artifact'); out.mkdir(exist_ok=True)
+          forms={
+            'latest':'sz300592,day,,,640,qfq',
+            'end_20240501':'sz300592,day,,2024-05-01,640,qfq',
+            'end_20230101':'sz300592,day,,2023-01-01,640,qfq',
+          }
+          summary={}
+          for name,param in forms.items():
+            url='https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?'+urllib.parse.urlencode({'param':param})
+            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Referer':'https://gu.qq.com/'})
+            try:
+              with urllib.request.urlopen(req,timeout=30) as r:
+                b=r.read(); status=r.status; ct=r.headers.get('Content-Type')
+              (out/f'{name}.json').write_bytes(b)
+              d=json.loads(b.decode('utf-8',errors='replace'))
+              stock=((d.get('data') or {}).get('sz300592') or {})
+              rows=stock.get('qfqday') or stock.get('day') or []
+              summary[name]={'status':status,'content_type':ct,'rows':len(rows),'first':rows[0][0] if rows else None,'last':rows[-1][0] if rows else None,'keys':sorted(stock.keys())}
+            except Exception as e:
+              summary[name]={'error':f'{type(e).__name__}: {e}'}
+          (out/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tencent-page-probe
+          path: artifact/
