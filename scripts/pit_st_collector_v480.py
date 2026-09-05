@@ -104,6 +104,12 @@ def read_scope(path: Path):
     return symbols
 
 
+def select_shard(symbols, shard_index, shard_count):
+    if shard_count <= 0 or shard_index < 0 or shard_index >= shard_count:
+        raise ValueError(f'invalid shard index/count: {shard_index}/{shard_count}')
+    return [symbol for i, symbol in enumerate(symbols) if i % shard_count == shard_index]
+
+
 def query_rows(bs, symbol):
     code = to_baostock_code(symbol)
     rs = bs.query_history_k_data_plus(
@@ -139,13 +145,16 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--scope', required=True)
     p.add_argument('--out-dir', required=True)
+    p.add_argument('--shard-index', type=int, default=0)
+    p.add_argument('--shard-count', type=int, default=1)
     args = p.parse_args()
 
     import baostock as bs
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    symbols = read_scope(Path(args.scope))
+    full_symbols = read_scope(Path(args.scope))
+    symbols = select_shard(full_symbols, args.shard_index, args.shard_count)
 
     login = bs.login()
     if str(login.error_code) != '0':
@@ -201,7 +210,10 @@ def main():
         'formal_window': [FORMAL_START, FORMAL_END],
         'provider': 'BaoStock query_history_k_data_plus',
         'fields': FIELDS,
-        'scope_n': len(symbols),
+        'scope_n': len(full_symbols),
+        'shard_index': args.shard_index,
+        'shard_count': args.shard_count,
+        'shard_symbol_n': len(symbols),
         'materialized_symbol_n': len(symbols) - len(unresolved),
         'unresolved_symbol_n': len(unresolved),
         'unresolved_symbols': unresolved,
@@ -225,7 +237,10 @@ def main():
         'oos_metrics_allowed': False,
         'pit_st': {
             'status': 'MATERIALIZED_AUDIT_PENDING' if not unresolved else 'MATERIALIZATION_INCOMPLETE',
-            'scope_n': len(symbols),
+            'scope_n': len(full_symbols),
+            'shard_index': args.shard_index,
+            'shard_count': args.shard_count,
+            'shard_symbol_n': len(symbols),
             'materialized_symbol_n': len(symbols) - len(unresolved),
             'unresolved_symbol_n': len(unresolved),
             'lifecycle_unresolved_n': len(lifecycle_unresolved),
