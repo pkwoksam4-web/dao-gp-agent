@@ -20,7 +20,7 @@ jobs:
           import hashlib
           import json
           import os
-          import traceback
+          import re
           import urllib.parse
           import urllib.request
           from datetime import datetime, timezone
@@ -45,7 +45,7 @@ jobs:
               body = b""
               try:
                   req = urllib.request.Request(url, headers=req_headers)
-                  with urllib.request.urlopen(req, timeout=25) as resp:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
                       body = resp.read()
                       meta["status"] = int(resp.status)
                       meta["content_type"] = resp.headers.get("Content-Type")
@@ -68,6 +68,7 @@ jobs:
               "sources": {},
           }
 
+          # 1) Corporate actions: Eastmoney datacenter.
           div_params = {
               "reportName": "RPT_SHAREBONUS_DET",
               "columns": "ALL",
@@ -97,6 +98,7 @@ jobs:
           except Exception as e:
               summary["eastmoney_sharebonus_parse_error"] = f"{type(e).__name__}: {e}"
 
+          # 2) Eastmoney RAW control (known push2his may block cloud runners).
           k_params = {
               "secid": "0.300592",
               "fields1": "f1,f2,f3,f4,f5,f6",
@@ -114,14 +116,49 @@ jobs:
               {"Referer": "https://quote.eastmoney.com/"},
           )
           summary["sources"]["eastmoney_raw"] = k_meta
-          try:
-              d = json.loads(k_body.decode("utf-8"))
-              klines = ((d.get("data") or {}).get("klines") or [])
-              summary["eastmoney_raw_rows"] = len(klines)
-              summary["eastmoney_raw_around_event"] = [x for x in klines if x.startswith("2024-05-20,") or x.startswith("2024-05-21,") or x.startswith("2024-05-22,")]
-          except Exception as e:
-              summary["eastmoney_raw_parse_error"] = f"{type(e).__name__}: {e}"
 
+          # 3) Sina unadjusted daily OHLC candidate for P_prev.
+          sina_raw_meta, sina_raw_body = fetch(
+              "sina_raw_300592.json",
+              "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData",
+              {"symbol": "sz300592", "scale": "240", "ma": "no", "datalen": "2000"},
+              {"Referer": "https://finance.sina.com.cn/"},
+          )
+          summary["sources"]["sina_raw"] = sina_raw_meta
+          try:
+              raw_text = sina_raw_body.decode("utf-8", errors="replace").strip()
+              if raw_text.startswith("var") and "=" in raw_text:
+                  raw_text = raw_text.split("=", 1)[1].rstrip(";\n ")
+              raw_rows = json.loads(raw_text)
+              summary["sina_raw_rows"] = len(raw_rows) if isinstance(raw_rows, list) else None
+              summary["sina_raw_around_event"] = [
+                  r for r in (raw_rows if isinstance(raw_rows, list) else [])
+                  if str(r.get("day") or "").startswith(("2024-05-20", "2024-05-21", "2024-05-22"))
+              ]
+          except Exception as e:
+              summary["sina_raw_parse_error"] = f"{type(e).__name__}: {e}"
+
+          # 4) Tencent forward-adjusted daily OHLC candidate for independent validation.
+          tx_meta, tx_body = fetch(
+              "tencent_qfq_300592.json",
+              "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get",
+              {"param": "sz300592,day,,,2000,qfq"},
+              {"Referer": "https://gu.qq.com/"},
+          )
+          summary["sources"]["tencent_qfq"] = tx_meta
+          try:
+              tx = json.loads(tx_body.decode("utf-8", errors="replace"))
+              stock = ((tx.get("data") or {}).get("sz300592") or {})
+              rows = stock.get("qfqday") or stock.get("day") or []
+              summary["tencent_qfq_rows"] = len(rows)
+              summary["tencent_qfq_around_event"] = [
+                  r for r in rows if r and str(r[0]).startswith(("2024-05-20", "2024-05-21", "2024-05-22"))
+              ]
+              summary["tencent_keys"] = sorted(stock.keys())
+          except Exception as e:
+              summary["tencent_qfq_parse_error"] = f"{type(e).__name__}: {e}"
+
+          # 5) Sina divisor evidence, already independently validated in V4.76.
           sina_meta, sina_body = fetch(
               "sina_qfq_300592.js",
               "https://finance.sina.com.cn/realstock/company/sz300592/qfq.js",
@@ -130,9 +167,9 @@ jobs:
           summary["sources"]["sina_qfq"] = sina_meta
           try:
               text = sina_body.decode("utf-8", errors="replace")
-              summary["sina_prefix"] = text[:80]
+              summary["sina_qfq_prefix"] = text[:120]
           except Exception as e:
-              summary["sina_parse_error"] = f"{type(e).__name__}: {e}"
+              summary["sina_qfq_parse_error"] = f"{type(e).__name__}: {e}"
 
           with open(os.path.join(OUT, "summary.json"), "w", encoding="utf-8") as f:
               json.dump(summary, f, ensure_ascii=False, indent=2, sort_keys=True)
