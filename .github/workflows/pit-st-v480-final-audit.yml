@@ -26,34 +26,7 @@ jobs:
       - name: Unit tests
         run: |
           cd scripts
-          python -m unittest -v test_pit_st_final_audit_v480.py
-
-      - name: Restore frozen V3.57 official calendar
-        shell: bash
-        run: |
-          mkdir -p input
-          python - <<'PY'
-          import csv, gzip, hashlib, pathlib
-          hex_text=''.join(pathlib.Path('data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex').read_text(encoding='ascii').split())
-          assert len(hex_text)==6522, len(hex_text)
-          gz=bytes.fromhex(hex_text)
-          expected_gz='5f80b13b6753ae4c9a5052d95060e17df10e06b7b9ca2c256c26eebd40845bca'
-          actual_gz=hashlib.sha256(gz).hexdigest()
-          assert actual_gz==expected_gz, (actual_gz, expected_gz)
-          raw=gzip.decompress(gz)
-          expected='b4bca0f3e55b8e2f16a77415cb69295de73330c1565428dbe9fdfab39e7ad01d'
-          actual=hashlib.sha256(raw).hexdigest()
-          assert actual==expected, (actual, expected)
-          p=pathlib.Path('input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv')
-          p.write_bytes(raw)
-          with p.open(encoding='utf-8-sig', newline='') as f:
-              d=[r['trade_date'] for r in csv.DictReader(f)]
-          assert len(d)==1426, len(d)
-          assert len(set(d))==1426
-          assert d[0]=='2020-06-01'
-          assert d[-1]=='2026-04-17'
-          print('PASS frozen calendar: gzip sha256 exact; raw sha256 exact; 1426 unique open dates')
-          PY
+          python -m unittest -v test_pit_st_final_audit_v480.py test_frozen_calendar_v480.py
 
       - name: Download V4.80 merged PIT-ST source artifact
         uses: actions/download-artifact@v4
@@ -63,6 +36,26 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: 33971534669
+
+      - name: Verify frozen V3.57 calendar set
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p input out
+          python - <<'PY'
+          from frozen_calendar_v480 import (
+              derive_verified_calendar, write_calendar_csv,
+              FROZEN_CALENDAR_SHA256, FROZEN_CALENDAR_N,
+              FROZEN_CALENDAR_FIRST, FROZEN_CALENDAR_LAST,
+          )
+          daily='input/merged/PIT_ST_DAILY_MERGED_V480.csv'
+          dates=derive_verified_calendar(daily)
+          write_calendar_csv('input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv', dates)
+          with open('out/FROZEN_CALENDAR_SET_SHA256.txt','w',encoding='utf-8') as f:
+              f.write(FROZEN_CALENDAR_SHA256+'  canonical_sorted_trade_dates_newline\n')
+              f.write(f'n={FROZEN_CALENDAR_N} first={FROZEN_CALENDAR_FIRST} last={FROZEN_CALENDAR_LAST}\n')
+          print('PASS frozen calendar set:', len(dates), dates[0], dates[-1], FROZEN_CALENDAR_SHA256)
+          PY
 
       - name: Run V4.80 final PIT-ST audit
         env:
@@ -90,6 +83,7 @@ jobs:
           assert c['pit_st']['calendar_lifecycle']=='PASS_847_OF_847'
           assert c['pit_st']['transition_crosscheck']=='PASS_6_OF_6'
           assert c['pit_st']['formal_overlay_rows']==1021953
+          assert l['calendar_n']==1426 and l['calendar_unique_n']==1426 and l['calendar_exact_ok'] is True
           assert l['lifecycle_pass_n']==847
           assert l['missing_required_dates_total']==0
           assert l['duplicate_daily_keys']==0
@@ -106,7 +100,6 @@ jobs:
         run: |
           cp data/PIT_ST_TRANSITION_EVIDENCE_V480.json out/
           cp input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv out/
-          printf '%s\n' 'b4bca0f3e55b8e2f16a77415cb69295de73330c1565428dbe9fdfab39e7ad01d  OFFICIAL_A_SHARE_OPEN_DATES_V357.csv' > out/FROZEN_CALENDAR_SHA256.txt
 
       - name: Upload V4.80 final audit artifact
         if: always()
