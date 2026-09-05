@@ -1,0 +1,103 @@
+name: GP Global QFQ source census V481
+
+on:
+  push:
+    branches:
+      - gp/global-qfq-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_global_qfq_source_v481.py test_global_qfq_merge_v481.py
+
+  collect:
+    needs: tests
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Collect Sina qfq.js shard
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/collect_global_qfq_source_v481.py \
+            --scope data/pit_st_scope_v480.txt \
+            --out-dir artifact \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 8
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-global-qfq-v481-shard-${{ matrix.shard }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
+
+  merge:
+    needs: collect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download all shard evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-global-qfq-v481-shard-*
+          path: downloads
+          merge-multiple: true
+      - name: Merge exact 847 source census
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/merge_global_qfq_source_v481.py \
+            --scope data/pit_st_scope_v480.txt \
+            --input-dir downloads \
+            --out-dir out
+      - name: Verify V4.81 stays fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('out/GLOBAL_QFQ_SOURCE_COVERAGE_V481.json',encoding='utf-8'))
+          c=json.load(open('out/FORMAL_GATE_CHECKPOINT_V481.json',encoding='utf-8'))
+          assert r['scope_n']==847 and r['record_n']==847 and r['partition_exact'] is True
+          assert r['formal_promotion'] is False
+          assert r['global_validated_provenance_emitted'] is False
+          assert r['formal_ready'] is False and r['oos_metrics_allowed'] is False
+          assert c['pit_st']['status']=='CLOSED_V480'
+          assert c['adjustment_provenance']['global_847']=='OPEN'
+          assert c['adjustment_provenance']['validated_global_provenance_emitted'] is False
+          assert c['formal_ready'] is False and c['oos_metrics_allowed'] is False
+          print('PASS V4.81 source census fail-closed invariants')
+          PY
+      - name: Upload merged V4.81 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: |
+            out/
+            downloads/raw/
+            downloads/GLOBAL_QFQ_SOURCE_COVERAGE_V481_SHARD_*.json
+          if-no-files-found: error
+          retention-days: 30
