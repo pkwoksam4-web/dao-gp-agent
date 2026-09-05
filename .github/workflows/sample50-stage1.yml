@@ -1,0 +1,527 @@
+name: Sample50 factor precheck stage1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - sample50-batch-probe
+    paths:
+      - .github/workflows/sample50-stage1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  stage1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Run Sample50 corporate-action factor precheck
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import math
+          import os
+          import re
+          import time
+          import urllib.parse
+          import urllib.request
+          from bisect import bisect_left
+          from collections import Counter, defaultdict
+          from datetime import date, datetime, timezone
+
+          SAMPLE50 = [
+              "600737.SH","002646.SZ","300465.SZ","002003.SZ","688200.SH",
+              "688125.SH","601162.SH","605068.SH","300152.SZ","002236.SZ",
+              "300827.SZ","600232.SH","300633.SZ","002318.SZ","600249.SH",
+              "300561.SZ","300246.SZ","603323.SH","300687.SZ","600386.SH",
+              "300775.SZ","002016.SZ","002627.SZ","600629.SH","002938.SZ",
+              "603583.SH","603901.SH","002662.SZ","600594.SH","300434.SZ",
+              "601225.SH","600592.SH","603170.SH","002001.SZ","300565.SZ",
+              "002693.SZ","600131.SH","300864.SZ","603123.SH","002230.SZ",
+              "002069.SZ","688277.SH","301327.SZ","002158.SZ","688455.SH",
+              "002658.SZ","601890.SH","605365.SH","600641.SH","600377.SH",
+          ]
+          WINDOW_START = "2020-06-01"
+          FORMAL_END = "2026-04-17"
+          OUT = "artifact"
+          RAW_DIR = os.path.join(OUT, "source_raw")
+          os.makedirs(RAW_DIR, exist_ok=True)
+          UA = "Mozilla/5.0"
+
+          def sha256_bytes(b):
+              return hashlib.sha256(b).hexdigest()
+
+          def save_bytes(path, b):
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, "wb") as f:
+                  f.write(b)
+              return sha256_bytes(b)
+
+          def decode_text(body):
+              for enc in ("utf-8", "gb18030"):
+                  try:
+                      return body.decode(enc)
+                  except UnicodeDecodeError:
+                      pass
+              return body.decode("utf-8", errors="replace")
+
+          def fetch_bytes(url, params=None, headers=None, retries=3, timeout=30):
+              if params:
+                  url = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
+              h = {"User-Agent": UA}
+              if headers:
+                  h.update(headers)
+              last = None
+              for attempt in range(1, retries + 1):
+                  body = b""
+                  try:
+                      req = urllib.request.Request(url, headers=h)
+                      with urllib.request.urlopen(req, timeout=timeout) as resp:
+                          body = resp.read()
+                          time.sleep(0.12)
+                          return {
+                              "ok": True, "status": int(resp.status), "url": url,
+                              "content_type": resp.headers.get("Content-Type"),
+                              "attempt": attempt, "error": None,
+                          }, body
+                  except Exception as e:
+                      last = e
+                      try:
+                          body = e.read()
+                      except Exception:
+                          pass
+                      if attempt < retries:
+                          time.sleep(0.6 * attempt)
+              return {
+                  "ok": False, "status": getattr(last, "code", None), "url": url,
+                  "content_type": None, "attempt": retries,
+                  "error": f"{type(last).__name__}: {last}",
+              }, body
+
+          def fnum(v):
+              if v in (None, "", "--"):
+                  return None
+              try:
+                  return float(v)
+              except Exception:
+                  return None
+
+          def iso10(v):
+              s = str(v or "")[:10]
+              return s if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s) else None
+
+          def api_symbol(symbol):
+              code, market = symbol.split(".")
+              return ("sh" if market == "SH" else "sz") + code
+
+          def parse_profile(row):
+              profile = str(row.get("IMPL_PLAN_PROFILE") or "").replace(" ", "")
+              cash_m = re.search(r"派(?:现)?([0-9]+(?:\.[0-9]+)?)元", profile)
+              stock_m = re.search(r"送(?:红股)?([0-9]+(?:\.[0-9]+)?)(?:股)?", profile)
+              cap_m = re.search(r"转(?:增)?([0-9]+(?:\.[0-9]+)?)(?:股)?", profile)
+              rights_m = re.search(r"(?<!分)配([0-9]+(?:\.[0-9]+)?)(?:股)?", profile)
+              cash = float(cash_m.group(1)) / 10.0 if cash_m else 0.0
+              stock = float(stock_m.group(1)) / 10.0 if stock_m else 0.0
+              cap = float(cap_m.group(1)) / 10.0 if cap_m else 0.0
+              reasons = []
+              if rights_m:
+                  reasons.append("RIGHTS_TERMS_PRESENT_IN_PROFILE")
+              if "派" in profile and not cash_m:
+                  reasons.append("UNPARSED_CASH_TERM")
+              if "送" in profile and not stock_m:
+                  reasons.append("UNPARSED_STOCK_DIVIDEND_TERM")
+              if "转" in profile and not cap_m:
+                  reasons.append("UNPARSED_CAPITALIZATION_TERM")
+              if not (cash_m or stock_m or cap_m or rights_m):
+                  reasons.append("NO_SUPPORTED_TERMS_PARSED")
+
+              field_cash = fnum(row.get("PRETAX_BONUS_RMB"))
+              field_cap = fnum(row.get("IT_RATIO"))
+              field_total = fnum(row.get("BONUS_IT_RATIO"))
+              if field_cash is not None and cash_m and abs(field_cash / 10.0 - cash) > 1e-8:
+                  reasons.append("CASH_FIELD_PROFILE_MISMATCH")
+              if field_cap is not None:
+                  if cap_m and abs(field_cap / 10.0 - cap) > 1e-8:
+                      reasons.append("CAP_FIELD_PROFILE_MISMATCH")
+                  if not cap_m and abs(field_cap) > 1e-12:
+                      reasons.append("CAP_FIELD_WITHOUT_PROFILE_TERM")
+              if field_total is not None and abs(field_total / 10.0 - (stock + cap)) > 1e-8:
+                  reasons.append("BONUS_IT_TOTAL_PROFILE_MISMATCH")
+              return {
+                  "profile": profile,
+                  "cash_per_share_cny": cash,
+                  "stock_dividend_ratio": stock,
+                  "capitalization_ratio": cap,
+                  "rights_ratio": 0.0,
+                  "rights_price_cny": None,
+                  "parse_status": "PASS" if not reasons else "AMBIGUOUS",
+                  "parse_reasons": reasons,
+              }
+
+          def event_ratio(p_prev, event):
+              rights_ratio = float(event.get("rights_ratio") or 0.0)
+              rights_price = event.get("rights_price_cny")
+              if rights_ratio > 0 and rights_price is None:
+                  raise ValueError("rights_price_missing")
+              rights_term = 0.0 if rights_ratio == 0 else float(rights_price) * rights_ratio
+              shares = 1.0 + float(event["stock_dividend_ratio"]) + float(event["capitalization_ratio"]) + rights_ratio
+              ex_ref = (p_prev - float(event["cash_per_share_cny"]) + rights_term) / shares
+              if p_prev <= 0 or shares <= 0 or ex_ref <= 0:
+                  raise ValueError("invalid_event_formula_inputs")
+              return ex_ref / p_prev
+
+          def self_test():
+              x = parse_profile({
+                  "IMPL_PLAN_PROFILE": "10转4股派4.00元(含税,扣税后3.60元)",
+                  "PRETAX_BONUS_RMB": 4, "IT_RATIO": 4, "BONUS_IT_RATIO": 4,
+              })
+              assert x["parse_status"] == "PASS", x
+              assert abs(x["cash_per_share_cny"] - 0.4) < 1e-12
+              assert abs(x["stock_dividend_ratio"] - 0.0) < 1e-12
+              assert abs(x["capitalization_ratio"] - 0.4) < 1e-12
+              r = event_ratio(19.52, x)
+              assert abs(r - 0.699648711943794) < 1e-12, r
+              y = parse_profile({"IMPL_PLAN_PROFILE": "10送2股转增3股派1.50元", "PRETAX_BONUS_RMB": 1.5, "IT_RATIO": 3, "BONUS_IT_RATIO": 5})
+              assert y["parse_status"] == "PASS", y
+              assert (y["cash_per_share_cny"], y["stock_dividend_ratio"], y["capitalization_ratio"]) == (0.15, 0.2, 0.3)
+
+          def fetch_eastmoney_events(symbol):
+              code = symbol.split(".")[0]
+              all_rows = []
+              raw_parts = []
+              pages = 1
+              for page in range(1, pages + 1):
+                  params = {
+                      "reportName": "RPT_SHAREBONUS_DET", "columns": "ALL",
+                      "filter": f'(SECURITY_CODE="{code}")', "pageNumber": str(page),
+                      "pageSize": "200", "sortColumns": "EX_DIVIDEND_DATE", "sortTypes": "-1",
+                      "source": "WEB", "client": "WEB",
+                  }
+                  meta, body = fetch_bytes(
+                      "https://datacenter-web.eastmoney.com/api/data/v1/get", params,
+                      {"Referer": "https://data.eastmoney.com/"},
+                  )
+                  raw_parts.append(body)
+                  if not meta["ok"]:
+                      return meta, [], raw_parts
+                  try:
+                      d = json.loads(decode_text(body))
+                  except Exception as e:
+                      meta["ok"] = False
+                      meta["error"] = f"JSON_PARSE: {e}"
+                      return meta, [], raw_parts
+                  result = d.get("result") or {}
+                  rows = result.get("data") or []
+                  all_rows.extend(rows)
+                  if page == 1:
+                      try:
+                          pages = max(1, int(result.get("pages") or 1))
+                      except Exception:
+                          pages = 1
+                      if pages > 10:
+                          meta["ok"] = False
+                          meta["error"] = f"UNEXPECTED_PAGES:{pages}"
+                          return meta, [], raw_parts
+              return meta, all_rows, raw_parts
+
+          def normalize_events(symbol, rows):
+              events_by_key = {}
+              ambiguous = []
+              for row in rows:
+                  ex_date = iso10(row.get("EX_DIVIDEND_DATE"))
+                  if not ex_date or ex_date > FORMAL_END or ex_date <= WINDOW_START:
+                      continue
+                  parsed = parse_profile(row)
+                  raw_canon = json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+                  rec = {
+                      "symbol": symbol, "ex_date": ex_date,
+                      "cash_per_share_cny": parsed["cash_per_share_cny"],
+                      "stock_dividend_ratio": parsed["stock_dividend_ratio"],
+                      "capitalization_ratio": parsed["capitalization_ratio"],
+                      "rights_ratio": parsed["rights_ratio"],
+                      "rights_price_cny": parsed["rights_price_cny"],
+                      "profile": parsed["profile"],
+                      "parse_status": parsed["parse_status"],
+                      "parse_reasons": "|".join(parsed["parse_reasons"]),
+                      "source_name": "EASTMONEY_RPT_SHAREBONUS_DET",
+                      "source_record_id": f"{symbol}|{ex_date}|{row.get('PLAN_NOTICE_DATE') or row.get('NOTICE_DATE') or ''}|{parsed['profile']}",
+                      "source_payload_hash": sha256_bytes(raw_canon),
+                  }
+                  key = (ex_date, parsed["profile"])
+                  events_by_key[key] = rec
+                  if rec["parse_status"] != "PASS":
+                      ambiguous.append(rec)
+              by_date = defaultdict(list)
+              for rec in events_by_key.values():
+                  by_date[rec["ex_date"]].append(rec)
+              combined = []
+              for ex_date, group in sorted(by_date.items()):
+                  if any(x["parse_status"] != "PASS" for x in group):
+                      continue
+                  combined.append({
+                      "symbol": symbol, "ex_date": ex_date,
+                      "cash_per_share_cny": sum(x["cash_per_share_cny"] for x in group),
+                      "stock_dividend_ratio": sum(x["stock_dividend_ratio"] for x in group),
+                      "capitalization_ratio": sum(x["capitalization_ratio"] for x in group),
+                      "rights_ratio": 0.0, "rights_price_cny": None,
+                      "profile": " || ".join(x["profile"] for x in group),
+                      "parse_status": "PASS", "parse_reasons": "",
+                      "source_name": "EASTMONEY_RPT_SHAREBONUS_DET",
+                      "source_record_id": " || ".join(x["source_record_id"] for x in group),
+                      "source_payload_hash": sha256_bytes("|".join(sorted(x["source_payload_hash"] for x in group)).encode()),
+                  })
+              return combined, ambiguous
+
+          def fetch_sina_raw(symbol):
+              s = api_symbol(symbol)
+              meta, body = fetch_bytes(
+                  "https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData",
+                  {"symbol": s, "scale": "240", "ma": "no", "datalen": "2000"},
+                  {"Referer": "https://finance.sina.com.cn/"},
+              )
+              if not meta["ok"]:
+                  return meta, [], body
+              try:
+                  text = decode_text(body).strip()
+                  if text.startswith("var") and "=" in text:
+                      text = text.split("=", 1)[1].rstrip(";\n ")
+                  data = json.loads(text)
+                  rows = []
+                  for r in data if isinstance(data, list) else []:
+                      d = iso10(r.get("day"))
+                      try:
+                          row = {
+                              "date": d, "open": float(r["open"]), "high": float(r["high"]),
+                              "low": float(r["low"]), "close": float(r["close"]), "volume": float(r.get("volume") or 0),
+                          }
+                      except Exception:
+                          continue
+                      if d and row["close"] > 0:
+                          rows.append(row)
+                  rows.sort(key=lambda x: x["date"])
+                  return meta, rows, body
+              except Exception as e:
+                  meta["ok"] = False
+                  meta["error"] = f"RAW_PARSE:{e}"
+                  return meta, [], body
+
+          def fetch_sina_factors(symbol):
+              s = api_symbol(symbol)
+              meta, body = fetch_bytes(
+                  f"https://finance.sina.com.cn/realstock/company/{s}/qfq.js",
+                  headers={"Referer": "https://finance.sina.com.cn/"},
+              )
+              if not meta["ok"]:
+                  return meta, [], body
+              try:
+                  text = decode_text(body)
+                  brace = text.find("{")
+                  payload, _ = json.JSONDecoder().raw_decode(text[brace:])
+                  factors = []
+                  for r in payload.get("data") or []:
+                      d = iso10(r.get("d") if isinstance(r, dict) else r[0])
+                      v = fnum(r.get("f") if isinstance(r, dict) else r[1])
+                      if d and v and v > 0:
+                          factors.append((d, v))
+                  factors.sort()
+                  return meta, factors, body
+              except Exception as e:
+                  meta["ok"] = False
+                  meta["error"] = f"QFQ_PARSE:{e}"
+                  return meta, [], body
+
+          def factor_for_date(factors, target):
+              out = None
+              for d, v in factors:
+                  if d <= target:
+                      out = v
+                  else:
+                      break
+              if out is None:
+                  raise ValueError(f"no_factor_covering:{target}")
+              return out
+
+          def p99(values):
+              vals = sorted(v for v in values if math.isfinite(v))
+              if not vals:
+                  return None
+              idx = max(0, min(len(vals) - 1, math.ceil(0.99 * len(vals)) - 1))
+              return vals[idx]
+
+          self_test()
+          normalized_events_all = []
+          result_rows = []
+          source_audit = []
+
+          for idx, symbol in enumerate(SAMPLE50, 1):
+              print(f"[{idx:02d}/50] {symbol}", flush=True)
+              em_meta, em_rows, em_raw_parts = fetch_eastmoney_events(symbol)
+              for j, body in enumerate(em_raw_parts, 1):
+                  save_bytes(os.path.join(RAW_DIR, f"{symbol.replace('.', '_')}_eastmoney_sharebonus_p{j}.json"), body)
+              events, ambiguous = normalize_events(symbol, em_rows) if em_meta["ok"] else ([], [])
+
+              raw_meta, raw_rows, raw_body = fetch_sina_raw(symbol)
+              save_bytes(os.path.join(RAW_DIR, f"{symbol.replace('.', '_')}_sina_raw.json"), raw_body)
+              qfq_meta, sina_factors, qfq_body = fetch_sina_factors(symbol)
+              save_bytes(os.path.join(RAW_DIR, f"{symbol.replace('.', '_')}_sina_qfq.js"), qfq_body)
+
+              row = {
+                  "sample_order": idx, "symbol": symbol,
+                  "eastmoney_ok": em_meta["ok"], "eastmoney_error": em_meta.get("error"),
+                  "eastmoney_rows_all_history": len(em_rows), "events_in_window": len(events),
+                  "ambiguous_events": len(ambiguous),
+                  "sina_raw_ok": raw_meta["ok"], "sina_raw_error": raw_meta.get("error"),
+                  "sina_raw_rows": len(raw_rows),
+                  "sina_qfq_ok": qfq_meta["ok"], "sina_qfq_error": qfq_meta.get("error"),
+                  "sina_qfq_rows": len(sina_factors),
+                  "anchor_date": None, "anchor_divisor": None,
+                  "derived_events": 0, "missing_prev_events": 0,
+                  "sina_transition_count": 0, "unexplained_sina_dates": "",
+                  "unmatched_event_dates": "", "p99_factor_diff_bp": None, "max_factor_diff_bp": None,
+                  "status": None,
+              }
+
+              source_audit.append({
+                  "symbol": symbol,
+                  "eastmoney": em_meta, "sina_raw": raw_meta, "sina_qfq": qfq_meta,
+                  "eastmoney_raw_pages": [sha256_bytes(x) for x in em_raw_parts],
+                  "sina_raw_sha256": sha256_bytes(raw_body), "sina_qfq_sha256": sha256_bytes(qfq_body),
+              })
+              normalized_events_all.extend(events)
+              normalized_events_all.extend(ambiguous)
+
+              if not (em_meta["ok"] and raw_meta["ok"] and qfq_meta["ok"]):
+                  row["status"] = "SOURCE_BLOCKED"
+                  result_rows.append(row)
+                  continue
+              if ambiguous:
+                  row["status"] = "AMBIGUOUS_EVENT_TERMS"
+                  result_rows.append(row)
+                  continue
+
+              actual_rows = [r for r in raw_rows if r["date"] <= FORMAL_END and r["volume"] > 0]
+              if not actual_rows:
+                  row["status"] = "RAW_NO_ACTUAL_ROWS"
+                  result_rows.append(row)
+                  continue
+              anchor = actual_rows[-1]["date"]
+              row["anchor_date"] = anchor
+              try:
+                  anchor_div = factor_for_date(sina_factors, anchor)
+              except Exception:
+                  row["status"] = "SINA_FACTOR_ANCHOR_MISSING"
+                  result_rows.append(row)
+                  continue
+              row["anchor_divisor"] = anchor_div
+
+              dates = [r["date"] for r in actual_rows]
+              derived = []
+              missing_prev = 0
+              for ev in events:
+                  if ev["ex_date"] > anchor:
+                      continue
+                  pos = bisect_left(dates, ev["ex_date"]) - 1
+                  while pos >= 0 and actual_rows[pos]["volume"] <= 0:
+                      pos -= 1
+                  if pos < 0:
+                      missing_prev += 1
+                      continue
+                  pprev = actual_rows[pos]["close"]
+                  try:
+                      ratio = event_ratio(pprev, ev)
+                  except Exception:
+                      missing_prev += 1
+                      continue
+                  z = dict(ev)
+                  z["p_prev_date"] = actual_rows[pos]["date"]
+                  z["p_prev_close"] = pprev
+                  z["event_ratio"] = ratio
+                  derived.append(z)
+              row["derived_events"] = len(derived)
+              row["missing_prev_events"] = missing_prev
+              if missing_prev:
+                  row["status"] = "RAW_PREV_MISSING"
+                  result_rows.append(row)
+                  continue
+
+              raw_window = [r for r in actual_rows if r["date"] >= WINDOW_START]
+              diffs = []
+              for r in raw_window:
+                  candidate = 1.0
+                  for ev in derived:
+                      if r["date"] < ev["ex_date"] <= anchor:
+                          candidate *= ev["event_ratio"]
+                  try:
+                      sina_norm = anchor_div / factor_for_date(sina_factors, r["date"])
+                  except Exception:
+                      continue
+                  diffs.append(abs(candidate / sina_norm - 1.0) * 10000.0)
+              row["p99_factor_diff_bp"] = p99(diffs)
+              row["max_factor_diff_bp"] = max(diffs) if diffs else None
+
+              sina_dates = {d for d, _ in sina_factors if WINDOW_START < d <= anchor}
+              event_dates = {e["ex_date"] for e in derived}
+              unexplained = sorted(sina_dates - event_dates)
+              unmatched = sorted(event_dates - sina_dates)
+              row["sina_transition_count"] = len(sina_dates)
+              row["unexplained_sina_dates"] = "|".join(unexplained)
+              row["unmatched_event_dates"] = "|".join(unmatched)
+
+              if row["max_factor_diff_bp"] is None:
+                  row["status"] = "NO_FACTOR_OVERLAP"
+              elif row["max_factor_diff_bp"] <= 5.0 and not unexplained and not unmatched:
+                  row["status"] = "FACTOR_PRECHECK_PASS" if derived else "NO_ACTION_FACTOR_CONSTANT_PRECHECK"
+              else:
+                  row["status"] = "RIGHTS_OR_UNSUPPORTED_EVENT_CHECK_REQUIRED"
+              result_rows.append(row)
+
+              for z in derived:
+                  for rec in normalized_events_all:
+                      if rec.get("symbol") == symbol and rec.get("ex_date") == z["ex_date"] and rec.get("parse_status") == "PASS":
+                          rec.setdefault("p_prev_date", z["p_prev_date"])
+                          rec.setdefault("p_prev_close", z["p_prev_close"])
+                          rec.setdefault("event_ratio", z["event_ratio"])
+
+          event_fields = [
+              "symbol","ex_date","cash_per_share_cny","stock_dividend_ratio","capitalization_ratio",
+              "rights_ratio","rights_price_cny","profile","parse_status","parse_reasons","source_name",
+              "source_record_id","source_payload_hash","p_prev_date","p_prev_close","event_ratio",
+          ]
+          with open(os.path.join(OUT, "SAMPLE50_NORMALIZED_EVENTS_STAGE1.csv"), "w", newline="", encoding="utf-8") as f:
+              w = csv.DictWriter(f, fieldnames=event_fields, extrasaction="ignore")
+              w.writeheader(); w.writerows(normalized_events_all)
+
+          result_fields = list(result_rows[0].keys())
+          with open(os.path.join(OUT, "SAMPLE50_FACTOR_PRECHECK_STAGE1.csv"), "w", newline="", encoding="utf-8") as f:
+              w = csv.DictWriter(f, fieldnames=result_fields)
+              w.writeheader(); w.writerows(result_rows)
+
+          counts = Counter(r["status"] for r in result_rows)
+          summary = {
+              "artifact": "SAMPLE50_FACTOR_PRECHECK_STAGE1",
+              "created_at_utc": datetime.now(timezone.utc).isoformat(),
+              "window": [WINDOW_START, FORMAL_END],
+              "sample_n": len(SAMPLE50),
+              "status_counts": dict(sorted(counts.items())),
+              "all_50_processed": len(result_rows) == 50,
+              "formal_oos_allowed": False,
+              "note": "Stage1 is diagnostic factor-transition precheck only; rights/allotment coverage and frozen Tencent adjusted return/shape validation remain required before Sample50 promotion.",
+          }
+          with open(os.path.join(OUT, "SAMPLE50_STAGE1_SUMMARY.json"), "w", encoding="utf-8") as f:
+              json.dump(summary, f, ensure_ascii=False, indent=2, sort_keys=True)
+          with open(os.path.join(OUT, "SAMPLE50_SOURCE_AUDIT_STAGE1.json"), "w", encoding="utf-8") as f:
+              json.dump(source_audit, f, ensure_ascii=False, indent=2, sort_keys=True)
+          print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload Sample50 stage1 artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample50-factor-precheck-stage1
+          path: artifact/
+          if-no-files-found: error
