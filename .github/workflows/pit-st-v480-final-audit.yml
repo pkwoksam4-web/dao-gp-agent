@@ -1,0 +1,110 @@
+name: GP PIT-ST final audit V480
+
+on:
+  push:
+    branches:
+      - gp/pit-st-v480-final-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  final-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_pit_st_final_audit_v480.py
+
+      - name: Restore frozen V3.57 official calendar
+        shell: bash
+        run: |
+          mkdir -p input
+          base64 -d data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64 > input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz
+          gzip -dc input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz > input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv
+          echo 'b4bca0f3e55b8e2f16a77415cb69295de73330c1565428dbe9fdfab39e7ad01d  input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv' | sha256sum -c -
+          python - <<'PY'
+          import csv
+          p='input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv'
+          with open(p, encoding='utf-8-sig', newline='') as f:
+              d=[r['trade_date'] for r in csv.DictReader(f)]
+          assert len(d)==1426, len(d)
+          assert len(set(d))==1426
+          assert d[0]=='2020-06-01'
+          assert d[-1]=='2026-04-17'
+          print('PASS frozen calendar: 1426 unique open dates')
+          PY
+
+      - name: Download V4.80 merged PIT-ST source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: input/merged
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 33971534669
+
+      - name: Run V4.80 final PIT-ST audit
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/pit_st_final_audit_v480.py \
+            --daily input/merged/PIT_ST_DAILY_MERGED_V480.csv \
+            --merged-audit input/merged/PIT_ST_AUDIT_MERGED_V480.json \
+            --calendar input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv \
+            --transition-evidence data/PIT_ST_TRANSITION_EVIDENCE_V480.json \
+            --out-dir out
+
+      - name: Verify V4.80 final fail-closed invariants
+        run: |
+          python - <<'PY'
+          import csv, json
+          c=json.load(open('out/FORMAL_GATE_CHECKPOINT_V480_FINAL.json', encoding='utf-8'))
+          l=json.load(open('out/PIT_ST_CALENDAR_LIFECYCLE_AUDIT_V480.json', encoding='utf-8'))
+          t=json.load(open('out/PIT_ST_TRANSITION_CROSSCHECK_V480.json', encoding='utf-8'))
+          assert c['pit_st']['status']=='CLOSED_V480', c['pit_st']
+          assert c['pit_st']['gate_closed'] is True
+          assert c['formal_ready'] is False
+          assert c['oos_metrics_allowed'] is False
+          assert c['adjustment_provenance']['global_847']=='OPEN'
+          assert c['pit_st']['calendar_lifecycle']=='PASS_847_OF_847'
+          assert c['pit_st']['transition_crosscheck']=='PASS_6_OF_6'
+          assert c['pit_st']['formal_overlay_rows']==1021953
+          assert l['lifecycle_pass_n']==847
+          assert l['missing_required_dates_total']==0
+          assert l['duplicate_daily_keys']==0
+          assert l['invalid_daily_rows']==0
+          assert l['outside_calendar_rows']==0
+          assert t['matched_n']==6 and t['evidence_n']==6 and t['all_pass'] is True
+          with open('out/PIT_ST_FORMAL_OVERLAY_V480.csv', encoding='utf-8', newline='') as f:
+              n=sum(1 for _ in f)-1
+          assert n==1021953, n
+          print('PASS V4.80 final: PIT-ST closed; Formal OOS remains OFF')
+          PY
+
+      - name: Copy provenance inputs
+        run: |
+          cp data/PIT_ST_TRANSITION_EVIDENCE_V480.json out/
+          cp input/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv out/
+          printf '%s\n' 'b4bca0f3e55b8e2f16a77415cb69295de73330c1565428dbe9fdfab39e7ad01d  OFFICIAL_A_SHARE_OPEN_DATES_V357.csv' > out/FROZEN_CALENDAR_SHA256.txt
+
+      - name: Upload V4.80 final audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: out/
+          if-no-files-found: warn
+          retention-days: 30
