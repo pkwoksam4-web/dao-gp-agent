@@ -1,0 +1,53 @@
+name: GP Sample50 official exact factor crosscheck V479
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/sample50_probe.py'
+      - 'scripts/sample50_validate.py'
+      - 'scripts/run_sample50_nominal.py'
+      - 'scripts/sample50_official_refinements.py'
+      - 'scripts/run_sample50_exact_from_nominal.py'
+      - 'scripts/test_sample50_exact.py'
+      - '.github/workflows/sample50-exact-crosscheck-v479.yml'
+  pull_request:
+    paths:
+      - 'scripts/sample50_probe.py'
+      - 'scripts/sample50_validate.py'
+      - 'scripts/run_sample50_nominal.py'
+      - 'scripts/sample50_official_refinements.py'
+      - 'scripts/run_sample50_exact_from_nominal.py'
+      - 'scripts/test_sample50_exact.py'
+      - '.github/workflows/sample50-exact-crosscheck-v479.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sample50-exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit-test official refinement overlay
+        run: python scripts/test_sample50_exact.py
+
+      - name: Materialize frozen V3.67 Sample50 nominal sources
+        env:
+          SAMPLE50_OUT: artifact_sample50
+        run: python scripts/run_sample50_nominal.py
+
+      - name: Run official refined factor crosscheck
+        env:
+          SAMPLE50_OUT: artifact_sample50
+        run: python scripts/run_sample50_exact_from_nominal.py
+
+      - name: Upload V4.79 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sample50-official-exact-v479
+          path: artifact_sample50/
+          if-no-files-found: error
