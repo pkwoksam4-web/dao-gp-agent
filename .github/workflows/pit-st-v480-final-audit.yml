@@ -33,11 +33,14 @@ jobs:
         run: |
           mkdir -p input
           python - <<'PY'
-          import base64, csv, gzip, hashlib, pathlib
-          src=pathlib.Path('data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64').read_text(encoding='utf-8')
-          # Ignore transport whitespace/non-base64 formatting only; exact raw-byte SHA below remains authoritative.
-          clean=''.join(c for c in src if c.isalnum() or c in '+/=')
-          raw=gzip.decompress(base64.b64decode(clean, validate=True))
+          import csv, gzip, hashlib, pathlib
+          hex_text=''.join(pathlib.Path('data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex').read_text(encoding='ascii').split())
+          assert len(hex_text)==6522, len(hex_text)
+          gz=bytes.fromhex(hex_text)
+          expected_gz='5f80b13b6753ae4c9a5052d95060e17df10e06b7b9ca2c256c26eebd40845bca'
+          actual_gz=hashlib.sha256(gz).hexdigest()
+          assert actual_gz==expected_gz, (actual_gz, expected_gz)
+          raw=gzip.decompress(gz)
           expected='b4bca0f3e55b8e2f16a77415cb69295de73330c1565428dbe9fdfab39e7ad01d'
           actual=hashlib.sha256(raw).hexdigest()
           assert actual==expected, (actual, expected)
@@ -49,7 +52,7 @@ jobs:
           assert len(set(d))==1426
           assert d[0]=='2020-06-01'
           assert d[-1]=='2026-04-17'
-          print('PASS frozen calendar: sha256 exact; 1426 unique open dates')
+          print('PASS frozen calendar: gzip sha256 exact; raw sha256 exact; 1426 unique open dates')
           PY
 
       - name: Download V4.80 merged PIT-ST source artifact
@@ -75,7 +78,7 @@ jobs:
       - name: Verify V4.80 final fail-closed invariants
         run: |
           python - <<'PY'
-          import csv, json
+          import json
           c=json.load(open('out/FORMAL_GATE_CHECKPOINT_V480_FINAL.json', encoding='utf-8'))
           l=json.load(open('out/PIT_ST_CALENDAR_LIFECYCLE_AUDIT_V480.json', encoding='utf-8'))
           t=json.load(open('out/PIT_ST_TRANSITION_CROSSCHECK_V480.json', encoding='utf-8'))
