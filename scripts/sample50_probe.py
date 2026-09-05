@@ -54,3 +54,18 @@ def eastmoney_kline_url(symbol: str) -> str:
         'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
     }
     return 'https://push2his.eastmoney.com/api/qt/stock/kline/get?' + urlencode(params)
+
+
+def sohu_history_url(symbol: str) -> str:
+    code = pure_code(symbol)
+    params = {
+        'code': f'cn_{code}',
+        'start': FORMAL_BEG,
+        'end': FORMAL_END,
+        'stat': 1,
+        'order': 'D',
+        'period': 'd',
+        'callback': 'historySearchHandler',
+        'rt': 'jsonp',
+    }
+    return 'https://q.stock.sohu.com/hisHq?' + urlencode(params)
