@@ -2,7 +2,7 @@ from __future__ import annotations
 import hashlib, json, os, pathlib, time
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
-from sample50_probe import sina_symbol, report_url, eastmoney_kline_url
+from sample50_probe import sina_symbol, report_url, eastmoney_kline_url, sohu_history_url
 
 OUT = pathlib.Path(os.environ.get('PROBE_OUT','artifact'))
 OUT.mkdir(parents=True, exist_ok=True)
@@ -42,6 +42,8 @@ sources=[
     ('eastmoney_sharebonus.json', report_url(SYMBOL,'RPT_SHAREBONUS_DET'), 'https://data.eastmoney.com/'),
     ('eastmoney_rights.json', report_url(SYMBOL,'RPT_IPO_ALLOTMENT'), 'https://data.eastmoney.com/'),
     ('eastmoney_raw_kline.json', eastmoney_kline_url(SYMBOL), 'https://quote.eastmoney.com/'),
+    ('sohu_raw_history.js', sohu_history_url(SYMBOL), 'https://q.stock.sohu.com/'),
+    ('eastmoney_rights_control_600030.json', report_url('600030.SH','RPT_IPO_ALLOTMENT'), 'https://data.eastmoney.com/'),
     ('sina_qfq.js', f'https://finance.sina.com.cn/realstock/company/{sina_symbol(SYMBOL)}/qfq.js', 'https://finance.sina.com.cn/'),
 ]
 manifest={'symbol':SYMBOL,'generated_at_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),'sources':[]}
