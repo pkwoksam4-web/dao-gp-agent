@@ -1,0 +1,12 @@
+{
+  "artifact": "PIT_ST_TRANSITION_EVIDENCE_V480",
+  "method": "Independent company disclosures on CNINFO; exact effective date and direction must match BaoStock observed transition.",
+  "evidence": [
+    {"symbol":"000007.SZ","effective_date":"2023-05-05","from_isST":"0","to_isST":"1","source_url":"https://static.cninfo.com.cn/finalpage/2024-07-01/1220502482.PDF","source_note":"2024 withdrawal announcement recounts that stock was put under delisting-risk warning from 2023-05-05."},
+    {"symbol":"000007.SZ","effective_date":"2024-07-02","from_isST":"1","to_isST":"0","source_url":"https://static.cninfo.com.cn/finalpage/2024-07-01/1220502482.PDF","source_note":"Announcement states withdrawal of delisting-risk warning effective 2024-07-02."},
+    {"symbol":"000692.SZ","effective_date":"2023-04-26","from_isST":"0","to_isST":"1","source_url":"https://static.cninfo.com.cn/finalpage/2023-12-20/1218666931.PDF","source_note":"Company disclosure states stock was put under delisting-risk warning on 2023-04-26."},
+    {"symbol":"000692.SZ","effective_date":"2024-05-29","from_isST":"1","to_isST":"0","source_url":"https://static.cninfo.com.cn/finalpage/2024-08-28/1221008105.PDF","source_note":"2024 half-year report states withdrawal of delisting-risk warning from market open 2024-05-29."},
+    {"symbol":"002141.SZ","effective_date":"2024-04-29","from_isST":"0","to_isST":"1","source_url":"https://static.cninfo.com.cn/finalpage/2025-06-27/1224000301.PDF","source_note":"2025 withdrawal announcement recounts implementation of delisting-risk and other risk warnings from 2024-04-29."},
+    {"symbol":"002141.SZ","effective_date":"2025-06-30","from_isST":"1","to_isST":"0","source_url":"https://static.cninfo.com.cn/finalpage/2025-06-27/1224000301.PDF","source_note":"Announcement states withdrawal of both warnings effective 2025-06-30."}
+  ]
+}
