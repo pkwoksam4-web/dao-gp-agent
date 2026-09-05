@@ -1,0 +1,176 @@
+name: Sample50 raw evidence collector
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [sample50-probe]
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Collect frozen Sample50 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          python - <<'PY'
+          import hashlib, json, pathlib, time, traceback, urllib.parse, urllib.request
+          from datetime import datetime, timezone
+
+          OUT = pathlib.Path('artifact')
+          FORMAL_BEG = '20200601'
+          FORMAL_END = '20260417'
+          FROZEN_SAMPLE_CSV_SHA256 = '4250ffe0ba973b3111a56e611a053c277e44ceb36015479f0e1a99e2390e8982'
+          SYMBOLS = [
+              '600737.SH','002646.SZ','300465.SZ','002003.SZ','688200.SH','688125.SH','601162.SH','605068.SH','300152.SZ','002236.SZ',
+              '300827.SZ','600232.SH','300633.SZ','002318.SZ','600249.SH','300561.SZ','300246.SZ','603323.SH','300687.SZ','600386.SH',
+              '300775.SZ','002016.SZ','002627.SZ','600629.SH','002938.SZ','603583.SH','603901.SH','002662.SZ','600594.SH','300434.SZ',
+              '601225.SH','600592.SH','603170.SH','002001.SZ','300565.SZ','002693.SZ','600131.SH','300864.SZ','603123.SH','002230.SZ',
+              '002069.SZ','688277.SH','301327.SZ','002158.SZ','688455.SH','002658.SZ','601890.SH','605365.SH','600641.SH','600377.SH'
+          ]
+          UA = 'Mozilla/5.0'
+
+          def sha(b): return hashlib.sha256(b).hexdigest()
+          def write_bytes(path, b):
+              path.parent.mkdir(parents=True, exist_ok=True)
+              path.write_bytes(b)
+
+          def request_bytes(url, referer, retries=3):
+              last = None
+              for attempt in range(1, retries + 1):
+                  try:
+                      req = urllib.request.Request(url, headers={'User-Agent': UA, 'Referer': referer})
+                      with urllib.request.urlopen(req, timeout=25) as r:
+                          b = r.read()
+                          return {'ok': True, 'http_status': r.status, 'content_type': r.headers.get('Content-Type'), 'body': b, 'attempt': attempt}
+                  except Exception as e:
+                      last = {'ok': False, 'error_type': type(e).__name__, 'error': str(e), 'traceback': traceback.format_exc(), 'attempt': attempt, 'body': b''}
+                      time.sleep(0.5 * attempt)
+              return last
+
+          def em_datacenter(report, code, sort_col):
+              params = {
+                  'reportName': report, 'columns': 'ALL', 'filter': f'(SECURITY_CODE="{code}")',
+                  'pageNumber': '1', 'pageSize': '500', 'sortColumns': sort_col, 'sortTypes': '-1',
+                  'source': 'WEB', 'client': 'WEB'
+              }
+              return 'https://datacenter-web.eastmoney.com/api/data/v1/get?' + urllib.parse.urlencode(params)
+
+          def secid(symbol):
+              code, exch = symbol.split('.')
+              return ('1.' if exch == 'SH' else '0.') + code
+
+          def sina_symbol(symbol):
+              code, exch = symbol.split('.')
+              return ('sh' if exch == 'SH' else 'sz') + code
+
+          def inspect_json(body):
+              try:
+                  d = json.loads(body.decode('utf-8-sig'))
+                  result = d.get('result') if isinstance(d, dict) else None
+                  rows = result.get('data') if isinstance(result, dict) else None
+                  return {
+                      'json_ok': True,
+                      'success_field': d.get('success') if isinstance(d, dict) else None,
+                      'message': d.get('message') if isinstance(d, dict) else None,
+                      'row_count': len(rows) if isinstance(rows, list) else 0,
+                      'result_is_none': result is None,
+                      'row_keys': sorted({k for row in (rows or []) if isinstance(row, dict) for k in row}),
+                  }
+              except Exception as e:
+                  return {'json_ok': False, 'json_error': str(e)}
+
+          def inspect_kline(body):
+              try:
+                  d = json.loads(body.decode('utf-8-sig'))
+                  data = d.get('data') if isinstance(d, dict) else None
+                  kl = data.get('klines') if isinstance(data, dict) else None
+                  return {'json_ok': True, 'kline_count': len(kl) if isinstance(kl, list) else 0, 'code': data.get('code') if isinstance(data, dict) else None}
+              except Exception as e:
+                  return {'json_ok': False, 'json_error': str(e)}
+
+          def inspect_sina(body):
+              try:
+                  text = body.decode('utf-8-sig')
+                  start, end = text.find('{'), text.rfind('}')
+                  if start < 0 or end <= start:
+                      return {'parse_ok': False, 'error': 'no JSON object'}
+                  d = json.loads(text[start:end+1])
+                  rows = d.get('data') if isinstance(d, dict) else None
+                  return {'parse_ok': True, 'row_count': len(rows) if isinstance(rows, list) else 0, 'prefix': text[:80]}
+              except Exception as e:
+                  return {'parse_ok': False, 'error': str(e)}
+
+          manifest = {
+              'artifact': 'SAMPLE50_RAW_EVIDENCE_V1',
+              'created_at_utc': datetime.now(timezone.utc).isoformat(),
+              'formal_window': ['2020-06-01','2026-04-17'],
+              'frozen_sample_source': 'QFQ_FINAL_SAMPLE50_V367.csv',
+              'frozen_sample_csv_sha256': FROZEN_SAMPLE_CSV_SHA256,
+              'sample_n': len(SYMBOLS),
+              'symbols': [],
+              'locked_rules': ['NO_FORWARD_FILL','NO_FORMAL_OOS','EMPTY_SOURCE_RESPONSE_IS_NOT_PROVEN_NO_ACTION']
+          }
+
+          for idx, symbol in enumerate(SYMBOLS, 1):
+              code = symbol.split('.')[0]
+              ddir = OUT / symbol
+              rec = {'sample_order': idx, 'symbol': symbol, 'endpoints': {}}
+
+              endpoints = [
+                  ('sharebonus', em_datacenter('RPT_SHAREBONUS_DET', code, 'EX_DIVIDEND_DATE'), 'https://data.eastmoney.com/yjfp/'),
+                  ('rights', em_datacenter('RPT_IPO_ALLOTMENT', code, 'EQUITY_RECORD_DATE'), 'https://data.eastmoney.com/xg/pg/'),
+                  ('raw_kline', 'https://push2his.eastmoney.com/api/qt/stock/kline/get?' + urllib.parse.urlencode({
+                      'secid': secid(symbol), 'klt': '101', 'fqt': '0', 'beg': FORMAL_BEG, 'end': FORMAL_END, 'lmt': '5000',
+                      'fields1': 'f1,f2,f3,f4,f5,f6', 'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61'
+                  }), 'https://quote.eastmoney.com/'),
+                  ('sina_qfq', f'https://finance.sina.com.cn/realstock/company/{sina_symbol(symbol)}/qfq.js', 'https://finance.sina.com.cn/'),
+              ]
+
+              for name, url, ref in endpoints:
+                  got = request_bytes(url, ref)
+                  body = got.pop('body', b'')
+                  ext = 'js' if name == 'sina_qfq' else 'json'
+                  write_bytes(ddir / f'{name}.{ext}', body)
+                  info = dict(got)
+                  info.update({'bytes': len(body), 'sha256': sha(body), 'url': url})
+                  if name in ('sharebonus','rights'):
+                      info.update(inspect_json(body))
+                  elif name == 'raw_kline':
+                      info.update(inspect_kline(body))
+                  else:
+                      info.update(inspect_sina(body))
+                  rec['endpoints'][name] = info
+                  time.sleep(0.12)
+
+              manifest['symbols'].append(rec)
+              print(f'[{idx:02d}/50] {symbol}', flush=True)
+
+          counts = {}
+          for ep in ('sharebonus','rights','raw_kline','sina_qfq'):
+              rs = [x['endpoints'][ep] for x in manifest['symbols']]
+              counts[ep] = {
+                  'transport_ok': sum(1 for r in rs if r.get('ok')),
+                  'http_200': sum(1 for r in rs if r.get('http_status') == 200),
+              }
+              if ep == 'raw_kline': counts[ep]['nonempty'] = sum(1 for r in rs if r.get('kline_count',0) > 0)
+              elif ep == 'sina_qfq': counts[ep]['parsed_nonempty'] = sum(1 for r in rs if r.get('parse_ok') and r.get('row_count',0) > 0)
+              else: counts[ep]['nonempty_rows'] = sum(1 for r in rs if r.get('row_count',0) > 0)
+          manifest['summary'] = counts
+          (OUT / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+          print(json.dumps(counts, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload Sample50 raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample50-raw-evidence
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 90
