@@ -1,0 +1,11 @@
+{
+  "artifact": "PIT_ST_SCOPE_V480",
+  "source_manifest": "UNIFIED_PRICE_REMEDIATION_MANIFEST_V371.csv",
+  "source_manifest_sha256": "176720e2599807eab8c77f75876b1b0292681eb6887463bbb6a49dae77c7fab3",
+  "source_manifest_rows": 847,
+  "source_manifest_unique_symbols": 847,
+  "scope_file": "data/pit_st_scope_v480.txt",
+  "preflight_delisted_symbols": ["002359.SZ", "600634.SH"],
+  "formal_window": ["2020-06-01", "2026-04-17"],
+  "rule": "UNKNOWN/FAILED never defaults to NOT_ST"
+}
