@@ -10,6 +10,13 @@ class ParseTests(unittest.TestCase):
         self.assertGreater(rows[0]['factor'], 0)
         self.assertEqual(len(rows), 2)
 
+    def test_parse_live_symbol_qfq_variable_name(self):
+        raw = b'var sz000001qfq={"total":2,"data":[{"d":"2026-06-12", "f":"1.0000000000000000"},{"d":"2025-10-15", "f":"1.0329067641682000"}]};'
+        rows = parse_sina_qfq_js(raw)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['date'], '2026-06-12')
+        self.assertAlmostEqual(rows[1]['factor'], 1.0329067641682)
+
     def test_empty_data_is_not_factor_one(self):
         raw = b'var KKE_ShareHFq={total:0,data:[]};'
         rows = parse_sina_qfq_js(raw)
