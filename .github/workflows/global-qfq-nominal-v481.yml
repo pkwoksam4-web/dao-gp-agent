@@ -1,0 +1,24 @@
+name: GP Global QFQ nominal crosscheck V481
+
+on:
+  push:
+    branches:
+      - gp/global-qfq-nominal-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 nominal unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_global_qfq_nominal_v481.py
