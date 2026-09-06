@@ -21,3 +21,42 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_global_event_ledger_v481.py
+
+  materialize:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Materialize complete Formal-window event ledgers
+        env:
+          PYTHONPATH: scripts
+        run: python scripts/materialize_global_event_ledger_v481.py
+      - name: Verify fail-closed ledger invariants
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('artifact_global_event_ledger_v481/GLOBAL_EVENT_LEDGER_AUDIT_V481.json')
+          x=json.loads(p.read_text(encoding='utf-8'))
+          assert x['status']=='GLOBAL_EVENT_LEDGER_EXPLICIT_SUCCESS'
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False and x['oos_metrics_allowed'] is False
+          by={r['report']:r for r in x['reports']}
+          assert set(by)=={'RPT_IPO_ALLOTMENT','RPT_SHAREBONUS_DET'}
+          assert by['RPT_IPO_ALLOTMENT']['row_count']==30
+          assert by['RPT_SHAREBONUS_DET']['row_count']==22688
+          assert all(r['page_hash_recheck']=='PASS_BYTE_IDENTICAL_TWO_PASS' for r in x['reports'])
+          print('PASS V4.81 complete global event ledger invariants')
+          PY
+      - name: Upload V4.81 global event ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-global-event-ledger-v481
+          path: artifact_global_event_ledger_v481/
+          if-no-files-found: error
+          retention-days: 30
