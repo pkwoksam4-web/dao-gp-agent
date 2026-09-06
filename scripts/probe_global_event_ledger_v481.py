@@ -11,13 +11,15 @@ OUT = pathlib.Path('artifact_global_event_ledger_probe')
 OUT.mkdir(parents=True, exist_ok=True)
 UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/152 Safari/537.36'
 BASE = 'https://datacenter-web.eastmoney.com/api/data/v1/get'
+FORMAL_BEG = '2020-06-01'
+FORMAL_END = '2026-04-17'
 
 
 def sha256(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
 
-def url_for(report: str, page: int = 1) -> str:
+def url_for(report: str, page: int = 1, formal_filter: bool = False) -> str:
     params = {
         'reportName': report,
         'columns': 'ALL',
@@ -26,37 +28,34 @@ def url_for(report: str, page: int = 1) -> str:
         'source': 'WEB',
         'client': 'WEB',
         'sortTypes': -1,
+        'sortColumns': 'EX_DIVIDEND_DATE',
     }
     if report == 'RPT_IPO_ALLOTMENT':
-        params['sortColumns'] = 'EQUITY_RECORD_DATE'
         params['quoteColumns'] = 'f2~01~SECURITY_CODE~NEW_PRICE'
-    else:
-        params['sortColumns'] = 'EX_DIVIDEND_DATE'
+    if formal_filter:
+        params['filter'] = f"(EX_DIVIDEND_DATE>='{FORMAL_BEG}')(EX_DIVIDEND_DATE<='{FORMAL_END}')"
     return BASE + '?' + urlencode(params)
 
 
-def probe(report: str) -> dict:
-    url = url_for(report, 1)
+def probe(report: str, formal_filter: bool) -> dict:
+    label = 'formal_filtered' if formal_filter else 'unfiltered'
+    url = url_for(report, 1, formal_filter=formal_filter)
     req = Request(url, headers={'User-Agent': UA, 'Accept': '*/*', 'Referer': 'https://data.eastmoney.com/'})
     with urlopen(req, timeout=35) as r:
         body = r.read()
         status = getattr(r, 'status', 200)
         ctype = r.headers.get('Content-Type')
-    raw_name = report + '_page1.json'
+    raw_name = f'{report}_{label}_page1.json'
     (OUT / raw_name).write_bytes(body)
     obj = json.loads(body.decode('utf-8'))
     result = obj.get('result') or {}
     data = result.get('data') or []
     first = data[0] if data else {}
-    dates = []
-    for row in data:
-        for key in ('EX_DIVIDEND_DATE', 'EQUITY_RECORD_DATE', 'NOTICE_DATE', 'PLAN_NOTICE_DATE'):
-            v = row.get(key)
-            if v:
-                dates.append(str(v)[:10])
-                break
+    ex_dates = [str(row.get('EX_DIVIDEND_DATE'))[:10] for row in data if row.get('EX_DIVIDEND_DATE')]
+    out_of_formal = [d for d in ex_dates if not (FORMAL_BEG <= d <= FORMAL_END)] if formal_filter else []
     return {
         'report': report,
+        'mode': label,
         'url': url,
         'http_status': status,
         'content_type': ctype,
@@ -68,12 +67,12 @@ def probe(report: str) -> dict:
         'pages': result.get('pages'),
         'count': result.get('count'),
         'page_data_n': len(data),
-        'page_date_min': min(dates) if dates else None,
-        'page_date_max': max(dates) if dates else None,
+        'page_ex_date_min': min(ex_dates) if ex_dates else None,
+        'page_ex_date_max': max(ex_dates) if ex_dates else None,
+        'page_out_of_formal_n': len(out_of_formal),
         'sample_keys': sorted(first.keys()) if isinstance(first, dict) else [],
         'sample_security_code': first.get('SECURITY_CODE') if isinstance(first, dict) else None,
         'sample_ex_dividend_date': first.get('EX_DIVIDEND_DATE') if isinstance(first, dict) else None,
-        'sample_equity_record_date': first.get('EQUITY_RECORD_DATE') if isinstance(first, dict) else None,
         'raw_file': raw_name,
     }
 
@@ -81,14 +80,16 @@ def probe(report: str) -> dict:
 def main() -> None:
     rows = []
     for report in ('RPT_IPO_ALLOTMENT', 'RPT_SHAREBONUS_DET'):
-        try:
-            rows.append(probe(report))
-        except Exception as e:
-            rows.append({'report': report, 'error': f'{type(e).__name__}: {e}'})
+        for formal_filter in (False, True):
+            try:
+                rows.append(probe(report, formal_filter))
+            except Exception as e:
+                rows.append({'report': report, 'mode': 'formal_filtered' if formal_filter else 'unfiltered', 'error': f'{type(e).__name__}: {e}'})
     doc = {
         'artifact': 'GLOBAL_EVENT_LEDGER_PROBE_V481',
         'version': 'V4.81',
         'generated_at_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        'formal_window': [FORMAL_BEG, FORMAL_END],
         'purpose': 'Feasibility only. No Formal promotion and no review-status mutation.',
         'formal_promotion': False,
         'validated_global_provenance_emitted': False,
