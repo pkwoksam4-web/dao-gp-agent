@@ -1,0 +1,41 @@
+name: GP Global event ledger probe V481
+
+on:
+  push:
+    branches:
+      - gp/global-event-ledger-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Probe global EastMoney corporate-action ledgers
+        run: python scripts/probe_global_event_ledger_v481.py
+      - name: Verify probe remains non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_global_event_ledger_probe/GLOBAL_EVENT_LEDGER_PROBE_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert len(x['results'])==2
+          print('PASS non-Formal probe guard')
+          PY
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-global-event-ledger-probe-v481
+          path: artifact_global_event_ledger_probe/
+          if-no-files-found: error
+          retention-days: 30
