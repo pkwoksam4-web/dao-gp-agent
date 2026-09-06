@@ -25,9 +25,9 @@ def parse_sina_qfq_js(raw: bytes):
         text=raw.decode('utf-8-sig', errors='strict').strip()
     except UnicodeDecodeError as e:
         raise ValueError(f'non-utf8 Sina qfq.js: {e}') from e
-    if 'KKE_ShareHFq' not in text or 'data' not in text:
-        raise ValueError('not a Sina KKE_ShareHFq payload')
-    m=re.search(r'data\s*:\s*(\[.*?\])\s*[,}]', text, flags=re.S)
+    if not re.match(r'^var\s+(?:KKE_ShareHFq|(?:sz|sh)\d{6}qfq)\s*=', text, flags=re.I) or 'data' not in text:
+        raise ValueError('not a recognized Sina qfq payload')
+    m=re.search(r'["\']?data["\']?\s*:\s*(\[.*?\])\s*[,}]', text, flags=re.S)
     if not m:
         raise ValueError('missing data[] in Sina qfq.js')
     try:
