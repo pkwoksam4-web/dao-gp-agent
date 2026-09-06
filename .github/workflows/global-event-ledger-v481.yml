@@ -1,0 +1,23 @@
+name: GP Global event ledger V481
+
+on:
+  push:
+    branches:
+      - gp/global-event-ledger-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 global ledger unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_global_event_ledger_v481.py
