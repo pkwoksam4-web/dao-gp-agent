@@ -1,6 +1,10 @@
 import unittest
 
-from global_qfq_nominal_v481 import classify_nominal_symbol
+from global_qfq_nominal_v481 import (
+    classify_nominal_symbol,
+    eastmoney_report_coverage,
+    sina_formal_event_dates,
+)
 
 
 class NominalClassificationTests(unittest.TestCase):
@@ -80,6 +84,31 @@ class NominalClassificationTests(unittest.TestCase):
             sina_formal_event_n=1,
         )
         self.assertEqual(r, 'BLOCKED_EVENT_SOURCE')
+
+
+class CoverageParserTests(unittest.TestCase):
+    def test_eastmoney_code0_is_explicit_success_even_when_data_empty(self):
+        raw = b'{"success":true,"code":0,"result":{"pages":0,"data":[]}}'
+        self.assertEqual(eastmoney_report_coverage(raw), 'EXPLICIT_SUCCESS')
+
+    def test_eastmoney_9201_is_empty_unproven(self):
+        raw = b'{"success":false,"code":9201,"message":"no data"}'
+        self.assertEqual(eastmoney_report_coverage(raw), 'EMPTY_UNPROVEN')
+
+    def test_malformed_eastmoney_payload_is_failed(self):
+        self.assertEqual(eastmoney_report_coverage(b'<html>blocked</html>'), 'FAILED')
+
+    def test_sina_formal_event_dates_are_window_bounded(self):
+        rows = [
+            {'date':'2026-05-01','factor':1.0},
+            {'date':'2025-06-01','factor':1.1},
+            {'date':'2020-06-01','factor':1.2},
+            {'date':'2020-05-01','factor':1.3},
+        ]
+        self.assertEqual(
+            sina_formal_event_dates(rows, '2020-06-01', '2026-04-17'),
+            ['2025-06-01'],
+        )
 
 
 if __name__ == '__main__':
