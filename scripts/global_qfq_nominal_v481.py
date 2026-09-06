@@ -1,5 +1,28 @@
 from __future__ import annotations
 
+import json
+
+
+def eastmoney_report_coverage(raw: bytes) -> str:
+    try:
+        obj = json.loads(raw.decode('utf-8'))
+    except Exception:
+        return 'FAILED'
+    try:
+        code = int(obj.get('code', -1))
+    except Exception:
+        return 'FAILED'
+    if obj.get('success') is True and code == 0:
+        return 'EXPLICIT_SUCCESS'
+    if code == 9201:
+        return 'EMPTY_UNPROVEN'
+    return 'FAILED'
+
+
+def sina_formal_event_dates(rows, formal_beg: str, formal_end: str):
+    dates = sorted({str(r.get('date', ''))[:10] for r in (rows or []) if formal_beg < str(r.get('date', ''))[:10] <= formal_end})
+    return dates
+
 
 def classify_nominal_symbol(
     *,
