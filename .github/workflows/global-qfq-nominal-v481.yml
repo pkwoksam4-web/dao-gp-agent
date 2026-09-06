@@ -21,4 +21,4 @@ jobs:
       - name: V4.81 nominal unit tests
         run: |
           cd scripts
-          python -m unittest -v test_global_qfq_nominal_v481.py
+          python -m unittest -v test_global_qfq_nominal_v481.py test_global_qfq_nominal_merge_v481.py
