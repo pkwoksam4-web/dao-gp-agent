@@ -1,0 +1,80 @@
+name: GP V4.82 CNINFO Low-rate Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - '.github/workflows/cninfo-low-rate-probe-v482.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe three unresolved events sequentially
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib, time
+          from scripts.cninfo_exact_term_v481 import resolve_orgid, query_cninfo, event_query_window
+          from scripts.collect_cninfo_exact_term_indices_v481 import match_announcements_to_events
+
+          targets={
+            '000631.SZ':['2023-05-17','2024-07-05'],
+            '001230.SZ':['2024-06-06'],
+          }
+          out=pathlib.Path('artifact_cninfo_low_rate_probe_v482')
+          raw=out/'raw'; raw.mkdir(parents=True,exist_ok=True)
+          rows=[]
+          for symbol,dates in targets.items():
+            code=symbol.split('.')[0]
+            try:
+              org=resolve_orgid(code)
+              orgid=org['orgid']
+              b=org['raw']; fn=f'{code}_orgid.json'; (raw/fn).write_bytes(b)
+              orgmeta={'orgid':orgid,'http_status':org.get('http_status'),'attempts':org.get('attempts'),'raw_file':fn,'sha256':hashlib.sha256(b).hexdigest()}
+            except Exception as e:
+              err=f'{type(e).__name__}: {e}'
+              for d in dates: rows.append({'symbol':symbol,'ex_date':d,'org_lookup':None,'query':None,'match':None,'error':err})
+              continue
+            for d in dates:
+              start,end=event_query_window(d,45,2)
+              row={'symbol':symbol,'ex_date':d,'org_lookup':orgmeta,'query':None,'match':None,'error':None}
+              try:
+                q=query_cninfo(code,start,end,orgid=orgid,searchkey='实施公告',timeout=45,attempts=8)
+                b=q['raw']; fn=f'{code}_{d}_low_rate.json'; (raw/fn).write_bytes(b)
+                items=(q.get('json') or {}).get('announcements') or []
+                row['query']={'http_status':q.get('http_status'),'attempts':q.get('attempts'),'announcement_n':len(items),'date_window':q.get('date_window'),'raw_file':fn,'sha256':hashlib.sha256(b).hexdigest()}
+                row['match']=match_announcements_to_events([d],items,max_prior_days=45)[d]
+              except Exception as e:
+                row['error']=f'{type(e).__name__}: {e}'
+              rows.append(row)
+              time.sleep(2.0)
+          report={
+            'artifact':'CNINFO_LOW_RATE_PROBE_V482','target_event_n':3,
+            'matched_event_n':sum(r['match'] is not None for r in rows),
+            'query_error_event_n':sum(r['error'] is not None for r in rows),
+            'unmatched_no_error_event_n':sum(r['match'] is None and r['error'] is None for r in rows),
+            'records':rows,'formal_promotion':False,'validated_global_provenance_emitted':False,
+            'formal_ready':False,'oos_metrics_allowed':False,
+          }
+          (out/'CNINFO_LOW_RATE_PROBE_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps({k:report[k] for k in ('target_event_n','matched_event_n','query_error_event_n','unmatched_no_error_event_n')},ensure_ascii=False,indent=2))
+          for r in rows:
+            print(json.dumps({'symbol':r['symbol'],'ex_date':r['ex_date'],'error':r['error'],'announcement_n':(r['query'] or {}).get('announcement_n'),'match_title':(r['match'] or {}).get('announcementTitle')},ensure_ascii=False))
+          PY
+      - name: Upload low-rate probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-low-rate-probe-v482
+          path: artifact_cninfo_low_rate_probe_v482/
+          if-no-files-found: error
+          retention-days: 14
