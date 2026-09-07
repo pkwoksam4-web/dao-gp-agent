@@ -5,6 +5,7 @@ from cninfo_exact_term_v481 import (
     query_window,
     choose_orgid_record,
     stock_query_param,
+    column_for_code,
 )
 from collect_cninfo_exact_term_indices_v481 import (
     select_standard_exact_symbols,
@@ -42,6 +43,13 @@ class CninfoExactTermResolverTests(unittest.TestCase):
 
     def test_stock_query_param_uses_code_and_orgid(self):
         self.assertEqual(stock_query_param('001202','gfbj0839749'),'001202,gfbj0839749')
+
+    def test_market_column_routes_shanghai_and_shenzhen(self):
+        self.assertEqual(column_for_code('600306'),'sse')
+        self.assertEqual(column_for_code('688001'),'sse')
+        self.assertEqual(column_for_code('000631'),'szse')
+        self.assertEqual(column_for_code('001299'),'szse')
+        self.assertEqual(column_for_code('300001'),'szse')
 
 
 class ExactTermBulkScopeTests(unittest.TestCase):
