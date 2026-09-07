@@ -31,3 +31,120 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_sohu_full_panel_v482.py
+
+  materialize:
+    needs: tests
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install collector dependencies
+        run: pip install -q requests pandas pyarrow
+      - name: Download authoritative PIT-ST V4.80 panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Materialize shard ${{ matrix.shard }}
+        env:
+          PYTHONPATH: scripts
+        run: |
+          PITST="$(find pitst -name PIT_ST_DAILY_MERGED_V480.csv -type f | head -1)"
+          test -n "$PITST"
+          python scripts/sohu_full_panel_v482.py shard \
+            --pitst "$PITST" \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 8 \
+            --workers 2 \
+            --timeout 20 \
+            --out-dir artifact_sohu_full_raw_v482_shard_${{ matrix.shard }}
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-shard-${{ matrix.shard }}
+          path: artifact_sohu_full_raw_v482_shard_${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Fail closed if shard coverage is incomplete
+        run: |
+          python - <<'PY'
+          import glob,json
+          p=glob.glob('artifact_sohu_full_raw_v482_shard_*/SOHU_RAW_SHARD_*_AUDIT_V482.json')
+          assert len(p)==1,p
+          x=json.load(open(p[0],encoding='utf-8'))
+          assert x['error_n']==0,x['errors'][:20]
+          assert x['review_n']==0,[a for a in x['audits'] if a['status']!='PASS_EXACT_TRADE_DATES'][:20]
+          assert x['pass_n']==x['symbols_selected']
+          assert x['raw_rows']==x['expected_trade_rows']
+          print(json.dumps({k:x[k] for k in ('shard_index','symbols_selected','expected_trade_rows','raw_rows','pass_n','review_n','error_n')},indent=2))
+          PY
+
+  merge:
+    needs: materialize
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install merge dependencies
+        run: pip install -q pandas pyarrow requests
+      - name: Download all successful shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-sohu-full-raw-v482-shard-*
+          path: shards
+          merge-multiple: true
+      - name: Download authoritative PIT-ST V4.80 panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Merge and globally re-audit exact trade dates
+        env:
+          PYTHONPATH: scripts
+        run: |
+          PITST="$(find pitst -name PIT_ST_DAILY_MERGED_V480.csv -type f | head -1)"
+          python scripts/sohu_full_panel_v482.py merge \
+            --pitst "$PITST" \
+            --shards-dir shards \
+            --out-dir artifact_sohu_full_raw_v482
+      - name: Gate exact 847 full RAW panel
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_sohu_full_raw_v482/SOHU_RAW_FULL_AUDIT_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['status']=='PASS_FULL_RAW_V482',x
+          assert x['symbol_n']==847
+          assert x['raw_rows']==1011602
+          assert x['missing_trade_dates_n']==0
+          assert x['extra_trade_dates_n']==0
+          assert x['duplicate_symbol_dates']==0
+          assert x['bad_ohlc_rows']==0 and x['bad_volume_rows']==0 and x['bad_amount_rows']==0
+          assert x['shard_review_n']==0 and x['shard_error_n']==0
+          assert x['zero_trade_symbols']==['600074.SH','600485.SH','600677.SH'],x['zero_trade_symbols']
+          assert x['formal_admission'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload full V4.82 RAW panel
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482
+          path: artifact_sohu_full_raw_v482/
+          if-no-files-found: error
+          retention-days: 30
