@@ -54,6 +54,13 @@ def stock_query_param(code: str, orgid: str) -> str:
     return f'{code},{orgid}'
 
 
+def column_for_code(code: str) -> str:
+    code=str(code).strip()
+    if not re.fullmatch(r'\d{6}',code):
+        raise ValueError(f'invalid stock code: {code!r}')
+    return 'sse' if code[0] in {'5','6','9'} else 'szse'
+
+
 def _post(url: str, payload: dict, timeout: int=20, attempts: int=3) -> dict:
     body=urllib.parse.urlencode(payload).encode('utf-8')
     headers={
@@ -97,7 +104,7 @@ def query_cninfo(code: str, start_date: str, end_date: str, orgid: str | None=No
         org_meta=resolve_orgid(code)
         orgid=org_meta['orgid']
     payload={
-        'pageNum':'1','pageSize':'30','column':'szse','tabName':'fulltext',
+        'pageNum':'1','pageSize':'30','column':column_for_code(code),'tabName':'fulltext',
         'plate':'','stock':stock_query_param(code,orgid),'searchkey':'权益分派实施公告','secid':'',
         'category':'','trade':'','seDate':f'{start_date}~{end_date}',
         'sortName':'','sortType':'','isHLtitle':'true',
@@ -105,6 +112,7 @@ def query_cninfo(code: str, start_date: str, end_date: str, orgid: str | None=No
     res=_post(ENDPOINT,payload)
     res['orgid']=orgid
     res['org_lookup']=org_meta
+    res['column']=payload['column']
     return res
 
 
