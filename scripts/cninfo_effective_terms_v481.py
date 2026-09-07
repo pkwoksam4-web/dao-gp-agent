@@ -25,6 +25,10 @@ def _unique_value(candidates: list[tuple[float,str]], label: str) -> tuple[float
     return value,kinds[0],[{'value':v,'kind':k} for v,k in candidates]
 
 
+def _comma_int(s: str) -> int:
+    return int(str(s).replace(',',''))
+
+
 def extract_effective_terms(text: str) -> dict:
     s=_norm(text)
     cash=[]
@@ -75,6 +79,28 @@ def extract_effective_terms(text: str) -> dict:
         r'按A股除权前总股本[^。;；]{0,260}?每10股派息(?:[（(]含税[）)])?[:：]?'
         r'([0-9]+(?:\.[0-9]+)?)元',s):
         cash.append((float(m.group(1))/10.0,'EXPLICIT_A_SHARE_FOLDED_CASH_PER10_V482'))
+
+    # A/H-share issuers with repurchased A shares can keep the nominal per-share
+    # distribution unchanged for participating holders while the A-share ex-dividend
+    # price is calculated over all listed A shares. Derive the effective A-share cash
+    # only when one implementation announcement supplies all four guarded inputs:
+    # total company shares, participating A/H shares, and the nominal per-10 cash.
+    if 'A股权益分派实施公告' in s and '回购股份不参与本次权益分派' in s:
+        total_m=re.search(r'公司总股本未发生变化,?为([0-9][0-9,]*)股',s)
+        part_m=re.search(r'总股份数为([0-9][0-9,]*)股,?其中A股([0-9][0-9,]*)股、H股([0-9][0-9,]*)股',s)
+        cash_m=re.search(r'每10股派发现金红利(?:人民币)?([0-9]+(?:\.[0-9]+)?)元',s)
+        if total_m and part_m and cash_m:
+            total=_comma_int(total_m.group(1))
+            participating_total=_comma_int(part_m.group(1))
+            participating_a=_comma_int(part_m.group(2))
+            participating_h=_comma_int(part_m.group(3))
+            if participating_a+participating_h != participating_total:
+                raise ValueError('A/H participating-share partition mismatch')
+            all_a=total-participating_h
+            if not (0 < participating_a <= all_a <= total):
+                raise ValueError('invalid A-share fold denominator')
+            nominal=float(cash_m.group(1))/10.0
+            cash.append((nominal*participating_a/all_a,'DERIVED_A_SHARE_FOLDED_CASH_FROM_REPURCHASE_V482'))
 
     # V4.82 supplement: when the implementation announcement prints the complete
     # numerical ex-right formula, cash and capitalization are a coupled evidence pair.
