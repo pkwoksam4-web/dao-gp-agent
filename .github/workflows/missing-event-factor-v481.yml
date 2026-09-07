@@ -1,0 +1,24 @@
+name: GP Missing Event Factor Recalc V481
+
+on:
+  push:
+    branches:
+      - gp/missing-event-factor-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 missing-event factor recalc unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_missing_event_terms_v481.py test_missing_event_factor_recalc_v481.py
