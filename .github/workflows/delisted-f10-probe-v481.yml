@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  probe-loader:
+  probe-bonus-js:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,28 +18,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Probe F10 loader base configuration
-        run: python scripts/probe_f10_loader_v481.py
+      - name: Probe SeaJS-resolved BonusFinancing JS
+        run: python scripts/probe_bonusfinancing_js_v481.py
       - name: Verify probe remains non-Formal
         if: always()
         run: |
           python - <<'PY'
           import json, pathlib
-          p=pathlib.Path('artifact_f10_loader_probe_v481/F10_LOADER_PROBE_V481.json')
-          if not p.exists(): raise SystemExit('loader probe report missing')
+          p=pathlib.Path('artifact_bonusfinancing_js_probe_v481/BONUSFINANCING_JS_PROBE_V481.json')
+          if not p.exists(): raise SystemExit('bonus JS probe report missing')
           x=json.load(open(p,encoding='utf-8'))
           assert x['formal_promotion'] is False
           assert x['validated_global_provenance_emitted'] is False
           assert x['formal_ready'] is False
           assert x['oos_metrics_allowed'] is False
-          assert len(x['files'])==4
-          print('PASS non-Formal loader probe guard')
+          assert len(x['candidates'])==2
+          print('PASS non-Formal BonusFinancing JS probe guard')
           PY
-      - name: Upload loader probe evidence
+      - name: Upload BonusFinancing JS probe evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gp-f10-loader-probe-v481
-          path: artifact_f10_loader_probe_v481/
+          name: gp-bonusfinancing-js-probe-v481
+          path: artifact_bonusfinancing_js_probe_v481/
           if-no-files-found: error
           retention-days: 30
