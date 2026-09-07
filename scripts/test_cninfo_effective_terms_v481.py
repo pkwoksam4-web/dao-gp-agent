@@ -107,6 +107,18 @@ class CninfoEffectiveTermParserTests(unittest.TestCase):
         x=extract_effective_terms(text)
         self.assertAlmostEqual(x['cash_per_share'],0.1117002)
 
+    def test_derives_a_share_effective_cash_when_repurchase_shares_do_not_participate(self):
+        text=(
+            '本公告为A股权益分派实施公告。公司总股本未发生变化，为8,677,992,236股；'
+            '回购股份不参与本次权益分派；公司实施本次分配方案的总股份数为8,254,035,470股，'
+            '其中A股6,672,070,922股、H股1,581,964,548股；'
+            '每10股派发现金红利人民币3.2元（含税）。'
+        )
+        x=extract_effective_terms(text)
+        expected=(3.2/10.0)*6672070922/(8677992236-1581964548)
+        self.assertAlmostEqual(x['cash_per_share'],expected,places=12)
+        self.assertEqual(x['cash_evidence_kind'],'DERIVED_A_SHARE_FOLDED_CASH_FROM_REPURCHASE_V482')
+
 
 if __name__=='__main__':
     unittest.main()
