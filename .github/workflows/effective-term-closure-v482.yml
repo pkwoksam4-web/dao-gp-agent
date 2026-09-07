@@ -6,6 +6,7 @@ on:
       - gp/v482-special-exright
     paths:
       - 'scripts/effective_term_closure_v482.py'
+      - 'scripts/effective_term_closure_66_v482.py'
       - 'scripts/test_effective_term_closure_v482.py'
       - '.github/workflows/effective-term-closure-v482.yml'
   workflow_dispatch:
@@ -48,7 +49,7 @@ jobs:
         with:
           name: gp-exact-term-effective-evidence-v482
           path: effective_evidence
-          run-id: 34101355150
+          run-id: 34102113470
           github-token: ${{ github.token }}
       - name: Download frozen Sina source census
         uses: actions/download-artifact@v4
@@ -66,7 +67,7 @@ jobs:
           github-token: ${{ github.token }}
       - name: Recompute all 87 standard exact-review factor paths
         run: |
-          python scripts/effective_term_closure_v482.py \
+          python scripts/effective_term_closure_66_v482.py \
             --frozen-closure-dir frozen_closure \
             --evidence-dir effective_evidence \
             --source-census-dir source_census \
@@ -79,18 +80,19 @@ jobs:
           p='artifact_effective_term_closure_v482/EFFECTIVE_TERM_CLOSURE_V482.json'
           x=json.load(open(p,encoding='utf-8'))
           assert x['standard_scope_n']==87
-          assert x['effective_override_event_n']==58
-          assert x['fully_closed_symbol_n']==28
-          assert x['remaining_exact_review_symbol_n']==59
+          assert x['effective_override_event_n']==66
+          assert x['fully_closed_symbol_n']==34
+          assert x['remaining_exact_review_symbol_n']==53
           assert x['closed_symbols']==[
             '000030.SZ','000069.SZ','000100.SZ','000425.SZ','000501.SZ','000528.SZ',
-            '000552.SZ','000601.SZ','000651.SZ','000718.SZ','000725.SZ','000789.SZ',
-            '000848.SZ','000850.SZ','000863.SZ','000902.SZ','001283.SZ','001979.SZ',
-            '002020.SZ','002029.SZ','002035.SZ','002083.SZ','002085.SZ','002090.SZ',
+            '000534.SZ','000552.SZ','000601.SZ','000651.SZ','000718.SZ','000725.SZ',
+            '000789.SZ','000848.SZ','000850.SZ','000863.SZ','000902.SZ','001202.SZ',
+            '001212.SZ','001283.SZ','001299.SZ','001979.SZ','002001.SZ','002020.SZ',
+            '002029.SZ','002035.SZ','002083.SZ','002084.SZ','002085.SZ','002090.SZ',
             '002110.SZ','002117.SZ','002127.SZ','002145.SZ'
           ]
           assert x['checkpoint_after_effective_terms']=={
-            'PASS':785,'EXACT_TERM_REVIEW':59,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
+            'PASS':791,'EXACT_TERM_REVIEW':53,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
           }
           assert x['formal_promotion'] is False
           assert x['validated_global_provenance_emitted'] is False
