@@ -1,0 +1,102 @@
+name: GP V4.82 Exact-term Effective Terms
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - '.github/workflows/exact-term-effective-v482.yml'
+      - 'scripts/materialize_standard_exact_pdfs_v481.py'
+      - 'scripts/cninfo_effective_terms_v481.py'
+      - 'scripts/cninfo_exact_term_v481.py'
+      - 'scripts/test_cninfo_effective_terms_v481.py'
+      - 'scripts/test_standard_exact_pdf_materializer_v481.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-term parser/materializer regression tests
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_cninfo_effective_terms_v481.py \
+            test_standard_exact_pdf_materializer_v481.py
+
+  materialize-effective-terms:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+      - name: Download frozen 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen_closure
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download supplemented 407/507 CNINFO index
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-standard-index-supplemented-v481
+          path: supplemented_index
+          run-id: 34082377591
+          github-token: ${{ github.token }}
+      - name: Download frozen 847 Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Materialize matched official PDFs and extract effective terms
+        run: |
+          python scripts/materialize_standard_exact_pdfs_v481.py \
+            --closure-dir frozen_closure \
+            --index-dir supplemented_index \
+            --source-census-dir source_census \
+            --out-dir artifact_exact_terms_v482 \
+            --threshold-bp 5 \
+            --workers 6
+      - name: Verify frozen candidate partition and non-Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_exact_terms_v482/CNINFO_STANDARD_EXACT_PDF_EVIDENCE_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['candidate_event_n']==89
+          assert x['candidate_symbol_n']==56
+          assert x['announcement_matched_event_n']==67
+          assert x['unique_announcement_n']<=67
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in (
+            'candidate_event_n','candidate_symbol_n','announcement_matched_event_n',
+            'pdf_text_ok_event_n','effective_term_event_n','unique_announcement_n')},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload exact-term effective evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-exact-term-effective-evidence-v482
+          path: artifact_exact_terms_v482/
+          if-no-files-found: error
+          retention-days: 30
