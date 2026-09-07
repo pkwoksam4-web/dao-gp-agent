@@ -22,3 +22,97 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_missing_event_terms_v481.py test_missing_event_factor_recalc_v481.py
+
+  recalc:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download integrated V4.81 847 checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-ledger-recalc-v481
+          path: integrated_847
+          run-id: 34073572831
+          github-token: ${{ github.token }}
+
+      - name: Download frozen supplemental 6-event evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-supplemental-missing-event-v481
+          path: supplemental
+          run-id: 34076028687
+          github-token: ${{ github.token }}
+
+      - name: Download frozen F10 unresolved-history evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-f10-unresolved-history-v481
+          path: f10_history
+          run-id: 34075792988
+          github-token: ${{ github.token }}
+
+      - name: Download corrected V4.81 Sina factor source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+
+      - name: Download frozen V4.81 Sohu RAW shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-global-qfq-nominal-v481-shard-*
+          path: nominal_shards
+          merge-multiple: true
+          run-id: 34009535349
+          github-token: ${{ github.token }}
+
+      - name: Recalculate 7 fully evidenced missing-event symbols
+        run: |
+          BASE_REVIEW="$(find integrated_847 -name GLOBAL_QFQ_LEDGER_REVIEW_QUEUE_V481.csv -print -quit)"
+          test -n "$BASE_REVIEW"
+          python scripts/run_missing_event_factor_recalc_v481.py \
+            --base-review "$BASE_REVIEW" \
+            --supplemental-dir supplemental \
+            --f10-dir f10_history \
+            --source-census source_census \
+            --nominal-shards nominal_shards \
+            --out-dir artifact_missing_event_factor_v481
+
+      - name: Verify exact 7-symbol result remains fail-closed and non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_missing_event_factor_v481/MISSING_EVENT_FACTOR_RECALC_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['target_symbol_n']==7
+          assert x['target_event_date_n']==12
+          assert x['blocked_n']==0
+          assert sum(x['status_counts'].values())==7
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert all(r['coverage_complete'] is True for r in x['records'])
+          print(json.dumps({
+              'status_counts':x['status_counts'],
+              'resolved_pass_n':x['resolved_pass_n'],
+              'resolved_to_exact_review_n':x['resolved_to_exact_review_n'],
+              'nominal_checkpoint_after_7':x['nominal_checkpoint_after_7'],
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload V4.81 missing-event factor recalc evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-missing-event-factor-recalc-v481
+          path: artifact_missing_event_factor_v481/
+          if-no-files-found: error
+          retention-days: 30
