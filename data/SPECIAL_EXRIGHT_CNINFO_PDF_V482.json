@@ -1,0 +1,18 @@
+{
+  "artifact": "SPECIAL_EXRIGHT_CNINFO_PDF_V482",
+  "version": "V4.82",
+  "record_n": 11,
+  "records": [
+    {"symbol":"000430.SZ","ex_date":"2025-12-29","announcement_id":"1224901403","pdf_url":"https://static.cninfo.com.cn/finalpage/2025-12-27/1224901403.PDF"},
+    {"symbol":"000525.SZ","ex_date":"2024-11-18","announcement_id":"1221743101","pdf_url":"https://static.cninfo.com.cn/finalpage/2024-11-16/1221743101.PDF"},
+    {"symbol":"000615.SZ","ex_date":"2025-12-29","announcement_id":"1224901147","pdf_url":"https://static.cninfo.com.cn/finalpage/2025-12-27/1224901147.PDF"},
+    {"symbol":"000691.SZ","ex_date":"2026-01-05","announcement_id":"1224910175","pdf_url":"https://static.cninfo.com.cn/finalpage/2025-12-31/1224910175.PDF"},
+    {"symbol":"000697.SZ","ex_date":"2025-11-28","announcement_id":"1224831706","pdf_url":"https://static.cninfo.com.cn/finalpage/2025-11-28/1224831706.PDF"},
+    {"symbol":"000796.SZ","ex_date":"2023-12-20","announcement_id":"1218657701","pdf_url":"https://static.cninfo.com.cn/finalpage/2023-12-19/1218657701.PDF"},
+    {"symbol":"000908.SZ","ex_date":"2026-03-11","announcement_id":"1225001945","pdf_url":"https://static.cninfo.com.cn/finalpage/2026-03-10/1225001945.PDF"},
+    {"symbol":"000981.SZ","ex_date":"2022-02-25","announcement_id":"1212401989","pdf_url":"https://static.cninfo.com.cn/finalpage/2022-02-21/1212401989.PDF"},
+    {"symbol":"002021.SZ","ex_date":"2023-12-29","announcement_id":"1218747409","pdf_url":"https://static.cninfo.com.cn/finalpage/2023-12-28/1218747409.PDF"},
+    {"symbol":"002076.SZ","ex_date":"2022-12-21","announcement_id":"1215397975","pdf_url":"https://static.cninfo.com.cn/finalpage/2022-12-20/1215397975.PDF"},
+    {"symbol":"600306.SH","ex_date":"2023-12-26","announcement_id":"1218716690","pdf_url":"https://static.cninfo.com.cn/finalpage/2023-12-26/1218716690.PDF"}
+  ]
+}
