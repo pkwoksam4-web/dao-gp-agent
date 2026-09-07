@@ -21,6 +21,21 @@ class RemainingExactClosureTests(unittest.TestCase):
         self.assertFalse(bad['accepted'])
         self.assertGreater(bad['corrected_event_diff_bp'],5.0)
 
+    def test_invalid_extracted_term_is_rejected_fail_closed_instead_of_aborting_batch(self):
+        event={
+            'prev_actual_close':10.0,
+            'cash_per_share_nominal':0.10,
+            'stock_ratio':0.0,
+            'capitalization_ratio':0.0,
+            'rights_ratio':0.0,
+            'rights_price':None,
+        }
+        out=mod.validate_new_term(event,{'cash_per_share':37.0,'cap_ratio':None},0.98998,5.0)
+        self.assertFalse(out['accepted'])
+        self.assertIsNone(out['corrected_event_ratio'])
+        self.assertIsNone(out['corrected_event_diff_bp'])
+        self.assertIn('INVALID_EFFECTIVE_TERM',out['rejection_reason'])
+
     def test_checkpoint_moves_only_by_newly_closed_symbols(self):
         self.assertEqual(
             mod.updated_checkpoint_from_current(
