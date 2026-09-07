@@ -22,3 +22,81 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_recalc_global_qfq_from_ledger_v481.py
+
+  recalc:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download corrected V4.81 Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+
+      - name: Download complete V4.81 global event ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-event-ledger-v481
+          path: global_ledger
+          run-id: 34009915082
+          github-token: ${{ github.token }}
+
+      - name: Download all V4.81 nominal shard raw evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-global-qfq-nominal-v481-shard-*
+          path: nominal_shards
+          merge-multiple: true
+          run-id: 34009535349
+          github-token: ${{ github.token }}
+
+      - name: Recalculate exact 847 factor paths from complete global ledger
+        run: |
+          python scripts/recalc_global_qfq_from_ledger_v481.py \
+            --scope data/pit_st_scope_v480.txt \
+            --ledger-dir global_ledger \
+            --source-census source_census \
+            --nominal-shards nominal_shards \
+            --out-dir artifact_global_qfq_ledger_recalc_v481
+
+      - name: Verify V4.81 recalc remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_global_qfq_ledger_recalc_v481/GLOBAL_QFQ_LEDGER_RECALC_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_n']==847
+          assert x['record_n']==847
+          assert x['partition_exact'] is True
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert sum(x['status_counts'].values())==847
+          assert x['global_event_ledger']['sharebonus_rows']==22688
+          assert x['global_event_ledger']['rights_rows']==30
+          print(json.dumps({
+              'status_counts':x['status_counts'],
+              'nominal_pass_n':x['nominal_pass_n'],
+              'not_applicable_n':x['not_applicable_n'],
+              'review_n':x['review_n'],
+              'factor_compared_n':x['factor_compared_n'],
+              'factor_over_5bp_n':x['factor_over_5bp_n'],
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload V4.81 global-ledger recalc evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-global-qfq-ledger-recalc-v481
+          path: artifact_global_qfq_ledger_recalc_v481/
+          if-no-files-found: error
+          retention-days: 30
