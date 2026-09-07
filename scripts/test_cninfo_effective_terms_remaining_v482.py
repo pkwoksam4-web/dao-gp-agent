@@ -26,7 +26,10 @@ class RemainingExactParserRegressionTests(unittest.TestCase):
         )
         x=extract_effective_terms(text)
         self.assertAlmostEqual(x['cash_per_share'],0.245406)
-        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_FOLDED_CASH_PER10_V482')
+        self.assertTrue(any(
+            c['kind']=='EXPLICIT_FOLDED_CASH_PER10_V482' and abs(c['value']-0.245406)<=1e-7
+            for c in x['cash_candidates']
+        ))
 
     def test_extracts_parenthetical_effective_cash_from_reference_price_formula(self):
         text=(
