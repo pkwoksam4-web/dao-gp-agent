@@ -1,0 +1,78 @@
+name: GP V4.82 Reparse Remaining Exact PDFs
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - 'scripts/cninfo_effective_terms_v481.py'
+      - 'scripts/reparse_existing_effective_terms_v482.py'
+      - 'scripts/test_cninfo_effective_terms_v481.py'
+      - 'scripts/test_reparse_existing_effective_terms_v482.py'
+      - '.github/workflows/reparse-remaining-exact-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parser and frozen-text reparse tests
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_cninfo_effective_terms_v481.py \
+            test_reparse_existing_effective_terms_v482.py
+
+  reparse:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen 203-event official-PDF evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-pdf-evidence-v482
+          path: evidence203
+          run-id: 34103413213
+          github-token: ${{ github.token }}
+      - name: Reparse existing frozen PDF text without network fetch
+        run: |
+          python scripts/reparse_existing_effective_terms_v482.py \
+            --evidence-dir evidence203 \
+            --out-dir artifact_reparsed_remaining_v482
+      - name: Verify frozen text partition and non-Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_reparsed_remaining_v482/REMAINING_EXACT_REPARSED_EVIDENCE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['source_matched_candidate_event_n']==203
+          assert x['reparsed_event_n'] + x['parse_error_event_n']==203
+          assert x['effective_term_event_n']>=128
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in (
+            'source_matched_candidate_event_n','reparsed_event_n','parse_error_event_n',
+            'effective_term_event_n','changed_term_event_n')},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload reparsed remaining exact evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-remaining-exact-reparsed-evidence-v482
+          path: artifact_reparsed_remaining_v482/
+          if-no-files-found: error
+          retention-days: 30
