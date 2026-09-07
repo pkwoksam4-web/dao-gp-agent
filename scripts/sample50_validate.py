@@ -190,6 +190,29 @@ def event_ratio(action: Action, prev_close: float) -> float:
     return ex_ref/p
 
 
+def event_ratio_v482(
+    action: Action,
+    prev_close: float,
+    adjusted_reference_price: float | None = None,
+) -> float:
+    """V4.82 event ratio with a fail-closed exchange-reference override.
+
+    Ordinary cash/stock/capitalization/rights events remain byte-for-byte on the
+    V4.81 nominal formula.  A validated restructuring event may instead supply
+    the exchange-adjusted ex-right reference price; the event factor is then
+    adjusted_reference_price / actual_previous_close.
+    """
+    if adjusted_reference_price is None:
+        return event_ratio(action, prev_close)
+    p=float(prev_close)
+    ref=float(adjusted_reference_price)
+    if not math.isfinite(p) or p<=0:
+        raise ValueError('prev_close must be positive')
+    if not math.isfinite(ref) or ref<=0:
+        raise ValueError('adjusted_reference_price must be positive')
+    return ref/p
+
+
 def expected_factor_for_date(d: str, actions: list[Action], ratios: dict[str,float], anchor: str) -> float:
     d=_date(d); anchor=_date(anchor); out=1.0
     for a in actions:
