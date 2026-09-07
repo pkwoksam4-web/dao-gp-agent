@@ -32,7 +32,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Download integrated V4.81 847 checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -40,7 +39,6 @@ jobs:
           path: integrated_847
           run-id: 34073572831
           github-token: ${{ github.token }}
-
       - name: Download frozen supplemental 6-event evidence
         uses: actions/download-artifact@v4
         with:
@@ -48,7 +46,6 @@ jobs:
           path: supplemental
           run-id: 34076028687
           github-token: ${{ github.token }}
-
       - name: Download frozen F10 unresolved-history evidence
         uses: actions/download-artifact@v4
         with:
@@ -56,7 +53,6 @@ jobs:
           path: f10_history
           run-id: 34075792988
           github-token: ${{ github.token }}
-
       - name: Download corrected V4.81 Sina factor source census
         uses: actions/download-artifact@v4
         with:
@@ -64,7 +60,6 @@ jobs:
           path: source_census
           run-id: 34009079533
           github-token: ${{ github.token }}
-
       - name: Download frozen V4.81 Sohu RAW shards
         uses: actions/download-artifact@v4
         with:
@@ -73,7 +68,6 @@ jobs:
           merge-multiple: true
           run-id: 34009535349
           github-token: ${{ github.token }}
-
       - name: Recalculate 7 fully evidenced missing-event symbols
         run: |
           BASE_REVIEW="$(find integrated_847 -name GLOBAL_QFQ_LEDGER_REVIEW_QUEUE_V481.csv -print -quit)"
@@ -85,30 +79,18 @@ jobs:
             --source-census source_census \
             --nominal-shards nominal_shards \
             --out-dir artifact_missing_event_factor_v481
-
       - name: Verify exact 7-symbol result remains fail-closed and non-Formal
         run: |
           python - <<'PY'
           import json
-          p='artifact_missing_event_factor_v481/MISSING_EVENT_FACTOR_RECALC_V481.json'
-          x=json.load(open(p,encoding='utf-8'))
-          assert x['target_symbol_n']==7
-          assert x['target_event_date_n']==12
-          assert x['blocked_n']==0
+          x=json.load(open('artifact_missing_event_factor_v481/MISSING_EVENT_FACTOR_RECALC_V481.json',encoding='utf-8'))
+          assert x['target_symbol_n']==7 and x['target_event_date_n']==12 and x['blocked_n']==0
           assert sum(x['status_counts'].values())==7
-          assert x['formal_promotion'] is False
-          assert x['validated_global_provenance_emitted'] is False
-          assert x['formal_ready'] is False
-          assert x['oos_metrics_allowed'] is False
+          assert x['formal_promotion'] is False and x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False and x['oos_metrics_allowed'] is False
           assert all(r['coverage_complete'] is True for r in x['records'])
-          print(json.dumps({
-              'status_counts':x['status_counts'],
-              'resolved_pass_n':x['resolved_pass_n'],
-              'resolved_to_exact_review_n':x['resolved_to_exact_review_n'],
-              'nominal_checkpoint_after_7':x['nominal_checkpoint_after_7'],
-          },ensure_ascii=False,indent=2))
+          print(json.dumps({'status_counts':x['status_counts'],'nominal_checkpoint_after_7':x['nominal_checkpoint_after_7']},ensure_ascii=False,indent=2))
           PY
-
       - name: Upload V4.81 missing-event factor recalc evidence
         uses: actions/upload-artifact@v4
         with:
@@ -126,7 +108,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Download integrated V4.81 847 checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -134,7 +115,6 @@ jobs:
           path: integrated_847
           run-id: 34073572831
           github-token: ${{ github.token }}
-
       - name: Download frozen all-60 F10 PageAjax evidence
         uses: actions/download-artifact@v4
         with:
@@ -142,7 +122,6 @@ jobs:
           path: f10_all60
           run-id: 34075413814
           github-token: ${{ github.token }}
-
       - name: Download corrected V4.81 Sina factor source census
         uses: actions/download-artifact@v4
         with:
@@ -150,7 +129,6 @@ jobs:
           path: source_census
           run-id: 34009079533
           github-token: ${{ github.token }}
-
       - name: Download frozen V4.81 Sohu RAW shards
         uses: actions/download-artifact@v4
         with:
@@ -159,7 +137,6 @@ jobs:
           merge-multiple: true
           run-id: 34009535349
           github-token: ${{ github.token }}
-
       - name: Recalculate remaining 53 fully evidenced missing-event symbols
         run: |
           python scripts/run_missing_event_factor_recalc_53_v481.py \
@@ -168,37 +145,79 @@ jobs:
             --source-census source_census \
             --nominal-shards nominal_shards \
             --out-dir artifact_missing_event_factor_53_v481
-
       - name: Verify exact 53-symbol result closes missing-event class only
         run: |
           python - <<'PY'
           import json
-          p='artifact_missing_event_factor_53_v481/MISSING_EVENT_FACTOR_RECALC_53_V481.json'
-          x=json.load(open(p,encoding='utf-8'))
-          assert x['target_symbol_n']==53
-          assert x['target_missing_event_date_n']==93
-          assert x['blocked_n']==0
-          assert sum(x['status_counts'].values())==53
-          assert all(r['coverage_complete'] is True for r in x['records'])
-          c=x['nominal_checkpoint_after_60']
-          assert c['MISSING_EVENT_REVIEW']==0
+          x=json.load(open('artifact_missing_event_factor_53_v481/MISSING_EVENT_FACTOR_RECALC_53_V481.json',encoding='utf-8'))
+          assert x['target_symbol_n']==53 and x['target_missing_event_date_n']==93 and x['blocked_n']==0
+          assert sum(x['status_counts'].values())==53 and all(r['coverage_complete'] is True for r in x['records'])
+          c=x['nominal_checkpoint_after_60']; assert c['MISSING_EVENT_REVIEW']==0
           assert c['PASS']+c['EXACT_TERM_REVIEW']+c['NOT_APPLICABLE']==847
-          assert x['formal_promotion'] is False
-          assert x['validated_global_provenance_emitted'] is False
-          assert x['formal_ready'] is False
-          assert x['oos_metrics_allowed'] is False
-          print(json.dumps({
-              'status_counts':x['status_counts'],
-              'resolved_pass_n':x['resolved_pass_n'],
-              'resolved_to_exact_review_n':x['resolved_to_exact_review_n'],
-              'nominal_checkpoint_after_60':c,
-          },ensure_ascii=False,indent=2))
+          assert x['formal_promotion'] is False and x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps({'status_counts':x['status_counts'],'nominal_checkpoint_after_60':c},ensure_ascii=False,indent=2))
           PY
-
       - name: Upload V4.81 remaining-53 factor recalc evidence
         uses: actions/upload-artifact@v4
         with:
           name: gp-missing-event-factor-recalc-53-v481
           path: artifact_missing_event_factor_53_v481/
+          if-no-files-found: error
+          retention-days: 30
+
+  merge-missing-event-closure:
+    needs: [recalc, recalc-remaining-53]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen integrated V4.81 847 checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-ledger-recalc-v481
+          path: integrated_847
+          run-id: 34073572831
+          github-token: ${{ github.token }}
+      - name: Download current-run 7-symbol resolution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-missing-event-factor-recalc-v481
+          path: recalc7
+      - name: Download current-run 53-symbol resolution artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-missing-event-factor-recalc-53-v481
+          path: recalc53
+      - name: Merge exact 60 missing-event resolutions into 847 checkpoint
+        run: |
+          python scripts/merge_missing_event_closure_v481.py \
+            --base-dir integrated_847 \
+            --recalc7-dir recalc7 \
+            --recalc53-dir recalc53 \
+            --out-dir artifact_missing_event_closure_v481
+      - name: Verify closed missing-event partition and Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('artifact_missing_event_closure_v481/GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json',encoding='utf-8'))
+          s=x['summary']
+          assert x['scope_n']==847 and x['record_n']==847 and x['partition_exact'] is True
+          assert x['missing_event_status']=='CLOSED_V481'
+          assert s['pass_n']==746 and s['exact_review_n']==98 and s['missing_event_n']==0 and s['not_applicable_n']==3
+          assert s['pass_n']+s['exact_review_n']+s['missing_event_n']+s['not_applicable_n']==847
+          assert sum(1 for r in x['records'] if r.get('missing_event_resolution'))==60
+          assert x['formal_promotion'] is False and x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps({'summary':s,'resolved_records':60},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload V4.81 merged 847 missing-event closure checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: artifact_missing_event_closure_v481/
           if-no-files-found: error
           retention-days: 30
