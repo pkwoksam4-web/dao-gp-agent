@@ -37,41 +37,44 @@ def sha256_file(path:pathlib.Path)->str:
     return h.hexdigest()
 
 
-def evaluate_one_calendar_series(x:pd.DataFrame, threshold:float, variant:str, min_actual_before:int=MIN_ACTUAL_BEFORE)->pd.DataFrame:
+def _rolling_components(x:pd.DataFrame,variant:str,min_actual_before:int=MIN_ACTUAL_BEFORE):
     z=x.copy().sort_values('date').reset_index(drop=True)
     traded=z['traded'].fillna(False).astype(bool)
     if variant=='market_day_zero':
-        a=pd.to_numeric(z['amount'],errors='coerce').where(traded,0.0).fillna(0.0)
+        amount=pd.to_numeric(z['amount'],errors='coerce').where(traded,0.0).fillna(0.0)
     elif variant=='market_day_nan':
-        a=pd.to_numeric(z['amount'],errors='coerce').where(traded,np.nan)
+        amount=pd.to_numeric(z['amount'],errors='coerce').where(traded,np.nan)
     else:
         raise ValueError(f'unknown variant {variant}')
-    z['median_amount20']=a.rolling(WINDOW,min_periods=MIN_PERIODS).median()
-    z['trade_density20']=traded.astype(float).rolling(WINDOW,min_periods=MIN_PERIODS).mean()
-    z['actual_traded_cum']=traded.astype(int).cumsum()
-    z['eligible']=(
-        (z['median_amount20']>=float(threshold)) &
-        (z['trade_density20']>=MIN_DENSITY) &
-        (z['actual_traded_cum']>=int(min_actual_before)) &
-        traded
-    )
+    median20=amount.rolling(WINDOW,min_periods=MIN_PERIODS).median()
+    density20=traded.astype(float).rolling(WINDOW,min_periods=MIN_PERIODS).mean()
+    cum=traded.astype(int).cumsum()
+    base=(density20>=MIN_DENSITY)&(cum>=int(min_actual_before))&traded
+    return z,traded,median20,density20,cum,base
+
+
+def evaluate_one_calendar_series(x:pd.DataFrame, threshold:float, variant:str, min_actual_before:int=MIN_ACTUAL_BEFORE)->pd.DataFrame:
+    z,traded,median20,density20,cum,base=_rolling_components(x,variant,min_actual_before)
+    z['median_amount20']=median20
+    z['trade_density20']=density20
+    z['actual_traded_cum']=cum
+    z['eligible']=base&(median20>=float(threshold))
     return z
 
 
 def _load_astock(root:pathlib.Path)->pd.DataFrame:
     files=sorted(root.glob('kline_*.parquet'))
-    files=[p for p in files if p.name not in {'kline_other.parquet'}] + ([root/'kline_other.parquet'] if (root/'kline_other.parquet').exists() else [])
-    if not files: raise FileNotFoundError('no kline_*.parquet')
+    files=[p for p in files if p.name!='kline_other.parquet']+([root/'kline_other.parquet'] if (root/'kline_other.parquet').exists() else [])
+    if not files:
+        raise FileNotFoundError('no kline_*.parquet')
     parts=[]
     for p in files:
         q=pd.read_parquet(p,columns=['code','date','volume','amount'])
-        q['source_partition']=p.name
         parts.append(q)
     df=pd.concat(parts,ignore_index=True)
     df['code']=df['code'].astype(str).str.replace(r'\.0$','',regex=True).str.zfill(6)
-    # V3.70 source replay excluded the dedicated 399 index family; the historical
-    # kline_000 ambiguity remains untouched because the replay must reproduce the
-    # frozen source behavior rather than repair it retroactively.
+    # Reproduce V3.70 source behavior. Only the dedicated 399 index family was
+    # excluded; historical kline_000 ambiguity is intentionally left untouched.
     df=df[~df['code'].str.startswith('399')].copy()
     df['date']=pd.to_datetime(df['date']).dt.normalize()
     df=df[(df['date']>=FORMAL_BEG)&(df['date']<=FORMAL_END)].copy()
@@ -85,21 +88,29 @@ def _metrics_for_variant(df:pd.DataFrame,variant:str)->dict:
     if len(calendar)!=EXPECTED_CALENDAR:
         raise ValueError(f'calendar {len(calendar)} != {EXPECTED_CALENDAR}')
     daily={t:np.zeros(len(calendar),dtype=np.int32) for t in THRESHOLDS}
-    ever={t:0 for t in THRESHOLDS}; mature_ever={t:0 for t in THRESHOLDS}
+    ever={t:0 for t in THRESHOLDS}
+    mature_ever={t:0 for t in THRESHOLDS}
     mature=0
     for _,g in df.groupby('code',sort=False):
         g=g.sort_values('date').drop_duplicates('date',keep='last').set_index('date')
         gg=g.reindex(calendar)
-        traded=(pd.to_numeric(gg['volume'],errors='coerce').fillna(0)>0)&(pd.to_numeric(gg['amount'],errors='coerce').fillna(0)>0)
-        base=pd.DataFrame({'date':calendar,'amount':pd.to_numeric(gg['amount'],errors='coerce').to_numpy(),'traded':traded.to_numpy()})
-        actual_n=int(traded.sum()); is_mature=actual_n>=843
-        if is_mature: mature+=1
+        amount=pd.to_numeric(gg['amount'],errors='coerce')
+        traded=(pd.to_numeric(gg['volume'],errors='coerce').fillna(0)>0)&(amount.fillna(0)>0)
+        base_df=pd.DataFrame({'date':calendar,'amount':amount.to_numpy(),'traded':traded.to_numpy()})
+        _,_,median20,_,_,base=_rolling_components(base_df,variant,MIN_ACTUAL_BEFORE)
+        med=median20.to_numpy()
+        b=base.to_numpy(dtype=bool)
+        actual_n=int(traded.sum())
+        is_mature=actual_n>=843
+        if is_mature:
+            mature+=1
         for t in THRESHOLDS:
-            e=evaluate_one_calendar_series(base,t,variant)['eligible'].to_numpy(dtype=bool)
+            e=b & (med>=float(t))
             daily[t]+=e.astype(np.int32)
             if e.any():
                 ever[t]+=1
-                if is_mature: mature_ever[t]+=1
+                if is_mature:
+                    mature_ever[t]+=1
     out=[]
     for t in THRESHOLDS:
         c=daily[t]
@@ -134,12 +145,27 @@ def _compare(replay:dict)->dict:
 def replay(root:pathlib.Path,out_dir:pathlib.Path)->dict:
     sha=sha256_file(root/'kline_002.parquet')
     df=_load_astock(root)
-    base={'source_commit':'0babe4cf6c1a175c6b84add10803b4b1f9c6000c','kline_002_sha256':sha,'kline_002_sha_match':sha==EXPECTED_KLINE002_SHA256,'rows_read':len(df),'symbols':df['code'].nunique(),'calendar_days':df['date'].nunique()}
+    base={
+        'source_commit':'0babe4cf6c1a175c6b84add10803b4b1f9c6000c',
+        'kline_002_sha256':sha,
+        'kline_002_sha_match':sha==EXPECTED_KLINE002_SHA256,
+        'rows_read':len(df),
+        'symbols':df['code'].nunique(),
+        'calendar_days':df['date'].nunique(),
+    }
     variants=[]
     for v in ('market_day_zero','market_day_nan'):
-        r=_metrics_for_variant(df,v); r['comparison_to_v370']=_compare(r); variants.append(r)
+        r=_metrics_for_variant(df,v)
+        r['comparison_to_v370']=_compare(r)
+        variants.append(r)
     exact=[v['variant'] for v in variants if v['comparison_to_v370']['exact_match']]
-    report={'artifact':'LIQUIDITY_REPLAY_V482','version':'V4.82','source':base,'expected_source_shape':{'rows':EXPECTED_ROWS,'symbols':EXPECTED_SYMBOLS,'calendar_days':EXPECTED_CALENDAR},'variants':variants,'exact_matching_variants':exact,'frozen_semantics_status':'CLOSED_REPRODUCED_V370' if len(exact)==1 else 'OPEN_NEEDS_DIAGNOSIS','formal_ready':False,'oos_metrics_allowed':False}
+    report={
+        'artifact':'LIQUIDITY_REPLAY_V482','version':'V4.82','source':base,
+        'expected_source_shape':{'rows':EXPECTED_ROWS,'symbols':EXPECTED_SYMBOLS,'calendar_days':EXPECTED_CALENDAR},
+        'variants':variants,'exact_matching_variants':exact,
+        'frozen_semantics_status':'CLOSED_REPRODUCED_V370' if len(exact)==1 else 'OPEN_NEEDS_DIAGNOSIS',
+        'formal_ready':False,'oos_metrics_allowed':False,
+    }
     out_dir.mkdir(parents=True,exist_ok=True)
     (out_dir/'LIQUIDITY_REPLAY_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps({'source':base,'exact_matching_variants':exact,'mismatch_counts':{v['variant']:v['comparison_to_v370']['mismatch_n'] for v in variants}},ensure_ascii=False,indent=2))
@@ -147,7 +173,11 @@ def replay(root:pathlib.Path,out_dir:pathlib.Path)->dict:
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--astock-dir',required=True); ap.add_argument('--out-dir',required=True)
-    a=ap.parse_args(); replay(pathlib.Path(a.astock_dir),pathlib.Path(a.out_dir))
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--astock-dir',required=True)
+    ap.add_argument('--out-dir',required=True)
+    a=ap.parse_args()
+    replay(pathlib.Path(a.astock_dir),pathlib.Path(a.out_dir))
 
-if __name__=='__main__': main()
+if __name__=='__main__':
+    main()
