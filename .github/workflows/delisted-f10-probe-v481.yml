@@ -1,0 +1,45 @@
+name: GP Delisted F10 probe V481
+
+on:
+  push:
+    branches:
+      - gp/delisted-f10-probe-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Probe delisted historical F10 dividend pages
+        run: python scripts/probe_delisted_f10_v481.py
+      - name: Verify probe remains non-Formal
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('artifact_delisted_f10_probe_v481/DELISTED_F10_PROBE_V481.json')
+          if not p.exists(): raise SystemExit('probe report missing')
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert len(x['controls'])==4
+          print('PASS non-Formal probe guard')
+          PY
+      - name: Upload F10 probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-delisted-f10-probe-v481
+          path: artifact_delisted_f10_probe_v481/
+          if-no-files-found: error
+          retention-days: 30
