@@ -1,0 +1,138 @@
+name: GP Exact Term V481 Residual Retry
+
+on:
+  push:
+    branches:
+      - gp/exact-term-v481
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 residual retry tests
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_cninfo_exact_term_v481.py \
+            test_cninfo_narrow_supplement_v481.py \
+            test_cninfo_evidence_union_v481.py
+
+  collect-residual-retry:
+    if: contains(github.event.head_commit.message, 'Run V4.81 residual exact-term retry')
+    needs: tests
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen 499/507 ordinary exact-term checkpoint
+        run: |
+          mkdir -p residual_base
+          gh api repos/${{ github.repository }}/actions/artifacts/10005804030/zip > residual_base.zip
+          unzip -q residual_base.zip -d residual_base
+          test -f residual_base/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json
+      - name: Verify frozen residual target is exactly 5 symbols / 8 events
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          sys.path.insert(0,'scripts')
+          from cninfo_narrow_supplement_v481 import select_unmatched_targets
+          p=next(pathlib.Path('residual_base').rglob('CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json'))
+          x=json.load(open(p,encoding='utf-8'))
+          t=select_unmatched_targets(x)
+          assert len(t)==5, t
+          assert sum(map(len,t.values()))==8, t
+          print(t)
+          PY
+      - name: Retry only final 5 symbols / 8 events serially
+        run: |
+          python scripts/cninfo_narrow_supplement_v481.py collect \
+            --base-index-dir residual_base \
+            --out-dir artifact_cninfo_residual_retry_v481 \
+            --shard-index 0 \
+            --shard-count 1 \
+            --timeout 12 \
+            --attempts 8 \
+            --sleep-between 0.80 \
+            --expected-target-symbol-n 5 \
+            --expected-target-event-n 8
+      - name: Verify retry evidence remains non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_residual_retry_v481/CNINFO_NARROW_EXACT_TERM_SUPPLEMENT_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['full_target_symbol_n']==5
+          assert x['full_target_event_n']==8
+          assert x['target_event_n']==8
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('target_symbol_n','target_event_n','matched_event_n','query_error_event_n','unmatched_no_error_event_n')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-residual-retry-v481
+          path: artifact_cninfo_residual_retry_v481
+          if-no-files-found: error
+
+  merge-residual-retry:
+    if: contains(github.event.head_commit.message, 'Run V4.81 residual exact-term retry')
+    needs: collect-residual-retry
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen 499/507 ordinary exact-term checkpoint
+        run: |
+          mkdir -p residual_base
+          gh api repos/${{ github.repository }}/actions/artifacts/10005804030/zip > residual_base.zip
+          unzip -q residual_base.zip -d residual_base
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-residual-retry-v481
+          path: residual_retry
+      - name: Merge residual retry
+        run: |
+          python scripts/cninfo_narrow_supplement_v481.py merge \
+            --base-index-dir residual_base \
+            --supplement-dir residual_retry \
+            --out-dir artifact_cninfo_standard_residual_closed_v481 \
+            --expected-scope-n 87
+      - name: Verify exact scope and Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_standard_residual_closed_v481/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_symbol_n']==87
+          assert x['event_date_n']==507
+          assert x['matched_event_n']>=499
+          assert x['unmatched_event_n']<=8
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('scope_symbol_n','event_date_n','matched_event_n','unmatched_event_n','symbols_all_events_matched_n','symbols_unresolved_n','status_counts')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-residual-closed-v481
+          path: artifact_cninfo_standard_residual_closed_v481
+          if-no-files-found: error
