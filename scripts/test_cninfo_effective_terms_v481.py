@@ -35,6 +35,40 @@ class CninfoEffectiveTermParserTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             extract_effective_terms(text)
 
+    def test_extracts_final_exright_cash_subtraction_from_long_formula(self):
+        text=(
+            '因回购专户股份不参与分红，本次权益分派实施后除权除息价格按照上述原则及计算方式执行。'
+            '本次利润分配实施后的除权除息价格=前收盘价-按公司总股本折算每股现金分红比例='
+            '股权登记日收盘价-2.3337380元。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],2.3337380)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_FINAL_EXRIGHT_CASH_SUBTRACTION')
+
+    def test_extracts_total_share_cash_calculation_without_word_ratio(self):
+        text=(
+            '按股权登记日的总股本折算每股现金红利=实际现金分红总金额÷股权登记日的总股本='
+            '273,108,941.30÷1,076,419,000=0.2537199元/股。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.2537199)
+
+    def test_extracts_a_share_folded_per10_cash(self):
+        text='按A股除权前总股本（含回购股份及其他不参与分红的股份）计算的每10股派息（含税）：2.941285元。'
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.2941285)
+
+    def test_complex_divisor_formula_does_not_promote_cash_without_cap_ratio(self):
+        text=(
+            '本次权益分派实施后的除权除息参考价格='
+            '（除权除息前一交易日收盘价-按公司总股本折算每股现金分红金额）/'
+            '（1+按公司总股本折算每股资本公积转增股本比例）='
+            '（股权登记日收盘价-0.0988848元/股）/（1+0.40）。'
+        )
+        x=extract_effective_terms(text)
+        self.assertIsNone(x['cash_per_share'])
+        self.assertIsNone(x['cap_ratio'])
+
 
 if __name__=='__main__':
     unittest.main()
