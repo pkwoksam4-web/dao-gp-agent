@@ -5,12 +5,11 @@ import datetime as dt
 import hashlib
 import json
 import pathlib
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter
 
-from cninfo_exact_term_v481 import resolve_orgid, query_cninfo
+from cninfo_exact_term_v481 import resolve_orgid, query_cninfo, is_distribution_implementation_title
 
 FORMAL_BEG='2020-06-01'
 FORMAL_END='2026-04-17'
@@ -28,13 +27,8 @@ def _date_from_ms(ms) -> dt.date | None:
         return None
 
 
-def _clean_title(s: str) -> str:
-    return re.sub(r'<[^>]+>','',str(s or '')).replace(' ','')
-
-
 def _is_implementation(item: dict) -> bool:
-    t=_clean_title(item.get('announcementTitle'))
-    return '权益分派实施公告' in t or '权益分配实施公告' in t
+    return is_distribution_implementation_title((item or {}).get('announcementTitle'))
 
 
 def select_standard_exact_symbols(report: dict) -> dict[str,list[str]]:
@@ -113,7 +107,8 @@ def collect_one(symbol: str, event_dates: list[str], raw_dir: pathlib.Path) -> d
         q_raw=q['raw']; q_file=f'{code}_formal_implementation_index.json'; (raw_dir/q_file).write_bytes(q_raw)
         items=(q['json'] or {}).get('announcements') or []
         rec['query']={'http_status':q.get('http_status'),'content_type':q.get('content_type'),'attempts':q.get('attempts'),
-                      'raw_file':q_file,'sha256':hashlib.sha256(q_raw).hexdigest(),'bytes':len(q_raw),'column':q.get('column')}
+                      'raw_file':q_file,'sha256':hashlib.sha256(q_raw).hexdigest(),'bytes':len(q_raw),'column':q.get('column'),
+                      'searchkey':q.get('searchkey'),'date_window':q.get('date_window')}
         rec['announcement_n']=len(items)
         matched=match_announcements_to_events(event_dates,items,30)
         for d,item in matched.items():
