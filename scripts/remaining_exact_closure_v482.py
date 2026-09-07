@@ -26,14 +26,24 @@ CURRENT_CHECKPOINT = {
 
 
 def validate_new_term(event: dict, terms: dict, actual_factor_jump: float, threshold_bp: float=THRESHOLD_BP) -> dict:
-    ratio=base.corrected_event_ratio(event,terms)
     actual=base._positive(actual_factor_jump,'actual_factor_jump')
+    try:
+        ratio=base.corrected_event_ratio(event,terms)
+    except (TypeError, ValueError) as e:
+        return {
+            'accepted':False,
+            'corrected_event_ratio':None,
+            'corrected_event_diff_bp':None,
+            'threshold_bp':float(threshold_bp),
+            'rejection_reason':f'INVALID_EFFECTIVE_TERM:{type(e).__name__}:{e}',
+        }
     diff=abs(actual/ratio-1.0)*10000.0
     return {
         'accepted':diff<=float(threshold_bp),
         'corrected_event_ratio':ratio,
         'corrected_event_diff_bp':diff,
         'threshold_bp':float(threshold_bp),
+        'rejection_reason':None if diff<=float(threshold_bp) else 'EVENT_JUMP_EXCEEDS_THRESHOLD',
     }
 
 
@@ -133,6 +143,7 @@ def close_remaining(
             'nominal_event_diff_bp':float(item.get('nominal_event_diff_bp')),
             'corrected_event_ratio':check['corrected_event_ratio'],
             'corrected_event_diff_bp':check['corrected_event_diff_bp'],
+            'rejection_reason':check.get('rejection_reason'),
             'cash_per_share_effective':terms.get('cash_per_share'),
             'cap_ratio_effective':terms.get('cap_ratio'),
             'cash_evidence_kind':terms.get('cash_evidence_kind'),
