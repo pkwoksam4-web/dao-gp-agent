@@ -60,7 +60,7 @@ jobs:
 
       - name: Recalculate exact 847 factor paths from complete global ledger
         run: |
-          python scripts/recalc_global_qfq_from_ledger_v481.py \
+          python scripts/recalc_global_qfq_from_ledger_v481_fixed.py \
             --scope data/pit_st_scope_v480.txt \
             --ledger-dir global_ledger \
             --source-census source_census \
