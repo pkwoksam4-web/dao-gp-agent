@@ -1,0 +1,52 @@
+name: GP V4.82 Special Ex-right Provenance Fast
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - '.github/workflows/special-exright-provenance-fast-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+      - name: Two-key low-rate special provenance collection
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import pathlib
+          import special_exright_provenance_v482 as m
+          m.SEARCH_KEYS=('重整','除权')
+          m.collect(pathlib.Path('data/SPECIAL_EXRIGHT_REFERENCE_V482.json'), pathlib.Path('artifact_special_fast_v482'), 1.5)
+          PY
+      - name: Verify non-Formal partition
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('artifact_special_fast_v482/SPECIAL_EXRIGHT_PROVENANCE_V482.json',encoding='utf-8'))
+          assert x['target_n']==11
+          assert x['materialized_n']+x['unresolved_n']==11
+          assert x['formal_ready'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps({'materialized_n':x['materialized_n'],'unresolved_n':x['unresolved_n'],'unresolved_symbols':[r['symbol'] for r in x['records'] if r['status']!='PASS_CNINFO_MATERIALIZED']},ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-special-exright-provenance-fast-v482
+          path: artifact_special_fast_v482/
+          if-no-files-found: error
+          retention-days: 30
