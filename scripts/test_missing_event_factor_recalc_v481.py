@@ -9,13 +9,23 @@ from missing_event_factor_recalc_v481 import (
 
 class SupplementalProfileTests(unittest.TestCase):
     def test_special_and_cash_profiles_are_canonicalized(self):
-        self.assertEqual(canonical_supplemental_profile('000564.SZ','2021-12-31'), '10转22.035714')
-        self.assertEqual(canonical_supplemental_profile('000981.SZ','2022-02-25'), '10转14.82')
-        self.assertEqual(canonical_supplemental_profile('002076.SZ','2022-12-21'), '10转4.58796')
-        self.assertEqual(canonical_supplemental_profile('300117.SZ','2020-07-20'), '10派0.03元')
-        self.assertEqual(canonical_supplemental_profile('300262.SZ','2020-08-11'), '10派0.13元')
-        self.assertEqual(canonical_supplemental_profile('600070.SH','2020-07-10'), '10派0.8元')
-        self.assertEqual(canonical_supplemental_profile('600190.SH','2020-07-02'), '10派0.2元')
+        expected={
+            ('000564.SZ','2021-12-31'): '10转22.035714',
+            ('000981.SZ','2022-02-25'): '10转14.82',
+            ('002076.SZ','2022-12-21'): '10转4.58796',
+            ('300117.SZ','2020-07-20'): '10派0.03元',
+            ('300117.SZ','2021-08-20'): '10派0.13元',
+            ('300262.SZ','2020-08-11'): '10派0.13元',
+            ('600070.SH','2020-07-10'): '10派0.8元',
+            ('600070.SH','2021-07-07'): '10派0.49元',
+            ('600190.SH','2020-07-02'): '10派0.2元',
+            ('600190.SH','2021-06-25'): '10派0.2元',
+            ('600190.SH','2022-06-24'): '10派0.2元',
+            ('600190.SH','2024-06-26'): '10派0.2元',
+        }
+        for (symbol,date),profile in expected.items():
+            with self.subTest(symbol=symbol,date=date):
+                self.assertEqual(canonical_supplemental_profile(symbol,date), profile)
 
     def test_unknown_supplemental_profile_fails_closed(self):
         with self.assertRaises(KeyError):
