@@ -22,3 +22,57 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_qfq_raw_blocker_repair_v481.py
+
+  repair:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download corrected V4.81 Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Download complete V4.81 global event ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-event-ledger-v481
+          path: global_ledger
+          run-id: 34009915082
+          github-token: ${{ github.token }}
+      - name: Repair two V4.81 RAW blockers
+        run: |
+          python scripts/qfq_raw_blocker_repair_v481.py \
+            --source-census source_census \
+            --ledger-dir global_ledger \
+            --out-dir artifact_qfq_raw_blocker_repair_v481
+      - name: Verify repair remains non-Formal
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('artifact_qfq_raw_blocker_repair_v481/QFQ_RAW_BLOCKER_REPAIR_V481.json')
+          if not p.exists():
+              raise SystemExit('repair report missing')
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert {r['symbol'] for r in x['records']}=={'000069.SZ','001379.SZ'}
+          print(json.dumps([(r['symbol'],r['raw_provider'],r['status'],(r.get('factor_validation') or {}).get('max_diff_bp')) for r in x['records']],ensure_ascii=False,indent=2))
+          PY
+      - name: Upload V4.81 RAW blocker repair evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-qfq-raw-blocker-repair-v481
+          path: artifact_qfq_raw_blocker_repair_v481/
+          if-no-files-found: error
+          retention-days: 30
