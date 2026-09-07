@@ -41,8 +41,8 @@ def extract_effective_terms(text: str) -> dict:
 
     # V4.82 supplement: many implementation announcements state the final ex-right
     # formula explicitly as "record-date close - effective cash" but put the folded
-    # cash calculation much earlier in the paragraph.  Accept the numeric subtraction
-    # only when nearby text is clearly about ex-right/ex-dividend pricing.  If the
+    # cash calculation much earlier in the paragraph. Accept the numeric subtraction
+    # only when nearby text is clearly about ex-right/ex-dividend pricing. If the
     # subtraction is followed by a non-trivial /(1+n) denominator, do not promote the
     # cash alone; that event requires a separately extracted capitalization ratio.
     for m in re.finditer(r'(?:股权登记日|权益分派股权登记日|前)收盘价[-－]([0-9]+(?:\.[0-9]+)?)(?:元/股|元)?',s):
@@ -70,11 +70,49 @@ def extract_effective_terms(text: str) -> dict:
 
     # Some A-share announcements publish the effective amount as a per-10-share
     # figure over the A-share ex-right total; convert that explicit folded value to
-    # a per-share cash term.  Nominal "每10股派X" plans do not match this guarded form.
+    # a per-share cash term. Nominal "每10股派X" plans do not match this guarded form.
     for m in re.finditer(
         r'按A股除权前总股本[^。;；]{0,260}?每10股派息(?:[（(]含税[）)])?[:：]?'
         r'([0-9]+(?:\.[0-9]+)?)元',s):
         cash.append((float(m.group(1))/10.0,'EXPLICIT_A_SHARE_FOLDED_CASH_PER10_V482'))
+
+    # V4.82 supplement: when the implementation announcement prints the complete
+    # numerical ex-right formula, cash and capitalization are a coupled evidence pair.
+    # Both values are promoted together; symbolic-only formulae are deliberately ignored.
+    coupled_pattern=(
+        r'[（(]?(?:(?:股权登记日|除权除息前一交易日)(?:股票)?收盘价)'
+        r'[-－﹣]([0-9]+(?:\.[0-9]+)?)(?:元/股)?[）)]?'
+        r'(?:/|÷)[（(]?1\+([0-9]+(?:\.[0-9]+)?)[）)]?'
+    )
+    for m in re.finditer(coupled_pattern,s):
+        prior=s[max(0,m.start()-500):m.start()]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cash.append((float(m.group(1)),'EXPLICIT_COUPLED_EXRIGHT_FORMULA_CASH_V482'))
+        cap.append((float(m.group(2)),'EXPLICIT_COUPLED_EXRIGHT_FORMULA_CAP_V482'))
+
+    # Cap-only numerical denominator in an explicit ex-right/ex-dividend formula.
+    # This covers no-cash capitalization events such as record-date-close/(1+n).
+    for m in re.finditer(r'(?:/|÷)[（(]?1\+([0-9]+(?:\.[0-9]+)?)[）)]?',s):
+        prior=s[max(0,m.start()-500):m.start()]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cap.append((float(m.group(1)),'EXPLICIT_PRICE_FORMULA_CAP_RATIO_V482'))
+
+    # Explicit effective per-share capitalization ratio used for ex-right pricing.
+    for m in re.finditer(r'每股(?:资本公积金)?转增(?:股本)?比例应以([0-9]+(?:\.[0-9]+)?)计算',s):
+        prior=s[max(0,m.start()-500):m.start()]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cap.append((float(m.group(1)),'EXPLICIT_EFFECTIVE_CAP_RATIO_V482'))
+
+    # Some cash-only implementation announcements state the effective folded cash
+    # in parentheses after a symbolic subtraction term.
+    for m in re.finditer(r'每股现金(?:红利|分红)[（(]([0-9]+(?:\.[0-9]+)?)元/股[）)]',s):
+        prior=s[max(0,m.start()-500):m.start()]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cash.append((float(m.group(1)),'EXPLICIT_PARENTHETICAL_FOLDED_CASH_V482'))
 
     # Formula parameter D is accepted only when the nearby announcement text calls it
     # virtual/effective distribution, so ordinary nominal D statements are not promoted.
