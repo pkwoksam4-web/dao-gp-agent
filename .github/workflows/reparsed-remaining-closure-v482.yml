@@ -1,0 +1,119 @@
+name: GP V4.82 Reparsed Remaining Closure
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - 'scripts/reparsed_remaining_closure_v482.py'
+      - 'scripts/test_reparsed_remaining_closure_v482.py'
+      - '.github/workflows/reparsed-remaining-closure-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reparsed remaining closure tests
+        run: |
+          cd scripts
+          python -m unittest -v test_reparsed_remaining_closure_v482.py
+
+  closure:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen_closure
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 792/52 effective-term closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective_closure
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 821/23 secondary closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary_closure
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - name: Download verified 142-term reparsed evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-reparsed-evidence-v482
+          path: reparsed_evidence
+          run-id: 34108707726
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Validate reparsed terms and recompute remaining 23 full paths
+        run: |
+          python scripts/reparsed_remaining_closure_v482.py \
+            --frozen-closure-dir frozen_closure \
+            --effective-closure-dir effective_closure \
+            --secondary-closure-dir secondary_closure \
+            --reparsed-evidence-dir reparsed_evidence \
+            --source-census-dir source_census \
+            --out-dir artifact_reparsed_remaining_closure_v482
+      - name: Verify V4.82 826/18 checkpoint remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_reparsed_remaining_closure_v482/REPARSED_REMAINING_CLOSURE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['relevant_reparsed_event_n']==32
+          assert x['relevant_effective_term_n']==20
+          assert x['relevant_parse_error_n']==1
+          assert x['relevant_no_term_n']==11
+          assert x['confirmed_existing_override_n']==3
+          assert x['new_reparsed_override_n']==17
+          assert x['total_standard_override_n']==208
+          assert x['newly_closed_symbol_n']==5
+          assert x['remaining_exact_review_symbol_n']==18
+          assert x['newly_closed_symbols']==['000541.SZ','000739.SZ','000997.SZ','001203.SZ','600705.SH']
+          assert x['checkpoint_after_reparsed_terms']=={
+            'PASS':826,'EXACT_TERM_REVIEW':18,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
+          }
+          assert sum(x['checkpoint_after_reparsed_terms'].values())==847
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+            'checkpoint':x['checkpoint_after_reparsed_terms'],
+            'newly_closed_symbols':x['newly_closed_symbols'],
+            'remaining_symbols':x['remaining_symbols'],
+          },ensure_ascii=False,indent=2))
+          PY
+      - name: Upload V4.82 826/18 closure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: artifact_reparsed_remaining_closure_v482/
+          if-no-files-found: error
+          retention-days: 30
