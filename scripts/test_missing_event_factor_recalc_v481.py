@@ -3,6 +3,9 @@ import unittest
 from missing_event_factor_recalc_v481 import (
     canonical_supplemental_profile,
     extract_f10_target_profile,
+    extract_supplemental_profile,
+    extract_targeted_probe_profile,
+    resolve_target_profile,
     classify_missing_event_recalc,
 )
 
@@ -30,6 +33,27 @@ class SupplementalProfileTests(unittest.TestCase):
     def test_unknown_supplemental_profile_fails_closed(self):
         with self.assertRaises(KeyError):
             canonical_supplemental_profile('000001.SZ','2020-01-01')
+
+    def test_positive_supplemental_evidence_unlocks_only_exact_symbol_date(self):
+        rows=[{
+            'symbol':'000564.SZ','target_date':'2021-12-31',
+            'status':'SUPPLEMENTAL_POSITIVE_EVENT_EVIDENCE',
+            'target_date_found':True,'expected_term_found':True,
+        }]
+        self.assertEqual(extract_supplemental_profile('000564.SZ','2021-12-31',rows),'10转22.035714')
+        with self.assertRaises(ValueError):
+            extract_supplemental_profile('000564.SZ','2021-12-30',rows)
+
+    def test_targeted_probe_requires_closed_exact_profile(self):
+        probe={
+            'artifact':'MISSING_EVENT_300262_PROBE_V481',
+            'symbol':'300262.SZ','target_date':'2020-08-11',
+            'profile':'10派0.13元','evidence_closed':True,
+        }
+        self.assertEqual(extract_targeted_probe_profile('300262.SZ','2020-08-11',probe),'10派0.13元')
+        bad=dict(probe, evidence_closed=False)
+        with self.assertRaises(ValueError):
+            extract_targeted_probe_profile('300262.SZ','2020-08-11',bad)
 
 
 class F10ExtractionTests(unittest.TestCase):
@@ -61,6 +85,19 @@ class F10ExtractionTests(unittest.TestCase):
             with self.subTest(target=target):
                 with self.assertRaises(ValueError):
                     extract_f10_target_profile(target)
+
+    def test_resolution_prefers_pageajax_then_positive_frozen_fallbacks(self):
+        direct={'date':'2025-12-29','status':'F10_PAGEAJAX_TARGET_DATE_HIT','hits':[{'row':{
+            'EX_DIVIDEND_DATE':'2025-12-29 00:00:00','ASSIGN_PROGRESS':'实施方案','IMPL_PLAN_PROFILE':'10转10'}}]}
+        self.assertEqual(resolve_target_profile('000430.SZ',direct,[],{}),('10转10','F10_PAGEAJAX'))
+
+        partial={'date':'2021-12-31','status':'F10_PAGEAJAX_TARGET_DATE_UNRESOLVED_PARTIAL_WINDOW','hits':[]}
+        supplements=[{'symbol':'000564.SZ','target_date':'2021-12-31','status':'SUPPLEMENTAL_POSITIVE_EVENT_EVIDENCE','target_date_found':True,'expected_term_found':True}]
+        self.assertEqual(resolve_target_profile('000564.SZ',partial,supplements,{}),('10转22.035714','SUPPLEMENTAL_EXACT_SOURCE'))
+
+        failed={'date':'2020-08-11','status':'F10_PAGEAJAX_FETCH_FAILED','hits':[]}
+        probes={('300262.SZ','2020-08-11'):{'artifact':'MISSING_EVENT_300262_PROBE_V481','symbol':'300262.SZ','target_date':'2020-08-11','profile':'10派0.13元','evidence_closed':True}}
+        self.assertEqual(resolve_target_profile('300262.SZ',failed,[],probes),('10派0.13元','TARGETED_PAGEAJAX_RETRY'))
 
 
 class ClassificationTests(unittest.TestCase):
