@@ -48,7 +48,7 @@ jobs:
         with:
           name: gp-exact-term-effective-evidence-v482
           path: effective_evidence
-          run-id: 34099919571
+          run-id: 34101355150
           github-token: ${{ github.token }}
       - name: Download frozen Sina source census
         uses: actions/download-artifact@v4
@@ -79,15 +79,18 @@ jobs:
           p='artifact_effective_term_closure_v482/EFFECTIVE_TERM_CLOSURE_V482.json'
           x=json.load(open(p,encoding='utf-8'))
           assert x['standard_scope_n']==87
-          assert x['effective_override_event_n']==26
-          assert x['fully_closed_symbol_n']==9
-          assert x['remaining_exact_review_symbol_n']==78
+          assert x['effective_override_event_n']==58
+          assert x['fully_closed_symbol_n']==28
+          assert x['remaining_exact_review_symbol_n']==59
           assert x['closed_symbols']==[
-            '000030.SZ','000100.SZ','000725.SZ','000789.SZ','000863.SZ',
-            '000902.SZ','002090.SZ','002117.SZ','002127.SZ'
+            '000030.SZ','000069.SZ','000100.SZ','000425.SZ','000501.SZ','000528.SZ',
+            '000552.SZ','000601.SZ','000651.SZ','000718.SZ','000725.SZ','000789.SZ',
+            '000848.SZ','000850.SZ','000863.SZ','000902.SZ','001283.SZ','001979.SZ',
+            '002020.SZ','002029.SZ','002035.SZ','002083.SZ','002085.SZ','002090.SZ',
+            '002110.SZ','002117.SZ','002127.SZ','002145.SZ'
           ]
           assert x['checkpoint_after_effective_terms']=={
-            'PASS':766,'EXACT_TERM_REVIEW':78,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
+            'PASS':785,'EXACT_TERM_REVIEW':59,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
           }
           assert x['formal_promotion'] is False
           assert x['validated_global_provenance_emitted'] is False
