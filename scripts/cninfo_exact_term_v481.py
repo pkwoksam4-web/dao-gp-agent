@@ -31,7 +31,7 @@ def is_distribution_implementation_title(s: str) -> bool:
         return False
     if '预案' in title:
         return False
-    families=('权益分派','权益分配','分红派息','利润分配')
+    families=('权益分派','权益分配','分红派息','利润分配','资本公积金转增股本','现金分红')
     if not any(x in title for x in families):
         return False
     return '实施公告' in title or '方案实施公告' in title
