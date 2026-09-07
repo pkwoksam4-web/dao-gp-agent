@@ -47,6 +47,59 @@ def extract_f10_target_profile(target: dict) -> str:
     return uniq[0]
 
 
+def extract_supplemental_profile(symbol: str, date: str, records: list[dict]) -> str:
+    symbol=str(symbol).upper(); date=str(date)[:10]
+    matches=[]
+    for r in records or []:
+        if not isinstance(r,dict):
+            continue
+        if str(r.get('symbol') or '').upper()!=symbol or str(r.get('target_date') or '')[:10]!=date:
+            continue
+        if r.get('status')!='SUPPLEMENTAL_POSITIVE_EVENT_EVIDENCE':
+            continue
+        if r.get('target_date_found') is not True:
+            continue
+        if not (r.get('expected_term_found') is True or r.get('target_term_near') is True):
+            continue
+        matches.append(r)
+    if len(matches)!=1:
+        raise ValueError(f'expected one positive supplemental record for {symbol} {date}; found={len(matches)}')
+    return canonical_supplemental_profile(symbol,date)
+
+
+def extract_targeted_probe_profile(symbol: str, date: str, probe: dict) -> str:
+    symbol=str(symbol).upper(); date=str(date)[:10]
+    if not isinstance(probe,dict) or probe.get('artifact')!='MISSING_EVENT_300262_PROBE_V481':
+        raise ValueError('unexpected targeted probe artifact')
+    if str(probe.get('symbol') or '').upper()!=symbol or str(probe.get('target_date') or '')[:10]!=date:
+        raise ValueError('targeted probe symbol/date mismatch')
+    if probe.get('evidence_closed') is not True:
+        raise ValueError('targeted probe evidence is not closed')
+    profile=str(probe.get('profile') or '').strip()
+    canonical=canonical_supplemental_profile(symbol,date)
+    if profile!=canonical:
+        raise ValueError(f'targeted probe profile mismatch: {profile!r} vs {canonical!r}')
+    return profile
+
+
+def resolve_target_profile(
+    symbol: str,
+    target: dict,
+    supplemental_records: list[dict],
+    targeted_probes: dict[tuple[str,str],dict],
+) -> tuple[str,str]:
+    symbol=str(symbol).upper()
+    if not isinstance(target,dict):
+        raise ValueError('target must be an object')
+    date=str(target.get('date') or '')[:10]
+    if target.get('status')=='F10_PAGEAJAX_TARGET_DATE_HIT':
+        return extract_f10_target_profile(target),'F10_PAGEAJAX'
+    key=(symbol,date)
+    if key in (targeted_probes or {}):
+        return extract_targeted_probe_profile(symbol,date,targeted_probes[key]),'TARGETED_PAGEAJAX_RETRY'
+    return extract_supplemental_profile(symbol,date,supplemental_records),'SUPPLEMENTAL_EXACT_SOURCE'
+
+
 def classify_missing_event_recalc(event_coverage_complete: bool, factor_compare_status: str | None) -> str:
     if not event_coverage_complete:
         return 'BLOCKED_MISSING_EVENT_COVERAGE'
