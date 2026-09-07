@@ -27,7 +27,6 @@ EXPECTED={
   80_000_000:(4532,4204,4164,99.0485,1938.5,1481.0,1693.0,3164.5,1315,2977),
  100_000_000:(4479,4204,4122,98.0495,1666.0,1263.0,1432.0,2798.0,1091,2660),
 }
-VARIANTS=('market_day_zero','market_day_nan','market_day_positive','last20_traded')
 
 
 def sha256_file(path:pathlib.Path)->str:
@@ -38,7 +37,12 @@ def sha256_file(path:pathlib.Path)->str:
     return h.hexdigest()
 
 
-def _rolling_components(x:pd.DataFrame,variant:str,min_actual_before:int=MIN_ACTUAL_BEFORE):
+def _rolling_components(
+    x:pd.DataFrame,
+    variant:str,
+    min_actual_before:int=MIN_ACTUAL_BEFORE,
+    actual_gate:str='current',
+):
     z=x.copy().sort_values('date').reset_index(drop=True)
     traded=z['traded'].fillna(False).astype(bool)
     raw_amount=pd.to_numeric(z['amount'],errors='coerce')
@@ -52,13 +56,9 @@ def _rolling_components(x:pd.DataFrame,variant:str,min_actual_before:int=MIN_ACT
         amount=raw_amount.where(traded,np.nan)
         median20=amount.rolling(WINDOW,min_periods=MIN_PERIODS).median()
     elif variant=='market_day_positive':
-        # The window is 20 market days (enforced by density20 min_periods=20),
-        # while the median itself uses only actual positive traded-day amounts.
         amount=raw_amount.where(traded,np.nan)
         median20=amount.rolling(WINDOW,min_periods=1).median()
     elif variant=='last20_traded':
-        # Candidate historical implementation: median over the last 20 actual
-        # traded observations, with an independent 20-market-day density gate.
         median20=pd.Series(np.nan,index=z.index,dtype=float)
         ti=np.flatnonzero(traded.to_numpy())
         vals=raw_amount.iloc[ti].astype(float).reset_index(drop=True)
@@ -67,17 +67,55 @@ def _rolling_components(x:pd.DataFrame,variant:str,min_actual_before:int=MIN_ACT
     else:
         raise ValueError(f'unknown variant {variant}')
 
-    base=(density20>=MIN_DENSITY)&(cum>=int(min_actual_before))&traded
+    if actual_gate=='current':
+        enough_actual=cum>=int(min_actual_before)
+    elif actual_gate=='prior':
+        # Contract wording: minimum actual traded days *before* daily evaluation.
+        # Therefore the current traded day itself does not count toward the 120.
+        enough_actual=cum.shift(1,fill_value=0)>=int(min_actual_before)
+    else:
+        raise ValueError(f'unknown actual_gate {actual_gate}')
+
+    base=(density20>=MIN_DENSITY)&enough_actual&traded
     return z,traded,median20,density20,cum,base
 
 
-def evaluate_one_calendar_series(x:pd.DataFrame, threshold:float, variant:str, min_actual_before:int=MIN_ACTUAL_BEFORE)->pd.DataFrame:
-    z,traded,median20,density20,cum,base=_rolling_components(x,variant,min_actual_before)
+def evaluate_one_calendar_series(
+    x:pd.DataFrame,
+    threshold:float,
+    variant:str,
+    min_actual_before:int=MIN_ACTUAL_BEFORE,
+    actual_gate:str='current',
+)->pd.DataFrame:
+    z,traded,median20,density20,cum,base=_rolling_components(
+        x,variant,min_actual_before,actual_gate
+    )
     z['median_amount20']=median20
     z['trade_density20']=density20
     z['actual_traded_cum']=cum
     z['eligible']=base&(median20>=float(threshold))
     return z
+
+
+def summarize_daily_counts(counts, *, positive_days_only:bool=False)->dict:
+    c=np.asarray(counts,dtype=float)
+    nz=c[c>0]
+    summary_base=nz if positive_days_only else c
+    if len(summary_base)==0:
+        median=p10=p25=p90=float('nan')
+    else:
+        median=float(np.median(summary_base))
+        p10=float(np.percentile(summary_base,10))
+        p25=float(np.percentile(summary_base,25))
+        p90=float(np.percentile(summary_base,90))
+    return {
+        'median_daily_passing_pre_st':median,
+        'p10_daily_passing_pre_st':p10,
+        'p25_daily_passing_pre_st':p25,
+        'p90_daily_passing_pre_st':p90,
+        'min_daily_passing_when_base_nonzero':int(nz.min()) if len(nz) else 0,
+        'latest_day_passing_pre_st':int(c[-1]) if len(c) else 0,
+    }
 
 
 def _load_astock(root:pathlib.Path)->pd.DataFrame:
@@ -99,7 +137,14 @@ def _load_astock(root:pathlib.Path)->pd.DataFrame:
     return df
 
 
-def _metrics_for_variant(df:pd.DataFrame,variant:str)->dict:
+def _metrics_for_config(
+    df:pd.DataFrame,
+    *,
+    name:str,
+    variant:str,
+    actual_gate:str,
+    positive_days_only:bool,
+)->dict:
     calendar=pd.DatetimeIndex(sorted(df['date'].dropna().unique()))
     if len(calendar)!=EXPECTED_CALENDAR:
         raise ValueError(f'calendar {len(calendar)} != {EXPECTED_CALENDAR}')
@@ -113,7 +158,9 @@ def _metrics_for_variant(df:pd.DataFrame,variant:str)->dict:
         amount=pd.to_numeric(gg['amount'],errors='coerce')
         traded=(pd.to_numeric(gg['volume'],errors='coerce').fillna(0)>0)&(amount.fillna(0)>0)
         base_df=pd.DataFrame({'date':calendar,'amount':amount.to_numpy(),'traded':traded.to_numpy()})
-        _,_,median20,_,_,base=_rolling_components(base_df,variant,MIN_ACTUAL_BEFORE)
+        _,_,median20,_,_,base=_rolling_components(
+            base_df,variant,MIN_ACTUAL_BEFORE,actual_gate
+        )
         med=median20.to_numpy()
         b=base.to_numpy(dtype=bool)
         actual_n=int(traded.sum())
@@ -121,7 +168,7 @@ def _metrics_for_variant(df:pd.DataFrame,variant:str)->dict:
         if is_mature:
             mature+=1
         for t in THRESHOLDS:
-            e=b & (med>=float(t))
+            e=b&(med>=float(t))
             daily[t]+=e.astype(np.int32)
             if e.any():
                 ever[t]+=1
@@ -129,22 +176,22 @@ def _metrics_for_variant(df:pd.DataFrame,variant:str)->dict:
                     mature_ever[t]+=1
     out=[]
     for t in THRESHOLDS:
-        c=daily[t]
-        nz=c[c>0]
+        stats=summarize_daily_counts(daily[t],positive_days_only=positive_days_only)
         out.append({
             'min_liq_amount_cny':t,
             'symbols_ever_passing':ever[t],
             'mature_symbols_ge843':mature,
             'mature_symbols_ge843_and_ever_passing':mature_ever[t],
             'mature_retention_pct':round(100.0*mature_ever[t]/mature,4),
-            'median_daily_passing_pre_st':float(np.median(c)),
-            'p10_daily_passing_pre_st':float(np.percentile(c,10)),
-            'p25_daily_passing_pre_st':float(np.percentile(c,25)),
-            'p90_daily_passing_pre_st':float(np.percentile(c,90)),
-            'min_daily_passing_when_base_nonzero':int(nz.min()) if len(nz) else 0,
-            'latest_day_passing_pre_st':int(c[-1]),
+            **stats,
         })
-    return {'variant':variant,'results':out}
+    return {
+        'variant':name,
+        'median_semantics':variant,
+        'actual_gate':actual_gate,
+        'positive_days_only_summary':positive_days_only,
+        'results':out,
+    }
 
 
 def _compare(replay:dict)->dict:
@@ -170,9 +217,20 @@ def replay(root:pathlib.Path,out_dir:pathlib.Path)->dict:
         'symbols':df['code'].nunique(),
         'calendar_days':df['date'].nunique(),
     }
+    configs=[
+        ('market_day_zero','market_day_zero','current',False),
+        ('market_day_zero_prior120_positive_summary','market_day_zero','prior',True),
+        ('market_day_zero_current120_positive_summary','market_day_zero','current',True),
+        ('market_day_nan','market_day_nan','current',False),
+        ('market_day_positive','market_day_positive','current',False),
+        ('last20_traded','last20_traded','current',False),
+    ]
     variants=[]
-    for v in VARIANTS:
-        r=_metrics_for_variant(df,v)
+    for name,median_semantics,actual_gate,positive_summary in configs:
+        r=_metrics_for_config(
+            df,name=name,variant=median_semantics,
+            actual_gate=actual_gate,positive_days_only=positive_summary,
+        )
         r['comparison_to_v370']=_compare(r)
         variants.append(r)
     exact=[v['variant'] for v in variants if v['comparison_to_v370']['exact_match']]
@@ -191,7 +249,11 @@ def replay(root:pathlib.Path,out_dir:pathlib.Path)->dict:
     }
     out_dir.mkdir(parents=True,exist_ok=True)
     (out_dir/'LIQUIDITY_REPLAY_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-    print(json.dumps({'source':base,'exact_matching_variants':exact,'mismatch_counts':{v['variant']:v['comparison_to_v370']['mismatch_n'] for v in variants}},ensure_ascii=False,indent=2))
+    print(json.dumps({
+        'source':base,
+        'exact_matching_variants':exact,
+        'mismatch_counts':{v['variant']:v['comparison_to_v370']['mismatch_n'] for v in variants},
+    },ensure_ascii=False,indent=2))
     return report
 
 
