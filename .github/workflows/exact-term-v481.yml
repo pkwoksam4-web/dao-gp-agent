@@ -28,6 +28,36 @@ jobs:
             test_merge_cninfo_shards_v481.py \
             test_cninfo_narrow_supplement_v481.py
 
+  probe-cninfo-narrow-controls:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Run V4.81 narrow control probe')
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Probe narrow-window implementation announcements
+        run: python scripts/probe_cninfo_narrow_controls_v481.py
+      - name: Verify non-Formal control artifact
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_narrow_controls_v481/CNINFO_NARROW_CONTROL_PROBE_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['control_n']==4
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('control_n','matched_n','error_n')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-narrow-controls-v481
+          path: artifact_cninfo_narrow_controls_v481
+          if-no-files-found: error
+
   collect-cninfo-standard-index:
     if: github.event_name == 'workflow_dispatch'
     needs: tests
