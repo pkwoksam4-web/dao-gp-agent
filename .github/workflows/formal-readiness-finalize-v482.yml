@@ -28,3 +28,157 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_formal_readiness_finalize_v482.py
+
+  finalize:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+
+      - name: Download verified special ex-right closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-closure-v482
+          path: special
+          run-id: 34099127574
+          github-token: ${{ github.token }}
+
+      - name: Download materialized 11 of 11 special provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-provenance-direct-v482
+          path: special_provenance
+          run-id: 34124614666
+          github-token: ${{ github.token }}
+
+      - name: Download 792/52 effective closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+
+      - name: Download 821/23 secondary closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+
+      - name: Download 826/18 reparsed closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+
+      - name: Download reparsed evidence for provenance reconstruction
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-reparsed-evidence-v482
+          path: reparsed_evidence
+          run-id: 34108707726
+          github-token: ${{ github.token }}
+
+      - name: Download 838/6 recovered closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+
+      - name: Download 840/4 final-six closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+
+      - name: Download 844/0 final-four closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: final_four
+          run-id: 34117443729
+          github-token: ${{ github.token }}
+
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+
+      - name: Re-run 844 full paths and close Formal provenance gate
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/formal_readiness_finalize_v482.py \
+            --frozen-dir frozen \
+            --special-dir special \
+            --special-provenance-dir special_provenance \
+            --effective-dir effective \
+            --secondary-dir secondary \
+            --reparsed-dir reparsed \
+            --reparsed-evidence-dir reparsed_evidence \
+            --recovered-dir recovered \
+            --final-six-dir final_six \
+            --final-four-dir final_four \
+            --source-census-dir source_census \
+            --out-dir artifact_formal_readiness_final_v482
+
+      - name: Verify V4.82 Formal readiness is closed while OOS stays off
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_formal_readiness_final_v482/FORMAL_READINESS_FINAL_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['checkpoint']=={'PASS':844,'EXACT_TERM_REVIEW':0,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3}
+          assert x['universe_n']==847 and x['formal_symbol_n']==844
+          assert x['full_path_pass_n']==844 and x['full_path_fail_n']==0
+          assert x['max_full_path_diff_bp']<=5.0
+          assert x['standard_override_n']==270
+          assert x['special_override_n']==11
+          assert x['total_override_n']==281
+          assert x['special_provenance']['materialized_n']==11
+          assert x['special_provenance']['blocker_n']==0
+          assert x['gate']['status']=='FORMAL_READY_V482'
+          assert x['formal_ready'] is True
+          assert x['validated_global_provenance_emitted'] is True
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+            'checkpoint':x['checkpoint'],
+            'full_path_pass_n':x['full_path_pass_n'],
+            'max_full_path_diff_bp':x['max_full_path_diff_bp'],
+            'standard_override_n':x['standard_override_n'],
+            'special_materialized_n':x['special_provenance']['materialized_n'],
+            'gate':x['gate'],
+            'oos_metrics_allowed':x['oos_metrics_allowed'],
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload final Formal readiness artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: artifact_formal_readiness_final_v482/
+          if-no-files-found: error
+          retention-days: 30
