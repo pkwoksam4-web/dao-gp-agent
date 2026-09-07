@@ -52,13 +52,20 @@ jobs:
         run: |
           test "$(sha256sum input/astock/kline_002.parquet | awk '{print $1}')" = "f7e09d35183863f66ac5f72edf28135d59a0eb6577ca12720acfaf1855cc800e"
           echo 'PASS kline_002 frozen SHA256 identity'
-      - name: Replay both candidate V3.70 liquidity semantics
+      - name: Replay candidate V3.70 liquidity semantics
         env:
           PYTHONPATH: scripts
         run: |
           python scripts/liquidity_replay_v482.py \
             --astock-dir input/astock \
             --out-dir artifact_liquidity_replay_v482
+      - name: Upload V4.82 liquidity replay artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-liquidity-replay-v482
+          path: artifact_liquidity_replay_v482/
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify source shape and uniquely reproduced semantics
         run: |
           python - <<'PY'
@@ -69,14 +76,14 @@ jobs:
           assert s['rows_read']==6006046, s
           assert s['symbols']==5322, s
           assert s['calendar_days']==1426, s
+          if len(x['exact_matching_variants']) != 1:
+              print('Candidate mismatch counts:')
+              for v in x['variants']:
+                  c=v['comparison_to_v370']
+                  print(v['variant'], c['mismatch_n'])
+                  for m in c['mismatches'][:12]:
+                      print(' ',m)
           assert len(x['exact_matching_variants'])==1, x['exact_matching_variants']
           assert x['frozen_semantics_status']=='CLOSED_REPRODUCED_V370'
           print(json.dumps({'source':s,'exact_matching_variants':x['exact_matching_variants']},indent=2))
           PY
-      - name: Upload V4.82 liquidity replay artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: gp-liquidity-replay-v482
-          path: artifact_liquidity_replay_v482/
-          if-no-files-found: error
-          retention-days: 30
