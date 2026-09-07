@@ -24,4 +24,5 @@ jobs:
           python -m unittest -v \
             test_cninfo_exact_term_v481.py \
             test_cninfo_effective_terms_v481.py \
-            test_standard_exact_pdf_materializer_v481.py
+            test_standard_exact_pdf_materializer_v481.py \
+            test_merge_cninfo_shards_v481.py
