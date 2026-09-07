@@ -28,3 +28,73 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_cninfo_remaining_low_rate_v482.py
+
+  recover:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download supplemented 407/507 CNINFO index
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-standard-index-supplemented-v481
+          path: base_index
+          run-id: 34082377591
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 826/18 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: closure826
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - name: Download successful three-event low-rate probe
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-low-rate-probe-v482
+          path: probe3
+          run-id: 34109870647
+          github-token: ${{ github.token }}
+      - name: Recover remaining 95 events sequentially at proven low request rate
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/cninfo_remaining_low_rate_v482.py \
+            --base-index-dir base_index \
+            --closure-dir closure826 \
+            --probe-dir probe3 \
+            --out-dir artifact_cninfo_remaining_low_rate_v482 \
+            --timeout 45 \
+            --attempts 8 \
+            --sleep-between 2.0
+      - name: Verify target partition and non-Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_remaining_low_rate_v482/CNINFO_REMAINING_LOW_RATE_RECOVERY_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['remaining_symbol_n']==18
+          assert x['target_event_n']==98
+          assert x['preseeded_match_n']==3
+          assert x['network_target_event_n']==95
+          assert len(x['records'])==98
+          assert x['matched_event_n']>=3
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in (
+            'target_event_n','preseeded_match_n','network_target_event_n','matched_event_n',
+            'network_matched_event_n','query_error_event_n','unresolved_event_n')},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload remaining low-rate recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-remaining-low-rate-recovery-v482
+          path: artifact_cninfo_remaining_low_rate_v482/
+          if-no-files-found: error
+          retention-days: 30
