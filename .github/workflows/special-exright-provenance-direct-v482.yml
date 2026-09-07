@@ -6,6 +6,7 @@ on:
       - gp/v482-special-exright
     paths:
       - 'data/SPECIAL_EXRIGHT_CNINFO_PDF_V482.json'
+      - 'data/SPECIAL_EXRIGHT_REFERENCE_V482.json'
       - 'scripts/materialize_special_exright_manifest_v482.py'
       - 'scripts/test_special_exright_direct_v482.py'
       - '.github/workflows/special-exright-provenance-direct-v482.yml'
@@ -28,3 +29,50 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_special_exright_direct_v482.py
+
+  materialize:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+      - name: Materialize pinned 11 official CNINFO PDFs
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/materialize_special_exright_manifest_v482.py \
+            --ledger data/SPECIAL_EXRIGHT_REFERENCE_V482.json \
+            --manifest data/SPECIAL_EXRIGHT_CNINFO_PDF_V482.json \
+            --out-dir artifact_special_exright_provenance_direct_v482
+      - name: Verify 11 of 11 provenance closure remains non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_special_exright_provenance_direct_v482/SPECIAL_EXRIGHT_PROVENANCE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['target_n']==11
+          assert x['materialized_n']==11
+          assert x['unresolved_n']==0
+          assert all(r['status']=='PASS_CNINFO_MATERIALIZED' for r in x['records'])
+          assert all((r.get('provenance') or {}).get('announcement_id') for r in x['records'])
+          assert all(len((r.get('provenance') or {}).get('materialized_sha256') or '')==64 for r in x['records'])
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({'materialized_n':x['materialized_n'],'unresolved_n':x['unresolved_n']},indent=2))
+          PY
+      - name: Upload pinned special provenance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-special-exright-provenance-direct-v482
+          path: artifact_special_exright_provenance_direct_v482/
+          if-no-files-found: error
+          retention-days: 30
