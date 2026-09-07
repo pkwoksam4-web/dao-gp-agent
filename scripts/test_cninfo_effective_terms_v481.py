@@ -58,16 +58,54 @@ class CninfoEffectiveTermParserTests(unittest.TestCase):
         x=extract_effective_terms(text)
         self.assertAlmostEqual(x['cash_per_share'],0.2941285)
 
-    def test_complex_divisor_formula_does_not_promote_cash_without_cap_ratio(self):
+    def test_symbolic_complex_divisor_does_not_promote_partial_cash(self):
         text=(
             '本次权益分派实施后的除权除息参考价格='
             '（除权除息前一交易日收盘价-按公司总股本折算每股现金分红金额）/'
-            '（1+按公司总股本折算每股资本公积转增股本比例）='
-            '（股权登记日收盘价-0.0988848元/股）/（1+0.40）。'
+            '（1+按公司总股本折算每股资本公积转增股本比例）。'
         )
         x=extract_effective_terms(text)
         self.assertIsNone(x['cash_per_share'])
         self.assertIsNone(x['cap_ratio'])
+
+    def test_extracts_complete_numeric_cash_and_cap_exright_formula(self):
+        text=(
+            '本次权益分派实施后的除权除息参考价格='
+            '（除权除息前一交易日收盘价-按总股本折算每股现金分红金额）/'
+            '（1+按公司总股本折算每股资本公积转增股本股数）='
+            '（股权登记日收盘价-0.0988848元/股）/（1+0.3955395）。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.0988848)
+        self.assertAlmostEqual(x['cap_ratio'],0.3955395)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_COUPLED_EXRIGHT_FORMULA_CASH_V482')
+        self.assertEqual(x['cap_evidence_kind'],'EXPLICIT_COUPLED_EXRIGHT_FORMULA_CAP_V482')
+
+    def test_extracts_cap_only_numeric_exright_denominator(self):
+        text=(
+            '本次权益分派实施后的每股除权除息参考价格='
+            '股权登记日股票收盘价÷（1+0.2941856）。'
+        )
+        x=extract_effective_terms(text)
+        self.assertIsNone(x['cash_per_share'])
+        self.assertAlmostEqual(x['cap_ratio'],0.2941856)
+
+    def test_extracts_explicit_effective_per_share_cap_ratio(self):
+        text=(
+            '考虑到回购专户不参与权益分派，本次权益分派实施后除权价格计算时，'
+            '每股转增股本比例应以0.096600计算（每股转增股本数=实际转增股本数/总股本）。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cap_ratio'],0.096600)
+
+    def test_extracts_parenthetical_folded_cash_in_exright_formula(self):
+        text=(
+            '本次权益分派实施后的除权除息价格按照上述原则及计算方式执行，'
+            '即本次权益分派实施后的除权除息价格=权益分派股权登记日收盘价-'
+            '按公司总股本折算的每股现金红利（0.1117002元/股）。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.1117002)
 
 
 if __name__=='__main__':
