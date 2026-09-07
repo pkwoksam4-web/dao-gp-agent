@@ -21,7 +21,7 @@ jobs:
       - name: V4.81 missing-event factor recalc unit tests
         run: |
           cd scripts
-          python -m unittest -v test_missing_event_terms_v481.py test_missing_event_factor_recalc_v481.py test_missing_event_factor_53_v481.py
+          python -m unittest -v test_missing_event_terms_v481.py test_missing_event_factor_recalc_v481.py test_missing_event_factor_53_v481.py test_merge_missing_event_closure_v481.py
 
   recalc:
     needs: tests
