@@ -6,9 +6,16 @@ on:
       - gp/v482-special-exright
     paths:
       - 'scripts/sample50_validate.py'
+      - 'scripts/special_exright_closure_v482.py'
       - 'scripts/test_special_exright_v482.py'
+      - 'scripts/test_special_exright_closure_v482.py'
+      - 'data/SPECIAL_EXRIGHT_REFERENCE_V482.json'
       - '.github/workflows/special-exright-v482.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   tests:
@@ -21,4 +28,4 @@ jobs:
       - name: V4.82 special ex-right tests
         run: |
           cd scripts
-          python -m unittest -v test_special_exright_v482.py
+          python -m unittest -v test_special_exright_v482.py test_special_exright_closure_v482.py
