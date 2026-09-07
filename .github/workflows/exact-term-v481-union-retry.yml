@@ -1,0 +1,177 @@
+name: GP Exact Term V481 Union Retry
+
+on:
+  push:
+    branches:
+      - gp/exact-term-v481
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 union/retry tests
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_cninfo_evidence_union_v481.py \
+            test_cninfo_narrow_supplement_v481.py
+
+  build-cninfo-evidence-union:
+    if: contains(github.event.head_commit.message, 'Run V4.81 evidence union')
+    needs: tests
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen CNINFO evidence sources
+        run: |
+          mkdir -p first_long second_long narrow
+          gh api repos/${{ github.repository }}/actions/artifacts/10003882783/zip > first.zip
+          gh api repos/${{ github.repository }}/actions/artifacts/10004022360/zip > second.zip
+          gh api repos/${{ github.repository }}/actions/artifacts/10004390420/zip > narrow.zip
+          unzip -q first.zip -d first_long
+          unzip -q second.zip -d second_long
+          unzip -q narrow.zip -d narrow
+          test -f first_long/CNINFO_STANDARD_EXACT_TERM_INDEX_MERGED_V481.json
+          test -f second_long/CNINFO_STANDARD_EXACT_TERM_INDEX_MERGED_V481.json
+          test -f narrow/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json
+      - name: Build positive-evidence union
+        run: |
+          python scripts/cninfo_evidence_union_v481.py \
+            --source narrow=narrow \
+            --source second_long=second_long \
+            --source first_long=first_long \
+            --out-dir artifact_cninfo_evidence_union_v481 \
+            --expected-scope-n 87
+      - name: Verify exact union checkpoint and Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_evidence_union_v481/CNINFO_STANDARD_EXACT_TERM_INDEX_UNION_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_symbol_n']==87
+          assert x['event_date_n']==507
+          assert x['matched_event_n']==484
+          assert x['unmatched_event_n']==23
+          assert x['symbols_all_events_matched_n']==78
+          assert x['symbols_unresolved_n']==9
+          assert x['conflict_event_n']==0
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('scope_symbol_n','event_date_n','matched_event_n','unmatched_event_n','symbols_all_events_matched_n','symbols_unresolved_n','conflict_event_n','selected_positive_source_counts','status_counts')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-evidence-union-v481
+          path: artifact_cninfo_evidence_union_v481
+          if-no-files-found: error
+
+  collect-final-narrow-retry:
+    if: contains(github.event.head_commit.message, 'Run V4.81 evidence union')
+    needs: build-cninfo-evidence-union
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-standard-evidence-union-v481
+          path: union_base
+      - name: Retry only unresolved 9 symbols / 23 events
+        run: |
+          python scripts/cninfo_narrow_supplement_v481.py collect \
+            --base-index-dir union_base \
+            --out-dir artifact_cninfo_final_retry_v481 \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 3 \
+            --timeout 12 \
+            --attempts 6 \
+            --sleep-between 0.50 \
+            --expected-target-symbol-n 9 \
+            --expected-target-event-n 23
+      - name: Verify retry shard remains non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_final_retry_v481/CNINFO_NARROW_EXACT_TERM_SUPPLEMENT_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['full_target_symbol_n']==9
+          assert x['full_target_event_n']==23
+          assert x['shard_count']==3
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('shard_index','target_symbol_n','target_event_n','matched_event_n','query_error_event_n','unmatched_no_error_event_n')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-final-retry-v481-shard-${{ matrix.shard }}
+          path: artifact_cninfo_final_retry_v481
+          if-no-files-found: error
+
+  merge-final-narrow-retry:
+    if: contains(github.event.head_commit.message, 'Run V4.81 evidence union')
+    needs: collect-final-narrow-retry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-standard-evidence-union-v481
+          path: union_base
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gp-cninfo-final-retry-v481-shard-*
+          path: final_retry_shards
+      - name: Merge final retry into evidence union
+        run: |
+          python scripts/cninfo_narrow_supplement_v481.py merge \
+            --base-index-dir union_base \
+            --supplement-dir final_retry_shards \
+            --out-dir artifact_cninfo_standard_final_retry_v481 \
+            --expected-scope-n 87
+      - name: Verify final retry scope and Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_standard_final_retry_v481/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_symbol_n']==87
+          assert x['event_date_n']==507
+          assert x['matched_event_n']>=484
+          assert x['unmatched_event_n']<=23
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('scope_symbol_n','event_date_n','matched_event_n','unmatched_event_n','symbols_all_events_matched_n','symbols_unresolved_n','status_counts')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-final-retry-v481
+          path: artifact_cninfo_standard_final_retry_v481
+          if-no-files-found: error
