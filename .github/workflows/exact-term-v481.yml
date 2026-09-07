@@ -58,6 +58,110 @@ jobs:
           path: artifact_cninfo_narrow_controls_v481
           if-no-files-found: error
 
+  collect-cninfo-narrow-supplement:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Run V4.81 narrow supplement full')
+    needs: tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen first-pass 87-symbol CNINFO index
+        run: |
+          mkdir -p base_index
+          gh api repos/${{ github.repository }}/actions/artifacts/10003882783/zip > base_index.zip
+          unzip -q base_index.zip -d base_index
+          test -f base_index/CNINFO_STANDARD_EXACT_TERM_INDEX_MERGED_V481.json
+      - name: Collect narrow-window supplement shard
+        run: |
+          python scripts/cninfo_narrow_supplement_v481.py collect \
+            --base-index-dir base_index \
+            --out-dir artifact_cninfo_narrow_supplement_v481 \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 4 \
+            --timeout 15 \
+            --attempts 4 \
+            --sleep-between 0.30 \
+            --expected-target-symbol-n 59 \
+            --expected-target-event-n 315
+      - name: Verify supplement shard remains non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_narrow_supplement_v481/CNINFO_NARROW_EXACT_TERM_SUPPLEMENT_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['full_target_symbol_n']==59
+          assert x['full_target_event_n']==315
+          assert x['shard_count']==4
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('shard_index','target_symbol_n','target_event_n','matched_event_n','query_error_event_n','unmatched_no_error_event_n')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-narrow-supplement-v481-shard-${{ matrix.shard }}
+          path: artifact_cninfo_narrow_supplement_v481
+          if-no-files-found: error
+
+  merge-cninfo-narrow-supplement:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Run V4.81 narrow supplement full')
+    needs: collect-cninfo-narrow-supplement
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen first-pass 87-symbol CNINFO index
+        run: |
+          mkdir -p base_index
+          gh api repos/${{ github.repository }}/actions/artifacts/10003882783/zip > base_index.zip
+          unzip -q base_index.zip -d base_index
+          test -f base_index/CNINFO_STANDARD_EXACT_TERM_INDEX_MERGED_V481.json
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gp-cninfo-narrow-supplement-v481-shard-*
+          path: input_narrow_shards
+      - name: Merge narrow supplement into exact 87-symbol index
+        run: |
+          python scripts/cninfo_narrow_supplement_v481.py merge \
+            --base-index-dir base_index \
+            --supplement-dir input_narrow_shards \
+            --out-dir artifact_cninfo_standard_index_supplemented_v481 \
+            --expected-scope-n 87
+      - name: Verify supplemented scope and Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_standard_index_supplemented_v481/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_symbol_n']==87
+          assert x['event_date_n']==507
+          assert x['matched_event_n']>=192
+          assert len({r['symbol'] for r in x['records']})==87
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('scope_symbol_n','event_date_n','matched_event_n','unmatched_event_n','symbols_all_events_matched_n','symbols_unresolved_n','status_counts')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-index-supplemented-v481
+          path: artifact_cninfo_standard_index_supplemented_v481
+          if-no-files-found: error
+
   collect-cninfo-standard-index:
     if: github.event_name == 'workflow_dispatch'
     needs: tests
