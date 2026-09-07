@@ -1,8 +1,10 @@
+import json
 import unittest
 
 from cninfo_narrow_supplement_v481 import (
     select_unmatched_targets,
     merge_base_with_supplement,
+    replay_saved_query_raw,
 )
 
 
@@ -50,6 +52,30 @@ class NarrowSupplementScopeTests(unittest.TestCase):
         supplement={'records':[{'symbol':'000001.SZ','ex_date':'2024-01-02','match':{'announcementId':'x'},'error':None}]}
         with self.assertRaises(ValueError):
             merge_base_with_supplement(base,supplement,expected_scope_n=1)
+
+    def test_saved_raw_replay_uses_current_title_matcher_and_keeps_sha(self):
+        raw=json.dumps({'announcements':[
+            {'announcementId':'1224486389',
+             'announcementTitle':'2024年度资本公积金转增股本<em>实施</em><em>公告</em>',
+             'announcementTime':1755187200000,
+             'adjunctUrl':'finalpage/2025-08-15/1224486389.PDF'},
+        ]},ensure_ascii=False).encode('utf-8')
+        row=replay_saved_query_raw('001323.SZ','2025-08-21',raw,'frozen/raw/001323.json')
+        self.assertEqual(row['symbol'],'001323.SZ')
+        self.assertEqual(row['ex_date'],'2025-08-21')
+        self.assertEqual(row['match']['announcementId'],'1224486389')
+        self.assertEqual(row['replay_provenance']['raw_file'],'frozen/raw/001323.json')
+        self.assertEqual(len(row['replay_provenance']['sha256']),64)
+        self.assertIsNone(row['error'])
+
+    def test_saved_raw_replay_stays_unmatched_when_no_valid_implementation_title(self):
+        raw=json.dumps({'announcements':[
+            {'announcementId':'bad','announcementTitle':'关于回购股份实施结果暨股份变动的公告',
+             'announcementTime':1753113600000,'adjunctUrl':'x.pdf'},
+        ]},ensure_ascii=False).encode('utf-8')
+        row=replay_saved_query_raw('001323.SZ','2025-08-21',raw,'frozen/raw/bad.json')
+        self.assertIsNone(row['match'])
+        self.assertIsNone(row['error'])
 
 
 if __name__=='__main__':
