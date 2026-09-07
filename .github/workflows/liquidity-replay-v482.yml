@@ -29,3 +29,54 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_liquidity_replay_v482.py
+
+  replay:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Checkout exact public astock snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: newbiestring-lang/astock
+          ref: 0babe4cf6c1a175c6b84add10803b4b1f9c6000c
+          path: input/astock
+          fetch-depth: 1
+      - name: Install replay dependencies
+        run: pip install -q pandas pyarrow numpy
+      - name: Verify frozen astock byte identity
+        run: |
+          test "$(sha256sum input/astock/kline_002.parquet | awk '{print $1}')" = "f7e09d35183863f66ac5f72edf28135d59a0eb6577ca12720acfaf1855cc800e"
+          echo 'PASS kline_002 frozen SHA256 identity'
+      - name: Replay both candidate V3.70 liquidity semantics
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/liquidity_replay_v482.py \
+            --astock-dir input/astock \
+            --out-dir artifact_liquidity_replay_v482
+      - name: Verify source shape and uniquely reproduced semantics
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('artifact_liquidity_replay_v482/LIQUIDITY_REPLAY_V482.json',encoding='utf-8'))
+          s=x['source']
+          assert s['kline_002_sha_match'] is True
+          assert s['rows_read']==6006046, s
+          assert s['symbols']==5322, s
+          assert s['calendar_days']==1426, s
+          assert len(x['exact_matching_variants'])==1, x['exact_matching_variants']
+          assert x['frozen_semantics_status']=='CLOSED_REPRODUCED_V370'
+          print(json.dumps({'source':s,'exact_matching_variants':x['exact_matching_variants']},indent=2))
+          PY
+      - name: Upload V4.82 liquidity replay artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-liquidity-replay-v482
+          path: artifact_liquidity_replay_v482/
+          if-no-files-found: error
+          retention-days: 30
