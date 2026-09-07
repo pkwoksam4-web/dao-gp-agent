@@ -58,7 +58,21 @@ jobs:
           run-id: 34009535349
           github-token: ${{ github.token }}
 
-      - name: Recalculate exact 847 factor paths from complete global ledger
+      - name: Download frozen two-symbol RAW repair
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-qfq-raw-blocker-repair-v481
+          path: raw_repair
+          run-id: 34073387924
+          github-token: ${{ github.token }}
+
+      - name: Integrate repaired Sohu RAW by verified SHA
+        run: |
+          python scripts/integrate_qfq_raw_repair_v481.py \
+            --repair-dir raw_repair \
+            --nominal-dir nominal_shards
+
+      - name: Recalculate exact 847 factor paths from frozen inputs
         run: |
           python scripts/recalc_global_qfq_from_ledger_v481_fixed.py \
             --scope data/pit_st_scope_v480.txt \
@@ -66,6 +80,14 @@ jobs:
             --source-census source_census \
             --nominal-shards nominal_shards \
             --out-dir artifact_global_qfq_ledger_recalc_v481
+
+      - name: Patch repaired RAW provenance into recalc outputs
+        run: |
+          python scripts/integrate_qfq_raw_repair_v481.py \
+            --repair-dir raw_repair \
+            --nominal-dir nominal_shards \
+            --out-dir artifact_global_qfq_ledger_recalc_v481 \
+            --patch-output
 
       - name: Verify V4.81 recalc remains fail-closed
         run: |
@@ -83,6 +105,10 @@ jobs:
           assert sum(x['status_counts'].values())==847
           assert x['global_event_ledger']['sharebonus_rows']==22688
           assert x['global_event_ledger']['rights_rows']==30
+          assert x['raw_repairs']['status']=='INTEGRATED_FROZEN_REPAIR_ARTIFACT'
+          assert x['raw_repairs']['source_run']==34073387924
+          assert {r['symbol'] for r in x['raw_repairs']['applied']}=={'000069.SZ','001379.SZ'}
+          assert x['status_counts'].get('BLOCKED_GLOBAL_LEDGER_RAW_SOURCE',0)==0
           print(json.dumps({
               'status_counts':x['status_counts'],
               'nominal_pass_n':x['nominal_pass_n'],
@@ -90,6 +116,7 @@ jobs:
               'review_n':x['review_n'],
               'factor_compared_n':x['factor_compared_n'],
               'factor_over_5bp_n':x['factor_over_5bp_n'],
+              'raw_repairs':x['raw_repairs'],
           },ensure_ascii=False,indent=2))
           PY
 
