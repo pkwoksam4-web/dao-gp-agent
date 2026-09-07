@@ -9,11 +9,10 @@ import urllib.request
 OUT = pathlib.Path('artifact_bonusfinancing_js_probe_v481')
 OUT.mkdir(parents=True, exist_ok=True)
 
+# SeaJS base resolves from f10pcCommon.min.js directory: /PC_HSF10/Content/js/lib/
 CANDIDATES = [
-    'https://emweb.securities.eastmoney.com/PC_HSF10/Content/js/new/BonusFinancing.js?v=1.0.2.7054',
-    'https://emweb.securities.eastmoney.com/Content/js/new/BonusFinancing.js?v=1.0.2.7054',
-    'https://emweb.securities.eastmoney.com/PC_HSF10/Content/js/new/BonusFinancing.js',
-    'https://emweb.securities.eastmoney.com/Content/js/new/BonusFinancing.js',
+    'https://emweb.securities.eastmoney.com/PC_HSF10/Content/js/lib/new/BonusFinancing.js?v=1.0.2.7054',
+    'https://emweb.securities.eastmoney.com/PC_HSF10/Content/js/lib/new/BonusFinancing.js',
 ]
 
 
@@ -40,12 +39,12 @@ def fetch(url: str):
 
 
 def interesting_lines(text: str):
-    pats = ('ajax', 'url', 'api', 'bonus', 'dividend', 'report', 'filter', 'Get', 'POST', 'BonusDetails')
+    pats = ('ajax', 'url', 'api', 'bonus', 'dividend', 'report', 'filter', 'Get', 'POST', 'BonusDetails', 'datacenter')
     out=[]
     for i,line in enumerate(text.splitlines(),1):
         if any(p.lower() in line.lower() for p in pats):
-            out.append({'line': i, 'text': line[:1000]})
-    return out[:500]
+            out.append({'line': i, 'text': line[:2000]})
+    return out[:800]
 
 
 def main():
@@ -59,8 +58,8 @@ def main():
             rec['raw_file']=p.name
             text=raw.decode('utf-8', errors='replace')
             rec['interesting_lines']=interesting_lines(text)
-            rec['urls']=sorted(set(re.findall(r'https?://[^\"\'\s)]+', text)))[:200]
-            rec['quoted_paths']=sorted(set(re.findall(r'[\"\']([^\"\']*(?:Bonus|bonus|Dividend|dividend|ajax|Ajax|api|API)[^\"\']*)[\"\']', text)))[:300]
+            rec['urls']=sorted(set(re.findall(r'https?://[^\"\'\s)]+', text)))[:400]
+            rec['quoted_paths']=sorted(set(re.findall(r'[\"\']([^\"\']*(?:Bonus|bonus|Dividend|dividend|ajax|Ajax|api|API|datacenter|report)[^\"\']*)[\"\']', text)))[:500]
         rows.append(rec)
     report={
         'artifact':'BONUSFINANCING_JS_PROBE_V481',
