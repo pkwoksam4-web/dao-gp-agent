@@ -45,6 +45,15 @@ class CninfoEffectiveTermParserTests(unittest.TestCase):
         self.assertAlmostEqual(x['cash_per_share'],2.3337380)
         self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_FINAL_EXRIGHT_CASH_SUBTRACTION')
 
+    def test_extracts_final_exright_cash_when_announcement_says_closing_price(self):
+        text=(
+            '因本次分红存在差异化安排，本次权益分派实施后的除权除息参考价格按照以下公式计算。'
+            '公司除权（息）参考价格=（股权登记日收盘价格-0.2961638）元/股。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.2961638)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_FINAL_EXRIGHT_CASH_SUBTRACTION')
+
     def test_extracts_total_share_cash_calculation_without_word_ratio(self):
         text=(
             '按股权登记日的总股本折算每股现金红利=实际现金分红总金额÷股权登记日的总股本='
@@ -53,10 +62,50 @@ class CninfoEffectiveTermParserTests(unittest.TestCase):
         x=extract_effective_terms(text)
         self.assertAlmostEqual(x['cash_per_share'],0.2537199)
 
+    def test_extracts_folded_per_share_cash_from_explicit_formula(self):
+        text=(
+            '因公司回购股份不参与利润分配，本次权益分派实施后需要计算除权除息参考价格。'
+            '折算每股现金红利=实际现金分红总额÷股权登记日的总股本='
+            '369,000,000÷1,176,862,492=0.3135332元/股。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.3135332)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_FOLDED_CASH_PER_SHARE_V482')
+
     def test_extracts_a_share_folded_per10_cash(self):
         text='按A股除权前总股本（含回购股份及其他不参与分红的股份）计算的每10股派息（含税）：2.941285元。'
         x=extract_effective_terms(text)
         self.assertAlmostEqual(x['cash_per_share'],0.2941285)
+
+    def test_extracts_a_share_specific_effective_cash_formula(self):
+        text=(
+            '本公告为A股权益分派实施公告。A股除权除息价格计算时，'
+            '每股现金红利=现金分红总额/总股本，即0.097115元/股。'
+            'B股现金红利折算结果另行计算。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.097115)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_A_SHARE_EFFECTIVE_CASH_V482')
+
+    def test_extracts_virtual_differential_cash_from_computed_formula(self):
+        text=(
+            '本次利润分配采用差异化分红，除权除息参考价格按虚拟分派计算。'
+            '虚拟分派的每股现金红利=本次实际参与分配的股本数×实际分派的每股现金红利÷'
+            '本次利润分配股权登记日的总股本=0.1109元/股。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.1109)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_DIFFERENTIAL_FOLDED_CASH_V482')
+
+    def test_extracts_folded_per10_cash_from_differential_formula(self):
+        text=(
+            '因公司回购股份不参与本次权益分派，本次除权除息参考价按差异化分红规则计算。'
+            '折算后的每10股现金股利=实际参与分配股份数×每10股现金股利÷总股本=2.454060元，'
+            '所以每股现金红利为0.245406元/股。'
+        )
+        x=extract_effective_terms(text)
+        self.assertAlmostEqual(x['cash_per_share'],0.245406)
+        self.assertEqual(x['cash_evidence_kind'],'EXPLICIT_FOLDED_CASH_PER10_V482')
 
     def test_symbolic_complex_divisor_does_not_promote_partial_cash(self):
         text=(
