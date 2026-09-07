@@ -26,3 +26,80 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_remaining_exact_candidates_v482.py
+
+  materialize:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+      - name: Download frozen 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen_closure
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download current 792/52 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: current_closure
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download supplemented 407/507 CNINFO index
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-standard-index-supplemented-v481
+          path: index407
+          run-id: 34082377591
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Materialize 203 matched unoverridden events
+        run: |
+          python scripts/remaining_exact_candidates_v482.py \
+            --frozen-closure-dir frozen_closure \
+            --current-closure-dir current_closure \
+            --index-dir index407 \
+            --source-census-dir source_census \
+            --out-dir artifact_remaining_exact_v482 \
+            --workers 8
+      - name: Verify remaining candidate partition and fail-closed guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_remaining_exact_v482/REMAINING_EXACT_MATCHED_PDF_EVIDENCE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['remaining_symbol_n']==52
+          assert x['matched_candidate_event_n']==203
+          assert x['matched_candidate_symbol_n']==36
+          assert x['unique_announcement_n']==203
+          assert x['pdf_text_ok_event_n']==203
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in (
+            'remaining_symbol_n','matched_candidate_event_n','matched_candidate_symbol_n',
+            'pdf_text_ok_event_n','effective_term_event_n')},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload remaining exact PDF evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-remaining-exact-pdf-evidence-v482
+          path: artifact_remaining_exact_v482/
+          if-no-files-found: error
+          retention-days: 30
