@@ -9,8 +9,10 @@ on:
       - 'scripts/materialize_standard_exact_pdfs_v481.py'
       - 'scripts/cninfo_effective_terms_v481.py'
       - 'scripts/cninfo_exact_term_v481.py'
+      - 'scripts/reparse_existing_effective_terms_v482.py'
       - 'scripts/test_cninfo_effective_terms_v481.py'
       - 'scripts/test_standard_exact_pdf_materializer_v481.py'
+      - 'scripts/test_reparse_existing_effective_terms_v482.py'
   workflow_dispatch:
 
 permissions:
@@ -30,7 +32,8 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_cninfo_effective_terms_v481.py \
-            test_standard_exact_pdf_materializer_v481.py
+            test_standard_exact_pdf_materializer_v481.py \
+            test_reparse_existing_effective_terms_v482.py
 
   materialize-effective-terms:
     needs: tests
