@@ -28,3 +28,57 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_materialize_remaining_recovered_v482.py
+
+  materialize:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+      - name: Download 92-event low-rate recovery evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-remaining-low-rate-recovery-v482
+          path: recovery92
+          run-id: 34110213720
+          github-token: ${{ github.token }}
+      - name: Materialize only newly recovered official PDFs
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/materialize_remaining_recovered_v482.py \
+            --recovery-dir recovery92 \
+            --out-dir artifact_recovered_remaining_pdfs_v482 \
+            --workers 6
+      - name: Verify recovered-PDF partition and non-Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_recovered_remaining_pdfs_v482/RECOVERED_REMAINING_PDF_EVIDENCE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['source_target_event_n']==98
+          assert x['source_matched_event_n']==92
+          assert x['source_unresolved_event_n']==6
+          assert x['matched_event_n']==92
+          assert x['unique_announcement_n']<=92
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in (
+            'matched_event_n','unique_announcement_n','pdf_text_ok_event_n','effective_term_event_n')},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload recovered official PDF evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-recovered-remaining-pdf-evidence-v482
+          path: artifact_recovered_remaining_pdfs_v482/
+          if-no-files-found: error
+          retention-days: 30
