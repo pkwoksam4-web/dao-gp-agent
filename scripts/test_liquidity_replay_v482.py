@@ -71,6 +71,26 @@ class LiquidityReplayTests(unittest.TestCase):
         self.assertEqual(s['p90_daily_passing_pre_st'],37.0)
         self.assertEqual(s['latest_day_passing_pre_st'],40)
 
+    def test_frozen_80m_gate_can_close_when_80m_and_all_eligibility_fields_match(self):
+        variant={
+            'variant':'market_day_zero_prior120_positive_summary',
+            'results':[],
+            'comparison_to_v370':{
+                'mismatches':[
+                    {'threshold':30_000_000,'field':'median_daily_passing_pre_st'},
+                    {'threshold':50_000_000,'field':'p10_daily_passing_pre_st'},
+                ]
+            },
+        }
+        for t,exp in m.EXPECTED.items():
+            fields=m.RESULT_FIELDS
+            variant['results'].append({'min_liq_amount_cny':t, **{f:exp[i] for i,f in enumerate(fields)}})
+        status=m.assess_frozen_80m_replay([variant])
+        self.assertEqual(status['frozen_80m_status'],'CLOSED_REPRODUCED_V370_80M')
+        self.assertEqual(status['frozen_80m_variant'],'market_day_zero_prior120_positive_summary')
+        self.assertEqual(status['eligibility_logic_residual_n'],0)
+        self.assertEqual(status['six_threshold_reporting_residual_n'],2)
+
     def test_current_day_must_be_traded(self):
         dates=pd.date_range('2026-01-01', periods=121, freq='D')
         x=pd.DataFrame({'date':dates,'amount':[100_000_000.0]*121,'traded':[True]*121})
