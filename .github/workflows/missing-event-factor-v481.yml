@@ -116,3 +116,89 @@ jobs:
           path: artifact_missing_event_factor_v481/
           if-no-files-found: error
           retention-days: 30
+
+  recalc-remaining-53:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download integrated V4.81 847 checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-ledger-recalc-v481
+          path: integrated_847
+          run-id: 34073572831
+          github-token: ${{ github.token }}
+
+      - name: Download frozen all-60 F10 PageAjax evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-f10-missing-event-v481
+          path: f10_all60
+          run-id: 34075413814
+          github-token: ${{ github.token }}
+
+      - name: Download corrected V4.81 Sina factor source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+
+      - name: Download frozen V4.81 Sohu RAW shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-global-qfq-nominal-v481-shard-*
+          path: nominal_shards
+          merge-multiple: true
+          run-id: 34009535349
+          github-token: ${{ github.token }}
+
+      - name: Recalculate remaining 53 fully evidenced missing-event symbols
+        run: |
+          python scripts/run_missing_event_factor_recalc_53_v481.py \
+            --integrated-dir integrated_847 \
+            --f10-dir f10_all60 \
+            --source-census source_census \
+            --nominal-shards nominal_shards \
+            --out-dir artifact_missing_event_factor_53_v481
+
+      - name: Verify exact 53-symbol result closes missing-event class only
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_missing_event_factor_53_v481/MISSING_EVENT_FACTOR_RECALC_53_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['target_symbol_n']==53
+          assert x['target_missing_event_date_n']==93
+          assert x['blocked_n']==0
+          assert sum(x['status_counts'].values())==53
+          assert all(r['coverage_complete'] is True for r in x['records'])
+          c=x['nominal_checkpoint_after_60']
+          assert c['MISSING_EVENT_REVIEW']==0
+          assert c['PASS']+c['EXACT_TERM_REVIEW']+c['NOT_APPLICABLE']==847
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+              'status_counts':x['status_counts'],
+              'resolved_pass_n':x['resolved_pass_n'],
+              'resolved_to_exact_review_n':x['resolved_to_exact_review_n'],
+              'nominal_checkpoint_after_60':c,
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload V4.81 remaining-53 factor recalc evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-missing-event-factor-recalc-53-v481
+          path: artifact_missing_event_factor_53_v481/
+          if-no-files-found: error
+          retention-days: 30
