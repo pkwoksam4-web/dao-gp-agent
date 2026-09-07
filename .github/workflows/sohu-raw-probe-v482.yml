@@ -29,3 +29,108 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_sohu_raw_v482.py
+
+  probe:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Checkout exact frozen astock snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: newbiestring-lang/astock
+          ref: 0babe4cf6c1a175c6b84add10803b4b1f9c6000c
+          path: input/astock
+          fetch-depth: 1
+      - name: Install probe dependencies
+        run: pip install -q requests pandas pyarrow numpy
+      - name: Probe 8 stratified full RAW histories
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/sohu_raw_v482.py \
+            --symbol 000001.SZ \
+            --symbol 000004.SZ \
+            --symbol 002002.SZ \
+            --symbol 002359.SZ \
+            --symbol 300104.SZ \
+            --symbol 600074.SH \
+            --symbol 600614.SH \
+            --symbol 600634.SH \
+            --workers 2 \
+            --out-dir artifact_sohu_raw_probe_v482
+      - name: Crosscheck unambiguous Sohu rows against frozen astock bytes
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          import numpy as np
+          import pandas as pd
+
+          out=pathlib.Path('artifact_sohu_raw_probe_v482')
+          checks=[]
+          targets={
+              '002002.SZ':'input/astock/kline_002.parquet',
+              '002359.SZ':'input/astock/kline_002.parquet',
+              '300104.SZ':'input/astock/kline_300.parquet',
+              '600074.SH':'input/astock/kline_600.parquet',
+              '600614.SH':'input/astock/kline_600.parquet',
+              '600634.SH':'input/astock/kline_600.parquet',
+          }
+          cache={}
+          for sym,p in targets.items():
+              csvp=out/f'{sym}.csv'
+              if not csvp.exists():
+                  checks.append({'symbol':sym,'status':'SOHU_CSV_MISSING'}); continue
+              if p not in cache:
+                  q=pd.read_parquet(p,columns=['code','date','volume','amount'])
+                  q['code']=q['code'].astype(str).str.replace(r'\.0$','',regex=True).str.zfill(6)
+                  q['date']=pd.to_datetime(q['date']).dt.strftime('%Y-%m-%d')
+                  cache[p]=q
+              code=sym.split('.')[0]
+              a=cache[p][cache[p]['code']==code][['date','volume','amount']].copy()
+              s=pd.read_csv(csvp,usecols=['date','volume','amount'])
+              z=s.merge(a,on='date',suffixes=('_sohu','_astock'))
+              if z.empty:
+                  checks.append({'symbol':sym,'status':'NO_COMMON_ROWS'}); continue
+              for c in ('volume','amount'):
+                  z[c+'_rel']=np.abs(z[c+'_sohu']-z[c+'_astock'])/np.maximum(np.abs(z[c+'_astock']),1.0)
+              checks.append({
+                  'symbol':sym,'status':'COMPARED','common_rows':len(z),
+                  'volume_rel_median':float(z['volume_rel'].median()),
+                  'volume_rel_p99':float(z['volume_rel'].quantile(.99)),
+                  'amount_rel_median':float(z['amount_rel'].median()),
+                  'amount_rel_p99':float(z['amount_rel'].quantile(.99)),
+                  'amount_rel_max':float(z['amount_rel'].max()),
+              })
+          report={'artifact':'SOHU_ASTOCK_CROSSCHECK_V482','checks':checks,'formal_admission':False}
+          (out/'SOHU_ASTOCK_CROSSCHECK_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload Sohu probe artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sohu-raw-probe-v482
+          path: artifact_sohu_raw_probe_v482/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Report diagnostic coverage without premature formal admission
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path('artifact_sohu_raw_probe_v482/SOHU_RAW_PROBE_V482.json')
+          if not p.exists(): raise SystemExit('probe summary missing')
+          x=json.load(p.open(encoding='utf-8'))
+          print(json.dumps({
+              'symbols_requested':x['symbols_requested'],'symbols_fetched':x['symbols_fetched'],
+              'nonempty_pass':x['nonempty_pass'],'errors':x['errors'],
+              'audits':[{k:a.get(k) for k in ('symbol','rows','first_date','last_date','max_chunk_rows','status')} for a in x['audits']],
+              'error_details':x['error_details'],'formal_admission':x['formal_admission'],
+          },ensure_ascii=False,indent=2))
+          PY
