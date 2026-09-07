@@ -52,6 +52,13 @@ def select_standard_exact_symbols(report: dict) -> dict[str,list[str]]:
     return dict(sorted(out.items()))
 
 
+def shard_standard_scope(scope: dict[str,list[str]], shard_index: int, shard_count: int) -> dict[str,list[str]]:
+    if shard_count < 1 or not (0 <= shard_index < shard_count):
+        raise ValueError(f'invalid shard {shard_index}/{shard_count}')
+    items=sorted(scope.items())
+    return dict(items[shard_index::shard_count])
+
+
 def match_announcements_to_events(event_dates: list[str], items: list[dict], max_prior_days: int=30) -> dict[str,dict|None]:
     candidates=[]
     for item in items or []:
@@ -106,7 +113,7 @@ def collect_one(symbol: str, event_dates: list[str], raw_dir: pathlib.Path) -> d
         q_raw=q['raw']; q_file=f'{code}_formal_implementation_index.json'; (raw_dir/q_file).write_bytes(q_raw)
         items=(q['json'] or {}).get('announcements') or []
         rec['query']={'http_status':q.get('http_status'),'content_type':q.get('content_type'),'attempts':q.get('attempts'),
-                      'raw_file':q_file,'sha256':hashlib.sha256(q_raw).hexdigest(),'bytes':len(q_raw)}
+                      'raw_file':q_file,'sha256':hashlib.sha256(q_raw).hexdigest(),'bytes':len(q_raw),'column':q.get('column')}
         rec['announcement_n']=len(items)
         matched=match_announcements_to_events(event_dates,items,30)
         for d,item in matched.items():
@@ -123,12 +130,18 @@ def main():
     ap.add_argument('--closure-dir',required=True)
     ap.add_argument('--out-dir',required=True)
     ap.add_argument('--workers',type=int,default=3)
+    ap.add_argument('--shard-index',type=int,default=0)
+    ap.add_argument('--shard-count',type=int,default=1)
     args=ap.parse_args()
     closure_path=_find_unique(pathlib.Path(args.closure_dir),'GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json')
     closure=json.loads(closure_path.read_text(encoding='utf-8'))
-    scope=select_standard_exact_symbols(closure)
-    if len(scope)!=87:
-        raise RuntimeError(f'expected exact 87 standard exact-term symbols; got {len(scope)}')
+    full_scope=select_standard_exact_symbols(closure)
+    if len(full_scope)!=87:
+        raise RuntimeError(f'expected exact 87 standard exact-term symbols; got {len(full_scope)}')
+    scope=shard_standard_scope(full_scope,args.shard_index,args.shard_count)
+    expected_shard_n=len(list(sorted(full_scope))[args.shard_index::args.shard_count])
+    if len(scope)!=expected_shard_n:
+        raise RuntimeError('deterministic shard size mismatch')
 
     out=pathlib.Path(args.out_dir); raw=out/'raw'; raw.mkdir(parents=True,exist_ok=True)
     records=[]
@@ -136,8 +149,8 @@ def main():
         fut={pool.submit(collect_one,s,dates,raw):s for s,dates in scope.items()}
         for i,f in enumerate(as_completed(fut),1):
             r=f.result(); records.append(r)
-            if i%10==0 or i==len(scope):
-                print(json.dumps({'progress':i,'total':len(scope),'symbol':r['symbol'],'matched':r['matched_event_n'],'events':len(r['event_dates']),'error':r['error']},ensure_ascii=False),flush=True)
+            if i%5==0 or i==len(scope):
+                print(json.dumps({'progress':i,'total':len(scope),'shard_index':args.shard_index,'shard_count':args.shard_count,'symbol':r['symbol'],'matched':r['matched_event_n'],'events':len(r['event_dates']),'error':r['error']},ensure_ascii=False),flush=True)
     records.sort(key=lambda r:r['symbol'])
     query_ok=sum(r['error'] is None for r in records)
     total_events=sum(len(r['event_dates']) for r in records)
@@ -145,8 +158,9 @@ def main():
     all_matched=sum(r['error'] is None and r['matched_event_n']==len(r['event_dates']) for r in records)
     report={
         'artifact':'CNINFO_STANDARD_EXACT_TERM_INDEX_V481','version':'V4.81',
-        'formal_window':[FORMAL_BEG,FORMAL_END],'scope_symbol_n':87,
-        'query_ok_n':query_ok,'query_error_n':87-query_ok,'event_date_n':total_events,
+        'formal_window':[FORMAL_BEG,FORMAL_END],'full_scope_symbol_n':87,
+        'shard_index':args.shard_index,'shard_count':args.shard_count,'scope_symbol_n':len(scope),
+        'query_ok_n':query_ok,'query_error_n':len(scope)-query_ok,'event_date_n':total_events,
         'matched_event_n':matched_events,'symbols_all_events_matched_n':all_matched,
         'status_counts':dict(Counter('QUERY_ERROR' if r['error'] else ('ALL_MATCHED' if r['matched_event_n']==len(r['event_dates']) else 'PARTIAL_MATCH') for r in records)),
         'records':records,
@@ -155,7 +169,7 @@ def main():
         'generated_at_utc':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),
     }
     (out/'CNINFO_STANDARD_EXACT_TERM_INDEX_V481.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-    print(json.dumps({k:report[k] for k in ['scope_symbol_n','query_ok_n','query_error_n','event_date_n','matched_event_n','symbols_all_events_matched_n','status_counts']},ensure_ascii=False,indent=2))
+    print(json.dumps({k:report[k] for k in ['shard_index','shard_count','scope_symbol_n','query_ok_n','query_error_n','event_date_n','matched_event_n','symbols_all_events_matched_n','status_counts']},ensure_ascii=False,indent=2))
 
 if __name__=='__main__':
     main()
