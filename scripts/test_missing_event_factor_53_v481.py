@@ -3,6 +3,8 @@ import unittest
 from run_missing_event_factor_recalc_53_v481 import (
     action_from_base_event,
     build_combined_actions,
+)
+from remaining53_contract_v481 import (
     select_remaining53,
     summarize_checkpoint_after_53,
 )
@@ -69,7 +71,6 @@ class Remaining53PartitionTests(unittest.TestCase):
         for i in range(60):
             symbol=(f'{i:06d}.SZ')
             records.append({'symbol':symbol,'status':'REVIEW_GLOBAL_LEDGER_MISSING_EVENT_MATCH'})
-        # Replace first seven synthetic names with the actual resolved7 names.
         for i,symbol in enumerate(sorted(resolved7)):
             records[i]={'symbol':symbol,'status':'REVIEW_GLOBAL_LEDGER_MISSING_EVENT_MATCH'}
         selected=select_remaining53({'records':records})
