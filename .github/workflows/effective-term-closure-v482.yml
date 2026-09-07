@@ -26,3 +26,83 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_effective_term_closure_v482.py
+
+  closure:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen_closure
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download V4.82 official-PDF effective-term evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-exact-term-effective-evidence-v482
+          path: effective_evidence
+          run-id: 34099919571
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Download V4.82 special-exright closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-closure-v482
+          path: special_closure
+          run-id: 34099127574
+          github-token: ${{ github.token }}
+      - name: Recompute all 87 standard exact-review factor paths
+        run: |
+          python scripts/effective_term_closure_v482.py \
+            --frozen-closure-dir frozen_closure \
+            --evidence-dir effective_evidence \
+            --source-census-dir source_census \
+            --special-closure-dir special_closure \
+            --out-dir artifact_effective_term_closure_v482
+      - name: Verify V4.82 checkpoint remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_effective_term_closure_v482/EFFECTIVE_TERM_CLOSURE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['standard_scope_n']==87
+          assert x['effective_override_event_n']==26
+          assert x['fully_closed_symbol_n']==9
+          assert x['remaining_exact_review_symbol_n']==78
+          assert x['closed_symbols']==[
+            '000030.SZ','000100.SZ','000725.SZ','000789.SZ','000863.SZ',
+            '000902.SZ','002090.SZ','002117.SZ','002127.SZ'
+          ]
+          assert x['checkpoint_after_effective_terms']=={
+            'PASS':766,'EXACT_TERM_REVIEW':78,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
+          }
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+            'checkpoint':x['checkpoint_after_effective_terms'],
+            'closed_symbols':x['closed_symbols'],
+            'effective_override_event_n':x['effective_override_event_n'],
+          },ensure_ascii=False,indent=2))
+          PY
+      - name: Upload V4.82 effective-term closure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: artifact_effective_term_closure_v482/
+          if-no-files-found: error
+          retention-days: 30
