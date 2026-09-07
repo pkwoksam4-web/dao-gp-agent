@@ -1,0 +1,109 @@
+{
+  "artifact": "SPECIAL_EXRIGHT_REFERENCE_V482",
+  "version": "V4.82",
+  "record_n": 11,
+  "formal_promotion": false,
+  "validated_global_provenance_emitted": false,
+  "purpose": "Fail-closed exchange-adjusted ex-right reference overrides for restructuring capitalization events that are not ordinary bonus/capitalization distributions.",
+  "records": [
+    {
+      "symbol": "000430.SZ",
+      "ex_date": "2025-12-29",
+      "adjusted_reference_price": 6.87,
+      "expected_prev_close": 7.90,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://paper.cnstock.com/html/2025-12/27/content_2163650.htm",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000525.SZ",
+      "ex_date": "2024-11-18",
+      "adjusted_reference_price": 9.07,
+      "expected_prev_close": 10.10,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=10596756&stockid=000525",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000615.SZ",
+      "ex_date": "2025-12-29",
+      "adjusted_reference_price": 3.53,
+      "expected_prev_close": 4.18,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=11879079&stockid=000615",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000691.SZ",
+      "ex_date": "2026-01-05",
+      "adjusted_reference_price": 7.05,
+      "expected_prev_close": 9.10,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://paper.cnstock.com/html/2026-01/05/content_2165997.htm",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000697.SZ",
+      "ex_date": "2025-11-28",
+      "adjusted_reference_price": 8.05,
+      "expected_prev_close": 8.52,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://paper.cnstock.com/html/2025-11/28/content_2151302.htm",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000796.SZ",
+      "ex_date": "2023-12-20",
+      "adjusted_reference_price": 3.93,
+      "expected_prev_close": 4.08,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://epaper.stcn.com/con/202312/20/content_2568217.html",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000908.SZ",
+      "ex_date": "2026-03-11",
+      "adjusted_reference_price": 4.36,
+      "expected_prev_close": 6.37,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=11989453&stockid=000908",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "000981.SZ",
+      "ex_date": "2022-02-25",
+      "adjusted_reference_price": 2.10,
+      "expected_prev_close": 3.50,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_IMPLEMENTATION_EVIDENCE",
+      "evidence_url": "https://qxb-pdf-osscache.qixin.com/AnBaseinfo/c6dcd04d7bd6c81c427d291ad6975af2.PDF",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "002021.SZ",
+      "ex_date": "2023-12-29",
+      "adjusted_reference_price": 2.80,
+      "expected_prev_close": 3.53,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://epaper.stcn.com/con/202312/29/content_2572590.html",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "002076.SZ",
+      "ex_date": "2022-12-21",
+      "adjusted_reference_price": 2.23,
+      "expected_prev_close": 2.60,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_IMPLEMENTATION_EVIDENCE",
+      "evidence_url": "https://www.sohu.com/a/619144022_120988533",
+      "formal_promotion": false
+    },
+    {
+      "symbol": "600306.SH",
+      "ex_date": "2023-12-26",
+      "adjusted_reference_price": 8.14,
+      "expected_prev_close": 11.98,
+      "evidence_kind": "RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT",
+      "evidence_url": "https://paper.cnstock.com/html/2023-12/26/content_1858624.htm",
+      "formal_promotion": false
+    }
+  ]
+}
