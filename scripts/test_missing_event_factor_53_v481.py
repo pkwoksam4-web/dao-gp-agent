@@ -3,6 +3,8 @@ import unittest
 from run_missing_event_factor_recalc_53_v481 import (
     action_from_base_event,
     build_combined_actions,
+    select_remaining53,
+    summarize_checkpoint_after_53,
 )
 
 
@@ -58,6 +60,42 @@ class Remaining53ActionTests(unittest.TestCase):
         }]}
         with self.assertRaises(ValueError):
             build_combined_actions('000430.SZ',base,f10)
+
+
+class Remaining53PartitionTests(unittest.TestCase):
+    def test_selects_only_missing_event_records_excluding_resolved7(self):
+        resolved7={'000564.SZ','000981.SZ','002076.SZ','300117.SZ','300262.SZ','600070.SH','600190.SH'}
+        records=[]
+        for i in range(60):
+            symbol=(f'{i:06d}.SZ')
+            records.append({'symbol':symbol,'status':'REVIEW_GLOBAL_LEDGER_MISSING_EVENT_MATCH'})
+        # Replace first seven synthetic names with the actual resolved7 names.
+        for i,symbol in enumerate(sorted(resolved7)):
+            records[i]={'symbol':symbol,'status':'REVIEW_GLOBAL_LEDGER_MISSING_EVENT_MATCH'}
+        selected=select_remaining53({'records':records})
+        self.assertEqual(len(selected),53)
+        self.assertTrue(resolved7.isdisjoint({r['symbol'] for r in selected}))
+
+    def test_checkpoint_moves_each_remaining_symbol_out_of_missing(self):
+        out=summarize_checkpoint_after_53([
+            'PASS_MISSING_EVENT_RESOLVED_NOMINAL_FACTOR']*40+
+            ['REVIEW_EXACT_TERMS_AFTER_MISSING_EVENT']*13
+        )
+        self.assertEqual(out,{
+            'PASS':747,'EXACT_TERM_REVIEW':97,'MISSING_EVENT_REVIEW':0,
+            'NOT_APPLICABLE':3,'REVIEW_TOTAL':97,
+        })
+
+    def test_blocked_symbols_remain_missing(self):
+        out=summarize_checkpoint_after_53([
+            'PASS_MISSING_EVENT_RESOLVED_NOMINAL_FACTOR']*50+
+            ['REVIEW_EXACT_TERMS_AFTER_MISSING_EVENT']*2+
+            ['BLOCKED_MISSING_EVENT_COVERAGE'],
+        )
+        self.assertEqual(out['PASS'],757)
+        self.assertEqual(out['EXACT_TERM_REVIEW'],86)
+        self.assertEqual(out['MISSING_EVENT_REVIEW'],1)
+        self.assertEqual(out['REVIEW_TOTAL'],87)
 
 
 if __name__=='__main__':
