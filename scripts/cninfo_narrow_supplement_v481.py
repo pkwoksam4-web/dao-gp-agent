@@ -38,6 +38,28 @@ def shard_targets(targets: dict[str,list[str]], shard_index: int, shard_count: i
     return dict(items[shard_index::shard_count])
 
 
+def replay_saved_query_raw(symbol: str, ex_date: str, raw: bytes, raw_file: str) -> dict:
+    if not isinstance(raw,(bytes,bytearray)) or not raw:
+        raise ValueError('saved CNINFO raw must be non-empty bytes')
+    symbol=str(symbol or '').strip(); ex_date=str(ex_date or '')[:10]
+    if not symbol or len(ex_date)!=10:
+        raise ValueError('invalid symbol/ex_date for saved raw replay')
+    try:
+        obj=json.loads(bytes(raw).decode('utf-8'))
+    except Exception as e:
+        raise ValueError(f'invalid saved CNINFO JSON: {e}') from e
+    items=(obj or {}).get('announcements') or []
+    match=match_announcements_to_events([ex_date],items,max_prior_days=45)[ex_date]
+    return {
+        'symbol':symbol,'ex_date':ex_date,'match':match,'error':None,
+        'replay_provenance':{
+            'method':'SAVED_CNINFO_RAW_REPLAY_CURRENT_MATCHER',
+            'raw_file':str(raw_file),'sha256':hashlib.sha256(bytes(raw)).hexdigest(),
+            'bytes':len(raw),'announcement_n':len(items),
+        },
+    }
+
+
 def _find_unique(root: pathlib.Path, name: str) -> pathlib.Path:
     hits=[p for p in root.rglob(name) if p.is_file()]
     if len(hits)!=1:
@@ -111,7 +133,7 @@ def merge_base_with_supplement(base: dict, supplement: dict, expected_scope_n: i
         if s.get('match') is not None:
             matches[d]=copy.deepcopy(s['match'])
         hist=r.setdefault('narrow_supplement',{'base_query_error':r.get('error'),'events':{}})
-        hist['events'][d]={k:copy.deepcopy(s.get(k)) for k in ('query','match','error','org_lookup')}
+        hist['events'][d]={k:copy.deepcopy(s.get(k)) for k in ('query','match','error','org_lookup','replay_provenance')}
 
     for r in records:
         dates=[str(d)[:10] for d in (r.get('event_dates') or [])]
