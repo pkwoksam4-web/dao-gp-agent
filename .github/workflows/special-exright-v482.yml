@@ -29,3 +29,56 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_special_exright_v482.py test_special_exright_closure_v482.py
+
+  closure:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen V4.81 remaining-53 recalc
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-missing-event-factor-recalc-53-v481
+          path: recalc53
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download frozen V4.81 first-7 recalc
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-missing-event-factor-recalc-v481
+          path: recalc7
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Recalculate exact 11 restructuring special ex-right reviews
+        run: |
+          python scripts/special_exright_closure_v482.py \
+            --recalc53-dir recalc53 \
+            --recalc7-dir recalc7 \
+            --override-ledger data/SPECIAL_EXRIGHT_REFERENCE_V482.json \
+            --out-dir artifact_special_exright_v482
+      - name: Verify V4.82 special-exright checkpoint
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('artifact_special_exright_v482/SPECIAL_EXRIGHT_CLOSURE_V482.json',encoding='utf-8'))
+          assert x['target_n']==11 and x['pass_n']==11 and x['review_n']==0
+          assert all(r['status']=='PASS_SPECIAL_EXRIGHT_V482' for r in x['records'])
+          assert max(r['diff_bp'] for r in x['records']) <= 5.0
+          c=x['checkpoint_after_special_exright']
+          assert c=={'PASS':757,'EXACT_TERM_REVIEW':87,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3}
+          assert sum(c.values())==847
+          assert x['formal_promotion'] is False and x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps({'checkpoint':c,'max_diff_bp':max(r['diff_bp'] for r in x['records'])},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload V4.82 special-exright closure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-special-exright-closure-v482
+          path: artifact_special_exright_v482/
+          if-no-files-found: error
+          retention-days: 30
