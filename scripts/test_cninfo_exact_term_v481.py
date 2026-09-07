@@ -10,6 +10,7 @@ from cninfo_exact_term_v481 import (
 from collect_cninfo_exact_term_indices_v481 import (
     select_standard_exact_symbols,
     match_announcements_to_events,
+    shard_standard_scope,
 )
 
 
@@ -76,6 +77,15 @@ class ExactTermBulkScopeTests(unittest.TestCase):
     def test_event_without_prior_implementation_announcement_stays_unmatched(self):
         out=match_announcements_to_events(['2023-05-17'],[],max_prior_days=30)
         self.assertIsNone(out['2023-05-17'])
+
+    def test_deterministic_shards_partition_scope_exactly(self):
+        scope={f'{i:06d}.SZ':['2024-01-02'] for i in range(17)}
+        shards=[shard_standard_scope(scope,i,4) for i in range(4)]
+        union={k for shard in shards for k in shard}
+        self.assertEqual(union,set(scope))
+        self.assertEqual(sum(len(s) for s in shards),len(scope))
+        self.assertTrue(all(set(shards[i]).isdisjoint(set(shards[j])) for i in range(4) for j in range(i+1,4)))
+        self.assertEqual(list(shards[0]),['000000.SZ','000004.SZ','000008.SZ','000012.SZ','000016.SZ'])
 
 
 if __name__=='__main__':
