@@ -39,6 +39,43 @@ def extract_effective_terms(text: str) -> dict:
     for m in re.finditer(r'按(?:公司)?总股本折算每股现金(?:分红|红利)比例[^。;；]*?=([0-9]+(?:\.[0-9]+)?)元/股',s):
         cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_FOLDED_CASH'))
 
+    # V4.82 supplement: many implementation announcements state the final ex-right
+    # formula explicitly as "record-date close - effective cash" but put the folded
+    # cash calculation much earlier in the paragraph.  Accept the numeric subtraction
+    # only when nearby text is clearly about ex-right/ex-dividend pricing.  If the
+    # subtraction is followed by a non-trivial /(1+n) denominator, do not promote the
+    # cash alone; that event requires a separately extracted capitalization ratio.
+    for m in re.finditer(r'(?:股权登记日|权益分派股权登记日|前)收盘价[-－]([0-9]+(?:\.[0-9]+)?)(?:元/股|元)?',s):
+        prior=s[max(0,m.start()-700):m.start()]
+        after=s[m.end():m.end()+180]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        if re.search(r'(?:/|÷)[（(]?1\+',after):
+            continue
+        cash.append((float(m.group(1)),'EXPLICIT_FINAL_EXRIGHT_CASH_SUBTRACTION'))
+
+    # V4.82 supplement: folded per-share cash may omit the literal word "比例" and
+    # may use "股权登记日的总股本" rather than "公司总股本".
+    for m in re.finditer(
+        r'按(?:股权登记日的|公司)?总股本(?:[（(]含回购股份[）)])?折算的?每股现金(?:分红|红利)'
+        r'[^。;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
+        cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_FOLDED_CASH_V482'))
+
+    # V4.82 supplement: an explicit total-cash / total-shares calculation is also a
+    # valid effective per-share term when the final result is written in 元/股.
+    for m in re.finditer(
+        r'每股现金红利=本次实际现金分红总金额/(?:公司)?总股本'
+        r'[^。;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
+        cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_CASH_CALC_V482'))
+
+    # Some A-share announcements publish the effective amount as a per-10-share
+    # figure over the A-share ex-right total; convert that explicit folded value to
+    # a per-share cash term.  Nominal "每10股派X" plans do not match this guarded form.
+    for m in re.finditer(
+        r'按A股除权前总股本[^。;；]{0,260}?每10股派息(?:[（(]含税[）)])?[:：]?'
+        r'([0-9]+(?:\.[0-9]+)?)元',s):
+        cash.append((float(m.group(1))/10.0,'EXPLICIT_A_SHARE_FOLDED_CASH_PER10_V482'))
+
     # Formula parameter D is accepted only when the nearby announcement text calls it
     # virtual/effective distribution, so ordinary nominal D statements are not promoted.
     for m in re.finditer(r'D为每股派发现金红利([0-9]+(?:\.[0-9]+)?)元/股(?P<context>.{0,100})',s):
