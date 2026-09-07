@@ -1,6 +1,10 @@
 import unittest
 
-from recalc_global_qfq_from_ledger_v481 import classify_result, rows_by_security_code
+from recalc_global_qfq_from_ledger_v481 import (
+    classify_result,
+    rows_by_security_code,
+    sina_factor_change_dates,
+)
 
 
 class LedgerRecalcClassificationTests(unittest.TestCase):
@@ -38,6 +42,33 @@ class LedgerRecalcClassificationTests(unittest.TestCase):
         self.assertEqual(
             classify_result(100, 1, None, ['2024-01-02'], ['2024-01-02']),
             'REVIEW_GLOBAL_LEDGER_FACTOR_COMPARISON',
+        )
+
+
+class SinaFactorChangeTests(unittest.TestCase):
+    def test_listing_baseline_duplicate_is_not_an_event(self):
+        rows = [
+            {'date':'1900-01-01','factor':1.3977387808545},
+            {'date':'2021-04-29','factor':1.3977387808545},
+            {'date':'2022-06-01','factor':1.3421258320141},
+            {'date':'2023-05-30','factor':1.3281921746824},
+        ]
+        self.assertEqual(
+            sina_factor_change_dates(rows, '2020-06-01', '2026-04-17'),
+            ['2022-06-01','2023-05-30'],
+        )
+
+    def test_factor_changes_are_window_bounded(self):
+        rows = [
+            {'date':'1900-01-01','factor':2.0},
+            {'date':'2020-05-20','factor':1.8},
+            {'date':'2020-06-01','factor':1.7},
+            {'date':'2021-07-01','factor':1.5},
+            {'date':'2026-05-01','factor':1.0},
+        ]
+        self.assertEqual(
+            sina_factor_change_dates(rows, '2020-06-01', '2026-04-17'),
+            ['2021-07-01'],
         )
 
 
