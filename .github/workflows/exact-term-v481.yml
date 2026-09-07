@@ -22,3 +22,21 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_cninfo_exact_term_v481.py
+
+  probe-cninfo-controls:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Probe four CNINFO exact-term controls
+        run: python scripts/probe_cninfo_exact_term_controls_v481.py
+      - name: Upload CNINFO control evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-exact-term-controls-v481
+          path: artifact_cninfo_exact_term_controls_v481/
+          if-no-files-found: error
+          retention-days: 30
