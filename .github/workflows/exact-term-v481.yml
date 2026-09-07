@@ -26,3 +26,90 @@ jobs:
             test_cninfo_effective_terms_v481.py \
             test_standard_exact_pdf_materializer_v481.py \
             test_merge_cninfo_shards_v481.py
+
+  collect-cninfo-standard-index:
+    needs: tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen 847 missing-event closure checkpoint
+        run: |
+          mkdir -p frozen_closure
+          gh api repos/${{ github.repository }}/actions/artifacts/10002862860/zip > closure.zip
+          unzip -q closure.zip -d frozen_closure
+          test -f frozen_closure/GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json
+      - name: Collect CNINFO standard exact-term announcement index shard
+        run: |
+          python scripts/collect_cninfo_exact_term_indices_v481.py \
+            --closure-dir frozen_closure \
+            --out-dir artifact_cninfo_standard_index_v481 \
+            --workers 3 \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 8
+      - name: Verify shard remains non-Formal
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_standard_index_v481/CNINFO_STANDARD_EXACT_TERM_INDEX_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['full_scope_symbol_n']==87
+          assert x['shard_count']==8
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('shard_index','scope_symbol_n','query_ok_n','query_error_n','event_date_n','matched_event_n','symbols_all_events_matched_n','status_counts')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-index-v481-shard-${{ matrix.shard }}
+          path: artifact_cninfo_standard_index_v481
+          if-no-files-found: error
+
+  merge-cninfo-standard-index:
+    needs: collect-cninfo-standard-index
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gp-cninfo-standard-index-v481-shard-*
+          path: input_cninfo_shards
+      - name: Merge exact 87-symbol CNINFO index partition
+        run: |
+          python scripts/merge_cninfo_shards_v481.py \
+            --input-dir input_cninfo_shards \
+            --out-dir artifact_cninfo_standard_index_merged_v481 \
+            --expected-scope-n 87
+      - name: Verify merged scope and Formal guard
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_cninfo_standard_index_merged_v481/CNINFO_STANDARD_EXACT_TERM_INDEX_MERGED_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_symbol_n']==87
+          assert x['shard_count']==8
+          assert len({r['symbol'] for r in x['records']})==87
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('scope_symbol_n','query_ok_n','query_error_n','event_date_n','matched_event_n','symbols_all_events_matched_n','status_counts')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-index-merged-v481
+          path: artifact_cninfo_standard_index_merged_v481
+          if-no-files-found: error
