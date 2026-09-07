@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import pathlib
-import tempfile
 import unittest
 
 import special_exright_closure_v482 as closure
@@ -36,6 +34,7 @@ class SpecialExRightClosureV482Tests(unittest.TestCase):
             'symbol': '600306.SH',
             'ex_date': '2023-12-26',
             'adjusted_reference_price': 8.14,
+            'expected_prev_close': 11.98,
             'formal_promotion': False,
         }
         result = closure.validate_one(frozen, override, threshold_bp=5.0)
@@ -53,6 +52,7 @@ class SpecialExRightClosureV482Tests(unittest.TestCase):
             'symbol': '000796.SZ',
             'ex_date': '2023-12-20',
             'adjusted_reference_price': 3.93,
+            'expected_prev_close': 4.08,
             'formal_promotion': False,
         }
         with self.assertRaises(ValueError):
