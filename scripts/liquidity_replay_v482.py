@@ -27,6 +27,7 @@ EXPECTED={
   80_000_000:(4532,4204,4164,99.0485,1938.5,1481.0,1693.0,3164.5,1315,2977),
  100_000_000:(4479,4204,4122,98.0495,1666.0,1263.0,1432.0,2798.0,1091,2660),
 }
+VARIANTS=('market_day_zero','market_day_nan','market_day_positive','last20_traded')
 
 
 def sha256_file(path:pathlib.Path)->str:
@@ -40,15 +41,32 @@ def sha256_file(path:pathlib.Path)->str:
 def _rolling_components(x:pd.DataFrame,variant:str,min_actual_before:int=MIN_ACTUAL_BEFORE):
     z=x.copy().sort_values('date').reset_index(drop=True)
     traded=z['traded'].fillna(False).astype(bool)
-    if variant=='market_day_zero':
-        amount=pd.to_numeric(z['amount'],errors='coerce').where(traded,0.0).fillna(0.0)
-    elif variant=='market_day_nan':
-        amount=pd.to_numeric(z['amount'],errors='coerce').where(traded,np.nan)
-    else:
-        raise ValueError(f'unknown variant {variant}')
-    median20=amount.rolling(WINDOW,min_periods=MIN_PERIODS).median()
+    raw_amount=pd.to_numeric(z['amount'],errors='coerce')
     density20=traded.astype(float).rolling(WINDOW,min_periods=MIN_PERIODS).mean()
     cum=traded.astype(int).cumsum()
+
+    if variant=='market_day_zero':
+        amount=raw_amount.where(traded,0.0).fillna(0.0)
+        median20=amount.rolling(WINDOW,min_periods=MIN_PERIODS).median()
+    elif variant=='market_day_nan':
+        amount=raw_amount.where(traded,np.nan)
+        median20=amount.rolling(WINDOW,min_periods=MIN_PERIODS).median()
+    elif variant=='market_day_positive':
+        # The window is 20 market days (enforced by density20 min_periods=20),
+        # while the median itself uses only actual positive traded-day amounts.
+        amount=raw_amount.where(traded,np.nan)
+        median20=amount.rolling(WINDOW,min_periods=1).median()
+    elif variant=='last20_traded':
+        # Candidate historical implementation: median over the last 20 actual
+        # traded observations, with an independent 20-market-day density gate.
+        median20=pd.Series(np.nan,index=z.index,dtype=float)
+        ti=np.flatnonzero(traded.to_numpy())
+        vals=raw_amount.iloc[ti].astype(float).reset_index(drop=True)
+        med=vals.rolling(WINDOW,min_periods=MIN_PERIODS).median().to_numpy()
+        median20.iloc[ti]=med
+    else:
+        raise ValueError(f'unknown variant {variant}')
+
     base=(density20>=MIN_DENSITY)&(cum>=int(min_actual_before))&traded
     return z,traded,median20,density20,cum,base
 
@@ -73,8 +91,6 @@ def _load_astock(root:pathlib.Path)->pd.DataFrame:
         parts.append(q)
     df=pd.concat(parts,ignore_index=True)
     df['code']=df['code'].astype(str).str.replace(r'\.0$','',regex=True).str.zfill(6)
-    # Reproduce V3.70 source behavior. Only the dedicated 399 index family was
-    # excluded; historical kline_000 ambiguity is intentionally left untouched.
     df=df[~df['code'].str.startswith('399')].copy()
     df['date']=pd.to_datetime(df['date']).dt.normalize()
     df=df[(df['date']>=FORMAL_BEG)&(df['date']<=FORMAL_END)].copy()
@@ -137,8 +153,9 @@ def _compare(replay:dict)->dict:
     for r in replay['results']:
         exp=EXPECTED[int(r['min_liq_amount_cny'])]
         for i,f in enumerate(fields):
-            if abs(float(r[f])-float(exp[i]))>1e-6:
-                mismatches.append({'threshold':r['min_liq_amount_cny'],'field':f,'actual':r[f],'expected':exp[i]})
+            delta=float(r[f])-float(exp[i])
+            if abs(delta)>1e-6:
+                mismatches.append({'threshold':r['min_liq_amount_cny'],'field':f,'actual':r[f],'expected':exp[i],'delta':delta})
     return {'exact_match':not mismatches,'mismatch_n':len(mismatches),'mismatches':mismatches}
 
 
@@ -154,7 +171,7 @@ def replay(root:pathlib.Path,out_dir:pathlib.Path)->dict:
         'calendar_days':df['date'].nunique(),
     }
     variants=[]
-    for v in ('market_day_zero','market_day_nan'):
+    for v in VARIANTS:
         r=_metrics_for_variant(df,v)
         r['comparison_to_v370']=_compare(r)
         variants.append(r)
@@ -162,6 +179,12 @@ def replay(root:pathlib.Path,out_dir:pathlib.Path)->dict:
     report={
         'artifact':'LIQUIDITY_REPLAY_V482','version':'V4.82','source':base,
         'expected_source_shape':{'rows':EXPECTED_ROWS,'symbols':EXPECTED_SYMBOLS,'calendar_days':EXPECTED_CALENDAR},
+        'contract_reference':{
+            'metric':'rolling 20-market-day median daily amount/turnover CNY',
+            'min_periods':20,'min_trade_density20':0.8,
+            'minimum_actual_traded_days_before_daily_liquidity_evaluation':120,
+            'current_day_must_be_traded':True,
+        },
         'variants':variants,'exact_matching_variants':exact,
         'frozen_semantics_status':'CLOSED_REPRODUCED_V370' if len(exact)==1 else 'OPEN_NEEDS_DIAGNOSIS',
         'formal_ready':False,'oos_metrics_allowed':False,
