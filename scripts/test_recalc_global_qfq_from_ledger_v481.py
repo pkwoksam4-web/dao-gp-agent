@@ -1,6 +1,6 @@
 import unittest
 
-from recalc_global_qfq_from_ledger_v481 import (
+from recalc_global_qfq_from_ledger_v481_fixed import (
     classify_result,
     rows_by_security_code,
     sina_factor_change_dates,
