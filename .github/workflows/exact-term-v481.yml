@@ -26,7 +26,8 @@ jobs:
             test_cninfo_effective_terms_v481.py \
             test_standard_exact_pdf_materializer_v481.py \
             test_merge_cninfo_shards_v481.py \
-            test_cninfo_narrow_supplement_v481.py
+            test_cninfo_narrow_supplement_v481.py \
+            test_cninfo_evidence_union_v481.py
 
   probe-cninfo-narrow-controls:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Run V4.81 narrow control probe')
@@ -84,6 +85,7 @@ jobs:
           python scripts/cninfo_narrow_supplement_v481.py collect \
             --base-index-dir base_index \
             --out-dir artifact_cninfo_narrow_supplement_v481 \
+            --workers 1 \
             --shard-index ${{ matrix.shard }} \
             --shard-count 4 \
             --timeout 15 \
