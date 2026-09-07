@@ -21,11 +21,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Probe three unresolved events sequentially
+        env:
+          PYTHONPATH: scripts
         run: |
           python - <<'PY'
           import hashlib, json, pathlib, time
-          from scripts.cninfo_exact_term_v481 import resolve_orgid, query_cninfo, event_query_window
-          from scripts.collect_cninfo_exact_term_indices_v481 import match_announcements_to_events
+          from cninfo_exact_term_v481 import resolve_orgid, query_cninfo, event_query_window
+          from collect_cninfo_exact_term_indices_v481 import match_announcements_to_events
 
           targets={
             '000631.SZ':['2023-05-17','2024-07-05'],
