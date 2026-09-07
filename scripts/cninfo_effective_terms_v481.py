@@ -49,7 +49,8 @@ def extract_effective_terms(text: str) -> dict:
     # only when nearby text is clearly about ex-right/ex-dividend pricing. If the
     # subtraction is followed by a non-trivial /(1+n) denominator, do not promote the
     # cash alone; that event requires a separately extracted capitalization ratio.
-    for m in re.finditer(r'(?:股权登记日|权益分派股权登记日|前)收盘价[-－]([0-9]+(?:\.[0-9]+)?)(?:元/股|元)?',s):
+    # Some issuers write 收盘价格 instead of 收盘价; both are explicit formula terms.
+    for m in re.finditer(r'(?:股权登记日|权益分派股权登记日|前)收盘价(?:格)?[-－]([0-9]+(?:\.[0-9]+)?)(?:元/股|元)?',s):
         prior=s[max(0,m.start()-700):m.start()]
         after=s[m.end():m.end()+180]
         if '除权' not in prior and '除息' not in prior:
@@ -72,6 +73,17 @@ def extract_effective_terms(text: str) -> dict:
         r'[^。;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
         cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_CASH_CALC_V482'))
 
+    # V4.82 secondary closure: a number of official implementation announcements use
+    # the shorter guarded form "折算每股现金红利=...=X元/股". Promote only when the
+    # nearby context explicitly discusses ex-right/ex-dividend pricing, so a nominal
+    # distribution plan cannot match this rule.
+    for m in re.finditer(
+        r'折算(?:后的?)?每股现金(?:红利|分红)[^。;；]{0,360}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元/股',s):
+        prior=s[max(0,m.start()-700):m.start()]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cash.append((float(m.group(1)),'EXPLICIT_FOLDED_CASH_PER_SHARE_V482'))
+
     # Some A-share announcements publish the effective amount as a per-10-share
     # figure over the A-share ex-right total; convert that explicit folded value to
     # a per-share cash term. Nominal "每10股派X" plans do not match this guarded form.
@@ -79,6 +91,15 @@ def extract_effective_terms(text: str) -> dict:
         r'按A股除权前总股本[^。;；]{0,260}?每10股派息(?:[（(]含税[）)])?[:：]?'
         r'([0-9]+(?:\.[0-9]+)?)元',s):
         cash.append((float(m.group(1))/10.0,'EXPLICIT_A_SHARE_FOLDED_CASH_PER10_V482'))
+
+    # V4.82 secondary closure: some A/B-share issuers explicitly print the A-share
+    # effective cash in the A-share ex-dividend-price section. This guarded A-share
+    # wording prevents a B-share cash conversion elsewhere in the same notice from
+    # being promoted into the A-share factor path.
+    for m in re.finditer(
+        r'A股除权除息价格计算时[^。;；]{0,220}?每股现金红利=现金分红总额/(?:公司)?总股本[,，]?(?:即|=)?'
+        r'([0-9]+(?:\.[0-9]+)?)元/股',s):
+        cash.append((float(m.group(1)),'EXPLICIT_A_SHARE_EFFECTIVE_CASH_V482'))
 
     # A/H-share issuers with repurchased A shares can keep the nominal per-share
     # distribution unchanged for participating holders while the A-share ex-dividend
@@ -101,6 +122,28 @@ def extract_effective_terms(text: str) -> dict:
                 raise ValueError('invalid A-share fold denominator')
             nominal=float(cash_m.group(1))/10.0
             cash.append((nominal*participating_a/all_a,'DERIVED_A_SHARE_FOLDED_CASH_FROM_REPURCHASE_V482'))
+
+    # V4.82 secondary closure: differential-dividend notices often state the final
+    # computed virtual/effective cash as "(虚拟分派的)每股现金红利=...≈X元/股".
+    # Require nearby differential-dividend plus ex-right/ex-dividend context.
+    for m in re.finditer(
+        r'(?:虚拟分派的)?每股现金红利=[^。;；]{0,520}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元/股',s):
+        prior=s[max(0,m.start()-900):m.start()]
+        if '差异化分红' not in prior:
+            continue
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cash.append((float(m.group(1)),'EXPLICIT_DIFFERENTIAL_FOLDED_CASH_V482'))
+
+    # V4.82 secondary closure: some differential-dividend announcements publish the
+    # folded value per 10 shares, not per share. Convert only a literal "折算后的每10股"
+    # calculation in an ex-right/ex-dividend context; nominal per-10 plans do not match.
+    for m in re.finditer(
+        r'折算后的?每10股现金(?:股利|红利|分红)[^。;；]{0,420}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元',s):
+        prior=s[max(0,m.start()-800):m.start()]
+        if '除权' not in prior and '除息' not in prior:
+            continue
+        cash.append((float(m.group(1))/10.0,'EXPLICIT_FOLDED_CASH_PER10_V482'))
 
     # V4.82 supplement: when the implementation announcement prints the complete
     # numerical ex-right formula, cash and capitalization are a coupled evidence pair.
