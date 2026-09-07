@@ -1,0 +1,3 @@
+V4.81 production trigger after fixing union retry target semantics.
+Expected frozen union before retry: 87 symbols, 507 events, 484 matched, 23 unmatched, 78 fully matched symbols, 9 unresolved symbols, 0 positive-evidence conflicts.
+Formal promotion remains false; OOS remains disallowed.
