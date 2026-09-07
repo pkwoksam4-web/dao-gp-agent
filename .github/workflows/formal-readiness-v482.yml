@@ -28,3 +28,135 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_formal_readiness_v482.py
+
+  audit:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download verified special-exright closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-closure-v482
+          path: special
+          run-id: 34099127574
+          github-token: ${{ github.token }}
+      - name: Download 792/52 effective closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download 821/23 secondary closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - name: Download 826/18 reparsed closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - name: Download reparsed source evidence for provenance reconstruction
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-reparsed-evidence-v482
+          path: reparsed_evidence
+          run-id: 34108707726
+          github-token: ${{ github.token }}
+      - name: Download 838/6 recovered closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+      - name: Download 840/4 final-six closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+      - name: Download 844/0 final-four closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: final_four
+          run-id: 34117443729
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Recompute all 844 formal paths and audit provenance
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/formal_readiness_v482.py \
+            --frozen-dir frozen \
+            --special-dir special \
+            --effective-dir effective \
+            --secondary-dir secondary \
+            --reparsed-dir reparsed \
+            --reparsed-evidence-dir reparsed_evidence \
+            --recovered-dir recovered \
+            --final-six-dir final_six \
+            --final-four-dir final_four \
+            --source-census-dir source_census \
+            --out-dir artifact_formal_readiness_v482
+      - name: Verify diagnostic Formal gate
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('artifact_formal_readiness_v482/FORMAL_READINESS_AUDIT_V482.json',encoding='utf-8'))
+          assert x['checkpoint']=={'PASS':844,'EXACT_TERM_REVIEW':0,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3}
+          assert x['universe_n']==847 and x['formal_symbol_n']==844
+          assert x['na']['symbols']==['600074.SH','600485.SH','600677.SH']
+          assert x['standard_override_n']==270
+          assert x['special_override_n']==11
+          assert x['total_override_n']==281
+          assert x['full_path_pass_n']==844 and x['full_path_fail_n']==0
+          assert x['max_full_path_diff_bp']<=5.0
+          # Existing special ledger is URL-backed only. Formal must remain closed until
+          # each of the 11 records has a frozen materialized source SHA.
+          assert x['special_provenance']['blocker_n']==11
+          assert x['gate']['status']=='MATH_CLOSED_PROVENANCE_OPEN'
+          assert x['formal_ready'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+            'checkpoint':x['checkpoint'],
+            'full_path_pass_n':x['full_path_pass_n'],
+            'max_full_path_diff_bp':x['max_full_path_diff_bp'],
+            'standard_override_n':x['standard_override_n'],
+            'special_provenance_blockers':x['special_provenance']['blockers'],
+            'gate':x['gate'],
+          },ensure_ascii=False,indent=2))
+          PY
+      - name: Upload Formal readiness diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-formal-readiness-v482
+          path: artifact_formal_readiness_v482/
+          if-no-files-found: error
+          retention-days: 30
