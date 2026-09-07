@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 import pandas as pd
 
 import liquidity_replay_v482 as m
@@ -44,12 +45,35 @@ class LiquidityReplayTests(unittest.TestCase):
         self.assertEqual(float(out.iloc[-1]['trade_density20']),0.8)
         self.assertEqual(float(out.iloc[-1]['median_amount20']),100_000_000.0)
 
-    def test_current_day_must_be_traded_and_120_rule(self):
+    def test_current_day_inclusive_120_rule(self):
         dates=pd.date_range('2026-01-01', periods=121, freq='D')
         x=pd.DataFrame({'date':dates,'amount':[100_000_000.0]*121,'traded':[True]*121})
         out=m.evaluate_one_calendar_series(x,80_000_000.0,'market_day_zero',min_actual_before=120)
         self.assertFalse(bool(out.iloc[118]['eligible']))
         self.assertTrue(bool(out.iloc[119]['eligible']))
+
+    def test_prior120_requires_120_traded_days_before_current_day(self):
+        dates=pd.date_range('2026-01-01', periods=121, freq='D')
+        x=pd.DataFrame({'date':dates,'amount':[100_000_000.0]*121,'traded':[True]*121})
+        out=m.evaluate_one_calendar_series(
+            x,80_000_000.0,'market_day_zero',min_actual_before=120,actual_gate='prior'
+        )
+        self.assertFalse(bool(out.iloc[119]['eligible']))
+        self.assertTrue(bool(out.iloc[120]['eligible']))
+
+    def test_daily_summary_percentiles_use_only_positive_base_days(self):
+        counts=np.array([0,0,10,20,30,40],dtype=float)
+        s=m.summarize_daily_counts(counts, positive_days_only=True)
+        self.assertEqual(s['min_daily_passing_when_base_nonzero'],10)
+        self.assertEqual(s['median_daily_passing_pre_st'],25.0)
+        self.assertEqual(s['p10_daily_passing_pre_st'],13.0)
+        self.assertEqual(s['p25_daily_passing_pre_st'],17.5)
+        self.assertEqual(s['p90_daily_passing_pre_st'],37.0)
+        self.assertEqual(s['latest_day_passing_pre_st'],40)
+
+    def test_current_day_must_be_traded(self):
+        dates=pd.date_range('2026-01-01', periods=121, freq='D')
+        x=pd.DataFrame({'date':dates,'amount':[100_000_000.0]*121,'traded':[True]*121})
         x.loc[120,'amount']=0.0; x.loc[120,'traded']=False
         out=m.evaluate_one_calendar_series(x,80_000_000.0,'market_day_zero',min_actual_before=120)
         self.assertFalse(bool(out.iloc[120]['eligible']))
