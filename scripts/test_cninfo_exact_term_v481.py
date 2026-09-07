@@ -3,9 +3,11 @@ import unittest
 from cninfo_exact_term_v481 import (
     choose_implementation_announcement,
     query_window,
+    event_query_window,
     choose_orgid_record,
     stock_query_param,
     column_for_code,
+    is_distribution_implementation_title,
 )
 from collect_cninfo_exact_term_indices_v481 import (
     select_standard_exact_symbols,
@@ -18,6 +20,9 @@ class CninfoExactTermResolverTests(unittest.TestCase):
     def test_query_window_centers_notice_date(self):
         self.assertEqual(query_window('2023-05-09', 10), ('2023-04-29','2023-05-19'))
 
+    def test_event_query_window_is_narrow_prior_focused(self):
+        self.assertEqual(event_query_window('2024-10-18',45,2),('2024-09-03','2024-10-20'))
+
     def test_prefers_equity_distribution_implementation_announcement(self):
         items=[
             {'announcementTitle':'2022年年度股东大会决议公告','announcementTime':1683504000000,'adjunctUrl':'a.pdf'},
@@ -26,6 +31,25 @@ class CninfoExactTermResolverTests(unittest.TestCase):
         ]
         x=choose_implementation_announcement(items,'2023-05-09')
         self.assertEqual(x['adjunctUrl'],'b.pdf')
+
+    def test_accepts_common_distribution_implementation_title_variants(self):
+        accepted=[
+            '2024年度中期A股分红派息实施公告',
+            '2023年年度利润分配实施公告',
+            '2022年度利润分配方案实施公告',
+            '2021年年度权益分派实施公告',
+            '2020年度权益分配实施公告',
+        ]
+        self.assertTrue(all(is_distribution_implementation_title(x) for x in accepted))
+
+    def test_rejects_implementation_after_adjustment_and_preplan_titles(self):
+        rejected=[
+            '关于2024年度权益分派实施后调整回购股份价格上限的公告',
+            '关于实施2023年度权益分派后调整可转债转股价格的公告',
+            '2022年度利润分配预案',
+            '关于回购股份的进展公告',
+        ]
+        self.assertTrue(all(not is_distribution_implementation_title(x) for x in rejected))
 
     def test_rejects_non_implementation_titles(self):
         items=[{'announcementTitle':'2022年度利润分配预案','announcementTime':1683504000000,'adjunctUrl':'a.pdf'}]
@@ -73,6 +97,16 @@ class ExactTermBulkScopeTests(unittest.TestCase):
         out=match_announcements_to_events(events,items,max_prior_days=30)
         self.assertEqual(out['2023-05-17']['adjunctUrl'],'a.pdf')
         self.assertEqual(out['2024-07-05']['adjunctUrl'],'b.pdf')
+
+    def test_matches_dividend_and_profit_distribution_title_variants(self):
+        events=['2024-10-18','2025-06-12']
+        items=[
+            {'announcementTitle':'2024年度中期A股分红派息实施公告','announcementTime':1728518400000,'adjunctUrl':'a.pdf'},
+            {'announcementTitle':'2024年年度利润分配实施公告','announcementTime':1749168000000,'adjunctUrl':'b.pdf'},
+        ]
+        out=match_announcements_to_events(events,items,max_prior_days=30)
+        self.assertEqual(out['2024-10-18']['adjunctUrl'],'a.pdf')
+        self.assertEqual(out['2025-06-12']['adjunctUrl'],'b.pdf')
 
     def test_event_without_prior_implementation_announcement_stays_unmatched(self):
         out=match_announcements_to_events(['2023-05-17'],[],max_prior_days=30)
