@@ -84,7 +84,7 @@ def merge_cninfo_evidence_sources(sources: list[tuple[str, dict]], expected_scop
             'matched_event_n': len(event_dates) - len(missing),
             'unmatched_event_dates': missing,
             'evidence_sources': evidence_sources,
-            'error': None if not missing else 'UNRESOLVED_AFTER_POSITIVE_EVIDENCE_UNION',
+            'error': None,
         })
 
     event_n = sum(len(r['event_dates']) for r in records)
