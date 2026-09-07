@@ -1,0 +1,24 @@
+name: GP QFQ raw blocker repair V481
+
+on:
+  push:
+    branches:
+      - gp/qfq-raw-blocker-repair-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 raw blocker repair unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_qfq_raw_blocker_repair_v481.py
