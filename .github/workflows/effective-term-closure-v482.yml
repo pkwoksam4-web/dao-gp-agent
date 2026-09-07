@@ -1,0 +1,28 @@
+name: GP V4.82 Effective-term Closure
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - 'scripts/effective_term_closure_v482.py'
+      - 'scripts/test_effective_term_closure_v482.py'
+      - '.github/workflows/effective-term-closure-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: V4.82 effective-term closure unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_effective_term_closure_v482.py
