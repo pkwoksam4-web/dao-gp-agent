@@ -39,6 +39,8 @@ class CninfoExactTermResolverTests(unittest.TestCase):
             '2022年度利润分配方案实施公告',
             '2021年年度权益分派实施公告',
             '2020年度权益分配实施公告',
+            '2024年度资本公积金转增股本实施公告',
+            '2025年中期现金分红的实施公告',
         ]
         self.assertTrue(all(is_distribution_implementation_title(x) for x in accepted))
 
