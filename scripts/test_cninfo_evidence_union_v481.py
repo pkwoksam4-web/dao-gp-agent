@@ -1,6 +1,7 @@
 import unittest
 
 from cninfo_evidence_union_v481 import merge_cninfo_evidence_sources
+from cninfo_narrow_supplement_v481 import select_unmatched_targets
 
 
 def ann(i, title='2024年年度权益分派实施公告'):
@@ -46,6 +47,15 @@ class EvidenceUnionTests(unittest.TestCase):
         self.assertEqual(by['000001.SZ']['matches']['2024-05-10']['announcementId'], 'a')
         self.assertEqual(by['000001.SZ']['matches']['2025-05-12']['announcementId'], 'c')
         self.assertEqual(by['000002.SZ']['matches']['2024-06-20']['announcementId'], 'b')
+
+    def test_partial_union_exposes_only_true_unmatched_dates_to_retry_selector(self):
+        first = report(ann('a'), ann('b'))
+        second = report(None, ann('b'))
+        out = merge_cninfo_evidence_sources([('first', first), ('second', second)], expected_scope_n=2)
+        by = {r['symbol']: r for r in out['records']}
+        self.assertIsNone(by['000001.SZ']['error'])
+        self.assertEqual(by['000001.SZ']['unmatched_event_dates'], ['2025-05-12'])
+        self.assertEqual(select_unmatched_targets(out), {'000001.SZ': ['2025-05-12']})
 
     def test_negative_or_failed_source_never_overwrites_positive_evidence(self):
         first = report(ann('a'), ann('b'))
