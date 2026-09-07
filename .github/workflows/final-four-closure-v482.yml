@@ -5,6 +5,7 @@ on:
     branches:
       - gp/v482-special-exright
     paths:
+      - 'scripts/cninfo_effective_terms_final_v482.py'
       - 'scripts/final_four_closure_v482.py'
       - 'scripts/test_final_four_closure_v482.py'
       - '.github/workflows/final-four-closure-v482.yml'
@@ -27,4 +28,124 @@ jobs:
           PYTHONPATH: scripts
         run: |
           cd scripts
-          python -m unittest -v test_final_four_closure_v482.py
+          python -m unittest -v test_final_four_closure_v482.py test_cninfo_effective_terms_final_v482.py
+
+  closure:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen_closure
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 792/52 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective_closure
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 821/23 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary_closure
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 826/18 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed_closure
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 838/6 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered_838
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 840/4 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six_840
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+      - name: Download frozen 92-PDF official evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-pdf-evidence-v482
+          path: recovered_92_evidence
+          run-id: 34110833992
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Reparse final-four frozen texts and recompute full paths
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/final_four_closure_v482.py \
+            --frozen-closure-dir frozen_closure \
+            --effective-closure-dir effective_closure \
+            --secondary-closure-dir secondary_closure \
+            --reparsed-closure-dir reparsed_closure \
+            --recovered-838-dir recovered_838 \
+            --final-six-840-dir final_six_840 \
+            --recovered-92-evidence-dir recovered_92_evidence \
+            --source-census-dir source_census \
+            --out-dir artifact_final_four_closure_v482
+      - name: Verify dynamic final-four checkpoint remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_final_four_closure_v482/FINAL_FOUR_CLOSURE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['input_checkpoint']=={
+            'PASS':840,'EXACT_TERM_REVIEW':4,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
+          }
+          assert x['base_standard_override_n']==265
+          c=x['checkpoint_after_final_four_terms']
+          assert sum(c.values())==847
+          assert c['PASS']>=840
+          assert c['EXACT_TERM_REVIEW']<=4
+          assert c['MISSING_EVENT_REVIEW']==0
+          assert c['NOT_APPLICABLE']==3
+          assert x['newly_closed_symbol_n']==c['PASS']-840
+          assert x['remaining_exact_review_symbol_n']==c['EXACT_TERM_REVIEW']
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+            'accepted_new_override_n':x['accepted_new_override_n'],
+            'rejected_term_event_n':x['rejected_term_event_n'],
+            'no_term_event_n':x['no_term_event_n'],
+            'text_error_event_n':x['text_error_event_n'],
+            'checkpoint':c,
+            'newly_closed_symbols':x['newly_closed_symbols'],
+            'remaining_symbols':x['remaining_symbols'],
+            'symbol_validation':x['symbol_validation'],
+          },ensure_ascii=False,indent=2))
+          PY
+      - name: Upload final-four closure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: artifact_final_four_closure_v482/
+          if-no-files-found: error
+          retention-days: 30
