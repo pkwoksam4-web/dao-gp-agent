@@ -50,13 +50,24 @@ def select_candidate_events(record: dict, factors: list[dict], threshold_bp: flo
 
 def _parse_sina_js(raw: bytes) -> list[dict]:
     text=raw.decode('utf-8-sig',errors='replace')
-    m=re.search(r'=\s*(\{.*\})\s*;?\s*$',text,re.S)
+    m=re.match(r'\s*var\s+[A-Za-z0-9_$]+qfq\s*=\s*',text)
     if not m:
-        raise ValueError('cannot parse Sina qfq JS')
-    obj=json.loads(m.group(1))
+        raise ValueError('cannot parse Sina qfq JS prefix')
+    payload=text[m.end():].lstrip()
+    try:
+        obj,end=json.JSONDecoder().raw_decode(payload)
+    except Exception as e:
+        raise ValueError(f'cannot parse Sina qfq JSON: {e}') from e
+    tail=payload[end:].strip()
+    if tail.startswith(';'):
+        tail=tail[1:].strip()
+    if tail and not re.fullmatch(r'/\*.*\*/',tail,re.S):
+        raise ValueError('unexpected trailing content in Sina qfq JS')
+    if not isinstance(obj,dict):
+        raise ValueError('Sina qfq payload is not an object')
     rows=obj.get('data') or []
-    if not rows:
-        raise ValueError('empty Sina factor rows')
+    if not isinstance(rows,list) or not rows:
+        raise ValueError('Sina qfq missing data[]')
     return rows
 
 
