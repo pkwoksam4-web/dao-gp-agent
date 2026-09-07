@@ -1,0 +1,31 @@
+name: GP V4.82 Frozen Liquidity Replay
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - 'scripts/liquidity_replay_v482.py'
+      - 'scripts/test_liquidity_replay_v482.py'
+      - '.github/workflows/liquidity-replay-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependency
+        run: pip install -q pandas
+      - name: Frozen liquidity unit tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_liquidity_replay_v482.py
