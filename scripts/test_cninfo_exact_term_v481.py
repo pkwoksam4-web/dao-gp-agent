@@ -6,6 +6,10 @@ from cninfo_exact_term_v481 import (
     choose_orgid_record,
     stock_query_param,
 )
+from collect_cninfo_exact_term_indices_v481 import (
+    select_standard_exact_symbols,
+    match_announcements_to_events,
+)
 
 
 class CninfoExactTermResolverTests(unittest.TestCase):
@@ -38,6 +42,32 @@ class CninfoExactTermResolverTests(unittest.TestCase):
 
     def test_stock_query_param_uses_code_and_orgid(self):
         self.assertEqual(stock_query_param('001202','gfbj0839749'),'001202,gfbj0839749')
+
+
+class ExactTermBulkScopeTests(unittest.TestCase):
+    def test_selects_standard_exact_and_excludes_special_restructuring(self):
+        report={'records':[
+            {'symbol':'000631.SZ','status':'REVIEW_GLOBAL_LEDGER_EXACT_TERMS','events':[{'ex_date':'2023-05-17'}]},
+            {'symbol':'000525.SZ','status':'REVIEW_EXACT_TERMS_AFTER_MISSING_EVENT','events':[{'ex_date':'2024-11-18'}]},
+            {'symbol':'000001.SZ','status':'PASS_GLOBAL_LEDGER_NOMINAL_FACTOR','events':[]},
+        ]}
+        out=select_standard_exact_symbols(report)
+        self.assertEqual(list(out),['000631.SZ'])
+        self.assertEqual(out['000631.SZ'],['2023-05-17'])
+
+    def test_matches_nearest_prior_implementation_announcement(self):
+        events=['2023-05-17','2024-07-05']
+        items=[
+            {'announcementTitle':'2022年年度权益分派实施公告','announcementTime':1683561600000,'adjunctUrl':'a.pdf'},
+            {'announcementTitle':'2023年年度权益分派实施公告','announcementTime':1719532800000,'adjunctUrl':'b.pdf'},
+        ]
+        out=match_announcements_to_events(events,items,max_prior_days=30)
+        self.assertEqual(out['2023-05-17']['adjunctUrl'],'a.pdf')
+        self.assertEqual(out['2024-07-05']['adjunctUrl'],'b.pdf')
+
+    def test_event_without_prior_implementation_announcement_stays_unmatched(self):
+        out=match_announcements_to_events(['2023-05-17'],[],max_prior_days=30)
+        self.assertIsNone(out['2023-05-17'])
 
 
 if __name__=='__main__':
