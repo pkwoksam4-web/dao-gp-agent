@@ -1,0 +1,132 @@
+name: GP Exact Term V481 Saved Replay PDF
+
+on:
+  push:
+    branches:
+      - gp/exact-term-v481
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  replay-saved-cninfo-raw:
+    if: contains(github.event.head_commit.message, 'Run V4.81 saved raw replay and PDF materialization')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download frozen 499/507 base and successful raw shards
+        run: |
+          mkdir -p base shard0 shard1
+          gh api repos/${{ github.repository }}/actions/artifacts/10005804030/zip > base.zip
+          unzip -q base.zip -d base
+          gh api repos/${{ github.repository }}/actions/artifacts/10005739251/zip > shard0.zip
+          unzip -q shard0.zip -d shard0
+          gh api repos/${{ github.repository }}/actions/artifacts/10005740191/zip > shard1.zip
+          unzip -q shard1.zip -d shard1
+          test -f base/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json
+          test -f shard0/raw/001323_2025-08-21_narrow_implementation.json
+          test -f shard1/raw/002014_2025-09-30_narrow_implementation.json
+      - name: Replay frozen successful raw with current matcher and merge
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          sys.path.insert(0,'scripts')
+          from cninfo_narrow_supplement_v481 import replay_saved_query_raw, merge_base_with_supplement
+
+          base=json.load(open('base/CNINFO_STANDARD_EXACT_TERM_INDEX_SUPPLEMENTED_V481.json',encoding='utf-8'))
+          specs=[
+            ('001323.SZ','2025-08-21',pathlib.Path('shard0/raw/001323_2025-08-21_narrow_implementation.json'),'1224486389'),
+            ('002014.SZ','2025-09-30',pathlib.Path('shard1/raw/002014_2025-09-30_narrow_implementation.json'),'1224674836'),
+          ]
+          rows=[]
+          for symbol,d,p,expected_id in specs:
+              row=replay_saved_query_raw(symbol,d,p.read_bytes(),str(p))
+              assert row['match'] is not None, (symbol,d,row)
+              assert str(row['match'].get('announcementId'))==expected_id, row
+              rows.append(row)
+          supplement={'artifact':'CNINFO_SAVED_RAW_REPLAY_SUPPLEMENT_V481','records':rows}
+          merged=merge_base_with_supplement(base,supplement,expected_scope_n=87)
+          assert merged['scope_symbol_n']==87
+          assert merged['event_date_n']==507
+          assert merged['matched_event_n']==501, merged
+          assert merged['unmatched_event_n']==6, merged
+          assert merged['symbols_all_events_matched_n']==84, merged
+          assert merged['symbols_unresolved_n']==3, merged
+          assert merged['formal_ready'] is False
+          assert merged['oos_metrics_allowed'] is False
+          out=pathlib.Path('artifact_saved_raw_replay_v481'); out.mkdir(parents=True,exist_ok=True)
+          text=json.dumps(merged,ensure_ascii=False,indent=2)
+          (out/'CNINFO_STANDARD_EXACT_TERM_INDEX_V481.json').write_text(text,encoding='utf-8')
+          (out/'CNINFO_STANDARD_EXACT_TERM_INDEX_SAVED_RAW_REPLAY_V481.json').write_text(text,encoding='utf-8')
+          replay={'artifact':'CNINFO_SAVED_RAW_REPLAY_EVIDENCE_V481','records':rows,
+                  'base_artifact_id':10005804030,'matched_event_n':501,'unmatched_event_n':6,
+                  'formal_promotion':False,'validated_global_provenance_emitted':False,
+                  'formal_ready':False,'oos_metrics_allowed':False}
+          (out/'CNINFO_SAVED_RAW_REPLAY_EVIDENCE_V481.json').write_text(json.dumps(replay,ensure_ascii=False,indent=2),encoding='utf-8')
+          print({k:merged[k] for k in ('scope_symbol_n','event_date_n','matched_event_n','unmatched_event_n','symbols_all_events_matched_n','symbols_unresolved_n')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-saved-raw-replay-v481
+          path: artifact_saved_raw_replay_v481
+          if-no-files-found: error
+
+  materialize-standard-exact-pdfs:
+    if: contains(github.event.head_commit.message, 'Run V4.81 saved raw replay and PDF materialization')
+    needs: replay-saved-cninfo-raw
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-standard-saved-raw-replay-v481
+          path: replay_index
+      - name: Download frozen 847 closure and Sina source census
+        run: |
+          mkdir -p closure source_census
+          gh api repos/${{ github.repository }}/actions/artifacts/10002862860/zip > closure.zip
+          unzip -q closure.zip -d closure
+          gh api repos/${{ github.repository }}/actions/artifacts/9981906893/zip > source.zip
+          unzip -q source.zip -d source_census
+          test -f closure/GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json
+      - name: Ensure PDF text extractor
+        run: |
+          command -v pdftotext || (sudo apt-get update -qq && sudo apt-get install -y poppler-utils)
+      - name: Materialize official CNINFO PDFs for >5bp ordinary events
+        run: |
+          python scripts/materialize_standard_exact_pdfs_v481.py \
+            --closure-dir closure \
+            --index-dir replay_index \
+            --source-census-dir source_census \
+            --out-dir artifact_standard_exact_pdfs_v481 \
+            --threshold-bp 5 \
+            --workers 4
+      - name: Verify non-Formal PDF evidence checkpoint
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_standard_exact_pdfs_v481/CNINFO_STANDARD_EXACT_PDF_EVIDENCE_V481.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['candidate_event_n']==89
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print({k:x[k] for k in ('candidate_event_n','candidate_symbol_n','announcement_matched_event_n','pdf_text_ok_event_n','effective_term_event_n','unique_announcement_n')})
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-cninfo-standard-exact-pdf-evidence-v481
+          path: artifact_standard_exact_pdfs_v481
+          if-no-files-found: error
