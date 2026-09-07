@@ -26,3 +26,85 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_remaining_exact_closure_v482.py
+
+  closure:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen_closure
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download verified V4.82 792/52 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: current_closure
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download 203-event secondary official-PDF evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-pdf-evidence-v482
+          path: new_evidence
+          run-id: 34103413213
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Validate 124 secondary terms and recompute remaining 52 full paths
+        run: |
+          python scripts/remaining_exact_closure_v482.py \
+            --frozen-closure-dir frozen_closure \
+            --current-closure-dir current_closure \
+            --new-evidence-dir new_evidence \
+            --source-census-dir source_census \
+            --out-dir artifact_remaining_exact_closure_v482
+      - name: Verify V4.82 821/23 checkpoint remains fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_remaining_exact_closure_v482/REMAINING_EXACT_CLOSURE_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['secondary_pdf_event_n']==203
+          assert x['secondary_effective_term_n']==128
+          assert x['secondary_accepted_override_n']==124
+          assert x['secondary_rejected_override_n']==4
+          assert x['total_standard_override_n']==191
+          assert x['newly_closed_symbol_n']==29
+          assert x['remaining_exact_review_symbol_n']==23
+          assert x['checkpoint_after_secondary_exact_terms']=={
+            'PASS':821,'EXACT_TERM_REVIEW':23,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3
+          }
+          assert x['formal_promotion'] is False
+          assert x['validated_global_provenance_emitted'] is False
+          assert x['formal_ready'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({
+            'checkpoint':x['checkpoint_after_secondary_exact_terms'],
+            'newly_closed_symbol_n':x['newly_closed_symbol_n'],
+            'remaining_exact_review_symbol_n':x['remaining_exact_review_symbol_n'],
+            'secondary_accepted_override_n':x['secondary_accepted_override_n'],
+            'secondary_rejected_override_n':x['secondary_rejected_override_n'],
+            'remaining_symbols':x['remaining_symbols'],
+          },ensure_ascii=False,indent=2))
+          PY
+      - name: Upload V4.82 821/23 closure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: artifact_remaining_exact_closure_v482/
+          if-no-files-found: error
+          retention-days: 30
