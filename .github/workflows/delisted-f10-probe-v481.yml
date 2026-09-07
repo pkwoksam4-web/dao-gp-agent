@@ -8,38 +8,52 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  probe-pageajax:
+  collect-missing-events:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Probe F10 BonusFinancing PageAjax on delisted controls
-        run: python scripts/probe_f10_pageajax_v481.py
-      - name: Verify probe remains non-Formal
-        if: always()
+      - name: Download integrated V4.81 847 recalc checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-ledger-recalc-v481
+          path: integrated_recalc
+          run-id: 34073572831
+          github-token: ${{ github.token }}
+      - name: Collect F10 PageAjax evidence for all 60 missing-event symbols
+        run: |
+          python scripts/collect_f10_missing_events_v481.py \
+            --review-queue integrated_recalc/GLOBAL_QFQ_LEDGER_REVIEW_QUEUE_V481.csv \
+            --out-dir artifact_f10_missing_event_v481
+      - name: Verify collection remains fail-closed and non-Formal
         run: |
           python - <<'PY'
-          import json, pathlib
-          p=pathlib.Path('artifact_f10_pageajax_probe_v481/F10_PAGEAJAX_PROBE_V481.json')
-          if not p.exists(): raise SystemExit('PageAjax probe report missing')
+          import json
+          p='artifact_f10_missing_event_v481/F10_MISSING_EVENT_COVERAGE_V481.json'
           x=json.load(open(p,encoding='utf-8'))
+          assert x['symbol_n']==60 and x['record_n']==60 and x['partition_exact'] is True
           assert x['formal_promotion'] is False
           assert x['validated_global_provenance_emitted'] is False
           assert x['formal_ready'] is False
           assert x['oos_metrics_allowed'] is False
-          assert len(x['controls'])==4
-          print('PASS non-Formal PageAjax probe guard')
+          assert sum(x['target_status_counts'].values())==x['target_date_n']
+          print(json.dumps({
+            'target_date_n':x['target_date_n'],
+            'target_status_counts':x['target_status_counts'],
+            'symbols_all_targets_hit_n':x['symbols_all_targets_hit_n'],
+            'symbols_with_any_unresolved_n':x['symbols_with_any_unresolved_n'],
+          },ensure_ascii=False,indent=2))
           PY
-      - name: Upload PageAjax probe evidence
-        if: always()
+      - name: Upload V4.81 F10 missing-event evidence
         uses: actions/upload-artifact@v4
         with:
-          name: gp-f10-pageajax-probe-v481
-          path: artifact_f10_pageajax_probe_v481/
+          name: gp-f10-missing-event-v481
+          path: artifact_f10_missing_event_v481/
           if-no-files-found: error
           retention-days: 30
