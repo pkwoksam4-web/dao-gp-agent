@@ -1,0 +1,103 @@
+name: GP V4.82 Sohu RAW Calibration
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - '.github/workflows/sohu-raw-calibration-v482.yml'
+      - 'scripts/sohu_raw_v482.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Checkout exact frozen astock snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: newbiestring-lang/astock
+          ref: 0babe4cf6c1a175c6b84add10803b4b1f9c6000c
+          path: astock
+          fetch-depth: 1
+      - name: Install dependencies
+        run: pip install -q requests pandas pyarrow numpy
+      - name: Crosscheck active symbols over one safe 90-day window
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p artifact_sohu_calibration_v482
+          python - <<'PY'
+          import json, pathlib
+          import numpy as np
+          import pandas as pd
+          import requests
+          from sohu_raw_v482 import fetch_chunk
+
+          specs={
+              '000004.SZ':'astock/kline_000.parquet',
+              '002001.SZ':'astock/kline_002.parquet',
+              '300001.SZ':'astock/kline_300.parquet',
+              '600000.SH':'astock/kline_600.parquet',
+          }
+          start,end='2025-01-01','2025-03-31'
+          checks=[]
+          for sym,p in specs.items():
+              q=pd.read_parquet(p,columns=['code','date','volume','amount'])
+              code=sym.split('.')[0]
+              q['code']=q['code'].astype(str).str.zfill(6)
+              q['date']=pd.to_datetime(q['date']).dt.strftime('%Y-%m-%d')
+              a=q[(q['code']==code)&(q['date']>=start)&(q['date']<=end)][['date','volume','amount']].copy()
+              ses=requests.Session()
+              try:
+                  rows=fetch_chunk(ses,sym,start,end,timeout=20,retries=3)
+              finally:
+                  ses.close()
+              s=pd.DataFrame(rows)[['date','volume','amount']] if rows else pd.DataFrame(columns=['date','volume','amount'])
+              z=s.merge(a,on='date',suffixes=('_sohu','_astock'))
+              if z.empty:
+                  checks.append({'symbol':sym,'status':'NO_COMMON_ROWS','sohu_rows':len(s),'astock_rows':len(a)})
+                  continue
+              for c in ('volume','amount'):
+                  denom=np.maximum(np.abs(z[c+'_astock'].astype(float)),1.0)
+                  z[c+'_rel']=np.abs(z[c+'_sohu'].astype(float)-z[c+'_astock'].astype(float))/denom
+              checks.append({
+                  'symbol':sym,'status':'PASS_CALIBRATED','common_rows':len(z),
+                  'sohu_rows':len(s),'astock_rows':len(a),
+                  'volume_rel_median':float(z['volume_rel'].median()),
+                  'volume_rel_p99':float(z['volume_rel'].quantile(.99)),
+                  'volume_rel_max':float(z['volume_rel'].max()),
+                  'amount_rel_median':float(z['amount_rel'].median()),
+                  'amount_rel_p99':float(z['amount_rel'].quantile(.99)),
+                  'amount_rel_max':float(z['amount_rel'].max()),
+              })
+          report={
+              'artifact':'SOHU_RAW_CALIBRATION_V482','version':'V4.82',
+              'window':[start,end],'source_commit':'0babe4cf6c1a175c6b84add10803b4b1f9c6000c',
+              'checks':checks,'formal_admission':False,'oos_metrics_allowed':False,
+          }
+          pathlib.Path('artifact_sohu_calibration_v482/SOHU_RAW_CALIBRATION_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          good=[x for x in checks if x['status']=='PASS_CALIBRATED']
+          assert len(good)>=3, report
+          # Calibration should be essentially the same raw tape. Sohu amount is rounded
+          # to 10k CNY units, so allow tiny rounding noise rather than demanding bytes.
+          assert max(x['volume_rel_p99'] for x in good) <= 1e-6, good
+          assert max(x['amount_rel_p99'] for x in good) <= 5e-4, good
+          PY
+      - name: Upload calibration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sohu-raw-calibration-v482
+          path: artifact_sohu_calibration_v482/
+          if-no-files-found: warn
+          retention-days: 30
