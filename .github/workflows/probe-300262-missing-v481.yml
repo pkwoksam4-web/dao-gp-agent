@@ -1,0 +1,55 @@
+name: GP 300262 Missing Event Probe V481
+
+on:
+  push:
+    branches:
+      - gp/missing-event-factor-v481-300262-probe
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Probe exact PageAjax target
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          from scripts.collect_f10_missing_events_v481 import fetch_one
+          from scripts.missing_event_factor_recalc_v481 import extract_f10_target_profile
+          out=pathlib.Path('artifact_300262_missing_v481'); raw=out/'raw'; raw.mkdir(parents=True,exist_ok=True)
+          rec=fetch_one('300262.SZ',['2020-08-11'],raw)
+          target=rec['targets'][0]
+          profile=None
+          error=None
+          try:
+              profile=extract_f10_target_profile(target)
+          except Exception as e:
+              error=f'{type(e).__name__}: {e}'
+          report={
+              'artifact':'MISSING_EVENT_300262_PROBE_V481',
+              'symbol':'300262.SZ','target_date':'2020-08-11',
+              'fetch_record':rec,'profile':profile,'error':error,
+              'evidence_closed': profile=='10派0.13元',
+              'formal_promotion':False,'validated_global_provenance_emitted':False,
+              'formal_ready':False,'oos_metrics_allowed':False,
+          }
+          (out/'MISSING_EVENT_300262_PROBE_V481.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps({'status':target.get('status'),'profile':profile,'error':error},ensure_ascii=False))
+          if not report['evidence_closed']:
+              raise SystemExit(2)
+          PY
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-300262-missing-event-v481
+          path: artifact_300262_missing_v481/
+          if-no-files-found: error
+          retention-days: 30
