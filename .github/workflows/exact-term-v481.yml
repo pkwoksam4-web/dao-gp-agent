@@ -21,7 +21,7 @@ jobs:
       - name: V4.81 exact-term resolver tests
         run: |
           cd scripts
-          python -m unittest -v test_cninfo_exact_term_v481.py test_cninfo_effective_terms_v481.py
+          python -m unittest -v test_cninfo_exact_term_v481.py test_cninfo_effective_terms_v481.py test_standard_exact_pdf_materializer_v481.py
 
   probe-cninfo-controls:
     needs: tests
