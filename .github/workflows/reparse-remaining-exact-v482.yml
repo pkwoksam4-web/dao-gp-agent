@@ -8,6 +8,7 @@ on:
       - 'scripts/cninfo_effective_terms_v481.py'
       - 'scripts/reparse_existing_effective_terms_v482.py'
       - 'scripts/test_cninfo_effective_terms_v481.py'
+      - 'scripts/test_cninfo_effective_terms_remaining_v482.py'
       - 'scripts/test_reparse_existing_effective_terms_v482.py'
       - '.github/workflows/reparse-remaining-exact-v482.yml'
   workflow_dispatch:
@@ -29,6 +30,7 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_cninfo_effective_terms_v481.py \
+            test_cninfo_effective_terms_remaining_v482.py \
             test_reparse_existing_effective_terms_v482.py
 
   reparse:
