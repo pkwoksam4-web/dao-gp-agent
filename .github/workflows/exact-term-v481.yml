@@ -1,0 +1,24 @@
+name: GP Exact Term V481
+
+on:
+  push:
+    branches:
+      - gp/exact-term-v481
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: V4.81 exact-term resolver tests
+        run: |
+          cd scripts
+          python -m unittest -v test_cninfo_exact_term_v481.py
