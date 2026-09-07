@@ -51,7 +51,7 @@ def extract_effective_terms(text: str) -> dict:
 
     # Explicit cash folded over total shares; announcement often shows the formula
     # and the resulting effective per-share amount after repurchase shares are excluded.
-    for m in re.finditer(r'按(?:公司)?总股本折算每股现金(?:分红|红利)比例[^.;；]*?=([0-9]+(?:\.[0-9]+)?)元/股',s):
+    for m in re.finditer(r'按(?:公司)?总股本折算每股现金(?:分红|红利)比例[^。;；]*?=([0-9]+(?:\.[0-9]+)?)元/股',s):
         if _in_repurchase_price_ceiling_context(s,m.start()):
             continue
         cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_FOLDED_CASH'))
@@ -76,7 +76,7 @@ def extract_effective_terms(text: str) -> dict:
     # may use "股权登记日的总股本" rather than "公司总股本".
     for m in re.finditer(
         r'按(?:股权登记日的|公司)?总股本(?:[（(]含回购股份[）)])?折算的?每股现金(?:分红|红利)'
-        r'[^.;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
+        r'[^。;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
         if _in_repurchase_price_ceiling_context(s,m.start()):
             continue
         cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_FOLDED_CASH_V482'))
@@ -85,7 +85,7 @@ def extract_effective_terms(text: str) -> dict:
     # valid effective per-share term when the final result is written in 元/股.
     for m in re.finditer(
         r'每股现金红利=本次实际现金分红总金额/(?:公司)?总股本'
-        r'[^.;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
+        r'[^。;；]{0,280}?=([0-9]+(?:\.[0-9]+)?)元/股',s):
         cash.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_CASH_CALC_V482'))
 
     # V4.82 secondary closure: a number of official implementation announcements use
@@ -93,7 +93,7 @@ def extract_effective_terms(text: str) -> dict:
     # nearby context explicitly discusses ex-right/ex-dividend pricing, so a nominal
     # distribution plan cannot match this rule.
     for m in re.finditer(
-        r'折算(?:后的?)?每股现金(?:红利|分红)[^.;；]{0,360}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元/股',s):
+        r'折算(?:后的?)?每股现金(?:红利|分红)[^。;；]{0,360}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元/股',s):
         prior=s[max(0,m.start()-700):m.start()]
         if '除权' not in prior and '除息' not in prior:
             continue
@@ -105,7 +105,7 @@ def extract_effective_terms(text: str) -> dict:
     # figure over the A-share ex-right total; convert that explicit folded value to
     # a per-share cash term. Nominal "每10股派X" plans do not match this guarded form.
     for m in re.finditer(
-        r'按A股除权前总股本[^.;；]{0,260}?每10股派息(?:[（(]含税[）)])?[:：]?'
+        r'按A股除权前总股本[^。;；]{0,260}?每10股派息(?:[（(]含税[）)])?[:：]?'
         r'([0-9]+(?:\.[0-9]+)?)元',s):
         cash.append((float(m.group(1))/10.0,'EXPLICIT_A_SHARE_FOLDED_CASH_PER10_V482'))
 
@@ -114,7 +114,7 @@ def extract_effective_terms(text: str) -> dict:
     # wording prevents a B-share cash conversion elsewhere in the same notice from
     # being promoted into the A-share factor path.
     for m in re.finditer(
-        r'A股除权除息价格计算时[^.;；]{0,220}?每股现金红利=现金分红总额/(?:公司)?总股本[,，]?(?:即|=)?'
+        r'A股除权除息价格计算时[^。;；]{0,220}?每股现金红利=现金分红总额/(?:公司)?总股本[,，]?(?:即|=)?'
         r'([0-9]+(?:\.[0-9]+)?)元/股',s):
         cash.append((float(m.group(1)),'EXPLICIT_A_SHARE_EFFECTIVE_CASH_V482'))
 
@@ -144,7 +144,7 @@ def extract_effective_terms(text: str) -> dict:
     # computed virtual/effective cash as "(虚拟分派的)每股现金红利=...≈X元/股".
     # Require nearby differential-dividend plus ex-right/ex-dividend context.
     for m in re.finditer(
-        r'(?:虚拟分派的)?每股现金红利=[^.;；]{0,520}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元/股',s):
+        r'(?:虚拟分派的)?每股现金红利=[^。;；]{0,520}?(?:=|≈)([0-9]+(?:\.[0-9]+)?)元/股',s):
         prior=s[max(0,m.start()-900):m.start()]
         if '差异化分红' not in prior:
             continue
@@ -158,7 +158,7 @@ def extract_effective_terms(text: str) -> dict:
     # Nominal per-10 distribution plans still do not match because "折算后的" and
     # ex-right/ex-dividend context are required.
     for m in re.finditer(
-        r'折算后的?每10股现金(?:股利|红利|分红)[^.;；]{0,420}?(?:即|=|≈)([0-9]+(?:\.[0-9]+)?)元',s):
+        r'折算后的?每10股现金(?:股利|红利|分红)[^。;；]{0,420}?(?:即|=|≈)([0-9]+(?:\.[0-9]+)?)元',s):
         prior=s[max(0,m.start()-800):m.start()]
         if '除权' not in prior and '除息' not in prior:
             continue
@@ -167,7 +167,7 @@ def extract_effective_terms(text: str) -> dict:
     # Some official implementation notices state the subtraction symbolically and
     # then give the effective cash in parentheses: "每股派发现金红利金额（即X元）".
     for m in re.finditer(
-        r'除权除息参考价(?:格)?=[^.;；]{0,260}?每股派发现金红利金额[（(]即'
+        r'除权除息参考价(?:格)?=[^。;；]{0,260}?每股派发现金红利金额[（(]即'
         r'([0-9]+(?:\.[0-9]+)?)元(?:/股)?[）)]',s):
         cash.append((float(m.group(1)),'EXPLICIT_PARENTHETICAL_EFFECTIVE_CASH_V482'))
 
@@ -220,7 +220,7 @@ def extract_effective_terms(text: str) -> dict:
         if '虚拟流通股份变动比例' in m.group('context') or '虚拟' in m.group('context'):
             cap.append((float(m.group(1)),'EXPLICIT_VIRTUAL_CAP_RATIO'))
 
-    for m in re.finditer(r'按(?:公司)?总股本折算每股(?:资本公积金)?转增(?:股本|股份)比例[^.;；]*?=([0-9]+(?:\.[0-9]+)?)股',s):
+    for m in re.finditer(r'按(?:公司)?总股本折算每股(?:资本公积金)?转增(?:股本|股份)比例[^。;；]*?=([0-9]+(?:\.[0-9]+)?)股',s):
         cap.append((float(m.group(1)),'EXPLICIT_TOTAL_SHARE_FOLDED_CAP_RATIO'))
 
     cash_v,cash_kind,cash_all=_unique_value(cash,'cash')
