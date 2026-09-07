@@ -110,7 +110,6 @@ jobs:
           assert c['PASS']>=826
           assert c['EXACT_TERM_REVIEW']<=18
           assert c['MISSING_EVENT_REVIEW']==0 and c['NOT_APPLICABLE']==3
-          assert x['newly_closed_symbol_n']==826-c['PASS']+x['newly_closed_symbol_n']  # partition sanity handled below
           assert x['newly_closed_symbol_n']==c['PASS']-826
           assert x['remaining_exact_review_symbol_n']==c['EXACT_TERM_REVIEW']
           assert x['formal_promotion'] is False
