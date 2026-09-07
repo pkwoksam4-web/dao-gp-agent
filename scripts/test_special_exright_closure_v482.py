@@ -35,6 +35,8 @@ class SpecialExRightClosureV482Tests(unittest.TestCase):
             'ex_date': '2023-12-26',
             'adjusted_reference_price': 8.14,
             'expected_prev_close': 11.98,
+            'evidence_kind': 'RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT',
+            'evidence_url': 'https://example.invalid/validated-fixture',
             'formal_promotion': False,
         }
         result = closure.validate_one(frozen, override, threshold_bp=5.0)
@@ -53,6 +55,8 @@ class SpecialExRightClosureV482Tests(unittest.TestCase):
             'ex_date': '2023-12-20',
             'adjusted_reference_price': 3.93,
             'expected_prev_close': 4.08,
+            'evidence_kind': 'RESTRUCTURING_SPECIAL_EXRIGHT_ANNOUNCEMENT',
+            'evidence_url': 'https://example.invalid/validated-fixture',
             'formal_promotion': False,
         }
         with self.assertRaises(ValueError):
