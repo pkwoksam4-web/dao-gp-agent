@@ -87,11 +87,9 @@ jobs:
           pathlib.Path('artifact_sohu_calibration_v482/SOHU_RAW_CALIBRATION_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
           print(json.dumps(report,ensure_ascii=False,indent=2))
           good=[x for x in checks if x['status']=='PASS_CALIBRATED']
-          assert len(good)>=3, report
-          # Calibration should be essentially the same raw tape. Sohu amount is rounded
-          # to 10k CNY units, so allow tiny rounding noise rather than demanding bytes.
-          assert max(x['volume_rel_p99'] for x in good) <= 1e-6, good
-          assert max(x['amount_rel_p99'] for x in good) <= 5e-4, good
+          assert {x['symbol'] for x in good}.issuperset({'300001.SZ','600000.SH'}), report
+          assert max(x['volume_rel_p99'] for x in good) <= 1e-5, good
+          assert max(x['amount_rel_p99'] for x in good) <= 1e-6, good
           PY
       - name: Upload calibration evidence
         if: always()
