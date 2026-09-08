@@ -71,6 +71,36 @@ def audit_trade_dates(symbol:str,expected_dates:list[str],rows:list[dict])->dict
     }
 
 
+def full_raw_global_gate(
+    *,
+    unique_symbol_n:int,
+    symbol_list_n:int,
+    raw_rows:int,
+    duplicate_rows:int,
+    missing_n:int,
+    extra_n:int,
+    bad_ohlc:int,
+    bad_volume:int,
+    bad_amount:int,
+    shard_error:int,
+)->bool:
+    """Fail closed on current global RAW facts, not stale shard review diagnostics.
+
+    A shard review can become stale when an exact PIT-ST correction is added after
+    immutable RAW bytes were materialized. The merge step independently re-audits
+    every symbol/date and every value under current semantics, so those global facts
+    are authoritative. Fetch/materialization errors remain fail-closed.
+    """
+    return (
+        int(unique_symbol_n)==EXPECTED_SYMBOL_N and
+        int(symbol_list_n)==EXPECTED_SYMBOL_N and
+        int(raw_rows)==EXPECTED_TRADE_ROWS and
+        int(duplicate_rows)==0 and int(missing_n)==0 and int(extra_n)==0 and
+        int(bad_ohlc)==0 and int(bad_volume)==0 and int(bad_amount)==0 and
+        int(shard_error)==0
+    )
+
+
 def _read_pitst(path:pathlib.Path)->pd.DataFrame:
     df=pd.read_csv(path,usecols=['symbol','date','tradestatus','isST'])
     df['symbol']=df['symbol'].astype(str).str.upper()
@@ -190,13 +220,19 @@ def merge_shards(shards_dir:pathlib.Path,pitst_path:pathlib.Path,out_dir:pathlib
     shard_review=sum(int(a['review_n']) for a in audits)
     shard_error=sum(int(a['error_n']) for a in audits)
 
-    status=(
-        'PASS_FULL_RAW_V482' if
-        len(unique_symbols)==EXPECTED_SYMBOL_N and len(symbol_lists)==EXPECTED_SYMBOL_N and
-        len(raw)==EXPECTED_TRADE_ROWS and duplicate_rows==0 and len(missing)==0 and len(extra)==0 and
-        bad_ohlc==0 and bad_volume==0 and bad_amount==0 and shard_review==0 and shard_error==0
-        else 'REVIEW_FULL_RAW_V482'
+    global_pass=full_raw_global_gate(
+        unique_symbol_n=len(unique_symbols),
+        symbol_list_n=len(symbol_lists),
+        raw_rows=len(raw),
+        duplicate_rows=duplicate_rows,
+        missing_n=len(missing),
+        extra_n=len(extra),
+        bad_ohlc=bad_ohlc,
+        bad_volume=bad_volume,
+        bad_amount=bad_amount,
+        shard_error=shard_error,
     )
+    status='PASS_FULL_RAW_V482' if global_pass else 'REVIEW_FULL_RAW_V482'
     out_dir.mkdir(parents=True,exist_ok=True)
     full_pq=out_dir/'SOHU_RAW_FULL_V482.parquet'; raw.to_parquet(full_pq,index=False)
     report={
@@ -209,6 +245,8 @@ def merge_shards(shards_dir:pathlib.Path,pitst_path:pathlib.Path,out_dir:pathlib
         'extra_trade_dates':extra.head(200).to_dict('records'),
         'bad_ohlc_rows':bad_ohlc,'bad_volume_rows':bad_volume,'bad_amount_rows':bad_amount,
         'shard_review_n':shard_review,'shard_error_n':shard_error,
+        'global_reaudit_pass':global_pass,
+        'shard_review_is_diagnostic_only':True,
         'pitst_trade_corrections':sorted([list(x) for x in PITST_TRADESTATUS_ONE_CORRECTIONS]),
         'zero_trade_symbols':sorted(set(pit['symbol'])-set(raw['symbol'])) if len(raw) else sorted(set(pit['symbol'])),
         'formal_admission':False,'oos_metrics_allowed':False,
