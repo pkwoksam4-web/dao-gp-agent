@@ -67,6 +67,21 @@ class SohuFullPanelV482Tests(unittest.TestCase):
         self.assertEqual(m.PITST_TRADESTATUS_ONE_CORRECTIONS,set(targets))
         self.assertEqual(m.EXPECTED_TRADE_ROWS,1_011_607)
 
+    def test_global_reaudit_supersedes_stale_shard_review_but_not_shard_errors(self):
+        common=dict(
+            unique_symbol_n=847,
+            symbol_list_n=847,
+            raw_rows=1_011_607,
+            duplicate_rows=0,
+            missing_n=0,
+            extra_n=0,
+            bad_ohlc=0,
+            bad_volume=0,
+            bad_amount=0,
+        )
+        self.assertTrue(m.full_raw_global_gate(**common,shard_error=0))
+        self.assertFalse(m.full_raw_global_gate(**common,shard_error=1))
+
 
 if __name__=='__main__':
     unittest.main()
