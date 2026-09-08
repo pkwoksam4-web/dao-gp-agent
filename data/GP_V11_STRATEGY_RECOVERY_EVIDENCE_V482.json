@@ -9,9 +9,19 @@
       "finding": "dao-gp-agent root commit 3ebc43fb1c751a0d21abd14964910e3b6846a669 was created 2026-09-04 and contains only .gitkeep; August GP V1.1 strategy source cannot be recovered from this repository parent history"
     },
     {
+      "surface": "github_current_tree_strategy_filename_scan",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "recursive tree at 5e578f172b6c14569460b755adccae710fd367f4 contains no pre-existing scorer or signal path; scorer/signal filename searches return zero matches and strategy references are limited to the V4.82 recovery evidence layer added after the original data-validation chain"
+    },
+    {
       "surface": "file_library_2026_08_13_to_2026_08_26",
       "confidence": "ABSENT",
       "finding": "no GP V1.1 strategy/scorer/Quant_Research source bundle was found; GP files visible from 2026-08-27 are data-remediation and gate artifacts"
+    },
+    {
+      "surface": "file_library_model_internal_column_scan_2026_08_27_to_2026_08_31",
+      "confidence": "ABSENT",
+      "finding": "searches for structure_score, inertia_score, execution_score, prob_up, prob_down, score_total, top_n, ranking semantics, mom5/mom10/mom20/mom60, er10/er20, sector_rs and related model-internal columns returned RAW/QFQ/hash-ranking remediation artifacts rather than a GP V1.1 scorer output or parameter/factor package"
     },
     {
       "surface": "gmail_2026_08_20_to_2026_09_02_attachments",
@@ -30,6 +40,16 @@
     }
   ],
   "confirmed_rules": [
+    {
+      "key": "framework_cardinality_and_version",
+      "confidence": "USER_CONFIRMED",
+      "value": {
+        "framework_version": "V1.0",
+        "factor_count": 12,
+        "frozen_framework_accepted": true,
+        "scope_note": "confirms the frozen 12-factor framework identity only; it does not confirm factor names, formulas, weights, normalization, aggregation or trade rules"
+      }
+    },
     {
       "key": "label_clock",
       "confidence": "USER_CONFIRMED",
