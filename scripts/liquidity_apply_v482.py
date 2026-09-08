@@ -19,6 +19,7 @@ from sohu_full_panel_v482 import (
 
 THRESHOLD_CNY=80_000_000.0
 EXPECTED_PANEL_ROWS=EXPECTED_SYMBOL_N*EXPECTED_CALENDAR
+EXPECTED_PITST_SOURCE_ROWS=1_022_100
 
 
 def apply_frozen_80m_one_symbol(x:pd.DataFrame)->pd.DataFrame:
@@ -41,6 +42,7 @@ def apply_frozen_80m_one_symbol(x:pd.DataFrame)->pd.DataFrame:
 def apply_non_st_overlay(df:pd.DataFrame)->pd.DataFrame:
     out=df.copy()
     pre=out['liquidity_80m_pre_st'].fillna(False).astype(bool)
+    # Lifecycle-unobserved rows retain isST=NaN and are conservatively ineligible.
     non_st=pd.to_numeric(out['isST'],errors='coerce').fillna(1).astype(int).eq(0)
     out['eligible_non_st']=pre&non_st
     return out
@@ -64,6 +66,35 @@ def _normalize_raw(raw:pd.DataFrame)->pd.DataFrame:
         if c in r.columns:
             r[c]=pd.to_numeric(r[c],errors='coerce')
     return r
+
+
+def expand_pitst_to_market_calendar(
+    pitst:pd.DataFrame,
+    symbols:list[str],
+    calendar:list[str],
+)->pd.DataFrame:
+    """Expand lifecycle-sparse authoritative PIT-ST rows to a market-calendar grid.
+
+    V4.80 PIT-ST is intentionally materialized only over each security's lifecycle.
+    The frozen liquidity rule, however, is defined on market days. We therefore pad
+    lifecycle-exterior dates only at the application layer. Padded rows are marked
+    pitst_observed=False, tradestatus=0, and keep isST unknown (NaN); no ST state is
+    invented and such rows cannot become eligible because current-day traded=False.
+    """
+    p=_normalize_pitst(pitst)
+    if p.duplicated(['symbol','date']).any():
+        raise ValueError('duplicate PIT-ST symbol/date rows before calendar expansion')
+    syms=sorted({str(s).upper() for s in symbols})
+    cal=sorted({str(d)[:10] for d in calendar})
+    grid=pd.MultiIndex.from_product([syms,cal],names=['symbol','date']).to_frame(index=False)
+    src=p[['symbol','date','tradestatus','isST']].copy()
+    src['pitst_observed']=True
+    out=grid.merge(src,on=['symbol','date'],how='left',validate='one_to_one')
+    out['pitst_observed']=out['pitst_observed'].fillna(False).astype(bool)
+    out['tradestatus']=pd.to_numeric(out['tradestatus'],errors='coerce').fillna(0).astype(int)
+    # Deliberately do not fill isST on lifecycle-padding rows.
+    out['isST']=pd.to_numeric(out['isST'],errors='coerce')
+    return out
 
 
 def audit_raw_vs_pitst(raw:pd.DataFrame,pitst:pd.DataFrame)->dict:
@@ -105,11 +136,14 @@ def build_eligibility_panel(raw:pd.DataFrame,pitst:pd.DataFrame)->tuple[pd.DataF
         raise ValueError(f'symbol universe {len(symbols)} != {EXPECTED_SYMBOL_N}')
     if len(calendar)!=EXPECTED_CALENDAR:
         raise ValueError(f'market calendar {len(calendar)} != {EXPECTED_CALENDAR}')
-    if len(p.drop_duplicates(['symbol','date']))!=EXPECTED_PANEL_ROWS:
-        raise ValueError(f'PIT-ST panel is not complete {EXPECTED_SYMBOL_N}x{EXPECTED_CALENDAR}')
+    pitst_source_rows=len(p.drop_duplicates(['symbol','date']))
+    if pitst_source_rows!=EXPECTED_PITST_SOURCE_ROWS:
+        raise ValueError(f'PIT-ST source rows {pitst_source_rows} != {EXPECTED_PITST_SOURCE_ROWS}')
 
     r2=r[['symbol','date','amount','volume']].copy()
-    p2=p[['symbol','date','tradestatus','isST']].drop_duplicates(['symbol','date']).copy()
+    p2=expand_pitst_to_market_calendar(p,symbols,calendar)
+    if len(p2)!=EXPECTED_PANEL_ROWS:
+        raise ValueError(f'expanded PIT-ST rows {len(p2)} != {EXPECTED_PANEL_ROWS}')
     panel=p2.merge(r2,on=['symbol','date'],how='left',validate='one_to_one')
     parts=[]
     for symbol,g in panel.groupby('symbol',sort=True):
@@ -131,7 +165,8 @@ def build_eligibility_panel(raw:pd.DataFrame,pitst:pd.DataFrame)->tuple[pd.DataF
     if len(out)!=EXPECTED_PANEL_ROWS:
         raise ValueError(f'eligibility panel rows {len(out)} != {EXPECTED_PANEL_ROWS}')
     current_trade_violation=int((out['liquidity_80m_pre_st']&~out['tradestatus'].eq(1)).sum())
-    st_overlay_violation=int((out['eligible_non_st']&out['isST'].ne(0)).sum())
+    st_overlay_violation=int((out['eligible_non_st']&pd.to_numeric(out['isST'],errors='coerce').fillna(1).ne(0)).sum())
+    observed_rows=int(out['pitst_observed'].sum())
     report={
         'artifact':'LIQUIDITY_80M_APPLY_V482',
         'version':'V4.82',
@@ -147,6 +182,9 @@ def build_eligibility_panel(raw:pd.DataFrame,pitst:pd.DataFrame)->tuple[pd.DataF
         'symbol_n':len(symbols),
         'calendar_days':len(calendar),
         'panel_rows':len(out),
+        'pitst_source_rows':pitst_source_rows,
+        'pitst_observed_rows':observed_rows,
+        'lifecycle_padding_rows':len(out)-observed_rows,
         'corrected_trade_rows':int(p['tradestatus'].eq(1).sum()),
         'raw_trade_rows':len(r),
         'liquidity_pre_st_true_rows':int(out['liquidity_80m_pre_st'].sum()),
