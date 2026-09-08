@@ -11,14 +11,43 @@ from sohu_raw_v482 import fetch_symbol, normalize_symbol
 
 RAW_FIELDS=['symbol','date','open','high','low','close','volume','amount','source']
 EXPECTED_SYMBOL_N=847
-EXPECTED_TRADE_ROWS=1_011_602
+EXPECTED_TRADE_ROWS=1_011_606
 ZERO_TRADE_SYMBOLS={'600074.SH','600485.SH','600677.SH'}
+
+# V4.82 correction overlay for four Baostock/PIT-ST false-zero trade-status rows.
+# All four were independently observed as real positive-volume trading sessions by
+# Sohu RAW and an external historical-tape source on 2024-06-13. Keep this list
+# exact and auditable; do not infer or broaden corrections from symbol class/date.
+PITST_TRADESTATUS_ONE_CORRECTIONS={
+    ('002087.SZ','2024-06-13'),
+    ('600647.SH','2024-06-13'),
+    ('600766.SH','2024-06-13'),
+    ('603133.SH','2024-06-13'),
+}
 
 
 def select_shard(symbols:list[str],shard_index:int,shard_count:int)->list[str]:
     if shard_count<=0 or not (0<=shard_index<shard_count):
         raise ValueError('invalid shard index/count')
     return list(symbols)[shard_index::shard_count]
+
+
+def apply_pitst_trade_corrections(pitst:pd.DataFrame,strict:bool=False)->pd.DataFrame:
+    out=pitst.copy()
+    out['symbol']=out['symbol'].astype(str).str.upper()
+    out['date']=out['date'].astype(str).str[:10]
+    out['tradestatus']=pd.to_numeric(out['tradestatus'],errors='coerce').fillna(0).astype(int)
+    applied=[]
+    for symbol,d in sorted(PITST_TRADESTATUS_ONE_CORRECTIONS):
+        mask=(out['symbol']==symbol)&(out['date']==d)
+        n=int(mask.sum())
+        if strict and n!=1:
+            raise ValueError(f'PIT-ST correction target must exist exactly once: {symbol} {d}; got {n}')
+        if n:
+            out.loc[mask,'tradestatus']=1
+            applied.extend([(symbol,d)]*n)
+    out.attrs['v482_trade_corrections']=applied
+    return out
 
 
 def expected_trade_dates(pitst:pd.DataFrame,symbol:str)->list[str]:
@@ -46,6 +75,7 @@ def _read_pitst(path:pathlib.Path)->pd.DataFrame:
     df['date']=df['date'].astype(str).str[:10]
     if df['symbol'].nunique()!=EXPECTED_SYMBOL_N:
         raise ValueError(f'PIT-ST universe must be {EXPECTED_SYMBOL_N}; got {df["symbol"].nunique()}')
+    df=apply_pitst_trade_corrections(df,strict=True)
     return df
 
 
@@ -75,7 +105,10 @@ def materialize_shard(
     def one(s:str):
         exp=expected[s]
         if not exp:
-            rows=[]; meta={'chunk_n':0,'chunk_nonempty_n':0,'max_chunk_rows':0,'empty_chunk_n':0}
+            rows=[]; meta={
+                'chunk_n':0,'chunk_nonempty_n':0,'max_chunk_rows':0,'empty_chunk_n':0,
+                'split_recovery_n':0,'leaf_chunk_n':0,'leaf_nonempty_n':0,'max_leaf_rows':0,
+            }
         else:
             rows,meta=fetch_symbol(s,start=exp[0],end=exp[-1],max_calendar_days=90,timeout=timeout,retries=3,delay=0.05)
         a=audit_trade_dates(s,exp,rows)
@@ -110,6 +143,7 @@ def materialize_shard(
         'symbols_selected':len(selected),'symbol_list':selected,
         'expected_trade_rows':sum(len(expected[s]) for s in selected),
         'raw_rows':len(frame),'pass_n':pass_n,'review_n':review_n,'error_n':len(errors),
+        'pitst_trade_corrections':sorted([list(x) for x in PITST_TRADESTATUS_ONE_CORRECTIONS]),
         'audits':audits,'errors':errors,
         'formal_admission':False,'oos_metrics_allowed':False,
     }
@@ -173,6 +207,7 @@ def merge_shards(shards_dir:pathlib.Path,pitst_path:pathlib.Path,out_dir:pathlib
         'extra_trade_dates':extra.head(200).to_dict('records'),
         'bad_ohlc_rows':bad_ohlc,'bad_volume_rows':bad_volume,'bad_amount_rows':bad_amount,
         'shard_review_n':shard_review,'shard_error_n':shard_error,
+        'pitst_trade_corrections':sorted([list(x) for x in PITST_TRADESTATUS_ONE_CORRECTIONS]),
         'zero_trade_symbols':sorted(set(pit['symbol'])-set(raw['symbol'])) if len(raw) else sorted(set(pit['symbol'])),
         'formal_admission':False,'oos_metrics_allowed':False,
     }
