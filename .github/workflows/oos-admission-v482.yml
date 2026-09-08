@@ -1,0 +1,32 @@
+name: GP V4.82 OOS Admission
+
+on:
+  push:
+    branches:
+      - gp/oos-admission-v482
+    paths:
+      - 'scripts/oos_admission_v482.py'
+      - 'scripts/test_oos_admission_v482.py'
+      - '.github/workflows/oos-admission-v482.yml'
+      - 'docs/superpowers/specs/2026-09-08-oos-admission-v482-design.md'
+      - 'docs/superpowers/plans/2026-09-08-oos-admission-v482.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: OOS admission contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_oos_admission_v482.py
