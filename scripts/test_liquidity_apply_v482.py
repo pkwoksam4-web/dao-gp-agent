@@ -73,6 +73,9 @@ class LiquidityApplyV482Tests(unittest.TestCase):
         self.assertEqual(int(padded['tradestatus']),0)
         self.assertTrue(pd.isna(padded['isST']))
 
+    def test_upstream_corrected_trade_row_contract_is_1011607(self):
+        self.assertEqual(m.EXPECTED_TRADE_ROWS,1_011_607)
+
 
 if __name__=='__main__':
     unittest.main()
