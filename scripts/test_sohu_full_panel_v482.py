@@ -46,6 +46,19 @@ class SohuFullPanelV482Tests(unittest.TestCase):
         })
         self.assertEqual(m.expected_trade_dates(df,'000001.SZ'),['2020-06-01','2020-06-03'])
 
+    def test_v482_pitst_corrections_are_exact_and_do_not_broaden_other_zero_rows(self):
+        df=pd.DataFrame({
+            'symbol':['002087.SZ','600647.SH','600766.SH','603133.SH','000001.SZ'],
+            'date':['2024-06-13']*5,
+            'tradestatus':[0,0,0,0,0],
+            'isST':[0,0,0,0,0],
+        })
+        fixed=m.apply_pitst_trade_corrections(df)
+        corrected=fixed[fixed['symbol'].isin({'002087.SZ','600647.SH','600766.SH','603133.SH'})]
+        self.assertTrue((corrected['tradestatus']==1).all())
+        self.assertEqual(int(fixed.loc[fixed['symbol']=='000001.SZ','tradestatus'].iloc[0]),0)
+        self.assertEqual(m.EXPECTED_TRADE_ROWS,1_011_606)
+
 
 if __name__=='__main__':
     unittest.main()
