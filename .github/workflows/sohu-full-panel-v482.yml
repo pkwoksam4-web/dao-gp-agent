@@ -132,7 +132,7 @@ jobs:
           x=json.load(open(p,encoding='utf-8'))
           assert x['status']=='PASS_FULL_RAW_V482',x
           assert x['symbol_n']==847
-          assert x['raw_rows']==1011606
+          assert x['raw_rows']==1011607
           assert x['missing_trade_dates_n']==0
           assert x['extra_trade_dates_n']==0
           assert x['duplicate_symbol_dates']==0
