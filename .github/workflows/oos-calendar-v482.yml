@@ -1,0 +1,31 @@
+name: GP V4.82 OOS Calendar Evidence
+
+on:
+  push:
+    branches:
+      - gp/oos-calendar-v482
+    paths:
+      - 'scripts/oos_calendar_v482.py'
+      - 'scripts/test_oos_calendar_v482.py'
+      - 'scripts/model_freeze_recovery_v482.py'
+      - '.github/workflows/oos-calendar-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: OOS calendar RED/contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_oos_calendar_v482.py
