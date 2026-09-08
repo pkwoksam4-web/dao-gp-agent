@@ -72,7 +72,8 @@ jobs:
           import base64,gzip
           from pathlib import Path
           b64=''.join(Path('data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64').read_text().split())
-          payload=base64.b64decode(b64)
+          b64 += '='*((-len(b64))%4)
+          payload=base64.b64decode(b64,validate=True)
           raw=gzip.decompress(payload)
           print('decoded_bytes=',len(raw))
           print('head_repr=',repr(raw[:500]))
