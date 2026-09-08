@@ -7,9 +7,11 @@ on:
     paths:
       - 'scripts/model_freeze_recovery_v482.py'
       - 'scripts/test_model_freeze_recovery_v482.py'
+      - 'scripts/test_model_freeze_recovery_calendar_v482.py'
       - 'data/OOS_SCOPE_INTENT_V482.json'
       - '.github/workflows/model-freeze-recovery-v482.yml'
       - 'docs/superpowers/specs/2026-09-08-model-freeze-recovery-v482-design.md'
+      - 'docs/superpowers/specs/2026-09-08-model-freeze-recovery-v482-calendar-evidence-amendment.md'
       - 'docs/superpowers/plans/2026-09-08-model-freeze-recovery-v482.md'
   workflow_dispatch:
 
@@ -31,7 +33,9 @@ jobs:
           PYTHONPATH: scripts
         run: |
           cd scripts
-          python -m unittest -v test_model_freeze_recovery_v482.py
+          python -m unittest -v \
+            test_model_freeze_recovery_v482.py \
+            test_model_freeze_recovery_calendar_v482.py
 
       - name: OOS Admission and Formal regression tests
         env:
