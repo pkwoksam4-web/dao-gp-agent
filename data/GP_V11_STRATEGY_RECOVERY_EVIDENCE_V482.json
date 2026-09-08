@@ -34,6 +34,11 @@
       "finding": "historical v11_offline_backtest_v3_10 trace proves an adjusted-source validation layer and a 50-symbol 27650-row reference sample existed, but archived global factor table and completed independent cross-source result were recorded as not found; this is not strategy-scorer provenance"
     },
     {
+      "surface": "v3_10_internal_source_path_trace",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "the V4.71 implementation plan explicitly references without modification /mnt/data/qfq_v310_extract/v11_offline_backtest_v3_10/src/cross_validate_adjusted_sources.py and requires reproducing its frozen compare behavior exactly; this proves a V3.10 src tree and one auxiliary adjusted-data validator existed, but it is RECOVERED_AUXILIARY_COMPONENT_NOT_SCORER and cannot satisfy STRATEGY_CODE_MISSING"
+    },
+    {
       "surface": "gp_recovery_checkpoint_20260828",
       "confidence": "AUTHORITATIVE_FILE",
       "finding": "recovered GP V1.1 assets are V3.73 data-remediation contracts/scripts and astock data, not scorer code, full parameter package, or complete factor-definition package"
@@ -124,6 +129,20 @@
         "drawdown_recovery": "20-60d"
       },
       "note": "conversation clue only; exact mathematical formulas, normalization and clipping remain unrecovered"
+    },
+    {
+      "key": "offline_backtest_archive_lineage",
+      "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
+      "value": {
+        "versions": [
+          "v11_offline_backtest_starter_v2.zip",
+          "v11_offline_backtest_v3_1.zip",
+          "v11_offline_backtest_v3_4.zip",
+          "v11_offline_backtest_v3_10"
+        ],
+        "v3_4_zip_sha256_candidate": "d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba"
+      },
+      "note": "version lineage and v3.4 ZIP SHA were recovered from prior assistant conversation output; original archive bytes or an authoritative archive manifest have not been recovered, so this clue is not freeze eligible"
     }
   ],
   "missing_required_fields": [
