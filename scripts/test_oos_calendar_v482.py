@@ -1,8 +1,6 @@
 import hashlib
-import json
 import unittest
 
-import model_freeze_recovery_v482 as recovery
 import oos_calendar_v482 as cal
 
 
@@ -101,7 +99,7 @@ class OosCalendarV482Tests(unittest.TestCase):
             'total_date_n': 1524,
             'calendar_sha256': cal.FULL_CALENDAR_SHA256,
         })
-        out = recovery.bind_oos_calendar_checkpoint(checkpoint, manifest)
+        out = cal.bind_oos_calendar_checkpoint(checkpoint, manifest)
         self.assertNotIn('OOS_CALENDAR_COVERAGE_MISSING', out['blockers'])
         self.assertEqual(set(out['blockers']), {
             'FACTOR_DEFINITION_MISSING', 'PARAMETER_SET_MISSING', 'STRATEGY_CODE_MISSING'
@@ -127,7 +125,7 @@ class OosCalendarV482Tests(unittest.TestCase):
             'calendar_sha256': cal.FULL_CALENDAR_SHA256,
         })
         with self.assertRaises(ValueError):
-            recovery.bind_oos_calendar_checkpoint(checkpoint, manifest)
+            cal.bind_oos_calendar_checkpoint(checkpoint, manifest)
 
 
 if __name__ == '__main__':
