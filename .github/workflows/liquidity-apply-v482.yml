@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: pip install -q pandas numpy
+        run: pip install -q pandas numpy requests
       - name: Frozen 80M application unit tests
         env:
           PYTHONPATH: scripts
