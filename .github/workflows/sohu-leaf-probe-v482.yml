@@ -1,0 +1,58 @@
+name: GP V4.82 Sohu Leaf Probe
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - '.github/workflows/sohu-leaf-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependency
+        run: pip install -q requests
+      - name: Probe failing leaf window one day at a time
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p artifact_sohu_leaf_probe_v482
+          python - <<'PY'
+          import json,pathlib,requests
+          from sohu_raw_v482 import fetch_chunk
+          symbols=['300064.SZ','300178.SZ','300297.SZ','300367.SZ']
+          dates=['2020-08-18','2020-08-19','2020-08-20','2020-08-21','2020-08-22','2020-08-23']
+          out=[]
+          for s in symbols:
+              ses=requests.Session()
+              try:
+                  for d in dates:
+                      try:
+                          rows=fetch_chunk(ses,s,d,d,timeout=15,retries=2)
+                          out.append({'symbol':s,'date':d,'status':'PASS','rows':len(rows),'row_dates':[r['date'] for r in rows]})
+                      except Exception as exc:
+                          out.append({'symbol':s,'date':d,'status':'ERROR','type':type(exc).__name__,'message':str(exc)})
+              finally:
+                  ses.close()
+          report={'artifact':'SOHU_LEAF_PROBE_V482','results':out,'pass_n':sum(x['status']=='PASS' for x in out),'error_n':sum(x['status']=='ERROR' for x in out)}
+          pathlib.Path('artifact_sohu_leaf_probe_v482/SOHU_LEAF_PROBE_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sohu-leaf-probe-v482
+          path: artifact_sohu_leaf_probe_v482/
+          if-no-files-found: error
+          retention-days: 30
