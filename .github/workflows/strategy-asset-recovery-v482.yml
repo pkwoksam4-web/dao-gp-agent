@@ -1,0 +1,31 @@
+name: GP V4.82 Strategy Asset Recovery
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - 'scripts/strategy_asset_recovery_v482.py'
+      - 'scripts/test_strategy_asset_recovery_v482.py'
+      - 'data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json'
+      - '.github/workflows/strategy-asset-recovery-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Strategy recovery RED/contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_strategy_asset_recovery_v482.py
