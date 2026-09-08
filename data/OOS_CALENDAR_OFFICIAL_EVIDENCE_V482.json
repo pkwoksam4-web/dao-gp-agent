@@ -1,0 +1,41 @@
+{
+  "artifact": "OOS_CALENDAR_OFFICIAL_EVIDENCE_V482",
+  "version": "V4.82",
+  "captured_on": "2026-09-08",
+  "sources": [
+    {
+      "exchange": "SSE",
+      "title": "关于上海证券交易所2026年部分节假日休市安排的通知",
+      "url": "https://www.sse.com.cn/disclosure/announcement/general/c/c_20251222_10802507.shtml",
+      "published_on": "2025-12-22",
+      "document_no": "上证公告〔2025〕45号",
+      "labor_day": {
+        "closed_start": "2026-05-01",
+        "closed_end": "2026-05-05",
+        "reopens": "2026-05-06"
+      },
+      "dragon_boat": {
+        "closed_start": "2026-06-19",
+        "closed_end": "2026-06-21",
+        "reopens": "2026-06-22"
+      }
+    },
+    {
+      "exchange": "SZSE",
+      "title": "关于2026年部分节假日休市安排的通知",
+      "url": "https://investor.szse.cn/disclosure/notice/general/t20251222_618087.html",
+      "published_on": "2025-12-22",
+      "document_no": "深证会〔2025〕481号",
+      "labor_day": {
+        "closed_start": "2026-05-01",
+        "closed_end": "2026-05-05",
+        "reopens": "2026-05-06"
+      },
+      "dragon_boat": {
+        "closed_start": "2026-06-19",
+        "closed_end": "2026-06-21",
+        "reopens": "2026-06-22"
+      }
+    }
+  ]
+}
