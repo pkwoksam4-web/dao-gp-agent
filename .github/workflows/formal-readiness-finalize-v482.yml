@@ -127,7 +127,23 @@ jobs:
           run-id: 34009079533
           github-token: ${{ github.token }}
 
-      - name: Re-run 844 full paths and close Formal provenance gate
+      - name: Download signed 847 Full RAW re-audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: market_raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Download signed frozen 80M liquidity application
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-liquidity-80m-v482
+          path: market_liquidity
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Re-run 844 full paths and close Formal provenance plus market-data gates
         env:
           PYTHONPATH: scripts
         run: |
@@ -143,6 +159,8 @@ jobs:
             --final-six-dir final_six \
             --final-four-dir final_four \
             --source-census-dir source_census \
+            --raw-dir market_raw \
+            --liquidity-dir market_liquidity \
             --out-dir artifact_formal_readiness_final_v482
 
       - name: Verify V4.82 Formal readiness is closed while OOS stays off
@@ -160,7 +178,18 @@ jobs:
           assert x['total_override_n']==281
           assert x['special_provenance']['materialized_n']==11
           assert x['special_provenance']['blocker_n']==0
+          m=x['market_data']
+          assert m['market_data_ready'] is True
+          assert m['full_raw_status']=='PASS_FULL_RAW_V482'
+          assert m['symbol_n']==847 and m['raw_trade_rows']==1011607
+          assert m['missing_trade_dates_n']==0 and m['extra_trade_dates_n']==0
+          assert m['duplicate_symbol_dates']==0
+          assert m['calendar_days']==1426 and m['panel_rows']==1207822
+          assert m['pitst_source_rows']==1022100 and m['lifecycle_padding_rows']==185722
+          assert m['raw_pitst_status']=='PASS_EXACT_RAW_PITST'
+          assert m['current_trade_violation_n']==0 and m['st_overlay_violation_n']==0
           assert x['gate']['status']=='FORMAL_READY_V482'
+          assert x['gate']['market_data_ready'] is True
           assert x['formal_ready'] is True
           assert x['validated_global_provenance_emitted'] is True
           assert x['oos_metrics_allowed'] is False
@@ -170,6 +199,7 @@ jobs:
             'max_full_path_diff_bp':x['max_full_path_diff_bp'],
             'standard_override_n':x['standard_override_n'],
             'special_materialized_n':x['special_provenance']['materialized_n'],
+            'market_data':m,
             'gate':x['gate'],
             'oos_metrics_allowed':x['oos_metrics_allowed'],
           },ensure_ascii=False,indent=2))
