@@ -70,21 +70,13 @@ jobs:
           run-id: 34192462041
           github-token: ${{ github.token }}
 
-      - name: Probe frozen calendar payload shape
-        run: |
-          python - <<'PY'
-          import base64,gzip
-          from pathlib import Path
-          b64=''.join(Path('data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64').read_text().split())
-          b64 += '='*((-len(b64))%4)
-          payload=base64.b64decode(b64,validate=True)
-          raw=gzip.decompress(payload)
-          print('decoded_bytes=',len(raw))
-          print('head_repr=',repr(raw[:500]))
-          print('head_lines=')
-          for line in raw.decode('utf-8-sig',errors='replace').splitlines()[:8]:
-              print(repr(line))
-          PY
+      - name: Download verified V4.80 frozen calendar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
 
       - name: Recover model-freeze evidence
         env:
@@ -93,8 +85,7 @@ jobs:
           python scripts/model_freeze_recovery_v482.py \
             --formal formal/FORMAL_READINESS_FINAL_V482.json \
             --universe data/pit_st_scope_v480.txt \
-            --calendar-b64 data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64 \
-            --calendar-hex data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex \
+            --calendar-csv calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv \
             --scope-intent data/OOS_SCOPE_INTENT_V482.json \
             --out-dir artifact_model_freeze_recovery_v482
 
@@ -103,9 +94,12 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+
           root=Path('artifact_model_freeze_recovery_v482')
           checkpoint=json.loads((root/'MODEL_ASSET_RECOVERY_CHECKPOINT_V482.json').read_text(encoding='utf-8'))
           scope=json.loads((root/'OOS_SCOPE_INTENT_VALIDATION_V482.json').read_text(encoding='utf-8'))
+          cal=checkpoint['evidence']['formal_calendar']
+
           assert checkpoint['artifact']=='MODEL_ASSET_RECOVERY_CHECKPOINT_V482'
           assert checkpoint['version']=='V4.82'
           assert checkpoint['status']=='MODEL_ASSETS_INCOMPLETE_V482'
@@ -115,36 +109,51 @@ jobs:
           assert checkpoint['recoverable']['universe'] is True
           assert checkpoint['recoverable']['formal_calendar'] is True
           assert checkpoint['recoverable']['liquidity_rule'] is True
-          assert len(checkpoint['universe_sha256'])==64
+          assert checkpoint['universe_sha256']=='dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb'
           assert len(checkpoint['formal_calendar_sha256'])==64
-          assert checkpoint['evidence']['universe']['count']==847
-          assert checkpoint['evidence']['formal_calendar']['start']=='2020-06-01'
-          assert checkpoint['evidence']['formal_calendar']['end']=='2026-04-17'
-          for code in ('STRATEGY_CODE_MISSING','PARAMETER_SET_MISSING','FACTOR_DEFINITION_MISSING'):
-              assert code in checkpoint['blockers'], checkpoint['blockers']
+
+          assert cal['source_kind']=='v480_final_audit_artifact'
+          assert cal['workflow_run_id']==33977325822
+          assert cal['artifact_id']==9972698555
+          assert cal['date_n']==1426
+          assert cal['decoded_min']=='2020-06-01'
+          assert cal['decoded_max']=='2026-04-17'
+          assert cal['legacy_frozen_calendar_sha256']=='0bfa32175dfccbd24d30eb7ceb0605f6cde2ed0bcc31ac2cac61479ba812add0'
+          assert cal['sha256']==checkpoint['formal_calendar_sha256']
+
+          expected_blockers={
+              'OOS_CALENDAR_COVERAGE_MISSING',
+              'STRATEGY_CODE_MISSING',
+              'PARAMETER_SET_MISSING',
+              'FACTOR_DEFINITION_MISSING',
+          }
+          assert set(checkpoint['blockers'])==expected_blockers, checkpoint['blockers']
+
           assert scope['status']=='SCOPE_INTENT_VALID_V482', scope
           assert scope['blockers']==[]
-          assert len(scope['scope_intent_sha256'])==64
+          assert scope['scope_intent_sha256']=='3702cc10f2263ca50d2ec1904f93252067faf629579d7a7e526bbf128e3fc87c'
+
           assert not Path('data/MODEL_FREEZE_V482.json').exists()
           assert not Path('data/OOS_SCOPE_V482.json').exists()
+
           print(json.dumps({
               'status':checkpoint['status'],
               'blockers':checkpoint['blockers'],
               'formal_artifact_sha256':checkpoint['formal_artifact_sha256'],
               'universe_sha256':checkpoint['universe_sha256'],
               'formal_calendar_sha256':checkpoint['formal_calendar_sha256'],
-              'calendar_decoded_min':checkpoint['evidence']['formal_calendar']['decoded_min'],
-              'calendar_decoded_max':checkpoint['evidence']['formal_calendar']['decoded_max'],
-              'formal_calendar_date_n':checkpoint['evidence']['formal_calendar']['date_n'],
+              'legacy_frozen_calendar_sha256':cal['legacy_frozen_calendar_sha256'],
+              'calendar_first':cal['decoded_min'],
+              'calendar_last':cal['decoded_max'],
+              'formal_calendar_date_n':cal['date_n'],
               'scope_intent_sha256':scope['scope_intent_sha256'],
           },ensure_ascii=False,indent=2))
           PY
 
       - name: Upload model-freeze recovery artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gp-model-freeze-recovery-v482
           path: artifact_model_freeze_recovery_v482/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
