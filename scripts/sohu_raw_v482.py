@@ -141,13 +141,13 @@ def fetch_chunk_resilient(
     end:str,
     timeout:int=20,
     retries:int=3,
-    min_calendar_days:int=7,
+    min_calendar_days:int=1,
 )->tuple[list[dict],dict]:
     """Fetch one requested range, bisecting only after normal retries are exhausted.
 
     This keeps the formal 90-calendar-day plan stable while recovering deterministic
-    Sohu 500/503 failures on particular wide windows. A leaf that still fails at or
-    below min_calendar_days remains a hard error.
+    Sohu 500/503 failures on particular multi-day windows. Recovery may bisect down
+    to a single calendar day; a single-day failure remains a hard error.
     """
     a=date.fromisoformat(start); b=date.fromisoformat(end)
     if b<a:
