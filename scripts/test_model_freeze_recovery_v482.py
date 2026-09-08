@@ -90,6 +90,13 @@ class ModelFreezeRecoveryV482Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.decode_calendar_representations(b64_text, bad_hex)
 
+    def test_calendar_base64_may_omit_transport_padding(self):
+        b64_text, hex_text = calendar_payload(['2026-04-16', '2026-04-17'])
+        unpadded = b64_text.rstrip('=')
+        self.assertNotEqual(unpadded, b64_text)
+        payload = mod.decode_calendar_representations(unpadded, hex_text)
+        self.assertEqual(payload.hex(), hex_text)
+
     def test_calendar_parser_requires_strictly_increasing_iso_dates(self):
         b64_text, hex_text = calendar_payload(['2026-04-16', '2026-04-17'])
         dates = mod.parse_calendar_dates(mod.decode_calendar_representations(b64_text, hex_text))
