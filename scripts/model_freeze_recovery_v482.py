@@ -20,6 +20,10 @@ OOS_END = '2026-09-08'
 LIQUIDITY_THRESHOLD_CNY = 80_000_000
 EXPECTED_UNIVERSE_N = 847
 EXPECTED_FORMAL_N = 844
+FROZEN_CALENDAR_LEGACY_SHA256 = '0bfa32175dfccbd24d30eb7ceb0605f6cde2ed0bcc31ac2cac61479ba812add0'
+FROZEN_CALENDAR_N = 1426
+FROZEN_CALENDAR_FIRST = FORMAL_START
+FROZEN_CALENDAR_LAST = FORMAL_END
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
 DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 SCOPE_KEYS = {
@@ -41,10 +45,7 @@ MODEL_KEYS = {
 
 def canonical_json_bytes(obj: object) -> bytes:
     return json.dumps(
-        obj,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(',', ':'),
+        obj, ensure_ascii=False, sort_keys=True, separators=(',', ':')
     ).encode('utf-8')
 
 
@@ -75,6 +76,11 @@ def canonical_universe(
 
 
 def decode_calendar_representations(b64_text: str, hex_text: str) -> bytes:
+    """Legacy/synthetic dual-wrapper decoder retained for regression tests.
+
+    Production recovery does not depend on repository wrapper equivalence; it
+    uses the V4.80 final-audit calendar CSV artifact instead.
+    """
     try:
         normalized = ''.join(b64_text.split())
         normalized += '=' * ((-len(normalized)) % 4)
@@ -85,6 +91,21 @@ def decode_calendar_representations(b64_text: str, hex_text: str) -> bytes:
     if b64_payload != hex_payload:
         raise ValueError('calendar representation mismatch')
     return b64_payload
+
+
+def _validate_date_sequence(dates: list[str]) -> list[str]:
+    if not dates:
+        raise ValueError('empty calendar')
+    for value in dates:
+        if not DATE_RE.fullmatch(value):
+            raise ValueError('invalid calendar date')
+        try:
+            dt.date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError('invalid calendar date') from exc
+    if dates != sorted(dates) or len(set(dates)) != len(dates):
+        raise ValueError('calendar dates not strictly increasing')
+    return dates
 
 
 def parse_calendar_dates(gzip_bytes: bytes) -> list[str]:
@@ -104,23 +125,12 @@ def parse_calendar_dates(gzip_bytes: bytes) -> list[str]:
             if row_index == 0:
                 continue
             raise ValueError('calendar row has no ISO date')
-        try:
-            dt.date.fromisoformat(date_value)
-        except ValueError as exc:
-            raise ValueError('invalid calendar date') from exc
         dates.append(date_value)
-
-    if not dates:
-        raise ValueError('empty calendar')
-    if dates != sorted(dates) or len(set(dates)) != len(dates):
-        raise ValueError('calendar dates not strictly increasing')
-    return dates
+    return _validate_date_sequence(dates)
 
 
 def calendar_range_sha256(
-    dates: list[str],
-    start: str,
-    end: str,
+    dates: list[str], start: str, end: str
 ) -> tuple[list[str], str]:
     try:
         start_date = dt.date.fromisoformat(start)
@@ -135,8 +145,55 @@ def calendar_range_sha256(
         raise ValueError('calendar range empty')
     if selected[0] != start or selected[-1] != end:
         raise ValueError('calendar range boundary missing')
-    payload = '\n'.join(selected).encode('utf-8')
+    payload = '\n'.join(selected).encode('ascii')
     return selected, hashlib.sha256(payload).hexdigest()
+
+
+def verify_authoritative_calendar_csv(
+    csv_text: str,
+    expected_n: int = FROZEN_CALENDAR_N,
+    expected_first: str = FROZEN_CALENDAR_FIRST,
+    expected_last: str = FROZEN_CALENDAR_LAST,
+    expected_legacy_sha256: str = FROZEN_CALENDAR_LEGACY_SHA256,
+) -> dict:
+    """Verify the calendar CSV emitted by successful V4.80 final audit.
+
+    The legacy V4.80 hash has a trailing newline after every date. The recovery
+    semantic hash has no trailing newline. Both namespaces are recorded.
+    """
+    try:
+        reader = csv.DictReader(io.StringIO(csv_text.lstrip('\ufeff')))
+        fields = list(reader.fieldnames or [])
+        date_field = 'trade_date' if 'trade_date' in fields else ('date' if 'date' in fields else None)
+        if date_field is None:
+            raise ValueError('calendar CSV missing date field')
+        dates = [str(row.get(date_field, '')).strip() for row in reader]
+    except (csv.Error, TypeError) as exc:
+        raise ValueError('invalid calendar CSV') from exc
+
+    if any(not value for value in dates):
+        raise ValueError('blank calendar date')
+    _validate_date_sequence(dates)
+    if len(dates) != expected_n:
+        raise ValueError(f'calendar count mismatch: {len(dates)} != {expected_n}')
+    if dates[0] != expected_first or dates[-1] != expected_last:
+        raise ValueError('calendar bounds mismatch')
+
+    legacy_payload = ''.join(value + '\n' for value in dates).encode('ascii')
+    legacy_sha = hashlib.sha256(legacy_payload).hexdigest()
+    if legacy_sha != expected_legacy_sha256:
+        raise ValueError('calendar legacy hash mismatch')
+
+    semantic_payload = '\n'.join(dates).encode('ascii')
+    semantic_sha = hashlib.sha256(semantic_payload).hexdigest()
+    return {
+        'dates': dates,
+        'date_n': len(dates),
+        'first': dates[0],
+        'last': dates[-1],
+        'legacy_frozen_calendar_sha256': legacy_sha,
+        'formal_calendar_sha256': semantic_sha,
+    }
 
 
 def _find_reserved(value: object, path: str = '$') -> list[str]:
@@ -177,53 +234,16 @@ def _formal_blockers(formal: dict) -> list[str]:
     return sorted(set(blockers))
 
 
-def recover_checkpoint(
-    formal: dict,
-    universe_text: str,
-    calendar_b64_text: str,
-    calendar_hex_text: str,
-    strategy_code_bytes: bytes | None = None,
-    parameters: dict | None = None,
-    factor_definition: dict | None = None,
+def _strategy_hashes(
+    blockers: list[str],
+    strategy_code_bytes: bytes | None,
+    parameters: dict | None,
+    factor_definition: dict | None,
 ) -> dict:
-    blockers = _formal_blockers(formal) if isinstance(formal, dict) else ['FORMAL_ARTIFACT_INVALID']
-    formal_sha = canonical_json_sha256(formal) if isinstance(formal, dict) else None
-
-    universe_sha = None
-    universe_rows: list[str] = []
-    try:
-        universe_rows, universe_sha = canonical_universe(universe_text)
-    except (TypeError, ValueError):
-        blockers.append('UNIVERSE_INVALID')
-
-    formal_calendar_sha = None
-    formal_dates: list[str] = []
-    all_dates: list[str] = []
-    calendar_payload_sha = None
-    calendar_max = None
-    calendar_min = None
-    try:
-        payload = decode_calendar_representations(calendar_b64_text, calendar_hex_text)
-        calendar_payload_sha = hashlib.sha256(payload).hexdigest()
-        all_dates = parse_calendar_dates(payload)
-        calendar_min = all_dates[0]
-        calendar_max = all_dates[-1]
-        formal_dates, formal_calendar_sha = calendar_range_sha256(
-            all_dates, FORMAL_START, FORMAL_END
-        )
-        if calendar_max < OOS_END:
-            blockers.append('OOS_CALENDAR_COVERAGE_MISSING')
-    except ValueError as exc:
-        message = str(exc)
-        if 'representation mismatch' in message:
-            blockers.append('FORMAL_CALENDAR_REPRESENTATION_MISMATCH')
-        else:
-            blockers.append('FORMAL_CALENDAR_INVALID')
-
     if strategy_code_bytes is None:
         strategy_sha = None
         blockers.append('STRATEGY_CODE_MISSING')
-    elif not isinstance(strategy_code_bytes, (bytes, bytearray)) or len(strategy_code_bytes) == 0:
+    elif not isinstance(strategy_code_bytes, (bytes, bytearray)) or not strategy_code_bytes:
         strategy_sha = None
         blockers.append('STRATEGY_CODE_INVALID')
     else:
@@ -247,8 +267,49 @@ def recover_checkpoint(
     else:
         factor_sha = canonical_json_sha256(factor_definition)
 
+    return {
+        'strategy_code_sha256': strategy_sha,
+        'parameter_sha256': parameter_sha,
+        'factor_definition_sha256': factor_sha,
+    }
+
+
+def _checkpoint_from_calendar_info(
+    formal: dict,
+    universe_text: str,
+    calendar_info: dict | None,
+    calendar_blockers: list[str],
+    strategy_code_bytes: bytes | None,
+    parameters: dict | None,
+    factor_definition: dict | None,
+    source_evidence: dict,
+) -> dict:
+    blockers = _formal_blockers(formal) if isinstance(formal, dict) else ['FORMAL_ARTIFACT_INVALID']
+    blockers.extend(calendar_blockers)
+    formal_sha = canonical_json_sha256(formal) if isinstance(formal, dict) else None
+
+    universe_sha = None
+    universe_rows: list[str] = []
+    try:
+        universe_rows, universe_sha = canonical_universe(universe_text)
+    except (TypeError, ValueError):
+        blockers.append('UNIVERSE_INVALID')
+
+    formal_calendar_sha = calendar_info.get('formal_calendar_sha256') if calendar_info else None
+    legacy_calendar_sha = calendar_info.get('legacy_frozen_calendar_sha256') if calendar_info else None
+    calendar_first = calendar_info.get('first') if calendar_info else None
+    calendar_last = calendar_info.get('last') if calendar_info else None
+    calendar_n = int(calendar_info.get('date_n') or 0) if calendar_info else 0
+    if calendar_info and calendar_last < OOS_END:
+        blockers.append('OOS_CALENDAR_COVERAGE_MISSING')
+
+    strategy_assets = _strategy_hashes(
+        blockers, strategy_code_bytes, parameters, factor_definition
+    )
     blockers = sorted(set(blockers))
     complete = not blockers
+
+    formal_bad = 'FORMAL_ARTIFACT_INVALID' in blockers
     return {
         'artifact': 'MODEL_ASSET_RECOVERY_CHECKPOINT_V482',
         'version': VERSION,
@@ -259,16 +320,12 @@ def recover_checkpoint(
         'liquidity_threshold_cny': LIQUIDITY_THRESHOLD_CNY,
         'formal_end': FORMAL_END,
         'recoverable': {
-            'formal_artifact': isinstance(formal, dict) and not any(b == 'FORMAL_ARTIFACT_INVALID' for b in blockers),
+            'formal_artifact': isinstance(formal, dict) and not formal_bad,
             'universe': universe_sha is not None,
-            'formal_calendar': formal_calendar_sha is not None,
+            'formal_calendar': calendar_info is not None and formal_calendar_sha is not None,
             'liquidity_rule': 'LIQUIDITY_RULE_MISMATCH' not in blockers,
         },
-        'strategy_assets': {
-            'strategy_code_sha256': strategy_sha,
-            'parameter_sha256': parameter_sha,
-            'factor_definition_sha256': factor_sha,
-        },
+        'strategy_assets': strategy_assets,
         'evidence': {
             'universe': {
                 'path': 'data/pit_st_scope_v480.txt',
@@ -276,20 +333,90 @@ def recover_checkpoint(
                 'sha256': universe_sha,
             },
             'formal_calendar': {
-                'b64_path': 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64',
-                'hex_path': 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex',
-                'decoded_payload_sha256': calendar_payload_sha,
-                'decoded_min': calendar_min,
-                'decoded_max': calendar_max,
+                **source_evidence,
                 'start': FORMAL_START,
                 'end': FORMAL_END,
-                'date_n': len(formal_dates),
+                'date_n': calendar_n,
+                'decoded_min': calendar_first,
+                'decoded_max': calendar_last,
+                'legacy_frozen_calendar_sha256': legacy_calendar_sha,
                 'sha256': formal_calendar_sha,
             },
         },
         'blockers': blockers,
         'model_freeze_allowed': complete,
     }
+
+
+def recover_checkpoint(
+    formal: dict,
+    universe_text: str,
+    calendar_b64_text: str,
+    calendar_hex_text: str,
+    strategy_code_bytes: bytes | None = None,
+    parameters: dict | None = None,
+    factor_definition: dict | None = None,
+) -> dict:
+    """Legacy wrapper path retained for synthetic/backward tests."""
+    calendar_info = None
+    calendar_blockers: list[str] = []
+    payload_sha = None
+    try:
+        payload = decode_calendar_representations(calendar_b64_text, calendar_hex_text)
+        payload_sha = hashlib.sha256(payload).hexdigest()
+        all_dates = parse_calendar_dates(payload)
+        selected, semantic_sha = calendar_range_sha256(all_dates, FORMAL_START, FORMAL_END)
+        legacy_sha = hashlib.sha256(
+            ''.join(value + '\n' for value in selected).encode('ascii')
+        ).hexdigest()
+        calendar_info = {
+            'first': selected[0], 'last': selected[-1], 'date_n': len(selected),
+            'legacy_frozen_calendar_sha256': legacy_sha,
+            'formal_calendar_sha256': semantic_sha,
+        }
+    except ValueError as exc:
+        if 'representation mismatch' in str(exc):
+            calendar_blockers.append('FORMAL_CALENDAR_REPRESENTATION_MISMATCH')
+        else:
+            calendar_blockers.append('FORMAL_CALENDAR_INVALID')
+
+    return _checkpoint_from_calendar_info(
+        formal, universe_text, calendar_info, calendar_blockers,
+        strategy_code_bytes, parameters, factor_definition,
+        {
+            'source_kind': 'legacy_repository_wrappers',
+            'b64_path': 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64',
+            'hex_path': 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex',
+            'decoded_payload_sha256': payload_sha,
+        },
+    )
+
+
+def recover_checkpoint_from_authoritative_calendar(
+    formal: dict,
+    universe_text: str,
+    calendar_csv_text: str,
+    strategy_code_bytes: bytes | None = None,
+    parameters: dict | None = None,
+    factor_definition: dict | None = None,
+) -> dict:
+    calendar_info = None
+    blockers: list[str] = []
+    try:
+        calendar_info = verify_authoritative_calendar_csv(calendar_csv_text)
+    except ValueError:
+        blockers.append('FORMAL_CALENDAR_INVALID')
+    return _checkpoint_from_calendar_info(
+        formal, universe_text, calendar_info, blockers,
+        strategy_code_bytes, parameters, factor_definition,
+        {
+            'source_kind': 'v480_final_audit_artifact',
+            'workflow_run_id': 33977325822,
+            'artifact_id': 9972698555,
+            'artifact_name': 'gp-pit-st-v480-final-audit',
+            'file': 'OFFICIAL_A_SHARE_OPEN_DATES_V357.csv',
+        },
+    )
 
 
 def validate_scope_intent(scope: dict) -> list[str]:
@@ -301,24 +428,16 @@ def validate_scope_intent(scope: dict) -> list[str]:
     if set(scope) != SCOPE_KEYS:
         blockers.append('SCOPE_INTENT_INVALID')
     expected = {
-        'artifact': 'OOS_SCOPE_INTENT_V482',
-        'version': VERSION,
-        'formal_end': FORMAL_END,
-        'oos_start': OOS_START,
-        'oos_end': OOS_END,
-        'intent_frozen': True,
-        'pre_exposure_confirmed': True,
+        'artifact': 'OOS_SCOPE_INTENT_V482', 'version': VERSION,
+        'formal_end': FORMAL_END, 'oos_start': OOS_START, 'oos_end': OOS_END,
+        'intent_frozen': True, 'pre_exposure_confirmed': True,
     }
-    if any(scope.get(k) != v for k, v in expected.items()):
+    if any(scope.get(key) != value for key, value in expected.items()):
         blockers.append('SCOPE_INTENT_INVALID')
     return sorted(set(blockers))
 
 
-def promote_model_freeze(
-    checkpoint: dict,
-    strategy_id: str,
-    calendar_sha256: str,
-) -> dict:
+def promote_model_freeze(checkpoint: dict, strategy_id: str, calendar_sha256: str) -> dict:
     if not isinstance(checkpoint, dict):
         raise ValueError('checkpoint invalid')
     required = (
@@ -348,13 +467,10 @@ def promote_model_freeze(
     if any(not _sha_ok(value) for value in hashes.values()):
         raise ValueError('checkpoint hash invalid')
     return {
-        'artifact': 'MODEL_FREEZE_V482',
-        'version': VERSION,
-        'strategy_id': strategy_id.strip(),
-        **hashes,
+        'artifact': 'MODEL_FREEZE_V482', 'version': VERSION,
+        'strategy_id': strategy_id.strip(), **hashes,
         'liquidity_threshold_cny': LIQUIDITY_THRESHOLD_CNY,
-        'formal_end': FORMAL_END,
-        'frozen': True,
+        'formal_end': FORMAL_END, 'frozen': True,
     }
 
 
@@ -374,11 +490,7 @@ def _validate_model(model: dict) -> None:
             raise ValueError('model freeze invalid')
 
 
-def promote_oos_scope(
-    intent: dict,
-    model_freeze: dict,
-    calendar_sha256: str,
-) -> dict:
+def promote_oos_scope(intent: dict, model_freeze: dict, calendar_sha256: str) -> dict:
     if validate_scope_intent(intent):
         raise ValueError('scope intent invalid')
     _validate_model(model_freeze)
@@ -387,12 +499,9 @@ def promote_oos_scope(
     if model_freeze.get('calendar_sha256') != calendar_sha256:
         raise ValueError('calendar hash mismatch')
     return {
-        'artifact': 'OOS_SCOPE_V482',
-        'version': VERSION,
-        'formal_end': intent['formal_end'],
-        'oos_start': intent['oos_start'],
-        'oos_end': intent['oos_end'],
-        'calendar_sha256': calendar_sha256,
+        'artifact': 'OOS_SCOPE_V482', 'version': VERSION,
+        'formal_end': intent['formal_end'], 'oos_start': intent['oos_start'],
+        'oos_end': intent['oos_end'], 'calendar_sha256': calendar_sha256,
         'universe_sha256': model_freeze['universe_sha256'],
         'model_freeze_sha256': canonical_json_sha256(model_freeze),
         'scope_frozen': True,
@@ -404,6 +513,28 @@ def _read_json(path: pathlib.Path) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f'{path} must contain JSON object')
     return value
+
+
+def _strategy_inputs(
+    strategy_code_path: pathlib.Path | None,
+    parameters_path: pathlib.Path | None,
+    factor_definition_path: pathlib.Path | None,
+) -> tuple[bytes | None, dict | None, dict | None]:
+    return (
+        strategy_code_path.read_bytes() if strategy_code_path else None,
+        _read_json(parameters_path) if parameters_path else None,
+        _read_json(factor_definition_path) if factor_definition_path else None,
+    )
+
+
+def _scope_validation(scope: dict) -> dict:
+    blockers = validate_scope_intent(scope)
+    return {
+        'artifact': 'OOS_SCOPE_INTENT_VALIDATION_V482', 'version': VERSION,
+        'status': 'SCOPE_INTENT_VALID_V482' if not blockers else 'SCOPE_INTENT_INVALID_V482',
+        'blockers': blockers,
+        'scope_intent_sha256': canonical_json_sha256(scope),
+    }
 
 
 def run_paths(
@@ -418,35 +549,47 @@ def run_paths(
 ) -> tuple[dict, dict]:
     formal = _read_json(formal_path)
     scope = _read_json(scope_intent_path)
-    strategy_bytes = strategy_code_path.read_bytes() if strategy_code_path else None
-    parameters = _read_json(parameters_path) if parameters_path else None
-    factor_definition = _read_json(factor_definition_path) if factor_definition_path else None
+    strategy_bytes, parameters, factor_definition = _strategy_inputs(
+        strategy_code_path, parameters_path, factor_definition_path
+    )
     checkpoint = recover_checkpoint(
-        formal,
-        universe_path.read_text(encoding='utf-8'),
+        formal, universe_path.read_text(encoding='utf-8'),
         calendar_b64_path.read_text(encoding='utf-8'),
         calendar_hex_path.read_text(encoding='utf-8'),
-        strategy_code_bytes=strategy_bytes,
-        parameters=parameters,
-        factor_definition=factor_definition,
+        strategy_bytes, parameters, factor_definition,
     )
-    scope_blockers = validate_scope_intent(scope)
-    scope_validation = {
-        'artifact': 'OOS_SCOPE_INTENT_VALIDATION_V482',
-        'version': VERSION,
-        'status': 'SCOPE_INTENT_VALID_V482' if not scope_blockers else 'SCOPE_INTENT_INVALID_V482',
-        'blockers': scope_blockers,
-        'scope_intent_sha256': canonical_json_sha256(scope),
-    }
-    return checkpoint, scope_validation
+    return checkpoint, _scope_validation(scope)
+
+
+def run_authoritative_paths(
+    formal_path: pathlib.Path,
+    universe_path: pathlib.Path,
+    calendar_csv_path: pathlib.Path,
+    scope_intent_path: pathlib.Path,
+    strategy_code_path: pathlib.Path | None = None,
+    parameters_path: pathlib.Path | None = None,
+    factor_definition_path: pathlib.Path | None = None,
+) -> tuple[dict, dict]:
+    formal = _read_json(formal_path)
+    scope = _read_json(scope_intent_path)
+    strategy_bytes, parameters, factor_definition = _strategy_inputs(
+        strategy_code_path, parameters_path, factor_definition_path
+    )
+    checkpoint = recover_checkpoint_from_authoritative_calendar(
+        formal, universe_path.read_text(encoding='utf-8'),
+        calendar_csv_path.read_text(encoding='utf-8'),
+        strategy_bytes, parameters, factor_definition,
+    )
+    return checkpoint, _scope_validation(scope)
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument('--formal', required=True)
     ap.add_argument('--universe', required=True)
-    ap.add_argument('--calendar-b64', required=True)
-    ap.add_argument('--calendar-hex', required=True)
+    ap.add_argument('--calendar-csv')
+    ap.add_argument('--calendar-b64')
+    ap.add_argument('--calendar-hex')
     ap.add_argument('--scope-intent', required=True)
     ap.add_argument('--strategy-code')
     ap.add_argument('--parameters')
@@ -454,16 +597,25 @@ def main() -> None:
     ap.add_argument('--out-dir', required=True)
     args = ap.parse_args()
 
-    checkpoint, scope_validation = run_paths(
-        pathlib.Path(args.formal),
-        pathlib.Path(args.universe),
-        pathlib.Path(args.calendar_b64),
-        pathlib.Path(args.calendar_hex),
-        pathlib.Path(args.scope_intent),
-        pathlib.Path(args.strategy_code) if args.strategy_code else None,
-        pathlib.Path(args.parameters) if args.parameters else None,
-        pathlib.Path(args.factor_definition) if args.factor_definition else None,
-    )
+    strategy_path = pathlib.Path(args.strategy_code) if args.strategy_code else None
+    parameters_path = pathlib.Path(args.parameters) if args.parameters else None
+    factor_path = pathlib.Path(args.factor_definition) if args.factor_definition else None
+
+    if args.calendar_csv:
+        checkpoint, scope_validation = run_authoritative_paths(
+            pathlib.Path(args.formal), pathlib.Path(args.universe),
+            pathlib.Path(args.calendar_csv), pathlib.Path(args.scope_intent),
+            strategy_path, parameters_path, factor_path,
+        )
+    else:
+        if not args.calendar_b64 or not args.calendar_hex:
+            raise SystemExit('provide --calendar-csv or both --calendar-b64 and --calendar-hex')
+        checkpoint, scope_validation = run_paths(
+            pathlib.Path(args.formal), pathlib.Path(args.universe),
+            pathlib.Path(args.calendar_b64), pathlib.Path(args.calendar_hex),
+            pathlib.Path(args.scope_intent), strategy_path, parameters_path, factor_path,
+        )
+
     out_dir = pathlib.Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / 'MODEL_ASSET_RECOVERY_CHECKPOINT_V482.json').write_text(
@@ -472,16 +624,17 @@ def main() -> None:
     (out_dir / 'OOS_SCOPE_INTENT_VALIDATION_V482.json').write_text(
         json.dumps(scope_validation, ensure_ascii=False, indent=2), encoding='utf-8'
     )
+    cal = checkpoint['evidence']['formal_calendar']
     print(json.dumps({
-        'status': checkpoint['status'],
-        'blockers': checkpoint['blockers'],
+        'status': checkpoint['status'], 'blockers': checkpoint['blockers'],
         'model_freeze_allowed': checkpoint['model_freeze_allowed'],
         'formal_artifact_sha256': checkpoint['formal_artifact_sha256'],
         'universe_sha256': checkpoint['universe_sha256'],
         'formal_calendar_sha256': checkpoint['formal_calendar_sha256'],
-        'calendar_decoded_min': checkpoint['evidence']['formal_calendar']['decoded_min'],
-        'calendar_decoded_max': checkpoint['evidence']['formal_calendar']['decoded_max'],
-        'formal_calendar_date_n': checkpoint['evidence']['formal_calendar']['date_n'],
+        'legacy_frozen_calendar_sha256': cal.get('legacy_frozen_calendar_sha256'),
+        'calendar_decoded_min': cal.get('decoded_min'),
+        'calendar_decoded_max': cal.get('decoded_max'),
+        'formal_calendar_date_n': cal.get('date_n'),
         'scope_intent_status': scope_validation['status'],
         'scope_intent_sha256': scope_validation['scope_intent_sha256'],
     }, ensure_ascii=False, indent=2))
