@@ -47,17 +47,25 @@ class SohuFullPanelV482Tests(unittest.TestCase):
         self.assertEqual(m.expected_trade_dates(df,'000001.SZ'),['2020-06-01','2020-06-03'])
 
     def test_v482_pitst_corrections_are_exact_and_do_not_broaden_other_zero_rows(self):
+        targets=[
+            ('002087.SZ','2024-06-13'),
+            ('600647.SH','2024-06-13'),
+            ('600766.SH','2024-06-13'),
+            ('603133.SH','2024-06-13'),
+            ('300356.SZ','2023-06-20'),
+        ]
         df=pd.DataFrame({
-            'symbol':['002087.SZ','600647.SH','600766.SH','603133.SH','000001.SZ'],
-            'date':['2024-06-13']*5,
-            'tradestatus':[0,0,0,0,0],
-            'isST':[0,0,0,0,0],
+            'symbol':[s for s,_ in targets]+['000001.SZ'],
+            'date':[d for _,d in targets]+['2024-06-13'],
+            'tradestatus':[0]*6,
+            'isST':[0]*6,
         })
         fixed=m.apply_pitst_trade_corrections(df)
-        corrected=fixed[fixed['symbol'].isin({'002087.SZ','600647.SH','600766.SH','603133.SH'})]
+        corrected=fixed.iloc[:len(targets)]
         self.assertTrue((corrected['tradestatus']==1).all())
         self.assertEqual(int(fixed.loc[fixed['symbol']=='000001.SZ','tradestatus'].iloc[0]),0)
-        self.assertEqual(m.EXPECTED_TRADE_ROWS,1_011_606)
+        self.assertEqual(m.PITST_TRADESTATUS_ONE_CORRECTIONS,set(targets))
+        self.assertEqual(m.EXPECTED_TRADE_ROWS,1_011_607)
 
 
 if __name__=='__main__':
