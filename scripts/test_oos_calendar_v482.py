@@ -1,4 +1,7 @@
+import copy
 import hashlib
+import json
+import pathlib
 import unittest
 
 import oos_calendar_v482 as cal
@@ -21,6 +24,11 @@ SZSE_HTML = '''
 '''
 
 
+def official_evidence():
+    path = pathlib.Path(__file__).resolve().parents[1] / 'data' / 'OOS_CALENDAR_OFFICIAL_EVIDENCE_V482.json'
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
 class OosCalendarV482Tests(unittest.TestCase):
     def test_dual_exchange_schedule_builds_exact_98_day_oos_calendar(self):
         out = cal.build_oos_calendar(SSE_HTML, SZSE_HTML)
@@ -36,8 +44,6 @@ class OosCalendarV482Tests(unittest.TestCase):
             out['oos_calendar_sha256'],
             '897a76ff4a857c9712f98877491f03e975f0ee591025cfa543e1a618b240b992',
         )
-        self.assertEqual(len(out['sse_source']['sha256']), 64)
-        self.assertEqual(len(out['szse_source']['sha256']), 64)
 
     def test_exchange_disagreement_fails_closed(self):
         bad_szse = SZSE_HTML.replace('6月19日', '6月18日')
@@ -47,6 +53,31 @@ class OosCalendarV482Tests(unittest.TestCase):
     def test_missing_official_schedule_marker_fails_closed(self):
         with self.assertRaises(ValueError):
             cal.build_oos_calendar('<html>劳动节</html>', SZSE_HTML)
+
+    def test_materialized_official_evidence_builds_same_calendar(self):
+        evidence = official_evidence()
+        out = cal.build_oos_calendar_from_evidence(evidence)
+        self.assertEqual(out['status'], 'OOS_CALENDAR_READY_V482')
+        self.assertEqual(out['oos_date_n'], 98)
+        self.assertEqual(out['oos_calendar_sha256'], cal.OOS_CALENDAR_SHA256)
+        self.assertEqual(
+            out['official_evidence_sha256'],
+            '082ce4579a5d526faaa01249babef41dccd79caee6f35a2fa383ea62a6ef2f87',
+        )
+        self.assertEqual([s['exchange'] for s in out['official_sources']], ['SSE', 'SZSE'])
+        self.assertTrue(all(len(s['evidence_sha256']) == 64 for s in out['official_sources']))
+
+    def test_materialized_evidence_exchange_disagreement_fails_closed(self):
+        evidence = official_evidence()
+        evidence['sources'][1]['dragon_boat']['closed_start'] = '2026-06-18'
+        with self.assertRaises(ValueError):
+            cal.build_oos_calendar_from_evidence(evidence)
+
+    def test_materialized_evidence_schema_is_strict(self):
+        evidence = official_evidence()
+        evidence['sources'][0]['unexpected'] = True
+        with self.assertRaises(ValueError):
+            cal.build_oos_calendar_from_evidence(evidence)
 
     def test_extended_calendar_binds_formal_and_oos_hashes(self):
         formal_dates = ['2020-06-01', '2020-06-02', '2026-04-17']
@@ -92,7 +123,7 @@ class OosCalendarV482Tests(unittest.TestCase):
             ],
             'model_freeze_allowed': False,
         }
-        manifest = cal.build_oos_calendar(SSE_HTML, SZSE_HTML)
+        manifest = cal.build_oos_calendar_from_evidence(official_evidence())
         manifest.update({
             'formal_calendar_sha256': cal.FORMAL_CALENDAR_SHA256,
             'formal_date_n': 1426,
@@ -117,7 +148,7 @@ class OosCalendarV482Tests(unittest.TestCase):
             'model_freeze_allowed': False,
             'strategy_assets': {}, 'evidence': {},
         }
-        manifest = cal.build_oos_calendar(SSE_HTML, SZSE_HTML)
+        manifest = cal.build_oos_calendar_from_evidence(official_evidence())
         manifest.update({
             'formal_calendar_sha256': '0' * 64,
             'formal_date_n': 1426,
