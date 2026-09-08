@@ -11,15 +11,17 @@ from sohu_raw_v482 import fetch_symbol, normalize_symbol
 
 RAW_FIELDS=['symbol','date','open','high','low','close','volume','amount','source']
 EXPECTED_SYMBOL_N=847
-EXPECTED_TRADE_ROWS=1_011_606
+EXPECTED_TRADE_ROWS=1_011_607
 ZERO_TRADE_SYMBOLS={'600074.SH','600485.SH','600677.SH'}
 
-# V4.82 correction overlay for four Baostock/PIT-ST false-zero trade-status rows.
-# All four were independently observed as real positive-volume trading sessions by
-# Sohu RAW and an external historical-tape source on 2024-06-13. Keep this list
-# exact and auditable; do not infer or broaden corrections from symbol class/date.
+# V4.82 correction overlay for five Baostock/PIT-ST false-zero trade-status rows.
+# Four 2024-06-13 sessions and the 300356.SZ 2023-06-20 delisting-period
+# opening session were independently verified as real positive-volume trading
+# sessions. Keep this list exact and auditable; do not infer or broaden
+# corrections from symbol class, delisting status, or date patterns.
 PITST_TRADESTATUS_ONE_CORRECTIONS={
     ('002087.SZ','2024-06-13'),
+    ('300356.SZ','2023-06-20'),
     ('600647.SH','2024-06-13'),
     ('600766.SH','2024-06-13'),
     ('603133.SH','2024-06-13'),
