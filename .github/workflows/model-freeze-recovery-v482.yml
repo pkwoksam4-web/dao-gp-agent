@@ -25,9 +25,110 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Model freeze recovery tests
         env:
           PYTHONPATH: scripts
         run: |
           cd scripts
           python -m unittest -v test_model_freeze_recovery_v482.py
+
+      - name: OOS Admission and Formal regression tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_oos_admission_v482.py \
+            test_formal_readiness_v482.py \
+            test_formal_readiness_finalize_v482.py
+
+      - name: Verify no production model or final OOS scope is fabricated
+        run: |
+          test ! -e data/MODEL_FREEZE_V482.json
+          test ! -e data/OOS_SCOPE_V482.json
+
+  recovery:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download closed Formal V4.82 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: formal
+          run-id: 34192462041
+          github-token: ${{ github.token }}
+
+      - name: Recover model-freeze evidence
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/model_freeze_recovery_v482.py \
+            --formal formal/FORMAL_READINESS_FINAL_V482.json \
+            --universe data/pit_st_scope_v480.txt \
+            --calendar-b64 data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64 \
+            --calendar-hex data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex \
+            --scope-intent data/OOS_SCOPE_INTENT_V482.json \
+            --out-dir artifact_model_freeze_recovery_v482
+
+      - name: Verify truthful fail-closed production checkpoint
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root=Path('artifact_model_freeze_recovery_v482')
+          checkpoint=json.loads((root/'MODEL_ASSET_RECOVERY_CHECKPOINT_V482.json').read_text(encoding='utf-8'))
+          scope=json.loads((root/'OOS_SCOPE_INTENT_VALIDATION_V482.json').read_text(encoding='utf-8'))
+
+          assert checkpoint['artifact']=='MODEL_ASSET_RECOVERY_CHECKPOINT_V482'
+          assert checkpoint['version']=='V4.82'
+          assert checkpoint['status']=='MODEL_ASSETS_INCOMPLETE_V482'
+          assert checkpoint['model_freeze_allowed'] is False
+          assert checkpoint['formal_artifact_sha256']=='e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796'
+          assert checkpoint['recoverable']['formal_artifact'] is True
+          assert checkpoint['recoverable']['universe'] is True
+          assert checkpoint['recoverable']['formal_calendar'] is True
+          assert checkpoint['recoverable']['liquidity_rule'] is True
+          assert len(checkpoint['universe_sha256'])==64
+          assert len(checkpoint['formal_calendar_sha256'])==64
+          assert checkpoint['evidence']['universe']['count']==847
+          assert checkpoint['evidence']['formal_calendar']['start']=='2020-06-01'
+          assert checkpoint['evidence']['formal_calendar']['end']=='2026-04-17'
+          for code in ('STRATEGY_CODE_MISSING','PARAMETER_SET_MISSING','FACTOR_DEFINITION_MISSING'):
+              assert code in checkpoint['blockers'], checkpoint['blockers']
+
+          assert scope['status']=='SCOPE_INTENT_VALID_V482', scope
+          assert scope['blockers']==[]
+          assert len(scope['scope_intent_sha256'])==64
+
+          assert not Path('data/MODEL_FREEZE_V482.json').exists()
+          assert not Path('data/OOS_SCOPE_V482.json').exists()
+
+          print(json.dumps({
+              'status':checkpoint['status'],
+              'blockers':checkpoint['blockers'],
+              'formal_artifact_sha256':checkpoint['formal_artifact_sha256'],
+              'universe_sha256':checkpoint['universe_sha256'],
+              'formal_calendar_sha256':checkpoint['formal_calendar_sha256'],
+              'calendar_decoded_min':checkpoint['evidence']['formal_calendar']['decoded_min'],
+              'calendar_decoded_max':checkpoint['evidence']['formal_calendar']['decoded_max'],
+              'formal_calendar_date_n':checkpoint['evidence']['formal_calendar']['date_n'],
+              'scope_intent_sha256':scope['scope_intent_sha256'],
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload model-freeze recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-model-freeze-recovery-v482
+          path: artifact_model_freeze_recovery_v482/
+          if-no-files-found: error
+          retention-days: 30
