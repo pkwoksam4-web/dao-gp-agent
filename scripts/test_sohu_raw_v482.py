@@ -70,6 +70,30 @@ class SohuRawV482Tests(unittest.TestCase):
         self.assertEqual(meta['split_recovery_n'],1)
         self.assertGreaterEqual(meta['leaf_chunk_n'],2)
 
+    def test_resilient_fetch_can_recover_six_day_window_by_splitting_to_single_days(self):
+        calls=[]
+
+        def fake_fetch_chunk(session,symbol,start,end,timeout=20,retries=3):
+            from datetime import date
+            calls.append((start,end))
+            days=(date.fromisoformat(end)-date.fromisoformat(start)).days+1
+            if days>1:
+                raise RuntimeError('synthetic pathological multi-day Sohu window')
+            weekday=date.fromisoformat(start).weekday()
+            if weekday>=5:
+                return []
+            return [
+                {'symbol':symbol,'date':start,'open':1.0,'high':1.0,'low':1.0,'close':1.0,'volume':100.0,'amount':1000.0,'source':'SOHU_HISHQ_RAW'},
+            ]
+
+        with patch.object(m,'fetch_chunk',side_effect=fake_fetch_chunk):
+            rows,meta=m.fetch_chunk_resilient(object(),'300064.SZ','2020-08-18','2020-08-23',timeout=1,retries=1)
+
+        self.assertEqual([r['date'] for r in rows],['2020-08-18','2020-08-19','2020-08-20','2020-08-21'])
+        self.assertTrue(any(a==b for a,b in calls))
+        self.assertGreater(meta['split_recovery_n'],1)
+        self.assertEqual(meta['leaf_chunk_n'],6)
+
 
 if __name__=='__main__':
     unittest.main()
