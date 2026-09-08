@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import sohu_raw_v482 as m
 
@@ -45,6 +46,29 @@ class SohuRawV482Tests(unittest.TestCase):
         self.assertEqual(m.normalize_symbol('1.sz'),'000001.SZ')
         with self.assertRaises(ValueError):
             m.normalize_symbol('000001')
+
+    def test_resilient_fetch_bisects_failed_range_and_merges_rows(self):
+        calls=[]
+
+        def fake_fetch_chunk(session,symbol,start,end,timeout=20,retries=3):
+            from datetime import date
+            calls.append((start,end))
+            days=(date.fromisoformat(end)-date.fromisoformat(start)).days+1
+            if days>45:
+                raise RuntimeError('synthetic 503')
+            return [
+                {'symbol':symbol,'date':start,'open':1.0,'high':1.0,'low':1.0,'close':1.0,'volume':100.0,'amount':1000.0,'source':'SOHU_HISHQ_RAW'},
+                {'symbol':symbol,'date':end,'open':1.0,'high':1.0,'low':1.0,'close':1.0,'volume':100.0,'amount':1000.0,'source':'SOHU_HISHQ_RAW'},
+            ]
+
+        with patch.object(m,'fetch_chunk',side_effect=fake_fetch_chunk):
+            rows,meta=m.fetch_chunk_resilient(object(),'000001.SZ','2020-06-01','2020-08-29',timeout=1,retries=1)
+
+        self.assertGreater(len(calls),1)
+        self.assertEqual(rows[0]['date'],'2020-06-01')
+        self.assertEqual(rows[-1]['date'],'2020-08-29')
+        self.assertEqual(meta['split_recovery_n'],1)
+        self.assertGreaterEqual(meta['leaf_chunk_n'],2)
 
 
 if __name__=='__main__':
