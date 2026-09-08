@@ -6,6 +6,7 @@ on:
       - gp/v482-special-exright
     paths:
       - 'scripts/sohu_raw_v482.py'
+      - 'scripts/test_sohu_raw_v482.py'
       - 'scripts/sohu_full_panel_v482.py'
       - 'scripts/test_sohu_full_panel_v482.py'
       - '.github/workflows/sohu-full-panel-v482.yml'
