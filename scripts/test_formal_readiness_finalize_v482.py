@@ -22,5 +22,37 @@ class FormalReadinessFinalizeV482Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.enrich_special_rows(special,report,expected_n=1)
 
+    def test_market_data_readiness_requires_exact_full_raw_and_frozen_liquidity(self):
+        raw={
+            'artifact':'SOHU_RAW_FULL_V482','version':'V4.82','status':'PASS_FULL_RAW_V482',
+            'symbol_n':847,'raw_rows':1_011_607,'expected_trade_rows':1_011_607,
+            'duplicate_symbol_dates':0,'missing_trade_dates_n':0,'extra_trade_dates_n':0,
+            'bad_ohlc_rows':0,'bad_volume_rows':0,'bad_amount_rows':0,'shard_error_n':0,
+            'global_reaudit_pass':True,'zero_trade_symbols':['600074.SH','600485.SH','600677.SH'],
+            'formal_admission':False,'oos_metrics_allowed':False,
+        }
+        liq={
+            'artifact':'LIQUIDITY_80M_APPLY_V482','version':'V4.82','threshold_cny':80_000_000,
+            'symbol_n':847,'calendar_days':1426,'panel_rows':1_207_822,
+            'pitst_source_rows':1_022_100,'pitst_observed_rows':1_022_100,'lifecycle_padding_rows':185_722,
+            'corrected_trade_rows':1_011_607,'raw_trade_rows':1_011_607,
+            'current_trade_violation_n':0,'st_overlay_violation_n':0,
+            'raw_pitst_audit':{
+                'status':'PASS_EXACT_RAW_PITST','expected_trade_rows':1_011_607,'raw_trade_rows':1_011_607,
+                'duplicate_raw_symbol_dates':0,'missing_trade_dates_n':0,'extra_trade_dates_n':0,
+                'bad_amount_rows':0,'bad_volume_rows':0,
+            },
+            'formal_admission':False,'oos_metrics_allowed':False,
+        }
+        out=mod.validate_market_data_readiness(raw,liq)
+        self.assertTrue(out['market_data_ready'])
+        self.assertEqual(out['raw_trade_rows'],1_011_607)
+        self.assertEqual(out['panel_rows'],1_207_822)
+        self.assertEqual(out['lifecycle_padding_rows'],185_722)
+
+        bad=dict(raw); bad['missing_trade_dates_n']=1
+        with self.assertRaises(ValueError):
+            mod.validate_market_data_readiness(bad,liq)
+
 
 if __name__=='__main__': unittest.main()
