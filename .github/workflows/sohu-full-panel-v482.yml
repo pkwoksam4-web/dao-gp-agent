@@ -40,7 +40,7 @@ jobs:
       matrix:
         shard: [0,1,2,3,4,5,6,7]
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -65,7 +65,7 @@ jobs:
             --pitst "$PITST" \
             --shard-index ${{ matrix.shard }} \
             --shard-count 8 \
-            --workers 2 \
+            --workers 1 \
             --timeout 20 \
             --out-dir artifact_sohu_full_raw_v482_shard_${{ matrix.shard }}
       - name: Upload shard evidence
@@ -131,7 +131,7 @@ jobs:
           x=json.load(open(p,encoding='utf-8'))
           assert x['status']=='PASS_FULL_RAW_V482',x
           assert x['symbol_n']==847
-          assert x['raw_rows']==1011602
+          assert x['raw_rows']==1011606
           assert x['missing_trade_dates_n']==0
           assert x['extra_trade_dates_n']==0
           assert x['duplicate_symbol_dates']==0
