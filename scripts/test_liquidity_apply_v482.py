@@ -54,6 +54,25 @@ class LiquidityApplyV482Tests(unittest.TestCase):
         self.assertEqual(audit['duplicate_raw_symbol_dates'],0)
         self.assertEqual(audit['status'],'PASS_EXACT_RAW_PITST')
 
+    def test_sparse_lifecycle_pitst_expands_to_full_market_calendar_without_inventing_st_state(self):
+        pit=pd.DataFrame({
+            'symbol':['000001.SZ','000001.SZ','000002.SZ'],
+            'date':['2024-01-01','2024-01-02','2024-01-02'],
+            'tradestatus':[1,1,1],
+            'isST':[0,0,0],
+        })
+        out=m.expand_pitst_to_market_calendar(
+            pit,
+            symbols=['000001.SZ','000002.SZ'],
+            calendar=['2024-01-01','2024-01-02'],
+        )
+        self.assertEqual(len(out),4)
+        self.assertEqual(int(out['pitst_observed'].sum()),3)
+        padded=out[(out['symbol']=='000002.SZ')&(out['date']=='2024-01-01')].iloc[0]
+        self.assertFalse(bool(padded['pitst_observed']))
+        self.assertEqual(int(padded['tradestatus']),0)
+        self.assertTrue(pd.isna(padded['isST']))
+
 
 if __name__=='__main__':
     unittest.main()
