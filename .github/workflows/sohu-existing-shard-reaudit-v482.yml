@@ -1,0 +1,133 @@
+name: GP V4.82 Existing Shard Reaudit + Liquidity Apply
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - '.github/workflows/sohu-existing-shard-reaudit-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  reaudit-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -q pandas numpy requests pyarrow
+
+      - name: Download all eight completed Sohu shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-sohu-full-raw-v482-shard-*
+          path: shards
+          merge-multiple: true
+          run-id: 34184522425
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download authoritative PIT-ST V4.80 panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Merge existing RAW bytes under current V4.82 correction semantics
+        env:
+          PYTHONPATH: scripts
+        run: |
+          PITST="$(find pitst -name PIT_ST_DAILY_MERGED_V480.csv -type f | head -1)"
+          test -n "$PITST"
+          python scripts/sohu_full_panel_v482.py merge \
+            --pitst "$PITST" \
+            --shards-dir shards \
+            --out-dir artifact_sohu_full_raw_v482_reaudit
+
+      - name: Gate exact 847 reaudited Full RAW panel
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_sohu_full_raw_v482_reaudit/SOHU_RAW_FULL_AUDIT_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['status']=='PASS_FULL_RAW_V482',x
+          assert x['symbol_n']==847
+          assert x['raw_rows']==1011607
+          assert x['missing_trade_dates_n']==0
+          assert x['extra_trade_dates_n']==0
+          assert x['duplicate_symbol_dates']==0
+          assert x['bad_ohlc_rows']==0
+          assert x['bad_volume_rows']==0
+          assert x['bad_amount_rows']==0
+          assert x['zero_trade_symbols']==['600074.SH','600485.SH','600677.SH'],x['zero_trade_symbols']
+          assert x['formal_admission'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Apply frozen 80M liquidity rule to the reaudited 847 panel
+        env:
+          PYTHONPATH: scripts
+        run: |
+          PITST="$(find pitst -name PIT_ST_DAILY_MERGED_V480.csv -type f | head -1)"
+          python scripts/liquidity_apply_v482.py \
+            --raw artifact_sohu_full_raw_v482_reaudit/SOHU_RAW_FULL_V482.parquet \
+            --pitst "$PITST" \
+            --out-dir artifact_liquidity_80m_v482
+
+      - name: Gate exact liquidity-application invariants
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_liquidity_80m_v482/LIQUIDITY_80M_APPLY_AUDIT_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          a=x['raw_pitst_audit']
+          assert x['artifact']=='LIQUIDITY_80M_APPLY_V482'
+          assert x['symbol_n']==847
+          assert x['calendar_days']==1426
+          assert x['panel_rows']==1207822
+          assert x['pitst_source_rows']==1022100
+          assert x['pitst_observed_rows']==1022100
+          assert x['lifecycle_padding_rows']==185722
+          assert x['corrected_trade_rows']==1011607
+          assert x['raw_trade_rows']==1011607
+          assert a['status']=='PASS_EXACT_RAW_PITST',a
+          assert a['expected_trade_rows']==1011607
+          assert a['raw_trade_rows']==1011607
+          assert a['duplicate_raw_symbol_dates']==0
+          assert a['missing_trade_dates_n']==0
+          assert a['extra_trade_dates_n']==0
+          assert a['bad_amount_rows']==0
+          assert a['bad_volume_rows']==0
+          assert x['current_trade_violation_n']==0
+          assert x['st_overlay_violation_n']==0
+          assert x['formal_admission'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload reaudited Full RAW panel
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: artifact_sohu_full_raw_v482_reaudit/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload 847 frozen-liquidity application
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-liquidity-80m-v482
+          path: artifact_liquidity_80m_v482/
+          if-no-files-found: error
+          retention-days: 30
