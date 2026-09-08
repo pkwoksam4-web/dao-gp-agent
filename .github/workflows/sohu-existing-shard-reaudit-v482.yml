@@ -5,6 +5,8 @@ on:
     branches:
       - gp/v482-special-exright
     paths:
+      - 'scripts/sohu_full_panel_v482.py'
+      - 'scripts/liquidity_apply_v482.py'
       - '.github/workflows/sohu-existing-shard-reaudit-v482.yml'
   workflow_dispatch:
 
@@ -69,6 +71,7 @@ jobs:
           assert x['bad_ohlc_rows']==0
           assert x['bad_volume_rows']==0
           assert x['bad_amount_rows']==0
+          assert x['shard_error_n']==0
           assert x['zero_trade_symbols']==['600074.SH','600485.SH','600677.SH'],x['zero_trade_symbols']
           assert x['formal_admission'] is False
           assert x['oos_metrics_allowed'] is False
