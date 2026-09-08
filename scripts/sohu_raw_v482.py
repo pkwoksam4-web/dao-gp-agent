@@ -120,6 +120,72 @@ def fetch_chunk(session:requests.Session,symbol:str,start:str,end:str,timeout:in
     raise RuntimeError(f'Sohu fetch failed for {normalize_symbol(symbol)} {start}..{end}: {last}')
 
 
+def _merge_rows_unique(symbol:str,*parts:list[dict])->list[dict]:
+    s=normalize_symbol(symbol)
+    by_date={}
+    for rows in parts:
+        for r in rows:
+            d=str(r.get('date') or '')[:10]
+            if not d:
+                continue
+            if d in by_date and by_date[d] != r:
+                raise RuntimeError(f'conflicting duplicate Sohu row {s} {d}')
+            by_date[d]=r
+    return [by_date[d] for d in sorted(by_date)]
+
+
+def fetch_chunk_resilient(
+    session:requests.Session,
+    symbol:str,
+    start:str,
+    end:str,
+    timeout:int=20,
+    retries:int=3,
+    min_calendar_days:int=7,
+)->tuple[list[dict],dict]:
+    """Fetch one requested range, bisecting only after normal retries are exhausted.
+
+    This keeps the formal 90-calendar-day plan stable while recovering deterministic
+    Sohu 500/503 failures on particular wide windows. A leaf that still fails at or
+    below min_calendar_days remains a hard error.
+    """
+    a=date.fromisoformat(start); b=date.fromisoformat(end)
+    if b<a:
+        raise ValueError('end before start')
+    try:
+        rows=fetch_chunk(session,symbol,start,end,timeout=timeout,retries=retries)
+        return rows,{
+            'split_recovery_n':0,
+            'leaf_chunk_n':1,
+            'leaf_nonempty_n':int(bool(rows)),
+            'max_leaf_rows':len(rows),
+        }
+    except RuntimeError:
+        days=(b-a).days+1
+        if days<=min_calendar_days:
+            raise
+        mid=a+timedelta(days=(days//2)-1)
+        right_start=mid+timedelta(days=1)
+        # A small pause prevents a failed wide request from immediately amplifying
+        # remote 503 pressure when the recovery path fans into two narrower calls.
+        time.sleep(0.25)
+        left,lm=fetch_chunk_resilient(
+            session,symbol,a.isoformat(),mid.isoformat(),
+            timeout=timeout,retries=retries,min_calendar_days=min_calendar_days,
+        )
+        right,rm=fetch_chunk_resilient(
+            session,symbol,right_start.isoformat(),b.isoformat(),
+            timeout=timeout,retries=retries,min_calendar_days=min_calendar_days,
+        )
+        rows=_merge_rows_unique(symbol,left,right)
+        return rows,{
+            'split_recovery_n':1+lm['split_recovery_n']+rm['split_recovery_n'],
+            'leaf_chunk_n':lm['leaf_chunk_n']+rm['leaf_chunk_n'],
+            'leaf_nonempty_n':lm['leaf_nonempty_n']+rm['leaf_nonempty_n'],
+            'max_leaf_rows':max(lm['max_leaf_rows'],rm['max_leaf_rows']),
+        }
+
+
 def fetch_symbol(
     symbol:str,
     start:str=FORMAL_BEG,
@@ -132,11 +198,16 @@ def fetch_symbol(
     s=normalize_symbol(symbol)
     session=requests.Session()
     by_date={}; chunk_rows=[]
+    split_recovery_n=0; leaf_chunk_n=0; leaf_nonempty_n=0; max_leaf_rows=0
     chunks=plan_chunks(start,end,max_calendar_days)
     try:
         for a,b in chunks:
-            rows=fetch_chunk(session,s,a,b,timeout=timeout,retries=retries)
+            rows,rmeta=fetch_chunk_resilient(session,s,a,b,timeout=timeout,retries=retries)
             chunk_rows.append(len(rows))
+            split_recovery_n+=rmeta['split_recovery_n']
+            leaf_chunk_n+=rmeta['leaf_chunk_n']
+            leaf_nonempty_n+=rmeta['leaf_nonempty_n']
+            max_leaf_rows=max(max_leaf_rows,rmeta['max_leaf_rows'])
             if len(rows)>=80:
                 raise RuntimeError(f'Sohu chunk may be truncated ({len(rows)} rows) {s} {a}..{b}')
             for r in rows:
@@ -153,6 +224,10 @@ def fetch_symbol(
         'chunk_n':len(chunks),'chunk_nonempty_n':sum(n>0 for n in chunk_rows),
         'max_chunk_rows':max(chunk_rows) if chunk_rows else 0,
         'empty_chunk_n':sum(n==0 for n in chunk_rows),
+        'split_recovery_n':split_recovery_n,
+        'leaf_chunk_n':leaf_chunk_n,
+        'leaf_nonempty_n':leaf_nonempty_n,
+        'max_leaf_rows':max_leaf_rows,
     }
     return rows,meta
 
