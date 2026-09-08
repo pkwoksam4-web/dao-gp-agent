@@ -1,0 +1,122 @@
+name: GP V4.82 OOS Admission
+
+on:
+  push:
+    branches:
+      - gp/oos-admission-v482
+    paths:
+      - 'scripts/oos_admission_v482.py'
+      - 'scripts/test_oos_admission_v482.py'
+      - '.github/workflows/oos-admission-v482.yml'
+      - 'docs/superpowers/specs/2026-09-08-oos-admission-v482-design.md'
+      - 'docs/superpowers/plans/2026-09-08-oos-admission-v482.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: OOS admission contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_oos_admission_v482.py
+
+      - name: Formal readiness regression tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_formal_readiness_v482.py test_formal_readiness_finalize_v482.py
+
+      - name: Prove Formal sources still keep OOS closed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          paths=[Path('scripts/formal_readiness_v482.py'),Path('scripts/formal_readiness_finalize_v482.py')]
+          for p in paths:
+              text=p.read_text(encoding='utf-8')
+              assert "'oos_metrics_allowed':False" in text or "'oos_metrics_allowed': False" in text
+          print('Formal sources remain OOS-closed')
+          PY
+
+  admission:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download closed Formal V4.82 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: formal
+          run-id: 34192462041
+          github-token: ${{ github.token }}
+
+      - name: Verify admission workflow invokes no OOS metric runner
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/oos-admission-v482.yml')
+          forbidden=('run_gp_walkforward.py','oos_metrics.py','backtest.py','compute_sharpe.py','compute_pnl.py')
+          bad=[]
+          for i,line in enumerate(p.read_text(encoding='utf-8').splitlines(),1):
+              s=line.strip().lower()
+              if ('python ' in s or s.startswith('./')) and any(token in s for token in forbidden):
+                  bad.append((i,line))
+          assert not bad, bad
+          print('No OOS metric/backtest command is invoked')
+          PY
+
+      - name: Evaluate OOS admission without exposing OOS metrics
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/oos_admission_v482.py \
+            --formal formal/FORMAL_READINESS_FINAL_V482.json \
+            --model-freeze data/model_freeze_v482.json \
+            --oos-scope data/oos_scope_v482.json \
+            --out-dir artifact_oos_admission_v482
+
+      - name: Verify production remains fail-closed until real model freeze exists
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifact_oos_admission_v482/OOS_ADMISSION_V482.json')
+          x=json.loads(p.read_text(encoding='utf-8'))
+          assert x['artifact']=='OOS_ADMISSION_V482'
+          assert x['version']=='V4.82'
+          assert x['status']=='OOS_BLOCKED_V482'
+          assert x['oos_metrics_allowed'] is False
+          assert 'MODEL_FREEZE_INVALID' in x['blockers']
+          assert 'OOS_SCOPE_INVALID' in x['blockers']
+          assert x['formal_ready'] is True
+          assert x['formal_artifact_sha256']
+          assert not Path('data/model_freeze_v482.json').exists()
+          assert not Path('data/oos_scope_v482.json').exists()
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload OOS admission decision
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-oos-admission-v482
+          path: artifact_oos_admission_v482/
+          if-no-files-found: error
+          retention-days: 30
