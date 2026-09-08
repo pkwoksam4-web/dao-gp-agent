@@ -23,9 +23,158 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: OOS calendar RED/contract tests
+
+      - name: OOS calendar contract tests
         env:
           PYTHONPATH: scripts
         run: |
           cd scripts
           python -m unittest -v test_oos_calendar_v482.py
+
+      - name: Recovery, admission and Formal regression tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_model_freeze_recovery_v482.py \
+            test_model_freeze_recovery_calendar_v482.py \
+            test_oos_admission_v482.py \
+            test_formal_readiness_v482.py \
+            test_formal_readiness_finalize_v482.py
+
+  production-calendar:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download verified V4.80 Formal calendar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: input/calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+
+      - name: Download current V4.82 recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-model-freeze-recovery-v482
+          path: input/recovery
+          run-id: 34207288888
+          github-token: ${{ github.token }}
+
+      - name: Fetch official 2026 exchange holiday schedules
+        run: |
+          mkdir -p input/official
+          curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 \
+            -A 'Mozilla/5.0 GP-OOS-Calendar-V482' \
+            'https://www.sse.com.cn/disclosure/announcement/general/c/c_20251222_10802507.shtml' \
+            -o input/official/sse-2026-holidays.html
+          curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 \
+            -A 'Mozilla/5.0 GP-OOS-Calendar-V482' \
+            'https://www.szse.cn/disclosure/notice/general/t20251222_618087.html' \
+            -o input/official/szse-2026-holidays.html
+          test -s input/official/sse-2026-holidays.html
+          test -s input/official/szse-2026-holidays.html
+
+      - name: Build and bind production OOS calendar evidence
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/oos-calendar
+          python - <<'PY'
+          import csv
+          import json
+          from pathlib import Path
+
+          import model_freeze_recovery_v482 as recovery
+          import oos_calendar_v482 as cal
+
+          calendar_csv = Path('input/calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv').read_text(encoding='utf-8-sig')
+          verified = recovery.verify_authoritative_calendar_csv(calendar_csv)
+          assert verified['date_n'] == 1426
+          assert verified['formal_calendar_sha256'] == cal.FORMAL_CALENDAR_SHA256
+
+          sse_html = Path('input/official/sse-2026-holidays.html').read_text(encoding='utf-8', errors='replace')
+          szse_html = Path('input/official/szse-2026-holidays.html').read_text(encoding='utf-8', errors='replace')
+          oos = cal.build_oos_calendar(sse_html, szse_html)
+          extended = cal.bind_extended_calendar(verified['dates'], oos['dates'])
+
+          assert extended['formal_date_n'] == 1426
+          assert extended['oos_date_n'] == 98
+          assert extended['total_date_n'] == 1524
+          assert extended['formal_calendar_sha256'] == cal.FORMAL_CALENDAR_SHA256
+          assert extended['oos_calendar_sha256'] == cal.OOS_CALENDAR_SHA256
+          assert extended['calendar_sha256'] == cal.FULL_CALENDAR_SHA256
+
+          manifest = {k: v for k, v in oos.items() if k != 'dates'}
+          manifest.update({
+              'formal_calendar_sha256': extended['formal_calendar_sha256'],
+              'formal_date_n': extended['formal_date_n'],
+              'total_date_n': extended['total_date_n'],
+              'calendar_sha256': extended['calendar_sha256'],
+          })
+
+          checkpoint = json.loads(Path('input/recovery/MODEL_ASSET_RECOVERY_CHECKPOINT_V482.json').read_text(encoding='utf-8'))
+          rebound = cal.bind_oos_calendar_checkpoint(checkpoint, manifest)
+          assert rebound['status'] == 'MODEL_ASSETS_INCOMPLETE_V482'
+          assert rebound['model_freeze_allowed'] is False
+          assert rebound['calendar_sha256'] == cal.FULL_CALENDAR_SHA256
+          assert rebound['oos_calendar_sha256'] == cal.OOS_CALENDAR_SHA256
+          assert set(rebound['blockers']) == {
+              'STRATEGY_CODE_MISSING',
+              'PARAMETER_SET_MISSING',
+              'FACTOR_DEFINITION_MISSING',
+          }, rebound['blockers']
+
+          out = Path('out/oos-calendar')
+          (out / 'OOS_CALENDAR_V482.json').write_text(
+              json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          (out / 'MODEL_ASSET_RECOVERY_CHECKPOINT_V482_OOS_CALENDAR.json').write_text(
+              json.dumps(rebound, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          with (out / 'OFFICIAL_A_SHARE_OPEN_DATES_TO_OOS_V482.csv').open('w', encoding='utf-8', newline='') as f:
+              w = csv.writer(f)
+              w.writerow(['trade_date'])
+              for date in extended['dates']:
+                  w.writerow([date])
+
+          print(json.dumps({
+              'status': manifest['status'],
+              'formal_date_n': extended['formal_date_n'],
+              'oos_date_n': extended['oos_date_n'],
+              'total_date_n': extended['total_date_n'],
+              'first_oos_trade_date': manifest['first_oos_trade_date'],
+              'last_oos_trade_date': manifest['last_oos_trade_date'],
+              'weekday_holiday_closures': manifest['weekday_holiday_closures'],
+              'formal_calendar_sha256': extended['formal_calendar_sha256'],
+              'oos_calendar_sha256': extended['oos_calendar_sha256'],
+              'calendar_sha256': extended['calendar_sha256'],
+              'remaining_blockers': rebound['blockers'],
+              'sse_source_sha256': manifest['sse_source']['sha256'],
+              'szse_source_sha256': manifest['szse_source']['sha256'],
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Preserve official raw source evidence
+        run: |
+          cp input/official/sse-2026-holidays.html out/oos-calendar/
+          cp input/official/szse-2026-holidays.html out/oos-calendar/
+
+      - name: Upload OOS calendar evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-oos-calendar-v482
+          path: out/oos-calendar/
+          if-no-files-found: warn
+          retention-days: 30
