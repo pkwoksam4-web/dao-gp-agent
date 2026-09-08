@@ -76,7 +76,9 @@ def canonical_universe(
 
 def decode_calendar_representations(b64_text: str, hex_text: str) -> bytes:
     try:
-        b64_payload = base64.b64decode(''.join(b64_text.split()), validate=True)
+        normalized = ''.join(b64_text.split())
+        normalized += '=' * ((-len(normalized)) % 4)
+        b64_payload = base64.b64decode(normalized, validate=True)
         hex_payload = bytes.fromhex(''.join(hex_text.split()))
     except (ValueError, TypeError) as exc:
         raise ValueError('invalid calendar representation') from exc
@@ -402,12 +404,6 @@ def _read_json(path: pathlib.Path) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f'{path} must contain JSON object')
     return value
-
-
-def _optional_json(path_text: str | None) -> dict | None:
-    if not path_text:
-        return None
-    return _read_json(pathlib.Path(path_text))
 
 
 def run_paths(
