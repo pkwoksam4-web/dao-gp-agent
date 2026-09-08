@@ -66,6 +66,21 @@ jobs:
           run-id: 34192462041
           github-token: ${{ github.token }}
 
+      - name: Probe frozen calendar payload shape
+        run: |
+          python - <<'PY'
+          import base64,gzip
+          from pathlib import Path
+          b64=''.join(Path('data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64').read_text().split())
+          payload=base64.b64decode(b64)
+          raw=gzip.decompress(payload)
+          print('decoded_bytes=',len(raw))
+          print('head_repr=',repr(raw[:500]))
+          print('head_lines=')
+          for line in raw.decode('utf-8-sig',errors='replace').splitlines()[:8]:
+              print(repr(line))
+          PY
+
       - name: Recover model-freeze evidence
         env:
           PYTHONPATH: scripts
@@ -83,11 +98,9 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
           root=Path('artifact_model_freeze_recovery_v482')
           checkpoint=json.loads((root/'MODEL_ASSET_RECOVERY_CHECKPOINT_V482.json').read_text(encoding='utf-8'))
           scope=json.loads((root/'OOS_SCOPE_INTENT_VALIDATION_V482.json').read_text(encoding='utf-8'))
-
           assert checkpoint['artifact']=='MODEL_ASSET_RECOVERY_CHECKPOINT_V482'
           assert checkpoint['version']=='V4.82'
           assert checkpoint['status']=='MODEL_ASSETS_INCOMPLETE_V482'
@@ -104,14 +117,11 @@ jobs:
           assert checkpoint['evidence']['formal_calendar']['end']=='2026-04-17'
           for code in ('STRATEGY_CODE_MISSING','PARAMETER_SET_MISSING','FACTOR_DEFINITION_MISSING'):
               assert code in checkpoint['blockers'], checkpoint['blockers']
-
           assert scope['status']=='SCOPE_INTENT_VALID_V482', scope
           assert scope['blockers']==[]
           assert len(scope['scope_intent_sha256'])==64
-
           assert not Path('data/MODEL_FREEZE_V482.json').exists()
           assert not Path('data/OOS_SCOPE_V482.json').exists()
-
           print(json.dumps({
               'status':checkpoint['status'],
               'blockers':checkpoint['blockers'],
@@ -126,9 +136,10 @@ jobs:
           PY
 
       - name: Upload model-freeze recovery artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gp-model-freeze-recovery-v482
           path: artifact_model_freeze_recovery_v482/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
