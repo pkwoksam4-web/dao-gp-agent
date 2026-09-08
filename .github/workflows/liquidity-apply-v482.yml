@@ -1,0 +1,32 @@
+name: GP V4.82 Frozen Liquidity Apply
+
+on:
+  push:
+    branches:
+      - gp/v482-special-exright
+    paths:
+      - 'scripts/liquidity_apply_v482.py'
+      - 'scripts/test_liquidity_apply_v482.py'
+      - '.github/workflows/liquidity-apply-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -q pandas numpy
+      - name: Frozen 80M application unit tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_liquidity_apply_v482.py
