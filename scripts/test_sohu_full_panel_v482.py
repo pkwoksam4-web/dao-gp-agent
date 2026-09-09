@@ -1,4 +1,9 @@
+import hashlib
+import json
+import pathlib
+import tempfile
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -81,6 +86,41 @@ class SohuFullPanelV482Tests(unittest.TestCase):
         )
         self.assertTrue(m.full_raw_global_gate(**common,shard_error=0))
         self.assertFalse(m.full_raw_global_gate(**common,shard_error=1))
+
+    def test_merge_report_binds_exact_full_parquet_bytes_and_schema(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=pathlib.Path(td)
+            shards=root/'shards'; shards.mkdir()
+            out=root/'out'
+            pit=root/'pit.csv'
+            pd.DataFrame([{
+                'symbol':'000001.SZ','date':'2020-06-01','tradestatus':1,'isST':0,
+            }]).to_csv(pit,index=False)
+            raw=pd.DataFrame([{
+                'symbol':'000001.SZ','date':'2020-06-01','open':10.0,'high':11.0,
+                'low':9.5,'close':10.5,'volume':1000.0,'amount':10000.0,'source':'SOHU_RAW',
+            }],columns=m.RAW_FIELDS)
+            raw.to_parquet(shards/'SOHU_RAW_SHARD_00_V482.parquet',index=False)
+            (shards/'SOHU_RAW_SHARD_00_AUDIT_V482.json').write_text(json.dumps({
+                'shard_index':0,'shard_count':1,'symbol_list':['000001.SZ'],
+                'review_n':0,'error_n':0,
+            }),encoding='utf-8')
+            with patch.object(m,'EXPECTED_SYMBOL_N',1), patch.object(m,'EXPECTED_TRADE_ROWS',1), patch.object(m,'PITST_TRADESTATUS_ONE_CORRECTIONS',set()):
+                report=m.merge_shards(shards,pit,out)
+            full=out/'SOHU_RAW_FULL_V482.parquet'
+            expected_sha=hashlib.sha256(full.read_bytes()).hexdigest()
+            self.assertEqual(report['full_parquet_sha256'],expected_sha)
+            self.assertEqual(report['full_parquet_bytes'],full.stat().st_size)
+            self.assertRegex(report['schema_fingerprint'],r'^[0-9a-f]{64}$')
+
+    def test_one_byte_mutation_changes_full_parquet_identity(self):
+        self.assertTrue(callable(getattr(m,'sha256_file',None)), 'sohu_full_panel_v482 must expose/use sha256_file')
+        with tempfile.TemporaryDirectory() as td:
+            p=pathlib.Path(td)/'raw.parquet'
+            p.write_bytes(b'abc')
+            first=m.sha256_file(p)
+            p.write_bytes(b'abd')
+            self.assertNotEqual(m.sha256_file(p),first)
 
 
 if __name__=='__main__':
