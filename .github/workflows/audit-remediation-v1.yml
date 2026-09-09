@@ -1,0 +1,35 @@
+name: GP Audit Remediation V1
+
+on:
+  push:
+    branches:
+      - gp/audit-remediation-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install regression dependencies
+        run: pip install -q pandas pyarrow numpy
+      - name: Run pre-remediation baseline
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_sohu_full_panel_v482.py \
+            test_liquidity_apply_v482.py \
+            test_formal_readiness_finalize_v482.py \
+            test_pit_st_final_audit_v480.py \
+            test_recalc_global_qfq_from_ledger_v481.py \
+            test_oos_admission_v482.py
