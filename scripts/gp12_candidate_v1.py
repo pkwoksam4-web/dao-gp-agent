@@ -43,6 +43,26 @@ LABEL_KEYS = {
     'label_source_id', 'horizon', 'score', 'outcome',
 }
 FACTOR_IDS = tuple(f'F{i}' for i in range(1, 13))
+RAW_PANEL_FIELDS = frozenset(
+    {'symbol', 'date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'source'})
+RAW_PANEL_UNREPRESENTED_FAMILIES = (
+    'stock_adjusted_close', 'market_adjusted_close', 'sector_adjusted_close',
+    'amount_turnover', 'main_net_flow', 'market_breadth', 'sector_breadth',
+    'intraday_15m', 'intraday_60m',
+)
+FEATURE_FAMILY_FIELDS = {
+    'market_calendar': ('calendar',),
+    'stock_adjusted_close': ('daily.close',),
+    'market_adjusted_close': ('daily.market_close',),
+    'sector_adjusted_close': ('daily.sector_close',),
+    'amount_turnover': ('daily.amount_cny', 'daily.turnover_ratio'),
+    'main_net_flow': ('daily.main_net_flow_cny',),
+    'market_breadth': ('daily.market_breadth_ratio',),
+    'sector_breadth': ('daily.sector_breadth_ratio',),
+    'status': ('status.is_st', 'status.tradable', 'status.upper_limit'),
+    'intraday_15m': ('intraday_15m',),
+    'intraday_60m': ('intraday_60m',),
+}
 
 
 def canonical_json_bytes(value: object) -> bytes:
@@ -175,6 +195,24 @@ def _return(values: list[float], window: int) -> float:
 
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values)
+
+
+def raw_panel_gap_report(fields: object) -> dict:
+    """Describe what the validated V4.82 RAW schema cannot provide by itself."""
+    if not isinstance(fields, (set, frozenset, list, tuple)):
+        observed = []
+    else:
+        observed = sorted({field for field in fields if isinstance(field, str)})
+    return {
+        'observed_fields': observed,
+        'raw_schema_complete': set(observed) >= RAW_PANEL_FIELDS,
+        'missing_raw_schema_fields': sorted(RAW_PANEL_FIELDS - set(observed)),
+        'candidate_families_unrepresented_by_raw_panel': list(
+            RAW_PANEL_UNREPRESENTED_FAMILIES),
+        'warning': (
+            'raw close/amount/volume fields are not substitutes for adjusted '
+            'close, turnover, flow, breadth, or intraday families'),
+    }
 
 
 def _log_slope_r_squared(values: list[float]) -> tuple[float, float]:
@@ -403,6 +441,93 @@ def score_snapshot(snapshot: object, parameters: object) -> dict:
         'source_ids': data['source_ids'],
         'source_ids_verified': False,
         'real_feature_inputs_validated': False,
+    }
+
+
+def feature_input_readiness(snapshot: object, raw_panel_fields: object = None) -> dict:
+    """Report structural feature gaps without asserting source truth.
+
+    This is intentionally weaker than ``score_snapshot``: it is a diagnostic
+    for wiring the real V4.82 inputs and never turns caller-declared source IDs
+    into substantive provenance verification.
+    """
+    missing_families = set()
+    missing_fields = set()
+    reasons = []
+    raw_panel_gap = (
+        raw_panel_gap_report(raw_panel_fields)
+        if raw_panel_fields is not None else None)
+    if not isinstance(snapshot, dict):
+        return {
+            'structural_input_contract_complete': False,
+            'missing_families': sorted(FEATURE_FAMILY_FIELDS),
+            'missing_fields': ['snapshot'],
+            'source_ids_present': False,
+            'source_ids_substantively_verified': False,
+            'real_feature_inputs_validated': False,
+            'reasons': ['snapshot must be an object'],
+            'raw_panel_gap': raw_panel_gap,
+        }
+
+    required_top_level = {'calendar', 'daily', 'status', 'intraday_15m',
+                          'intraday_60m', 'source_ids'}
+    missing_top_level = sorted(required_top_level - set(snapshot))
+    if missing_top_level:
+        reasons.append('missing top-level contract fields')
+        missing_fields.update(missing_top_level)
+        if 'calendar' in missing_top_level:
+            missing_families.add('market_calendar')
+
+    daily = snapshot.get('daily')
+    if not isinstance(daily, list) or not daily:
+        reasons.append('daily must be a non-empty list')
+        for family in ('stock_adjusted_close', 'market_adjusted_close',
+                       'sector_adjusted_close', 'amount_turnover',
+                       'main_net_flow', 'market_breadth', 'sector_breadth'):
+            missing_families.add(family)
+    else:
+        for family, paths in FEATURE_FAMILY_FIELDS.items():
+            for path in paths:
+                if (path.startswith('daily.') and any(
+                        not isinstance(row, dict) or path[6:] not in row
+                        for row in daily)):
+                    missing_families.add(family)
+                    missing_fields.add(path)
+
+    status = snapshot.get('status')
+    if not isinstance(status, dict):
+        missing_families.add('status')
+        missing_fields.add('status')
+    else:
+        for key in ('is_st', 'tradable', 'upper_limit'):
+            if key not in status:
+                missing_families.add('status')
+                missing_fields.add(f'status.{key}')
+
+    for family in ('intraday_15m', 'intraday_60m'):
+        bars = snapshot.get(family)
+        if not isinstance(bars, list) or len(bars) != 5:
+            missing_families.add(family)
+            missing_fields.add(family)
+
+    source_ids = snapshot.get('source_ids')
+    source_ids_present = isinstance(source_ids, dict) and all(
+        isinstance(source_ids.get(family), str) and source_ids[family].strip()
+        for family in FEATURE_FAMILY_FIELDS)
+    if not source_ids_present:
+        reasons.append('source_ids are missing or incomplete')
+
+    if missing_families:
+        reasons.append('one or more required feature families are structurally absent')
+    return {
+        'structural_input_contract_complete': not missing_families and not missing_top_level,
+        'missing_families': sorted(missing_families),
+        'missing_fields': sorted(missing_fields),
+        'source_ids_present': source_ids_present,
+        'source_ids_substantively_verified': False,
+        'real_feature_inputs_validated': False,
+        'reasons': sorted(set(reasons)),
+        'raw_panel_gap': raw_panel_gap,
     }
 
 

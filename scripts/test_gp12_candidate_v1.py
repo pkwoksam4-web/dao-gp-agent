@@ -101,6 +101,30 @@ def score_bundle(symbol, sector, score, snapshot_date='2026-04-17'):
 
 
 class ScoringTests(unittest.TestCase):
+    def test_feature_readiness_reports_structure_separately_from_provenance(self):
+        raw_fields = {'symbol', 'date', 'open', 'high', 'low', 'close',
+                      'volume', 'amount', 'source'}
+        raw_gap = mod.raw_panel_gap_report(raw_fields)
+        self.assertTrue(raw_gap['raw_schema_complete'])
+        self.assertIn('main_net_flow',
+                      raw_gap['candidate_families_unrepresented_by_raw_panel'])
+
+        report = mod.feature_input_readiness(valid_snapshot(), raw_fields)
+        self.assertTrue(report['structural_input_contract_complete'])
+        self.assertEqual(report['missing_families'], [])
+        self.assertTrue(report['source_ids_present'])
+        self.assertFalse(report['source_ids_substantively_verified'])
+        self.assertFalse(report['real_feature_inputs_validated'])
+        self.assertEqual(report['raw_panel_gap'], raw_gap)
+
+        incomplete = valid_snapshot()
+        incomplete['daily'][-1].pop('turnover_ratio')
+        incomplete['source_ids'].pop('main_net_flow')
+        report = mod.feature_input_readiness(incomplete)
+        self.assertFalse(report['structural_input_contract_complete'])
+        self.assertEqual(report['missing_families'], ['amount_turnover'])
+        self.assertFalse(report['source_ids_present'])
+
     def test_flat_fixture_has_twelve_neutral_factors_and_cannot_enter(self):
         result = mod.score_snapshot(valid_snapshot(), parameters())
         self.assertEqual(result['strategy_id'], 'GP12_REBUILD_CANDIDATE_V1')
