@@ -4,6 +4,7 @@ import unittest
 import gp12_share_known_at_v1 as mod
 
 
+FORMAL_START = '2020-06-01'
 FORMAL_END = '2026-04-17'
 
 
@@ -190,6 +191,113 @@ class ShareKnownAtV1Tests(unittest.TestCase):
         self.assertIn('known_mod.dual_source_probe_gate(', workflow)
         self.assertIn("binding_blockers=result['binding_blockers']", workflow)
         self.assertIn("pit_verified=result['pit_verified']", workflow)
+
+
+class FormalAnchorBindingTests(unittest.TestCase):
+    def test_pre_anchor_mismatch_is_diagnostic_but_formal_chain_can_pass(self):
+        result = mod.bind_formal_anchor_states(
+            '600000.SH',
+            [
+                share_row('2017-05-26', 28000000000.0),
+                share_row('2018-12-31', 28103763900.0),
+                share_row('2020-06-30', 28103763900.0),
+            ],
+            [
+                structure_row('2018-12-31', '2019-03-26', '2810376.39', 2),
+                structure_row('2020-06-30', '2020-07-03', '2810376.39', 2),
+            ],
+            'a' * 64,
+            'b' * 64,
+        )
+        self.assertEqual(result['formal_anchor_change_date'], '2018-12-31')
+        self.assertEqual(result['formal_anchor_known_at'], '2019-03-26')
+        self.assertEqual(result['pre_anchor_mismatch_dates'], ['2017-05-26'])
+        self.assertEqual(result['formal_chain_mismatch_n'], 0)
+        self.assertEqual(
+            [state['change_date'] for state in result['states']],
+            ['2018-12-31', '2020-06-30'],
+        )
+        self.assertTrue(result['pit_verified'])
+        self.assertEqual(result['blockers'], [])
+
+    def test_latest_known_preformal_exact_match_becomes_anchor(self):
+        result = mod.bind_formal_anchor_states(
+            '600000.SH',
+            [
+                share_row('2016-12-31', 27000000000.0),
+                share_row('2018-12-31', 28103763900.0),
+            ],
+            [
+                structure_row('2016-12-31', '2017-03-20', '2700000', 0),
+                structure_row('2018-12-31', '2019-03-26', '2810376.39', 2),
+            ],
+            'a' * 64,
+            'b' * 64,
+        )
+        self.assertEqual(result['formal_anchor_change_date'], '2018-12-31')
+        self.assertEqual([s['change_date'] for s in result['states']], ['2018-12-31'])
+
+    def test_missing_eligible_anchor_blocks(self):
+        result = mod.bind_formal_anchor_states(
+            '600000.SH',
+            [share_row('2020-06-30', 28103763900.0)],
+            [structure_row('2020-06-30', '2020-07-03', '2810376.39', 2)],
+            'a' * 64,
+            'b' * 64,
+        )
+        self.assertIsNone(result['formal_anchor_change_date'])
+        self.assertIn('SINA_FORMAL_ANCHOR_MISSING', result['blockers'])
+        self.assertFalse(result['pit_verified'])
+
+    def test_missing_post_anchor_match_blocks_formal_chain(self):
+        result = mod.bind_formal_anchor_states(
+            '600000.SH',
+            [
+                share_row('2018-12-31', 28103763900.0),
+                share_row('2020-06-30', 28103763900.0),
+            ],
+            [structure_row('2018-12-31', '2019-03-26', '2810376.39', 2)],
+            'a' * 64,
+            'b' * 64,
+        )
+        self.assertEqual(result['formal_chain_mismatch_dates'], ['2020-06-30'])
+        self.assertIn('SINA_FORMAL_CHAIN_MATCH_MISSING', result['blockers'])
+        self.assertFalse(result['pit_verified'])
+
+    def test_post_anchor_amount_mismatch_blocks_formal_chain(self):
+        result = mod.bind_formal_anchor_states(
+            '600000.SH',
+            [
+                share_row('2018-12-31', 28103763900.0),
+                share_row('2020-06-30', 28103763900.0),
+            ],
+            [
+                structure_row('2018-12-31', '2019-03-26', '2810376.39', 2),
+                structure_row('2020-06-30', '2020-07-03', '2810376.38', 2),
+            ],
+            'a' * 64,
+            'b' * 64,
+        )
+        self.assertIn('SINA_FORMAL_CHAIN_AMOUNT_MISMATCH', result['blockers'])
+        self.assertEqual(result['formal_chain_mismatch_dates'], ['2020-06-30'])
+
+    def test_post_anchor_ambiguous_match_blocks_formal_chain(self):
+        result = mod.bind_formal_anchor_states(
+            '600000.SH',
+            [
+                share_row('2018-12-31', 28103763900.0),
+                share_row('2020-06-30', 28103763900.0),
+            ],
+            [
+                structure_row('2018-12-31', '2019-03-26', '2810376.39', 2),
+                structure_row('2020-06-30', '2020-07-03', '2810376.39', 2),
+                structure_row('2020-06-30', '2020-07-04', '2810376.39', 2),
+            ],
+            'a' * 64,
+            'b' * 64,
+        )
+        self.assertIn('SINA_FORMAL_CHAIN_MATCH_AMBIGUOUS', result['blockers'])
+        self.assertEqual(result['formal_chain_mismatch_dates'], ['2020-06-30'])
 
 
 if __name__ == '__main__':
