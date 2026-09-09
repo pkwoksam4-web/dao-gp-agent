@@ -520,7 +520,8 @@ def feature_input_readiness(snapshot: object, raw_panel_fields: object = None) -
     if missing_families:
         reasons.append('one or more required feature families are structurally absent')
     return {
-        'structural_input_contract_complete': not missing_families and not missing_top_level,
+        'structural_input_contract_complete': (
+            not missing_families and not missing_top_level and source_ids_present),
         'missing_families': sorted(missing_families),
         'missing_fields': sorted(missing_fields),
         'source_ids_present': source_ids_present,

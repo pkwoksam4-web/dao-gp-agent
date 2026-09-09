@@ -117,6 +117,13 @@ class ScoringTests(unittest.TestCase):
         self.assertFalse(report['real_feature_inputs_validated'])
         self.assertEqual(report['raw_panel_gap'], raw_gap)
 
+        no_source_id = valid_snapshot()
+        no_source_id['source_ids'].pop('main_net_flow')
+        report = mod.feature_input_readiness(no_source_id)
+        self.assertFalse(report['structural_input_contract_complete'])
+        self.assertEqual(report['missing_families'], [])
+        self.assertFalse(report['source_ids_present'])
+
         incomplete = valid_snapshot()
         incomplete['daily'][-1].pop('turnover_ratio')
         incomplete['source_ids'].pop('main_net_flow')
