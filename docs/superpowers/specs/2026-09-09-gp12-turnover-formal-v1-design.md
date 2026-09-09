@@ -102,7 +102,9 @@ For a Formal trade date `d`:
 
 Forward-fill is permitted only from an already-effective earlier/equal source record to later trade dates.
 
-`PIT_VERIFIED` requires evidence that the source record date is an effective/known-at boundary suitable for this use. Merely reproducing AKShare's forward-fill behavior does not by itself prove PIT validity. If the source date semantics cannot be established, the artifact may be structurally complete but must remain `PIT_UNVERIFIED` or `PIT_PARTIAL` and retain a deterministic blocker.
+`PIT_VERIFIED` requires evidence that the source record date is an effective/known-at boundary suitable for this use. Merely reproducing AKShare's forward-fill behavior does not by itself prove PIT validity.
+
+The implementation must retain an explicit `share_date_semantics_evidence` record. It may establish the semantics from a documented Sina stock-structure contract/page or from independently retrievable Sina stock-structure history that identifies the same dated capital changes as effective historical states. If neither source path establishes what the date means, the artifact remains `PIT_UNVERIFIED` or `PIT_PARTIAL` with `SINA_SHARE_DATE_SEMANTICS_UNVERIFIED` even when all numeric rows are present.
 
 No row after `2026-04-17` may influence any share-capital state, audit, fallback, or readiness decision.
 
@@ -151,6 +153,7 @@ Audit/provenance manifest for all attempted symbols. Required top-level fields:
 - `normalized_record_count`
 - `parser_version`
 - `source_endpoint_family`
+- `share_date_semantics_evidence`
 - `symbol_evidence`
 - `blockers`
 - `formal_admission = false`
@@ -176,6 +179,7 @@ Primary Formal turnover artifact. Required summary fields:
 - `raw_volume_source_artifact`
 - `raw_volume_source_sha256`
 - `share_manifest_sha256`
+- `turnover_rows_sha256`
 - `symbol_n`
 - `expected_trade_rows`
 - `materialized_trade_rows`
@@ -195,7 +199,24 @@ Primary Formal turnover artifact. Required summary fields:
 - `model_freeze_allowed = false`
 - `oos_metrics_allowed = false`
 
-The row file and summary must be cryptographically bound by SHA256 in the workflow artifact manifest.
+### 7.3 Hash conventions
+
+All JSON semantic hashes in this subsystem use the same canonical encoding as the readiness layer:
+
+- UTF-8;
+- recursive key sort;
+- separators `(',', ':')`;
+- `ensure_ascii = false`;
+- finite JSON only;
+- no trailing newline included in the canonical bytes.
+
+`share_manifest_sha256` is the canonical JSON SHA256 of the complete `SINA_SHARE_AMOUNT_MANIFEST_GP12_V1` object.
+
+`turnover_rows_sha256` is the SHA256 of the exact UTF-8 CSV bytes after deterministic row ordering and a fixed header/newline convention defined in implementation tests.
+
+The readiness binder sets `amount_turnover.source_sha256` to the canonical JSON SHA256 of the complete `GP12_TURNOVER_FORMAL_V1` summary object. The summary itself does not contain this self-hash, so there is no recursive hashing ambiguity.
+
+The workflow artifact also records the ZIP digest separately. ZIP digest, raw-response hash, row-CSV hash, manifest hash, and summary semantic hash are distinct identities and MUST NOT be substituted for one another.
 
 ## 8. Pass and fail-closed states
 
@@ -260,7 +281,7 @@ If and only if `GP12_TURNOVER_FORMAL_V1` passes all gates, a readiness evidence 
 - `binding_state = BOUND_VERIFIED_ARTIFACT`
 - `pit_state = PIT_VERIFIED`
 - `source_artifact = GP12_TURNOVER_FORMAL_V1`
-- `source_sha256 = <canonical/declared turnover artifact hash>`
+- `source_sha256 = canonical SHA256 of the complete GP12_TURNOVER_FORMAL_V1 summary object`
 - `coverage_start = 2020-06-01`
 - `coverage_end = 2026-04-17`
 - `blockers = []`
@@ -341,6 +362,7 @@ Required tests include:
 18. existing GP12 readiness tests remain green.
 19. existing Formal V4.82 regression tests remain green.
 20. no test fixture contains forbidden OOS/performance fields in production outputs.
+21. manifest, row CSV, summary semantic hash, and ZIP digest identities cannot be interchanged.
 
 ## 15. Success criterion
 
