@@ -7,6 +7,7 @@ import pathlib
 import re
 
 import formal_readiness_v482 as base
+from audit_evidence_v1 import validate_sha256
 
 EXPECTED_SPECIAL_N = 11
 EXPECTED_ZERO_TRADE_SYMBOLS = ['600074.SH','600485.SH','600677.SH']
@@ -87,6 +88,9 @@ def validate_market_data_readiness(raw: dict, liquidity: dict) -> dict:
         'shard_error': int(raw.get('shard_error_n') or 0) == 0,
         'global_reaudit': raw.get('global_reaudit_pass') is True,
         'zero_trade_symbols': raw.get('zero_trade_symbols') == EXPECTED_ZERO_TRADE_SYMBOLS,
+        'full_parquet_sha256': validate_sha256(raw.get('full_parquet_sha256')),
+        'full_parquet_bytes': int(raw.get('full_parquet_bytes') or 0) > 0,
+        'schema_fingerprint': validate_sha256(raw.get('schema_fingerprint')),
         'source_formal_closed': raw.get('formal_admission') is False,
         'source_oos_closed': raw.get('oos_metrics_allowed') is False,
     }
@@ -117,6 +121,11 @@ def validate_market_data_readiness(raw: dict, liquidity: dict) -> dict:
         'raw_pitst_bad_volume': int(pit.get('bad_volume_rows') or 0) == 0,
         'current_trade_violation': int(liquidity.get('current_trade_violation_n') or 0) == 0,
         'st_overlay_violation': int(liquidity.get('st_overlay_violation_n') or 0) == 0,
+        'input_full_raw_sha256': validate_sha256(liquidity.get('input_full_raw_sha256')),
+        'input_pitst_sha256': validate_sha256(liquidity.get('input_pitst_sha256')),
+        'panel_parquet_sha256': validate_sha256(liquidity.get('panel_parquet_sha256')),
+        'panel_parquet_bytes': int(liquidity.get('panel_parquet_bytes') or 0) > 0,
+        'schema_fingerprint': validate_sha256(liquidity.get('schema_fingerprint')),
         'source_formal_closed': liquidity.get('formal_admission') is False,
         'source_oos_closed': liquidity.get('oos_metrics_allowed') is False,
     }
@@ -124,6 +133,14 @@ def validate_market_data_readiness(raw: dict, liquidity: dict) -> dict:
     if failed_liq:
         raise ValueError(f'Frozen liquidity market-data gate failed: {failed_liq}')
 
+    if liquidity['input_full_raw_sha256'] != raw['full_parquet_sha256']:
+        raise ValueError('Frozen liquidity input RAW hash does not match Full RAW parquet hash')
+
+    byte_bindings = {
+        'full_raw_sha256': raw['full_parquet_sha256'],
+        'liquidity_panel_sha256': liquidity['panel_parquet_sha256'],
+        'pitst_sha256': liquidity['input_pitst_sha256'],
+    }
     return {
         'market_data_ready': True,
         'full_raw_status': raw['status'],
@@ -146,6 +163,7 @@ def validate_market_data_readiness(raw: dict, liquidity: dict) -> dict:
         'raw_pitst_status': pit['status'],
         'current_trade_violation_n': 0,
         'st_overlay_violation_n': 0,
+        'byte_bindings': byte_bindings,
     }
 
 
@@ -211,6 +229,7 @@ def finalize(frozen_dir: pathlib.Path, special_dir: pathlib.Path, special_proven
         'special_provenance': special_prov,
         'special_materialized_rows': enriched,
         'market_data': market_data,
+        'byte_bindings': dict(market_data['byte_bindings']),
         'gate': gate,
         'formal_ready': True,
         'validated_global_provenance_emitted': True,
