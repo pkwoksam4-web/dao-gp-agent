@@ -1,0 +1,37 @@
+{
+  "artifact": "AUDIT_STATUS_MODEL_V1",
+  "version": "V1",
+  "states": [
+    "FORMAL_DATA_READY",
+    "FEATURE_INPUT_READY",
+    "STRATEGY_READY",
+    "MODEL_FROZEN",
+    "OOS_ADMITTED"
+  ],
+  "implies": {},
+  "definitions": {
+    "FORMAL_DATA_READY": "Historical market-data/provenance gate only; does not imply feature, strategy, model, or OOS readiness.",
+    "FEATURE_INPUT_READY": "All frozen candidate feature families have validated point-in-time inputs and provenance.",
+    "STRATEGY_READY": "Authoritative strategy code, factor definitions, parameters, normalization, aggregation and trade rules are fully recovered or separately approved.",
+    "MODEL_FROZEN": "A specific strategy package is frozen and hash-bound to Formal inputs, universe and calendar.",
+    "OOS_ADMITTED": "Formal, model freeze, OOS scope and isolation gates all pass exact hash-linked admission."
+  },
+  "current_state": {
+    "formal_data_ready": false,
+    "formal_data_ready_reason": "V4.82 mathematical/row-level Formal closure exists, but Audit Remediation V1 byte-bound reissue has not yet been materialized from exact production files.",
+    "feature_input_ready": false,
+    "strategy_ready": false,
+    "model_frozen": false,
+    "oos_admitted": false
+  },
+  "hard_boundaries": [
+    "FORMAL_DATA_READY never implies FEATURE_INPUT_READY",
+    "FEATURE_INPUT_READY never implies STRATEGY_READY",
+    "UNAPPROVED GP12 candidate never implies STRATEGY_READY",
+    "Missing historical GP V1.1 strategy code/parameters/factor definitions keeps STRATEGY_READY false",
+    "MODEL_FROZEN requires an explicit hash-bound model package",
+    "OOS_ADMITTED requires a separate exact admission decision"
+  ],
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
