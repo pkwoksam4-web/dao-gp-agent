@@ -1,4 +1,8 @@
+import hashlib
+import pathlib
+import tempfile
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -75,6 +79,36 @@ class LiquidityApplyV482Tests(unittest.TestCase):
 
     def test_upstream_corrected_trade_row_contract_is_1011607(self):
         self.assertEqual(m.EXPECTED_TRADE_ROWS,1_011_607)
+
+    def test_run_binds_raw_pitst_and_output_panel_exact_bytes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=pathlib.Path(td)
+            raw_path=root/'raw.parquet'
+            pit_path=root/'pit.csv'
+            out=root/'out'
+            raw=pd.DataFrame([{'symbol':'000001.SZ','date':'2024-01-02','amount':100_000_000.0,'volume':1_000_000.0}])
+            pit=pd.DataFrame([{'symbol':'000001.SZ','date':'2024-01-02','tradestatus':1,'isST':0}])
+            raw.to_parquet(raw_path,index=False)
+            pit.to_csv(pit_path,index=False)
+            panel=pd.DataFrame([{'symbol':'000001.SZ','date':'2024-01-02','eligible_non_st':True}])
+            base_report={'artifact':'LIQUIDITY_80M_APPLY_V482','version':'V4.82','formal_admission':False,'oos_metrics_allowed':False}
+            with patch.object(m,'build_eligibility_panel',return_value=(panel,base_report)):
+                report=m.run(raw_path,pit_path,out)
+            panel_path=out/'LIQUIDITY_80M_PANEL_V482.parquet'
+            self.assertEqual(report['input_full_raw_sha256'],hashlib.sha256(raw_path.read_bytes()).hexdigest())
+            self.assertEqual(report['input_pitst_sha256'],hashlib.sha256(pit_path.read_bytes()).hexdigest())
+            self.assertEqual(report['panel_parquet_sha256'],hashlib.sha256(panel_path.read_bytes()).hexdigest())
+            self.assertEqual(report['panel_parquet_bytes'],panel_path.stat().st_size)
+            self.assertRegex(report['schema_fingerprint'],r'^[0-9a-f]{64}$')
+
+    def test_input_raw_mutation_changes_liquidity_binding(self):
+        self.assertTrue(callable(getattr(m,'sha256_file',None)), 'liquidity_apply_v482 must expose/use sha256_file')
+        with tempfile.TemporaryDirectory() as td:
+            p=pathlib.Path(td)/'raw.parquet'
+            p.write_bytes(b'raw-a')
+            first=m.sha256_file(p)
+            p.write_bytes(b'raw-b')
+            self.assertNotEqual(m.sha256_file(p),first)
 
 
 if __name__=='__main__':
