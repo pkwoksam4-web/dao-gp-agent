@@ -8,6 +8,7 @@ on:
       - 'scripts/gp12_formal_input_readiness_v1.py'
       - 'scripts/test_gp12_formal_input_readiness_v1.py'
       - 'scripts/test_gp12_formal_input_readiness_production_v1.py'
+      - 'scripts/test_gp12_formal_input_readiness_cli_v1.py'
       - 'data/GP12_FORMAL_INPUT_EVIDENCE_V1.json'
       - '.github/workflows/gp12-formal-input-readiness-v1.yml'
   workflow_dispatch:
@@ -30,4 +31,5 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_gp12_formal_input_readiness_v1.py \
-            test_gp12_formal_input_readiness_production_v1.py
+            test_gp12_formal_input_readiness_production_v1.py \
+            test_gp12_formal_input_readiness_cli_v1.py
