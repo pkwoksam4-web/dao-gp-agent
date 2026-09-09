@@ -1,0 +1,59 @@
+{
+  "artifact": "FIXED_PROBE_REGISTRY_V1",
+  "version": "V1",
+  "bare_label_forbidden": true,
+  "probes": [
+    {
+      "probe_id": "RAW_PITST_SOURCE_FIXED5_V482",
+      "probe_kind": "EXACT_FIXED_SET",
+      "contract_status": "VERIFIED_EXACT_FIXED_SET",
+      "purpose": "BaoStock RAW/PIT-ST source capability and lifecycle probe",
+      "ordered_symbols": [
+        "000001.SZ",
+        "000014.SZ",
+        "001201.SZ",
+        "002001.SZ",
+        "002002.SZ"
+      ],
+      "sorted_symbol_sha256": "b6b69832cec5e97ac1c8a7bf3e6dd432fca070f4d3e5d28e697f161d9fd615fc",
+      "source_branch": "gp/baostock-fixed5-probe-v482",
+      "source_head_sha": "16abc49c91463d92c4b8c33a74723be3b3e5ade9",
+      "source_run_id": 34350541625,
+      "source_artifact_id": 10103537004,
+      "source_artifact_name": "gp-baostock-fixed5-probe-v482",
+      "source_artifact_digest": "sha256:2d50cc6f1a4644ebd3afa0b766eb4ae87e08f9a70e30991240f9b6bda8d84ce9",
+      "promotion_eligible": false,
+      "promotion_note": "Probe evidence only; does not itself promote BaoStock to the full 847 universe or Formal/OOS."
+    },
+    {
+      "probe_id": "QFQ_SEMANTIC_PILOT_V471_V477",
+      "probe_kind": "SEMANTIC_PILOT",
+      "contract_status": "NOT_AN_EXACT_FIXED5_CONTRACT",
+      "purpose": "Recovered QFQ factor-semantics pilot evidence",
+      "ordered_symbols": [
+        "002938.SZ",
+        "300592.SZ"
+      ],
+      "sorted_symbol_sha256": "49d19bd3350e413a9a633b0ba0bb5e82cd699aee1537d60758a246b25563233a",
+      "source_contract_files": [
+        "QFQ_FACTOR_PILOT_V471.csv",
+        "FORMAL_GATE_CHECKPOINT_V477.json"
+      ],
+      "source_identity_status": "RECOVERED_FILE_EVIDENCE_WITHOUT_EXACT_FIXED5_BRANCH_RUN_CONTRACT",
+      "promotion_eligible": false,
+      "promotion_note": "Do not rename this semantic pilot as fixed5; exact five-symbol provenance was not recovered."
+    }
+  ],
+  "unverified_prior_assertions": [
+    {
+      "assertion_id": "PRIOR_QFQ_FIXED5_ASSERTION",
+      "status": "UNVERIFIED_PRIOR_ASSERTION_NOT_FREEZE_ELIGIBLE",
+      "description": "A prior adversarial-review statement asserted a separate exact V4.77 QFQ fixed-five set. Authoritative recovery did not substantiate the exact five-symbol contract or branch/run identity.",
+      "unsupported_symbol_list_persisted_as_fact": false,
+      "promotion_eligible": false
+    }
+  ],
+  "formal_admission": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
