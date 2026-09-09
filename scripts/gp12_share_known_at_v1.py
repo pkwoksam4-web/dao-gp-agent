@@ -225,3 +225,29 @@ def resolve_known_at_state(states: list[dict], trade_date: str) -> dict | None:
     if len(latest) != 1:
         raise ValueError('ambiguous known-at state for trade date')
     return latest[0]
+
+
+def dual_source_probe_gate(
+    *,
+    structural_blockers: list[str],
+    binding_blockers: list[str],
+    matched_state_n: int,
+    pit_verified: bool,
+) -> str:
+    """Return the single-symbol probe gate without weakening PIT blockers."""
+    if not isinstance(structural_blockers, list):
+        raise ValueError('structural_blockers must be a list')
+    if not isinstance(binding_blockers, list):
+        raise ValueError('binding_blockers must be a list')
+    if not isinstance(matched_state_n, int) or isinstance(matched_state_n, bool):
+        raise ValueError('matched_state_n must be an integer')
+    if not isinstance(pit_verified, bool):
+        raise ValueError('pit_verified must be boolean')
+    if (
+        not structural_blockers
+        and not binding_blockers
+        and matched_state_n > 0
+        and pit_verified
+    ):
+        return 'DUAL_SOURCE_STRUCTURAL_PASS'
+    return 'BLOCKED'
