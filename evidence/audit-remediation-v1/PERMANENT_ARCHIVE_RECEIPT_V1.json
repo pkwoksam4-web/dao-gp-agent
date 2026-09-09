@@ -1,0 +1,57 @@
+{
+  "artifact": "PERMANENT_ARCHIVE_RECEIPT_V1",
+  "version": "V1",
+  "provider": "GOOGLE_DRIVE_ARTIFACT_ZIP",
+  "repository": "pkwoksam4-web/dao-gp-agent",
+  "archive_target_sha": "ee445e5dae3f2b78328d72de144d15f4c52e77ad",
+  "folder_id": "19nU3IpDny1arBzwrPxydmi_AybBipTVH",
+  "retention_lock": false,
+  "verification": {
+    "method": "UPLOAD_ORIGINAL_ACTIONS_ARTIFACT_ZIP_THEN_RAW_DOWNLOAD_AND_REHASH",
+    "container_and_member_hashes_verified": true,
+    "verified_at_utc": "2026-09-09T15:40:00Z",
+    "github_release_attempt": {
+      "workflow_run_id": 34363551900,
+      "status": "BLOCKED_BY_INTEGRATION_403",
+      "error": "Resource not accessible by integration"
+    }
+  },
+  "assets": [
+    {
+      "logical_name": "FULL_RAW_PARQUET_V482",
+      "asset_name": "SOHU_RAW_FULL_V482.parquet",
+      "sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "bytes": 20761201,
+      "download_verified": true,
+      "drive_file_id": "1n4XXtGIXVYoAJcnDHC88raH2Kz42LOmv",
+      "archive_container_name": "gp-sohu-full-raw-v482-reaudit__artifact-10042614517.zip",
+      "archive_container_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+      "archive_container_bytes": 17193739,
+      "source_artifact_id": 10042614517
+    },
+    {
+      "logical_name": "LIQUIDITY_80M_PANEL_V482",
+      "asset_name": "LIQUIDITY_80M_PANEL_V482.parquet",
+      "sha256": "5c40f0dfbad32e1e9693aad9dfed218aa2d6b2d315b3dd81af409130a00911bf",
+      "bytes": 19873719,
+      "download_verified": true,
+      "drive_file_id": "1Rk6sIE85aFCQfc98Glu0PSeo2TYIA35O",
+      "archive_container_name": "gp-liquidity-80m-v482__artifact-10042615093.zip",
+      "archive_container_sha256": "a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+      "archive_container_bytes": 14288266,
+      "source_artifact_id": 10042615093
+    },
+    {
+      "logical_name": "PIT_ST_DAILY_MERGED_V480",
+      "asset_name": "PIT_ST_DAILY_MERGED_V480.csv",
+      "sha256": "ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de",
+      "bytes": 36795635,
+      "download_verified": true,
+      "drive_file_id": "1nAQnXwS3h8FEYiOjrrD-ESBLvba2qM8z",
+      "archive_container_name": "gp-pit-st-v480-merged__artifact-9971136795.zip",
+      "archive_container_sha256": "655896cc32483d8372072e014e9cb29c09a947eb587695c10b0c993636beef3c",
+      "archive_container_bytes": 3035991,
+      "source_artifact_id": 9971136795
+    }
+  ]
+}
