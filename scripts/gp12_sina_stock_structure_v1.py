@@ -88,8 +88,10 @@ def _iso_yyyymmdd(value: Any) -> str:
     return parsed.isoformat()
 
 
-def _display_amount(value: Any) -> tuple[str, int]:
+def _display_amount(value: Any) -> tuple[str, int] | None:
     text = str(value or '').replace(',', '').strip()
+    if text == '--':
+        return None
     match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*万股', text)
     if not match:
         raise ValueError('StockStructure circulating A-share value invalid')
@@ -130,7 +132,7 @@ def parse_stock_structure_bytes(symbol: str, raw: bytes) -> list[dict]:
     if not starts:
         raise ValueError('StockStructure change-date row missing')
 
-    normalized_rows: list[dict] = []
+    candidates: list[dict] = []
     seen: set[tuple[str, str, str]] = set()
     for position, start in enumerate(starts):
         end = starts[position + 1] if position + 1 < len(starts) else len(parser.rows)
@@ -159,28 +161,51 @@ def parse_stock_structure_bytes(symbol: str, raw: bytes) -> list[dict]:
         for offset in range(1, column_n + 1):
             change_date = _iso_yyyymmdd(change_row[offset])
             announcement_date = _iso_yyyymmdd(announcement_row[offset])
-            amount_text, scale = _display_amount(circulating_row[offset])
+            amount = _display_amount(circulating_row[offset])
             reason = str(reason_row[offset] or '').strip()
-            key = (change_date, announcement_date, amount_text)
+            amount_key = '--' if amount is None else amount[0]
+            key = (change_date, announcement_date, amount_key)
             if key in seen:
                 raise ValueError('duplicate StockStructure normalized column')
             seen.add(key)
-            normalized_rows.append({
+            candidates.append({
                 'symbol': normalized,
                 'change_date': change_date,
                 'announcement_date': announcement_date,
                 'change_reason': reason,
-                'circulating_a_10k_display': amount_text,
-                'circulating_a_display_scale': scale,
+                '_amount': amount,
             })
 
-    normalized_rows.sort(
+    candidates.sort(
         key=lambda item: (
             item['change_date'],
             item['announcement_date'],
-            item['circulating_a_10k_display'],
+            '' if item['_amount'] is None else item['_amount'][0],
         )
     )
+
+    normalized_rows: list[dict] = []
+    valid_state_seen = False
+    for item in candidates:
+        amount = item['_amount']
+        if amount is None:
+            if valid_state_seen:
+                raise ValueError(
+                    'StockStructure circulating A-share placeholder after valid state')
+            continue
+        valid_state_seen = True
+        amount_text, scale = amount
+        normalized_rows.append({
+            'symbol': item['symbol'],
+            'change_date': item['change_date'],
+            'announcement_date': item['announcement_date'],
+            'change_reason': item['change_reason'],
+            'circulating_a_10k_display': amount_text,
+            'circulating_a_display_scale': scale,
+        })
+
+    if not normalized_rows:
+        raise ValueError('StockStructure circulating A-share state missing')
     return normalized_rows
 
 
