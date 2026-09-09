@@ -53,6 +53,33 @@ def _append(errors: list[str], value: str) -> None:
         errors.append(value)
 
 
+def _valid_large_archive(item: dict, sha: str, size: int) -> bool:
+    archive = item.get('archive')
+    if not isinstance(archive, dict):
+        return False
+    if archive.get('provider') != 'GITHUB_RELEASE':
+        return False
+    if archive.get('repository') != CANONICAL_REPOSITORY:
+        return False
+    if not str(archive.get('release_tag') or '').strip():
+        return False
+    if not re.fullmatch(r'^[0-9a-f]{40}$', str(archive.get('release_target_sha') or '')):
+        return False
+    if archive.get('asset_name') != item.get('file_name'):
+        return False
+    if archive.get('sha256') != sha or not validate_sha256(archive.get('sha256')):
+        return False
+    try:
+        archive_bytes = int(archive.get('bytes'))
+    except (TypeError, ValueError):
+        return False
+    if archive_bytes != size:
+        return False
+    if archive.get('download_verified') is not True:
+        return False
+    return True
+
+
 def validate_evidence_manifest(doc: dict) -> list[str]:
     errors: list[str] = []
     if not isinstance(doc, dict):
@@ -105,7 +132,7 @@ def validate_evidence_manifest(doc: dict) -> list[str]:
 
         permanent = item.get('permanent_bytes_available')
         expiry = item.get('expiry_at')
-        if cls == 'LARGE_HASH_BOUND' and permanent is True and expiry:
+        if cls == 'LARGE_HASH_BOUND' and permanent is True and expiry and not _valid_large_archive(item, str(sha or ''), size):
             _append(errors, f'ACTIONS_ONLY_BYTES_FALSELY_PERMANENT:{name}')
         if cls == 'SMALL_PERSISTED' and permanent is True and not item.get('persisted_repository_path'):
             _append(errors, f'PERSISTED_PATH_MISSING:{name}')
