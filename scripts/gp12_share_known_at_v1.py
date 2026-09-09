@@ -10,6 +10,7 @@ from gp12_sina_share_amount_v1 import normalize_symbol
 
 
 VERSION = '1.0'
+FORMAL_START = '2020-06-01'
 FORMAL_END = '2026-04-17'
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
 
@@ -98,6 +99,75 @@ def _normalize_structure_rows(symbol: str, rows: list[dict]) -> list[dict]:
     return normalized
 
 
+def _normalize_share_rows(symbol: str, rows: list[dict], formal_end: str) -> tuple[list[dict], int]:
+    if not isinstance(rows, list):
+        raise ValueError('share_rows must be a list')
+    normalized: list[dict] = []
+    seen: set[str] = set()
+    post_formal_n = 0
+    for raw in rows:
+        if not isinstance(raw, dict):
+            raise ValueError('ShareAmount row must be an object')
+        if normalize_symbol(raw.get('symbol')) != symbol:
+            raise ValueError('ShareAmount symbol mismatch')
+        change_date = _canonical_date(raw.get('record_date'), 'record_date')
+        shares = _positive_shares(raw.get('outstanding_share_shares'))
+        if change_date in seen:
+            raise ValueError('duplicate Formal ShareAmount date')
+        seen.add(change_date)
+        if change_date > formal_end:
+            post_formal_n += 1
+            continue
+        normalized.append({
+            'symbol': symbol,
+            'change_date': change_date,
+            'outstanding_share_shares': shares,
+        })
+    normalized.sort(key=lambda item: item['change_date'])
+    return normalized, post_formal_n
+
+
+def _match_share_state(
+    symbol: str,
+    share: dict,
+    structures: list[dict],
+    share_sha: str,
+    structure_sha: str,
+) -> tuple[str, dict | None]:
+    change_date = share['change_date']
+    shares = share['outstanding_share_shares']
+    same_date = [item for item in structures if item['change_date'] == change_date]
+    if not same_date:
+        return 'MISSING', None
+
+    api_amount_10k = Decimal(str(shares)) / Decimal('10000')
+    matching = [
+        item for item in same_date
+        if _matches_display(
+            api_amount_10k,
+            item['circulating_a_10k_display'],
+            item['circulating_a_display_scale'],
+        )
+    ]
+    if not matching:
+        return 'AMOUNT_MISMATCH', None
+    if len(matching) != 1:
+        return 'AMBIGUOUS', None
+
+    matched = matching[0]
+    announcement_date = matched['announcement_date']
+    known_at = max(change_date, announcement_date)
+    return 'MATCH', {
+        'symbol': symbol,
+        'change_date': change_date,
+        'announcement_date': announcement_date,
+        'known_at': known_at,
+        'outstanding_share_shares': shares,
+        'share_amount_raw_sha256': share_sha,
+        'stock_structure_raw_sha256': structure_sha,
+    }
+
+
 def bind_known_at_states(
     symbol: str,
     share_rows: list[dict],
@@ -111,70 +181,25 @@ def bind_known_at_states(
     structure_sha = _sha256(structure_raw_sha256, 'structure_raw_sha256')
     formal_boundary = _canonical_date(formal_end, 'formal_end')
     structures = _normalize_structure_rows(normalized_symbol, structure_rows)
-    if not isinstance(share_rows, list):
-        raise ValueError('share_rows must be a list')
+    shares, post_formal_share_row_n = _normalize_share_rows(
+        normalized_symbol, share_rows, formal_boundary)
 
     states: list[dict] = []
     blockers: set[str] = set()
-    seen_share_dates: set[str] = set()
-    formal_share_row_n = 0
-    post_formal_share_row_n = 0
-
-    for raw in share_rows:
-        if not isinstance(raw, dict):
-            raise ValueError('ShareAmount row must be an object')
-        if normalize_symbol(raw.get('symbol')) != normalized_symbol:
-            raise ValueError('ShareAmount symbol mismatch')
-        change_date = _canonical_date(raw.get('record_date'), 'record_date')
-        shares = _positive_shares(raw.get('outstanding_share_shares'))
-        if change_date in seen_share_dates:
-            raise ValueError('duplicate Formal ShareAmount date')
-        seen_share_dates.add(change_date)
-
-        if change_date > formal_boundary:
-            post_formal_share_row_n += 1
-            continue
-        formal_share_row_n += 1
-
-        same_date = [
-            item for item in structures
-            if item['change_date'] == change_date
-        ]
-        if not same_date:
+    for share in shares:
+        status, state = _match_share_state(
+            normalized_symbol, share, structures, share_sha, structure_sha)
+        if status == 'MISSING':
             blockers.add('SINA_STOCK_STRUCTURE_MATCH_MISSING')
-            continue
-
-        api_amount_10k = Decimal(str(shares)) / Decimal('10000')
-        matching = [
-            item for item in same_date
-            if _matches_display(
-                api_amount_10k,
-                item['circulating_a_10k_display'],
-                item['circulating_a_display_scale'],
-            )
-        ]
-        if not matching:
+        elif status == 'AMOUNT_MISMATCH':
             blockers.add('SINA_STOCK_STRUCTURE_AMOUNT_MISMATCH')
-            continue
-        if len(matching) != 1:
+        elif status == 'AMBIGUOUS':
             blockers.add('SINA_STOCK_STRUCTURE_MATCH_AMBIGUOUS')
-            continue
-
-        matched = matching[0]
-        announcement_date = matched['announcement_date']
-        known_at = max(change_date, announcement_date)
-        states.append({
-            'symbol': normalized_symbol,
-            'change_date': change_date,
-            'announcement_date': announcement_date,
-            'known_at': known_at,
-            'outstanding_share_shares': shares,
-            'share_amount_raw_sha256': share_sha,
-            'stock_structure_raw_sha256': structure_sha,
-        })
+        elif state is not None:
+            states.append(state)
 
     states.sort(key=lambda item: (item['change_date'], item['announcement_date']))
-    if formal_share_row_n == 0:
+    if not shares:
         blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
 
     blocker_list = sorted(blockers)
@@ -183,12 +208,136 @@ def bind_known_at_states(
         'version': VERSION,
         'symbol': normalized_symbol,
         'formal_end': formal_boundary,
-        'formal_share_row_n': formal_share_row_n,
+        'formal_share_row_n': len(shares),
         'post_formal_share_row_n': post_formal_share_row_n,
         'matched_state_n': len(states),
         'states': states,
         'blockers': blocker_list,
         'pit_verified': bool(states) and not blocker_list,
+        'formal_feature_ready': False,
+        'model_freeze_allowed': False,
+        'oos_metrics_allowed': False,
+    }
+
+
+def bind_formal_anchor_states(
+    symbol: str,
+    share_rows: list[dict],
+    structure_rows: list[dict],
+    share_raw_sha256: str,
+    structure_raw_sha256: str,
+    formal_start: str = FORMAL_START,
+    formal_end: str = FORMAL_END,
+) -> dict:
+    normalized_symbol = normalize_symbol(symbol)
+    share_sha = _sha256(share_raw_sha256, 'share_raw_sha256')
+    structure_sha = _sha256(structure_raw_sha256, 'structure_raw_sha256')
+    start = _canonical_date(formal_start, 'formal_start')
+    end = _canonical_date(formal_end, 'formal_end')
+    if start > end:
+        raise ValueError('formal_start must not exceed formal_end')
+
+    structures = _normalize_structure_rows(normalized_symbol, structure_rows)
+    shares, post_formal_share_row_n = _normalize_share_rows(
+        normalized_symbol, share_rows, end)
+
+    match_results: list[dict] = []
+    for share in shares:
+        status, state = _match_share_state(
+            normalized_symbol, share, structures, share_sha, structure_sha)
+        match_results.append({
+            'change_date': share['change_date'],
+            'status': status,
+            'state': state,
+        })
+
+    anchor_candidates = [
+        item['state']
+        for item in match_results
+        if item['status'] == 'MATCH'
+        and item['state'] is not None
+        and item['state']['change_date'] <= start
+        and item['state']['known_at'] <= start
+    ]
+    anchor = max(anchor_candidates, key=lambda item: item['change_date']) if anchor_candidates else None
+
+    blockers: set[str] = set()
+    if anchor is None:
+        blockers.add('SINA_FORMAL_ANCHOR_MISSING')
+        return {
+            'artifact': 'SINA_SHARE_FORMAL_ANCHOR_V1',
+            'version': VERSION,
+            'symbol': normalized_symbol,
+            'formal_start': start,
+            'formal_end': end,
+            'post_formal_share_row_n': post_formal_share_row_n,
+            'formal_anchor_change_date': None,
+            'formal_anchor_announcement_date': None,
+            'formal_anchor_known_at': None,
+            'formal_anchor_outstanding_share_shares': None,
+            'pre_anchor_share_row_n': 0,
+            'pre_anchor_matched_state_n': 0,
+            'pre_anchor_mismatch_n': 0,
+            'pre_anchor_mismatch_dates': [],
+            'formal_required_share_row_n': 0,
+            'formal_matched_state_n': 0,
+            'formal_chain_mismatch_n': 0,
+            'formal_chain_mismatch_dates': [],
+            'states': [],
+            'blockers': sorted(blockers),
+            'pit_verified': False,
+            'formal_feature_ready': False,
+            'model_freeze_allowed': False,
+            'oos_metrics_allowed': False,
+        }
+
+    anchor_date = anchor['change_date']
+    pre_anchor = [item for item in match_results if item['change_date'] < anchor_date]
+    required = [item for item in match_results if item['change_date'] >= anchor_date]
+
+    formal_states: list[dict] = []
+    formal_mismatch_dates: list[str] = []
+    for item in required:
+        status = item['status']
+        if status == 'MATCH' and item['state'] is not None:
+            formal_states.append(item['state'])
+        else:
+            formal_mismatch_dates.append(item['change_date'])
+            if status == 'MISSING':
+                blockers.add('SINA_FORMAL_CHAIN_MATCH_MISSING')
+            elif status == 'AMOUNT_MISMATCH':
+                blockers.add('SINA_FORMAL_CHAIN_AMOUNT_MISMATCH')
+            elif status == 'AMBIGUOUS':
+                blockers.add('SINA_FORMAL_CHAIN_MATCH_AMBIGUOUS')
+
+    formal_states.sort(key=lambda item: (item['change_date'], item['announcement_date']))
+    pre_anchor_mismatch_dates = sorted(
+        item['change_date'] for item in pre_anchor if item['status'] != 'MATCH')
+    pre_anchor_matched_state_n = sum(1 for item in pre_anchor if item['status'] == 'MATCH')
+
+    blocker_list = sorted(blockers)
+    return {
+        'artifact': 'SINA_SHARE_FORMAL_ANCHOR_V1',
+        'version': VERSION,
+        'symbol': normalized_symbol,
+        'formal_start': start,
+        'formal_end': end,
+        'post_formal_share_row_n': post_formal_share_row_n,
+        'formal_anchor_change_date': anchor['change_date'],
+        'formal_anchor_announcement_date': anchor['announcement_date'],
+        'formal_anchor_known_at': anchor['known_at'],
+        'formal_anchor_outstanding_share_shares': anchor['outstanding_share_shares'],
+        'pre_anchor_share_row_n': len(pre_anchor),
+        'pre_anchor_matched_state_n': pre_anchor_matched_state_n,
+        'pre_anchor_mismatch_n': len(pre_anchor_mismatch_dates),
+        'pre_anchor_mismatch_dates': pre_anchor_mismatch_dates,
+        'formal_required_share_row_n': len(required),
+        'formal_matched_state_n': len(formal_states),
+        'formal_chain_mismatch_n': len(formal_mismatch_dates),
+        'formal_chain_mismatch_dates': sorted(formal_mismatch_dates),
+        'states': formal_states,
+        'blockers': blocker_list,
+        'pit_verified': bool(formal_states) and not blocker_list,
         'formal_feature_ready': False,
         'model_freeze_allowed': False,
         'oos_metrics_allowed': False,
