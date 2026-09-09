@@ -24,6 +24,8 @@
       "source_artifact_digest": "sha256:cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
       "source_head_sha": "8e19520d5d3d942496ac8be75a86197fa8cefbe5",
       "file_name": "SOHU_RAW_FULL_V482.parquet",
+      "expected_sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "expected_bytes": 20761201,
       "permanent_bytes_available": false,
       "expiry_at": "2026-10-08T05:51:50Z"
     },
@@ -38,6 +40,8 @@
       "source_artifact_digest": "sha256:a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
       "source_head_sha": "8e19520d5d3d942496ac8be75a86197fa8cefbe5",
       "file_name": "LIQUIDITY_80M_PANEL_V482.parquet",
+      "expected_sha256": "5c40f0dfbad32e1e9693aad9dfed218aa2d6b2d315b3dd81af409130a00911bf",
+      "expected_bytes": 19873719,
       "permanent_bytes_available": false,
       "expiry_at": "2026-10-08T05:51:52Z"
     },
@@ -52,6 +56,8 @@
       "source_artifact_digest": "sha256:655896cc32483d8372072e014e9cb29c09a947eb587695c10b0c993636beef3c",
       "source_head_sha": "afc4aec3a9b5320a10476451301cfe2630d1581f",
       "file_name": "PIT_ST_DAILY_MERGED_V480.csv",
+      "expected_sha256": "ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de",
+      "expected_bytes": 36795635,
       "permanent_bytes_available": false,
       "expiry_at": "2026-10-05T14:26:12Z"
     },
