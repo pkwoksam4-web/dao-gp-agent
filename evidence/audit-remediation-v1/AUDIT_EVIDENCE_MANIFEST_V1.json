@@ -1,0 +1,110 @@
+{
+  "artifact": "AUDIT_EVIDENCE_MANIFEST_V1",
+  "version": "V1",
+  "canonical_lineage": {
+    "repository": "pkwoksam4-web/dao-gp-agent",
+    "base_branch": "gp/gp12-formal-input-readiness-v1",
+    "base_head_sha": "b815773d00e4c6bf775b3ce111aef3fc458cd741",
+    "remediation_branch": "gp/audit-remediation-v1",
+    "remediation_head_sha": "f8e32090ca1ecd6198bff454e6076e0d2880c459"
+  },
+  "evidence_items": [
+    {
+      "logical_name": "FULL_RAW_PARQUET_V482",
+      "class": "LARGE_HASH_BOUND",
+      "source_type": "GITHUB_ACTIONS",
+      "source_run_id": 34192233633,
+      "source_artifact_id": 10042614517,
+      "source_artifact_name": "gp-sohu-full-raw-v482-reaudit",
+      "source_artifact_digest": "sha256:cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+      "source_head_sha": "8e19520d5d3d942496ac8be75a86197fa8cefbe5",
+      "file_name": "SOHU_RAW_FULL_V482.parquet",
+      "expected_sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "expected_bytes": 20761201,
+      "permanent_bytes_available": false,
+      "expiry_at": "2026-10-08T05:51:50Z",
+      "sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "bytes": 20761201,
+      "row_count": 1011607,
+      "schema_fingerprint": "f9fa9e598d9e8729380fec764109583c38e1f3f17ea2a29164dc1d35810cfd32"
+    },
+    {
+      "logical_name": "LIQUIDITY_80M_PANEL_V482",
+      "class": "LARGE_HASH_BOUND",
+      "source_type": "GITHUB_ACTIONS",
+      "source_run_id": 34192233633,
+      "source_artifact_id": 10042615093,
+      "source_artifact_name": "gp-liquidity-80m-v482",
+      "source_artifact_digest": "sha256:a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+      "source_head_sha": "8e19520d5d3d942496ac8be75a86197fa8cefbe5",
+      "file_name": "LIQUIDITY_80M_PANEL_V482.parquet",
+      "expected_sha256": "5c40f0dfbad32e1e9693aad9dfed218aa2d6b2d315b3dd81af409130a00911bf",
+      "expected_bytes": 19873719,
+      "permanent_bytes_available": false,
+      "expiry_at": "2026-10-08T05:51:52Z",
+      "sha256": "5c40f0dfbad32e1e9693aad9dfed218aa2d6b2d315b3dd81af409130a00911bf",
+      "bytes": 19873719,
+      "row_count": 1207822,
+      "schema_fingerprint": "5311cd2d67183d80f3061fa94e75b2cdeefe1705e86fffbc559c16916e795efb"
+    },
+    {
+      "logical_name": "PIT_ST_DAILY_MERGED_V480",
+      "class": "LARGE_HASH_BOUND",
+      "source_type": "GITHUB_ACTIONS",
+      "source_run_id": 33971534669,
+      "source_artifact_id": 9971136795,
+      "source_artifact_name": "gp-pit-st-v480-merged",
+      "source_artifact_digest": "sha256:655896cc32483d8372072e014e9cb29c09a947eb587695c10b0c993636beef3c",
+      "source_head_sha": "afc4aec3a9b5320a10476451301cfe2630d1581f",
+      "file_name": "PIT_ST_DAILY_MERGED_V480.csv",
+      "expected_sha256": "ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de",
+      "expected_bytes": 36795635,
+      "permanent_bytes_available": false,
+      "expiry_at": "2026-10-05T14:26:12Z",
+      "sha256": "ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de",
+      "bytes": 36795635
+    },
+    {
+      "logical_name": "AUDIT_STATUS_MODEL_V1",
+      "class": "SMALL_PERSISTED",
+      "source_type": "REPOSITORY",
+      "source_head_sha": "56d727e4f4cd349c12e2b47e993727176c67f75b",
+      "persisted_repository_path": "data/AUDIT_STATUS_MODEL_V1.json",
+      "permanent_bytes_available": true,
+      "file_name": "AUDIT_STATUS_MODEL_V1.json",
+      "sha256": "a42c1d0e8497ee0890a5e385c7466b4cc58056116b57e141571df8f3e8ba67db",
+      "bytes": 1757
+    },
+    {
+      "logical_name": "PIT_ST_EVIDENCE_COVERAGE_V1",
+      "class": "SMALL_PERSISTED",
+      "source_type": "REPOSITORY",
+      "source_head_sha": "72672ba290a294053147e1791f34439db90f40df",
+      "persisted_repository_path": "data/PIT_ST_EVIDENCE_COVERAGE_V1.json",
+      "permanent_bytes_available": true,
+      "file_name": "PIT_ST_EVIDENCE_COVERAGE_V1.json",
+      "sha256": "83ea31a34999c1d4cf02f41d037c0d78e7a502aedb1ea879ef0c3c8d5a71f149",
+      "bytes": 1537
+    },
+    {
+      "logical_name": "FIXED_PROBE_REGISTRY_V1",
+      "class": "SMALL_PERSISTED",
+      "source_type": "REPOSITORY",
+      "source_head_sha": "23ad43d67f9351a0d1c96aa0cc90e010f1146d44",
+      "persisted_repository_path": "data/FIXED_PROBE_REGISTRY_V1.json",
+      "permanent_bytes_available": true,
+      "file_name": "FIXED_PROBE_REGISTRY_V1.json",
+      "sha256": "b01fadf38445758be6fa6538f3a3f8210a5d7f37b5bcc075301dbd2fa1a50aed",
+      "bytes": 2454
+    }
+  ],
+  "blockers": [
+    "PERMANENT_BYTE_ARCHIVE_OPEN",
+    "REPOSITORY_BRANCH_PROTECTION_OPEN",
+    "STRATEGY_ASSETS_INCOMPLETE"
+  ],
+  "formal_promotion_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "baostock_847_scaleout_allowed": false
+}
