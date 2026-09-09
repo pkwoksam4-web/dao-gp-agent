@@ -57,13 +57,10 @@ def _valid_large_archive(item: dict, sha: str, size: int) -> bool:
     archive = item.get('archive')
     if not isinstance(archive, dict):
         return False
-    if archive.get('provider') != 'GITHUB_RELEASE':
+    provider = archive.get('provider')
+    if provider not in {'GITHUB_RELEASE', 'GOOGLE_DRIVE_ARTIFACT_ZIP'}:
         return False
     if archive.get('repository') != CANONICAL_REPOSITORY:
-        return False
-    if not str(archive.get('release_tag') or '').strip():
-        return False
-    if not re.fullmatch(r'^[0-9a-f]{40}$', str(archive.get('release_target_sha') or '')):
         return False
     if archive.get('asset_name') != item.get('file_name'):
         return False
@@ -73,11 +70,27 @@ def _valid_large_archive(item: dict, sha: str, size: int) -> bool:
         archive_bytes = int(archive.get('bytes'))
     except (TypeError, ValueError):
         return False
-    if archive_bytes != size:
+    if archive_bytes != size or archive.get('download_verified') is not True:
         return False
-    if archive.get('download_verified') is not True:
+    if provider == 'GITHUB_RELEASE':
+        if not str(archive.get('release_tag') or '').strip():
+            return False
+        if not re.fullmatch(r'^[0-9a-f]{40}$', str(archive.get('release_target_sha') or '')):
+            return False
+        return True
+    if not re.fullmatch(r'^[0-9a-f]{40}$', str(archive.get('archive_target_sha') or '')):
         return False
-    return True
+    if not str(archive.get('folder_id') or '').strip() or not str(archive.get('drive_file_id') or '').strip():
+        return False
+    if not str(archive.get('archive_container_name') or '').strip():
+        return False
+    if not validate_sha256(archive.get('archive_container_sha256')):
+        return False
+    try:
+        container_bytes = int(archive.get('archive_container_bytes'))
+    except (TypeError, ValueError):
+        return False
+    return container_bytes > 0 and archive.get('retention_lock') in {True, False}
 
 
 def validate_evidence_manifest(doc: dict) -> list[str]:
