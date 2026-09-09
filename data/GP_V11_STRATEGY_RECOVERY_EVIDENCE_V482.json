@@ -14,6 +14,11 @@
       "finding": "recursive tree at 5e578f172b6c14569460b755adccae710fd367f4 contains no pre-existing scorer or signal path; scorer/signal filename searches return zero matches and strategy references are limited to the V4.82 recovery evidence layer added after the original data-validation chain"
     },
     {
+      "surface": "current_runtime_local_mount_2026_09_09",
+      "confidence": "ABSENT",
+      "finding": "direct filesystem scan of current /mnt/data found no gp_v11 directory, v11_offline_backtest archive, qfq_v310_extract directory, run_formal_pipeline.py, verify_dataset.py, or cross_validate_adjusted_sources.py remnants; current runtime cannot recover the historical archive bytes"
+    },
+    {
       "surface": "file_library_2026_08_13_to_2026_08_26",
       "confidence": "ABSENT",
       "finding": "no GP V1.1 strategy/scorer/Quant_Research source bundle was found; GP files visible from 2026-08-27 are data-remediation and gate artifacts"
@@ -26,7 +31,7 @@
     {
       "surface": "file_library_exact_archive_and_internal_filename_rescan_2026_09_09",
       "confidence": "ABSENT",
-      "finding": "exact and recall searches for v11_offline_backtest_starter_v2.zip, v11_offline_backtest_v3_1.zip, v11_offline_backtest_v3_4.zip, the candidate v3.4 ZIP SHA256, run_formal_pipeline.py, verify_dataset.py and starter-v2 MFE/MAE/ATR terms did not recover an archive, manifest or scorer source; the only high-confidence legacy code reference remains the later V3.10 auxiliary adjusted-source validator path"
+      "finding": "exact and recall searches for v11_offline_backtest_starter_v2.zip, v11_offline_backtest_v3_1.zip, v11_offline_backtest_v3_4.zip, the candidate v3.4 ZIP SHA256, run_formal_pipeline.py, fetch_baostock.py, verify_dataset.py, r120, MFE/MAE/ATR and starter-v2 output terms did not recover an archive, manifest or scorer source; only the later V3.10 auxiliary adjusted-source validator reference is file-backed"
     },
     {
       "surface": "gmail_2026_08_20_to_2026_09_02_attachments",
@@ -46,7 +51,7 @@
     {
       "surface": "replit_relevant_window_apps_2026_09_09",
       "confidence": "UNINSPECTABLE",
-      "finding": "two user-editable Replit apps exist in the relevant historical window: FruitfulStormySign updated 2026-08-29 and AgedCapitalDeclaration updated 2026-08-30; GP and Quant title searches did not identify a matching app, but read-only codebase inspection requests to both apps timed out, so these carriers cannot be classified as absent or authoritative and cannot affect strategy recovery blockers"
+      "finding": "two user-editable Replit apps exist in the relevant historical window: FruitfulStormySign updated 2026-08-29 and AgedCapitalDeclaration updated 2026-08-30; GP and Quant title searches did not identify a matching app, but repeated read-only codebase inspection requests to both apps timed out and public-name searches returned no indexed cache, so these carriers cannot be classified as absent or authoritative and cannot affect strategy recovery blockers"
     },
     {
       "surface": "v3_10_archive_trace",
@@ -165,15 +170,62 @@
       "key": "offline_backtest_archive_lineage",
       "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
       "value": {
-        "versions": [
-          "v11_offline_backtest_starter_v2.zip",
-          "v11_offline_backtest_v3_1.zip",
-          "v11_offline_backtest_v3_4.zip",
-          "v11_offline_backtest_v3_10"
-        ],
-        "v3_4_zip_sha256_candidate": "d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba"
+        "starter_v2": {
+          "archive": "v11_offline_backtest_starter_v2.zip",
+          "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_starter_v2.zip",
+          "reported_features": [
+            "r120",
+            "MFE/MAE horizons 1/2/3",
+            "future-3-day Hit thresholds ±2% and +4%",
+            "ATR threshold logic",
+            "UP/DOWN/FLAT/AMBIG adaptive path labels",
+            "RAW/EVENT_CLEAN/STRESS modes",
+            "Walk-forward skeleton"
+          ],
+          "reported_outputs": ["summary", "bucket_stats", "walk_forward", "daily_replay"],
+          "reported_selfcheck": "1000 simulated K-lines"
+        },
+        "v3_1": {
+          "archive": "v11_offline_backtest_v3_1.zip",
+          "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_v3_1.zip",
+          "reported_new_files": ["fetch_baostock.py", "verify_dataset.py", "run_formal_pipeline.py"],
+          "reported_pipeline_rules": [
+            "2020-2026 full-A daily bars plus amount/history-ST/trading-status/listing-delisting audit",
+            "20-day attendance measured on joint market calendar",
+            ">=843 historical-bar audit",
+            "low-amount threshold must be explicit",
+            "Walk-forward starts only after dataset audit passes",
+            "RAW/EVENT_CLEAN/STRESS plus six targets and OOS calibration"
+          ],
+          "reported_formal_result": "simulation regression passed; no Formal result was produced at that point"
+        },
+        "v3_4": {
+          "archive": "v11_offline_backtest_v3_4.zip",
+          "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_v3_4.zip",
+          "candidate_zip_sha256": "d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba",
+          "reported_new_file": "fetch_ashare21_snapshot.py",
+          "reported_snapshot": {
+            "name": "all-prices-with-values-250423.csv",
+            "bytes": 2134704074,
+            "sha256_prefix_suffix": "034f...eea"
+          },
+          "reported_additions": [
+            "dual-proof exchange delisting dates",
+            "single-snapshot locking",
+            "provider-QFQ audit with SHA256 and return reconciliation"
+          ],
+          "reported_tests": "25/25 passed"
+        },
+        "v3_10": {
+          "directory": "v11_offline_backtest_v3_10",
+          "file_backed_auxiliary_component": "src/cross_validate_adjusted_sources.py",
+          "reference_sample_symbols": 50,
+          "reference_sample_rows": 27650,
+          "reference_sample_sha256": "03918c8d649250c3f82a7f786f3a898f35afa20969a784dac9a7b87860192b62",
+          "archive_status": "global factor table and completed independent cross-source result not found in archive audit"
+        }
       },
-      "note": "version lineage and v3.4 ZIP SHA were recovered from prior assistant conversation output; original archive bytes or an authoritative archive manifest have not been recovered, so this clue is not freeze eligible"
+      "note": "starter_v2, v3_1 and v3_4 lineage/details were recovered from prior assistant outputs, not original archive bytes or an authoritative archive manifest; only the V3.10 auxiliary validator path/sample is file-backed. None of this lineage is freeze eligible for the trading strategy."
     }
   ],
   "missing_required_fields": [
