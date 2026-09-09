@@ -13,6 +13,13 @@ VERSION = '1.0'
 FORMAL_END = '2026-04-17'
 PARAMETERS_SHA256 = '22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
 FACTORS_SHA256 = 'b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
+FORMAL_ARTIFACT_SHA256 = 'e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796'
+FORMAL_CALENDAR_SHA256 = '5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7'
+UNIVERSE_SHA256 = 'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb'
+RAW_ARTIFACT_NAME = 'gp-sohu-full-raw-v482-reaudit'
+RAW_ARTIFACT_SHA256 = 'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550'
+LIQUIDITY_ARTIFACT_NAME = 'gp-liquidity-80m-v482'
+LIQUIDITY_ARTIFACT_SHA256 = 'a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b'
 
 FEATURE_FAMILIES = (
     'market_calendar',
@@ -34,60 +41,30 @@ SUPPORTING_EVIDENCE = (
     'historical_label_provenance',
     'sector_membership_pit',
 )
-SUPPORTING_DEPENDENCIES = {
-    'F5': ('sector_membership_pit',),
-}
+SUPPORTING_DEPENDENCIES = {'F5': ('sector_membership_pit',)}
 EVIDENCE_KEYS = {
-    'artifact',
-    'version',
-    'strategy_id',
-    'formal_end',
-    'formal_artifact_sha256',
-    'formal_calendar_sha256',
-    'universe_sha256',
-    'supporting_evidence',
-    'feature_families',
+    'artifact', 'version', 'strategy_id', 'formal_end',
+    'formal_artifact_sha256', 'formal_calendar_sha256', 'universe_sha256',
+    'supporting_evidence', 'feature_families',
 }
 FAMILY_KEYS = {
-    'binding_state',
-    'pit_state',
-    'source_artifact',
-    'source_sha256',
-    'coverage_start',
-    'coverage_end',
-    'blockers',
+    'binding_state', 'pit_state', 'source_artifact', 'source_sha256',
+    'coverage_start', 'coverage_end', 'blockers',
 }
 SUPPORT_KEYS = {
-    'binding_state',
-    'pit_state',
-    'source_artifact',
-    'source_sha256',
-    'ready',
-    'blockers',
+    'binding_state', 'pit_state', 'source_artifact', 'source_sha256',
+    'ready', 'blockers',
 }
 BINDING_STATES = {
-    'BOUND_VERIFIED_ARTIFACT',
-    'BOUND_STRUCTURAL_ONLY',
-    'UNBOUND',
+    'BOUND_VERIFIED_ARTIFACT', 'BOUND_STRUCTURAL_ONLY', 'UNBOUND',
     'NOT_DIRECTLY_REQUIRED',
 }
 PIT_STATES = {
-    'PIT_VERIFIED',
-    'PIT_PARTIAL',
-    'PIT_UNVERIFIED',
-    'PIT_NOT_APPLICABLE',
+    'PIT_VERIFIED', 'PIT_PARTIAL', 'PIT_UNVERIFIED', 'PIT_NOT_APPLICABLE',
 }
 FORBIDDEN_RESULT_KEYS = {
-    'return',
-    'returns',
-    'pnl',
-    'alpha',
-    'sharpe',
-    'drawdown',
-    'hit_rate',
-    'win_rate',
-    'performance',
-    'metrics',
+    'return', 'returns', 'pnl', 'alpha', 'sharpe', 'drawdown', 'hit_rate',
+    'win_rate', 'performance', 'metrics',
 }
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
 FACTOR_IDS = tuple(f'F{i}' for i in range(1, 13))
@@ -95,10 +72,7 @@ FACTOR_IDS = tuple(f'F{i}' for i in range(1, 13))
 
 def canonical_json_bytes(value: object) -> bytes:
     return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(',', ':'),
+        value, ensure_ascii=False, sort_keys=True, separators=(',', ':'),
         allow_nan=False,
     ).encode('utf-8')
 
@@ -213,12 +187,13 @@ def _normalize_family(name: str, raw: object) -> dict:
             raise ValueError(f'bound family requires source artifact: {name}')
         source_artifact = source_artifact.strip()
         source_sha = _sha(source_sha, f'{name}.source_sha256')
-    else:
-        if source_artifact is not None or source_sha is not None:
-            raise ValueError(f'unbound family cannot carry source identity: {name}')
+    elif source_artifact is not None or source_sha is not None:
+        raise ValueError(f'unbound family cannot carry source identity: {name}')
 
-    coverage_start = _iso_date(raw.get('coverage_start'), f'{name}.coverage_start', nullable=True)
-    coverage_end = _iso_date(raw.get('coverage_end'), f'{name}.coverage_end', nullable=True)
+    coverage_start = _iso_date(
+        raw.get('coverage_start'), f'{name}.coverage_start', nullable=True)
+    coverage_end = _iso_date(
+        raw.get('coverage_end'), f'{name}.coverage_end', nullable=True)
     if (coverage_start is None) != (coverage_end is None):
         raise ValueError(f'family coverage must provide both endpoints: {name}')
     if coverage_start is not None:
@@ -359,6 +334,102 @@ def derive_factor_readiness(
     return result
 
 
+def validate_production_evidence_manifest(evidence_manifest: dict) -> dict:
+    """Validate identity of the known V4.82 Formal evidence binding.
+
+    This checks that the manifest faithfully identifies the frozen upstream
+    evidence. It intentionally does not require all candidate feature families
+    to be ready; missing/unverified families belong to the readiness report.
+    """
+    _validate_evidence_top_level(evidence_manifest)
+    families = evaluate_feature_families(evidence_manifest)
+    supporting = _normalize_supporting(evidence_manifest)
+    blockers: list[str] = []
+
+    if evidence_manifest['formal_artifact_sha256'] != FORMAL_ARTIFACT_SHA256:
+        blockers.append('FORMAL_EVIDENCE_INVALID')
+    if evidence_manifest['formal_calendar_sha256'] != FORMAL_CALENDAR_SHA256:
+        blockers.append('CALENDAR_BINDING_INVALID')
+    if evidence_manifest['universe_sha256'] != UNIVERSE_SHA256:
+        blockers.append('UNIVERSE_BINDING_INVALID')
+
+    calendar = families['market_calendar']
+    if not (
+        calendar['binding_state'] == 'BOUND_VERIFIED_ARTIFACT'
+        and calendar['pit_state'] == 'PIT_VERIFIED'
+        and calendar['source_artifact'] == 'OFFICIAL_A_SHARE_OPEN_DATES_V357'
+        and calendar['source_sha256'] == FORMAL_CALENDAR_SHA256
+        and calendar['coverage_start'] == '2020-06-01'
+        and calendar['coverage_end'] == FORMAL_END
+        and not calendar['blockers']
+    ):
+        blockers.append('CALENDAR_BINDING_INVALID')
+
+    universe = supporting['formal_universe']
+    if not (
+        universe['binding_state'] == 'BOUND_VERIFIED_ARTIFACT'
+        and universe['pit_state'] == 'PIT_NOT_APPLICABLE'
+        and universe['source_artifact'] == 'PIT_ST_SCOPE_V480'
+        and universe['source_sha256'] == UNIVERSE_SHA256
+        and universe['ready'] is True
+        and not universe['blockers']
+    ):
+        blockers.append('UNIVERSE_BINDING_INVALID')
+
+    raw = supporting['raw_daily_panel']
+    if not (
+        raw['binding_state'] == 'BOUND_VERIFIED_ARTIFACT'
+        and raw['pit_state'] == 'PIT_PARTIAL'
+        and raw['source_artifact'] == RAW_ARTIFACT_NAME
+        and raw['source_sha256'] == RAW_ARTIFACT_SHA256
+        and raw['ready'] is True
+        and not raw['blockers']
+    ):
+        blockers.append('RAW_PANEL_EVIDENCE_INVALID')
+
+    liquidity = supporting['liquidity_contract']
+    if not (
+        liquidity['binding_state'] == 'BOUND_VERIFIED_ARTIFACT'
+        and liquidity['pit_state'] == 'PIT_VERIFIED'
+        and liquidity['source_artifact'] == LIQUIDITY_ARTIFACT_NAME
+        and liquidity['source_sha256'] == LIQUIDITY_ARTIFACT_SHA256
+        and liquidity['ready'] is True
+        and not liquidity['blockers']
+    ):
+        blockers.append('LIQUIDITY_EVIDENCE_INVALID')
+
+    adjusted = families['stock_adjusted_close']
+    if not (
+        adjusted['binding_state'] == 'BOUND_STRUCTURAL_ONLY'
+        and adjusted['pit_state'] == 'PIT_UNVERIFIED'
+        and adjusted['source_artifact'] == 'FORMAL_READINESS_FINAL_V482'
+        and adjusted['source_sha256'] == FORMAL_ARTIFACT_SHA256
+        and adjusted['coverage_start'] == '2020-06-01'
+        and adjusted['coverage_end'] == FORMAL_END
+        and adjusted['blockers'] == ['ADJUSTED_CLOSE_PIT_UNVERIFIED']
+        and adjusted['formal_feature_ready'] is False
+    ):
+        blockers.append('QFQ_EVIDENCE_INVALID')
+
+    status = families['status']
+    if not (
+        status['binding_state'] == 'BOUND_STRUCTURAL_ONLY'
+        and status['pit_state'] == 'PIT_PARTIAL'
+        and status['source_artifact'] == LIQUIDITY_ARTIFACT_NAME
+        and status['source_sha256'] == LIQUIDITY_ARTIFACT_SHA256
+        and status['coverage_start'] == '2020-06-01'
+        and status['coverage_end'] == FORMAL_END
+        and status['blockers'] == ['STATUS_SEMANTICS_INCOMPLETE']
+        and status['formal_feature_ready'] is False
+    ):
+        blockers.append('STATUS_SEMANTICS_INCOMPLETE')
+
+    return {
+        'production_manifest_valid': not blockers,
+        'blockers': sorted(set(blockers)),
+    }
+
+
 def build_readiness_report(parameters: dict, factors: dict, evidence_manifest: dict) -> dict:
     identity = validate_candidate_identity(parameters, factors)
     _validate_evidence_top_level(evidence_manifest)
@@ -378,13 +449,9 @@ def build_readiness_report(parameters: dict, factors: dict, evidence_manifest: d
     missing_or_unvalidated = sorted(
         name for name, state in families.items() if not state['formal_feature_ready'])
     ready_factor_ids = [
-        factor_id for factor_id in FACTOR_IDS
-        if factor_readiness[factor_id]['ready']
-    ]
+        factor_id for factor_id in FACTOR_IDS if factor_readiness[factor_id]['ready']]
     blocked_factor_ids = [
-        factor_id for factor_id in FACTOR_IDS
-        if not factor_readiness[factor_id]['ready']
-    ]
+        factor_id for factor_id in FACTOR_IDS if not factor_readiness[factor_id]['ready']]
     candidate_scoring_ready = (
         not blocked_factor_ids
         and families['status']['formal_feature_ready']
