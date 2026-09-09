@@ -1,0 +1,77 @@
+{
+  "artifact": "BAOSTOCK_FIXED5_RAW_CROSSCHECK_V482",
+  "version": "V4.82",
+  "status": "PASS_BAOSTOCK_RAW_WITH_GUIDEBEE_ENDPOINT_EXCEPTION_DIAGNOSED",
+  "scope": "fixed-five BaoStock probe evidence only; no Formal/OOS promotion",
+  "fixed5_symbols": [
+    "000001.SZ",
+    "000014.SZ",
+    "001201.SZ",
+    "002001.SZ",
+    "002002.SZ"
+  ],
+  "baostock": {
+    "provider": "query_history_k_data_plus",
+    "adjustflag": "3",
+    "frequency": "d",
+    "formal_window": ["2020-06-01", "2026-04-17"],
+    "workflow_run_id": 34350541625,
+    "workflow_artifact_id": 10103537004,
+    "workflow_artifact_sha256": "2d50cc6f1a4644ebd3afa0b766eb4ae87e08f9a70e30991240f9b6bda8d84ce9"
+  },
+  "frozen_guidebee_overlap": {
+    "source_artifact": "GUIDEBEE_PILOT_OVERLAP_V373.csv",
+    "price_basis": "RAW_UNADJUSTED",
+    "active_symbols": ["000001.SZ", "000014.SZ", "001201.SZ", "002001.SZ"],
+    "stable_overlap_dates": ["2026-02-24", "2026-02-25", "2026-02-27", "2026-03-02", "2026-03-03"],
+    "stable_overlap_rows": 20,
+    "ohlc_exact_rows": 20,
+    "ohlc_total_rows": 20,
+    "max_abs_ohlc_diff": 0.0,
+    "max_volume_relative_error": 0.000011920889875355772,
+    "max_amount_relative_error": 0.00001195641691921405,
+    "interpretation": "BaoStock adjustflag=3 is numerically consistent with the previously corroborated Guidebee RAW basis on all 20 stable overlap rows."
+  },
+  "formal_endpoint_2026_04_17": {
+    "guidebee_rows_compared": 4,
+    "guidebee_result": "DIVERGES_FROM_FINAL_DAILY_VALUES",
+    "diagnosis": "GUIDEBEE_ENDPOINT_FILE_APPEARS_PARTIAL_OR_STALE_INTRADAY_SNAPSHOT",
+    "third_source": "Longbridge candlesticks forward_adjust=false",
+    "third_source_result": "CONFIRMS_BAOSTOCK_4_OF_4",
+    "rows": [
+      {
+        "symbol": "000001.SZ",
+        "baostock": {"open": 11.09, "high": 11.11, "low": 10.99, "close": 11.01, "volume_shares": 72253042, "amount_cny": 797678405.53},
+        "longbridge": {"open": 11.09, "high": 11.11, "low": 10.99, "close": 11.01, "volume_lots": 722530, "volume_shares_normalized": 72253000, "amount_cny": 797678405.53},
+        "guidebee": {"open": 11.09, "high": 11.11, "low": 11.01, "close": 11.02, "volume_shares": 20183000, "amount_cny": 223091277.6106}
+      },
+      {
+        "symbol": "000014.SZ",
+        "baostock": {"open": 13.33, "high": 13.57, "low": 13.25, "close": 13.41, "volume_shares": 6839941, "amount_cny": 91787420.0},
+        "longbridge": {"open": 13.33, "high": 13.57, "low": 13.25, "close": 13.41, "volume_lots": 68399, "volume_shares_normalized": 6839900, "amount_cny": 91787420.0},
+        "guidebee": {"open": 13.33, "high": 13.55, "low": 13.25, "close": 13.42, "volume_shares": 2778620, "amount_cny": 37243848.6014}
+      },
+      {
+        "symbol": "001201.SZ",
+        "baostock": {"open": 13.4, "high": 13.42, "low": 13.13, "close": 13.22, "volume_shares": 6044516, "amount_cny": 79879115.52},
+        "longbridge": {"open": 13.4, "high": 13.42, "low": 13.13, "close": 13.22, "volume_lots": 60445, "volume_shares_normalized": 6044500, "amount_cny": 79879115.52},
+        "guidebee": {"open": 13.4, "high": 13.42, "low": 13.14, "close": 13.21, "volume_shares": 2950916, "amount_cny": 39072090.461700015}
+      },
+      {
+        "symbol": "002001.SZ",
+        "baostock": {"open": 37.64, "high": 37.84, "low": 35.9, "close": 36.19, "volume_shares": 46515490, "amount_cny": 1697715740.0},
+        "longbridge": {"open": 37.64, "high": 37.84, "low": 35.9, "close": 36.19, "volume_lots": 465155, "volume_shares_normalized": 46515500, "amount_cny": 1697715740.0},
+        "guidebee": {"open": 37.64, "high": 37.84, "low": 35.9, "close": 36.0, "volume_shares": 13004936, "amount_cny": 480004080.4534}
+      }
+    ]
+  },
+  "locked_interpretation": [
+    "The fixed-five BaoStock source probe remains PASS 5/5.",
+    "BaoStock RAW basis is independently corroborated on 20 stable Guidebee overlap rows and on the 2026-04-17 endpoint by Longbridge.",
+    "Do not use the frozen Guidebee 2026-04-17 endpoint rows as complete daily bars without replacement or re-materialization.",
+    "002002.SZ historical-delisted lifecycle evidence remains BaoStock-only within this fixed-five crosscheck and is not promoted into Formal by this artifact.",
+    "formal_admission remains false and oos_metrics_allowed remains false."
+  ],
+  "formal_admission": false,
+  "oos_metrics_allowed": false
+}
