@@ -37,7 +37,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install regression dependencies
-        run: pip install -q pandas pyarrow numpy
+        run: pip install -q pandas pyarrow numpy requests
       - name: Run pre-remediation baseline
         env:
           PYTHONPATH: scripts
