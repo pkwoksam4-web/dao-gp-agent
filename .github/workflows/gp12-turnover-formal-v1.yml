@@ -11,6 +11,8 @@ on:
       - 'scripts/test_gp12_sina_stock_structure_v1.py'
       - 'scripts/gp12_share_known_at_v1.py'
       - 'scripts/test_gp12_share_known_at_v1.py'
+      - 'scripts/gp12_formal_anchor_gate_v1.py'
+      - 'scripts/test_gp12_formal_anchor_gate_v1.py'
       - 'scripts/gp12_turnover_formal_v1.py'
       - 'scripts/test_gp12_turnover_formal_v1.py'
       - 'scripts/gp12_turnover_readiness_bind_v1.py'
@@ -18,9 +20,11 @@ on:
       - '.github/workflows/gp12-turnover-formal-v1.yml'
       - 'docs/superpowers/specs/2026-09-09-gp12-turnover-formal-v1-design.md'
       - 'docs/superpowers/specs/2026-09-09-gp12-turnover-known-at-pit-amendment-2-design.md'
+      - 'docs/superpowers/specs/2026-09-09-gp12-turnover-formal-anchor-pit-amendment-3-design.md'
       - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-v1.md'
       - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-v1-amendment-1.md'
       - 'docs/superpowers/plans/2026-09-09-gp12-turnover-known-at-pit-amendment-2.md'
+      - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-anchor-pit-amendment-3.md'
   workflow_dispatch:
 
 permissions:
@@ -45,6 +49,7 @@ jobs:
           python -m unittest -v \
             test_gp12_sina_stock_structure_v1.py \
             test_gp12_share_known_at_v1.py \
+            test_gp12_formal_anchor_gate_v1.py \
             test_gp12_sina_share_amount_v1.py \
             test_gp12_turnover_formal_v1.py \
             test_gp12_turnover_readiness_bind_v1.py \
@@ -54,7 +59,7 @@ jobs:
     needs: contracts
     runs-on: ubuntu-latest
     outputs:
-      dual_source_gate: ${{ steps.probe.outputs.dual_source_gate }}
+      formal_anchor_gate: ${{ steps.probe.outputs.formal_anchor_gate }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -62,7 +67,7 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependency
         run: python -m pip install --disable-pip-version-check requests
-      - name: Probe dual-source known-at evidence for 600000.SH
+      - name: Probe Formal-anchor known-at evidence for 600000.SH
         id: probe
         env:
           PYTHONPATH: scripts
@@ -78,6 +83,7 @@ jobs:
           import gp12_sina_share_amount_v1 as share_mod
           import gp12_sina_stock_structure_v1 as structure_mod
           import gp12_share_known_at_v1 as known_mod
+          import gp12_formal_anchor_gate_v1 as gate_mod
 
           out = pathlib.Path('out/known_at_probe')
           symbol = '600000.SH'
@@ -90,9 +96,11 @@ jobs:
               session, symbol, timeout=20, retries=2)
 
           result = {
-              'artifact': 'SINA_SHARE_KNOWN_AT_PROBE_GP12_V1',
+              'artifact': 'SINA_SHARE_FORMAL_ANCHOR_PROBE_GP12_V1',
               'version': '1.0',
               'symbol': symbol,
+              'formal_start': '2020-06-01',
+              'formal_end': '2026-04-17',
               'fetched_at': fetched_at,
               'share_amount': {
                   'fetch_status': share_meta.get('status'),
@@ -110,9 +118,17 @@ jobs:
                   'request_identity': structure_meta.get('request_identity'),
                   'parsed_row_n': 0,
               },
-              'matched_state_n': 0,
-              'first_matched_change_date': None,
-              'last_matched_change_date': None,
+              'legacy_all_history_matched_state_n': 0,
+              'legacy_all_history_blockers': [],
+              'formal_anchor_change_date': None,
+              'formal_anchor_announcement_date': None,
+              'formal_anchor_known_at': None,
+              'pre_anchor_mismatch_n': 0,
+              'pre_anchor_mismatch_dates': [],
+              'formal_required_share_row_n': 0,
+              'formal_matched_state_n': 0,
+              'formal_chain_mismatch_n': 0,
+              'formal_chain_mismatch_dates': [],
               'target_delayed_state': None,
               'pre_known_at_resolved_change_date': None,
               'on_known_at_resolved_change_date': None,
@@ -143,8 +159,7 @@ jobs:
           if structure_raw is not None:
               (out / '600000.SH.stock_structure.raw').write_bytes(structure_raw)
               try:
-                  structure_rows = structure_mod.parse_stock_structure_bytes(
-                      symbol, structure_raw)
+                  structure_rows = structure_mod.parse_stock_structure_bytes(symbol, structure_raw)
                   result['stock_structure']['parsed_row_n'] = len(structure_rows)
               except Exception as exc:
                   structural_blockers.add('SINA_STOCK_STRUCTURE_PAYLOAD_INVALID')
@@ -153,7 +168,17 @@ jobs:
           binding = None
           if not structural_blockers and share_rows is not None and structure_rows is not None:
               try:
-                  binding = known_mod.bind_known_at_states(
+                  legacy = known_mod.bind_known_at_states(
+                      symbol,
+                      share_rows,
+                      structure_rows,
+                      share_meta['raw_sha256'],
+                      structure_meta['raw_sha256'],
+                  )
+                  result['legacy_all_history_matched_state_n'] = legacy['matched_state_n']
+                  result['legacy_all_history_blockers'] = list(legacy['blockers'])
+
+                  binding = known_mod.bind_formal_anchor_states(
                       symbol,
                       share_rows,
                       structure_rows,
@@ -161,12 +186,18 @@ jobs:
                       structure_meta['raw_sha256'],
                   )
                   result['binding_blockers'] = list(binding['blockers'])
-                  result['matched_state_n'] = binding['matched_state_n']
-                  if binding['states']:
-                      result['first_matched_change_date'] = binding['states'][0]['change_date']
-                      result['last_matched_change_date'] = binding['states'][-1]['change_date']
-                  else:
-                      structural_blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+                  for key in (
+                      'formal_anchor_change_date',
+                      'formal_anchor_announcement_date',
+                      'formal_anchor_known_at',
+                      'pre_anchor_mismatch_n',
+                      'pre_anchor_mismatch_dates',
+                      'formal_required_share_row_n',
+                      'formal_matched_state_n',
+                      'formal_chain_mismatch_n',
+                      'formal_chain_mismatch_dates',
+                  ):
+                      result[key] = binding[key]
 
                   delayed = [
                       state for state in binding['states']
@@ -185,10 +216,8 @@ jobs:
                       before = (known_at_date - timedelta(days=1)).isoformat()
                       pre = known_mod.resolve_known_at_state(binding['states'], before)
                       on = known_mod.resolve_known_at_state(binding['states'], target['known_at'])
-                      result['pre_known_at_resolved_change_date'] = (
-                          None if pre is None else pre['change_date'])
-                      result['on_known_at_resolved_change_date'] = (
-                          None if on is None else on['change_date'])
+                      result['pre_known_at_resolved_change_date'] = None if pre is None else pre['change_date']
+                      result['on_known_at_resolved_change_date'] = None if on is None else on['change_date']
                       if pre is not None and pre['change_date'] == target['change_date']:
                           structural_blockers.add('TURNOVER_FUTURE_KNOWN_AT_VIOLATION')
                       if on is None or on['change_date'] != target['change_date']:
@@ -198,23 +227,25 @@ jobs:
                   result['binding_error'] = f'{type(exc).__name__}: {exc}'
 
           result['structural_blockers'] = sorted(structural_blockers)
-          all_blockers = set(result['structural_blockers'])
-          all_blockers.update(result['binding_blockers'])
-          result['blockers'] = sorted(all_blockers)
           result['pit_verified'] = bool(
               binding is not None
               and binding.get('pit_verified') is True
               and not result['structural_blockers']
           )
-          gate = known_mod.dual_source_probe_gate(
+          all_blockers = set(result['structural_blockers'])
+          all_blockers.update(result['binding_blockers'])
+          result['blockers'] = sorted(all_blockers)
+
+          gate = gate_mod.formal_anchor_probe_gate(
               structural_blockers=result['structural_blockers'],
               binding_blockers=result['binding_blockers'],
-              matched_state_n=result['matched_state_n'],
+              formal_anchor_change_date=result['formal_anchor_change_date'],
+              formal_chain_mismatch_n=result['formal_chain_mismatch_n'],
               pit_verified=result['pit_verified'],
           )
           result['data_gate'] = gate
 
-          target_path = out / 'SINA_SHARE_KNOWN_AT_PROBE_GP12_V1.json'
+          target_path = out / 'SINA_SHARE_FORMAL_ANCHOR_PROBE_GP12_V1.json'
           target_path.write_text(
               json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
               encoding='utf-8',
@@ -223,12 +254,12 @@ jobs:
           print('WORKFLOW_STATUS=SUCCESS')
           print('DATA_GATE=' + gate)
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as handle:
-              handle.write('dual_source_gate=' + gate + '\n')
+              handle.write('formal_anchor_gate=' + gate + '\n')
           PY
-      - name: Upload known-at probe evidence
+      - name: Upload Formal-anchor probe evidence
         uses: actions/upload-artifact@v4
         with:
-          name: gp12-sina-known-at-probe-v1
+          name: gp12-sina-formal-anchor-probe-v1
           path: out/known_at_probe/
           if-no-files-found: error
           retention-days: 30
