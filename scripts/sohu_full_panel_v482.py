@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 
+from audit_evidence_v1 import sha256_file, schema_fingerprint
 from sohu_raw_v482 import fetch_symbol, normalize_symbol
 
 RAW_FIELDS=['symbol','date','open','high','low','close','volume','amount','source']
@@ -235,6 +236,9 @@ def merge_shards(shards_dir:pathlib.Path,pitst_path:pathlib.Path,out_dir:pathlib
     status='PASS_FULL_RAW_V482' if global_pass else 'REVIEW_FULL_RAW_V482'
     out_dir.mkdir(parents=True,exist_ok=True)
     full_pq=out_dir/'SOHU_RAW_FULL_V482.parquet'; raw.to_parquet(full_pq,index=False)
+    full_sha=sha256_file(full_pq)
+    full_bytes=full_pq.stat().st_size
+    full_schema=schema_fingerprint(raw)
     report={
         'artifact':'SOHU_RAW_FULL_V482','version':'V4.82','status':status,
         'symbol_n':len(unique_symbols),'expected_symbol_n':EXPECTED_SYMBOL_N,
@@ -249,6 +253,9 @@ def merge_shards(shards_dir:pathlib.Path,pitst_path:pathlib.Path,out_dir:pathlib
         'shard_review_is_diagnostic_only':True,
         'pitst_trade_corrections':sorted([list(x) for x in PITST_TRADESTATUS_ONE_CORRECTIONS]),
         'zero_trade_symbols':sorted(set(pit['symbol'])-set(raw['symbol'])) if len(raw) else sorted(set(pit['symbol'])),
+        'full_parquet_sha256':full_sha,
+        'full_parquet_bytes':full_bytes,
+        'schema_fingerprint':full_schema,
         'formal_admission':False,'oos_metrics_allowed':False,
     }
     (out_dir/'SOHU_RAW_FULL_AUDIT_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
