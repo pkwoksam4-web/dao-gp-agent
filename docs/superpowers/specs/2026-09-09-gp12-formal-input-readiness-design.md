@@ -40,6 +40,7 @@ All outputs fix:
 - `strategy_id = GP12_REBUILD_CANDIDATE_V1`
 - `candidate_adoption_status = UNAPPROVED`
 - `formal_end = 2026-04-17`
+- `candidate_freeze_ready = false`
 - `model_freeze_allowed = false`
 - `oos_metrics_allowed = false`
 
@@ -224,7 +225,48 @@ A factor is ready only when every required family/supporting PIT contract is rea
 
 No partial factor score is promoted into a full candidate score. Even if F6-F10 become ready first, `candidate_scoring_ready` remains false until all 12 factors and required status/liquidity execution gates are ready.
 
-## 8. Readiness artifact schema
+`historical_label_provenance` is not a dependency of factor calculation. It gates only probability/calibration readiness. Therefore label provenance may remain blocked while all 12 factors are otherwise scoring-ready; the artifact must represent these as separate states.
+
+## 8. Readiness state semantics
+
+The artifact exposes separate readiness paths:
+
+### 8.1 Scoring readiness
+
+`candidate_scoring_ready=true` only when:
+
+- every F1-F12 dependency is `FORMAL_FEATURE_READY`;
+- `status` is fully ready for `is_st`, `tradable`, and `upper_limit` semantics;
+- the frozen liquidity contract is verified and applicable;
+- all data consumed are bounded to Formal dates through `2026-04-17`.
+
+`scoring_blockers` contains only blockers that prevent Formal-only scoring/materialization.
+
+`real_feature_inputs_validated` equals `candidate_scoring_ready` in V1. It says only that all real feature inputs required to score are production-validated; it does not approve the candidate.
+
+### 8.2 Probability/calibration readiness
+
+`probability_mapping_ready=true` only when:
+
+- `candidate_scoring_ready=true`;
+- `historical_label_provenance` is artifact-bound and PIT-verified;
+- label horizons follow the frozen market-calendar T+1/T+2/T+3 semantics;
+- labels are known by their declared `label_known_at` and never use OOS rows.
+
+`probability_blockers` contains label/calibration blockers in addition to any scoring blockers. Missing label provenance MUST NOT make a ready factor appear unready; it only keeps `probability_mapping_ready=false`.
+
+### 8.3 Adoption/freeze readiness
+
+In this subsystem, regardless of scoring/probability readiness:
+
+- `candidate_adoption_status = UNAPPROVED`
+- `candidate_freeze_ready = false`
+- `model_freeze_allowed = false`
+- `oos_metrics_allowed = false`
+
+A later, explicitly approved candidate-adoption/freeze subsystem is required to change those values.
+
+## 9. Readiness artifact schema
 
 Output file:
 
@@ -250,7 +292,10 @@ Required top-level fields:
 - `ready_factor_ids`
 - `blocked_factor_ids`
 - `blockers`
+- `scoring_blockers`
+- `probability_blockers`
 - `candidate_scoring_ready`
+- `probability_mapping_ready`
 - `candidate_freeze_ready`
 - `real_feature_inputs_validated`
 - `model_freeze_allowed`
@@ -258,9 +303,9 @@ Required top-level fields:
 
 The artifact MUST contain no performance or OOS-result fields.
 
-`model_freeze_allowed` and `oos_metrics_allowed` are always false in V1, regardless of readiness completeness. A later explicit candidate-adoption/freeze subsystem would be required to change that.
+`candidate_freeze_ready`, `model_freeze_allowed`, and `oos_metrics_allowed` are always false in V1, regardless of readiness completeness. A later explicit candidate-adoption/freeze subsystem would be required to change them.
 
-## 9. Candidate package identity binding
+## 10. Candidate package identity binding
 
 Readiness must bind to the exact candidate package identities already supported by `gp12_candidate_v1.py`:
 
@@ -269,7 +314,7 @@ Readiness must bind to the exact candidate package identities already supported 
 
 Any mismatch, unknown formula set/version, or altered candidate contract blocks readiness generation rather than silently validating a different strategy.
 
-## 10. Deterministic blockers
+## 11. Deterministic blockers
 
 At minimum support deterministic blocker codes:
 
@@ -294,9 +339,11 @@ At minimum support deterministic blocker codes:
 - `LABEL_PROVENANCE_UNBOUND`
 - `FORBIDDEN_OOS_OR_PERFORMANCE_FIELD`
 
-Blockers are sorted and unique. Missing production evidence is a validation state, not an exception. Programmer/schema corruption is an exception/nonzero workflow failure.
+All blocker arrays are sorted and unique. Missing production evidence is a validation state, not an exception. Programmer/schema corruption is an exception/nonzero workflow failure.
 
-## 11. Production workflow behavior
+The aggregate `blockers` is the sorted union of `scoring_blockers` and `probability_blockers` plus any package/evidence integrity blockers. This allows the report to remain globally incomplete while still truthfully distinguishing whether scoring itself is ready.
+
+## 12. Production workflow behavior
 
 A new isolated workflow will:
 
@@ -307,12 +354,12 @@ A new isolated workflow will:
 5. generate `GP12_FORMAL_INPUT_READINESS_V1.json`;
 6. assert `formal_end == 2026-04-17` and no consumed source row/window exceeds Formal end;
 7. assert `candidate_adoption_status == UNAPPROVED`;
-8. assert `model_freeze_allowed == false` and `oos_metrics_allowed == false`;
+8. assert `candidate_freeze_ready == false`, `model_freeze_allowed == false`, and `oos_metrics_allowed == false`;
 9. upload the readiness artifact and evidence manifest.
 
 The workflow must not download OOS market data or invoke any performance/backtest command.
 
-## 12. TDD requirements
+## 13. TDD requirements
 
 Write RED tests before production implementation. Tests must cover at least:
 
@@ -327,12 +374,14 @@ Write RED tests before production implementation. Tests must cover at least:
 9. 15m and 60m are independently required for F12;
 10. incomplete status semantics blocks candidate execution readiness;
 11. liquidity contract remains supporting evidence and does not satisfy turnover ratio;
-12. OOS dates, OOS outcome fields, or performance fields are rejected recursively;
-13. all blocker lists are deterministic/sorted/unique;
-14. even a synthetic all-family-ready fixture still leaves adoption/model-freeze/OOS disabled in this V1 subsystem;
-15. existing GP12 candidate, source-router, Strategy Recovery, Model Freeze Recovery and OOS Admission tests remain green.
+12. label provenance missing keeps `probability_mapping_ready=false` without changing otherwise-ready factor states;
+13. OOS dates, OOS outcome fields, or performance fields are rejected recursively;
+14. all blocker lists are deterministic/sorted/unique;
+15. a synthetic all-scoring-family-ready fixture may set `candidate_scoring_ready=true` and `real_feature_inputs_validated=true`, but still has `candidate_freeze_ready=false`, `model_freeze_allowed=false`, and `oos_metrics_allowed=false`;
+16. a synthetic fully PIT-verified Formal label fixture can set `probability_mapping_ready=true` without changing adoption/freeze/OOS states;
+17. existing GP12 candidate, source-router, Strategy Recovery, Model Freeze Recovery and OOS Admission tests remain green.
 
-## 13. Planned files
+## 14. Planned files
 
 Create on `gp/gp12-formal-input-readiness-v1` after implementation-plan approval:
 
@@ -344,7 +393,7 @@ Create on `gp/gp12-formal-input-readiness-v1` after implementation-plan approval
 
 Do not edit the candidate formula/parameter JSON unless a separate adoption/design decision explicitly changes the strategy proposal.
 
-## 14. Completion criterion for this subsystem
+## 15. Completion criterion for this subsystem
 
 This subsystem is complete when a production GitHub Actions run emits a source-backed, Formal-only readiness artifact that truthfully distinguishes:
 
@@ -352,5 +401,6 @@ This subsystem is complete when a production GitHub Actions run emits a source-b
 - evidence bound but PIT-unverified;
 - completely missing feature families;
 - exact factor dependencies blocked by those gaps;
+- scoring readiness versus probability/calibration readiness;
 
-while keeping `candidate_scoring_ready` false unless all required families are truly ready, and keeping candidate adoption, Model Freeze, and OOS metrics disabled regardless.
+while keeping candidate adoption, candidate freeze, Model Freeze, and OOS metrics disabled regardless.
