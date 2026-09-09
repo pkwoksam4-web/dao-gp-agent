@@ -1,3 +1,4 @@
+import pathlib
 import unittest
 
 import gp12_share_known_at_v1 as mod
@@ -177,6 +178,18 @@ class ShareKnownAtV1Tests(unittest.TestCase):
             pit_verified=True,
         )
         self.assertEqual(gate, 'DUAL_SOURCE_STRUCTURAL_PASS')
+
+    def test_workflow_uses_centralized_fail_closed_probe_gate(self):
+        workflow_path = (
+            pathlib.Path(__file__).resolve().parents[1]
+            / '.github'
+            / 'workflows'
+            / 'gp12-turnover-formal-v1.yml'
+        )
+        workflow = workflow_path.read_text(encoding='utf-8')
+        self.assertIn('known_mod.dual_source_probe_gate(', workflow)
+        self.assertIn("binding_blockers=result['binding_blockers']", workflow)
+        self.assertIn("pit_verified=result['pit_verified']", workflow)
 
 
 if __name__ == '__main__':
