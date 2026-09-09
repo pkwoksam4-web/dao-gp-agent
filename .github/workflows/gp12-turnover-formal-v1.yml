@@ -14,6 +14,7 @@ on:
       - '.github/workflows/gp12-turnover-formal-v1.yml'
       - 'docs/superpowers/specs/2026-09-09-gp12-turnover-formal-v1-design.md'
       - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-v1.md'
+      - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-v1-amendment-1.md'
   workflow_dispatch:
 
 permissions:
@@ -30,9 +31,11 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependency
         run: python -m pip install --disable-pip-version-check requests
-      - name: RED/contract tests
+      - name: Turnover contract tests
         env:
           PYTHONPATH: scripts
         run: |
           cd scripts
-          python -m unittest -v test_gp12_sina_share_amount_v1.py
+          python -m unittest -v \
+            test_gp12_sina_share_amount_v1.py \
+            test_gp12_turnover_formal_v1.py
