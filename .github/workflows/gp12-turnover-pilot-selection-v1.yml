@@ -1,0 +1,86 @@
+name: GP12 Turnover Pilot Selection V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-formal-v1
+    paths:
+      - '.github/workflows/gp12-turnover-pilot-selection-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet reader
+        run: python -m pip install --disable-pip-version-check pyarrow
+      - name: Download signed frozen-universe liquidity panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-liquidity-80m-v482
+          path: input/liquidity
+          run-id: 34192233633
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Select fixed pilot symbols before any pilot fetch
+        run: |
+          mkdir -p out/pilot-selection
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import pyarrow.parquet as pq
+
+          panel = Path('input/liquidity/LIQUIDITY_80M_PANEL_V482.parquet')
+          symbols = sorted(set(pq.read_table(panel, columns=['symbol']).column('symbol').to_pylist()))
+          if len(symbols) != 847:
+              raise SystemExit(f'expected frozen universe 847, got {len(symbols)}')
+
+          families = {
+              'shanghai_main': lambda s: s.endswith('.SH') and s[:3] in {'600','601','603','605'},
+              'shenzhen_main': lambda s: s.endswith('.SZ') and s[:3] in {'000','001','002','003'},
+              'chinext': lambda s: s.endswith('.SZ') and s[:3] in {'300','301'},
+              'star': lambda s: s.endswith('.SH') and s[:3] in {'688','689'},
+          }
+          selected = {}
+          candidates = {}
+          for family, predicate in families.items():
+              values = [s for s in symbols if predicate(s)]
+              if not values:
+                  raise SystemExit(f'no frozen-universe candidate for {family}')
+              candidates[family] = values
+              selected[family] = values[0]
+
+          payload = {
+              'artifact': 'GP12_TURNOVER_PILOT_SELECTION_V1',
+              'version': '1.0',
+              'selection_rule': 'LEXICOGRAPHIC_FIRST_BY_FIXED_BOARD_PREFIX_FROM_SIGNED_LIQUIDITY_UNIVERSE',
+              'source_run_id': 34192233633,
+              'source_artifact': 'gp-liquidity-80m-v482',
+              'source_artifact_digest': 'sha256:a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b',
+              'frozen_universe_n': len(symbols),
+              'selected': selected,
+              'candidate_counts': {k: len(v) for k, v in candidates.items()},
+              'pilot_fetch_executed': False,
+              'oos_data_consumed': False,
+          }
+          canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+          payload['selection_sha256'] = hashlib.sha256(canonical).hexdigest()
+          target = Path('out/pilot-selection/GP12_TURNOVER_PILOT_SELECTION_V1.json')
+          target.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2))
+          PY
+      - name: Upload selection evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-pilot-selection-v1
+          path: out/pilot-selection/
+          if-no-files-found: error
+          retention-days: 30
