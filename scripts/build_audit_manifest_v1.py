@@ -15,6 +15,7 @@ from audit_evidence_v1 import (
     sha256_file,
     validate_artifact_digest,
     validate_evidence_manifest,
+    validate_sha256,
 )
 
 SHA40_RE = re.compile(r'^[0-9a-f]{40}$')
@@ -80,7 +81,7 @@ def _validate_source_provenance(item: dict) -> None:
             raise ValueError(f"Actions source head invalid: {item.get('logical_name')}")
         return
     if source_type == 'REPOSITORY':
-        if 'source_artifact_digest' in item or 'source_artifact_id' in item or 'source_run_id' in item:
+        if any(key in item for key in ('source_artifact_digest','source_artifact_id','source_run_id')):
             raise ValueError(f"repository evidence must not carry fake Actions provenance: {item.get('logical_name')}")
         if not SHA40_RE.fullmatch(str(item.get('source_head_sha') or '')):
             raise ValueError(f"repository source head invalid: {item.get('logical_name')}")
@@ -88,6 +89,23 @@ def _validate_source_provenance(item: dict) -> None:
             raise ValueError(f"repository evidence missing persisted path: {item.get('logical_name')}")
         return
     raise ValueError(f"unknown source_type: {source_type}")
+
+
+def _enforce_expected_identity(item: dict) -> None:
+    expected_sha = item.get('expected_sha256')
+    if expected_sha is not None:
+        if not validate_sha256(expected_sha):
+            raise ValueError(f"expected sha invalid: {item.get('logical_name')}")
+        if item['sha256'] != expected_sha:
+            raise ValueError(f"expected sha mismatch: {item.get('logical_name')}")
+    expected_bytes = item.get('expected_bytes')
+    if expected_bytes is not None:
+        try:
+            n = int(expected_bytes)
+        except (TypeError, ValueError):
+            raise ValueError(f"expected bytes invalid: {item.get('logical_name')}")
+        if n < 0 or item['bytes'] != n:
+            raise ValueError(f"expected bytes mismatch: {item.get('logical_name')}")
 
 
 def build_manifest(config: dict) -> dict:
@@ -108,6 +126,7 @@ def build_manifest(config: dict) -> dict:
         item['file_name'] = item.get('file_name') or p.name
         item['sha256'] = sha256_file(p)
         item['bytes'] = p.stat().st_size
+        _enforce_expected_identity(item)
         if p.suffix.lower() == '.parquet':
             frame = pd.read_parquet(p)
             item['row_count'] = len(frame)
