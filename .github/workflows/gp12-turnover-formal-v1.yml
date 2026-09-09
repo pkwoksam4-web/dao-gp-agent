@@ -50,9 +50,11 @@ jobs:
             test_gp12_turnover_readiness_bind_v1.py \
             test_gp12_formal_input_readiness_v1.py
 
-  probe:
+  known_at_probe:
     needs: contracts
     runs-on: ubuntu-latest
+    outputs:
+      dual_source_gate: ${{ steps.probe.outputs.dual_source_gate }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -60,83 +62,173 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependency
         run: python -m pip install --disable-pip-version-check requests
-      - name: Probe Sina historical share amount for 600000.SH
+      - name: Probe dual-source known-at evidence for 600000.SH
+        id: probe
         env:
           PYTHONPATH: scripts
         run: |
-          mkdir -p out/probe
+          mkdir -p out/known_at_probe
           python - <<'PY'
           import json
+          import os
           import pathlib
-          from datetime import datetime, timezone
+          from datetime import date, timedelta, datetime, timezone
 
           import requests
-          import gp12_sina_share_amount_v1 as mod
+          import gp12_sina_share_amount_v1 as share_mod
+          import gp12_sina_stock_structure_v1 as structure_mod
+          import gp12_share_known_at_v1 as known_mod
 
-          out = pathlib.Path('out/probe')
+          out = pathlib.Path('out/known_at_probe')
           symbol = '600000.SH'
           session = requests.Session()
-          raw, fetch_meta = mod.fetch_share_amount(session, symbol, timeout=20, retries=2)
+          fetched_at = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+          share_raw, share_meta = share_mod.fetch_share_amount(
+              session, symbol, timeout=20, retries=2)
+          structure_raw, structure_meta = structure_mod.fetch_stock_structure(
+              session, symbol, timeout=20, retries=2)
+
           result = {
-              'artifact': 'SINA_SHARE_AMOUNT_PROBE_GP12_V1',
+              'artifact': 'SINA_SHARE_KNOWN_AT_PROBE_GP12_V1',
               'version': '1.0',
               'symbol': symbol,
-              'source_endpoint_family': mod.SOURCE_ENDPOINT_FAMILY,
-              'fetch_status': fetch_meta.get('status'),
-              'http_status': fetch_meta.get('http_status'),
-              'raw_sha256': fetch_meta.get('raw_sha256'),
-              'raw_byte_n': fetch_meta.get('raw_byte_n', 0),
-              'request_identity': fetch_meta.get('request_identity'),
-              'fetched_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
-              'structural_status': 'BLOCKED',
-              'record_count_all': 0,
-              'record_count_formal': 0,
-              'post_formal_record_n': 0,
-              'record_start': None,
-              'record_end': None,
-              'blockers': list(fetch_meta.get('blockers') or []),
+              'fetched_at': fetched_at,
+              'share_amount': {
+                  'fetch_status': share_meta.get('status'),
+                  'http_status': share_meta.get('http_status'),
+                  'raw_sha256': share_meta.get('raw_sha256'),
+                  'raw_byte_n': share_meta.get('raw_byte_n', 0),
+                  'request_identity': share_meta.get('request_identity'),
+                  'parsed_row_n': 0,
+              },
+              'stock_structure': {
+                  'fetch_status': structure_meta.get('status'),
+                  'http_status': structure_meta.get('http_status'),
+                  'raw_sha256': structure_meta.get('raw_sha256'),
+                  'raw_byte_n': structure_meta.get('raw_byte_n', 0),
+                  'request_identity': structure_meta.get('request_identity'),
+                  'parsed_row_n': 0,
+              },
+              'matched_state_n': 0,
+              'first_matched_change_date': None,
+              'last_matched_change_date': None,
+              'target_delayed_state': None,
+              'pre_known_at_resolved_change_date': None,
+              'on_known_at_resolved_change_date': None,
+              'structural_blockers': [],
+              'binding_blockers': [],
+              'blockers': [],
               'pit_verified': False,
               'formal_feature_ready': False,
               'model_freeze_allowed': False,
               'oos_metrics_allowed': False,
           }
-          if raw is not None:
-              (out / '600000.SH.share_amount.raw').write_bytes(raw)
+
+          structural_blockers = set()
+          structural_blockers.update(share_meta.get('blockers') or [])
+          structural_blockers.update(structure_meta.get('blockers') or [])
+          share_rows = None
+          structure_rows = None
+
+          if share_raw is not None:
+              (out / '600000.SH.share_amount.raw').write_bytes(share_raw)
               try:
-                  rows = mod.parse_share_amount_bytes(symbol, raw)
-                  evidence = mod.build_symbol_evidence(
-                      symbol,
-                      raw,
-                      result['fetched_at'],
-                      int(fetch_meta['http_status']),
-                  )
-                  result.update({
-                      'structural_status': 'STRUCTURAL_PASS',
-                      'record_count_all': len(rows),
-                      'record_count_formal': evidence['normalized_record_count'],
-                      'post_formal_record_n': evidence['post_formal_record_n'],
-                      'record_start': evidence['record_start'],
-                      'record_end': evidence['record_end'],
-                      'blockers': [],
-                  })
+                  share_rows = share_mod.parse_share_amount_bytes(symbol, share_raw)
+                  result['share_amount']['parsed_row_n'] = len(share_rows)
               except Exception as exc:
-                  result['blockers'] = ['SINA_SHARE_PAYLOAD_INVALID']
-                  result['parse_error'] = f'{type(exc).__name__}: {exc}'
-          if result['structural_status'] != 'STRUCTURAL_PASS' and not result['blockers']:
-              result['blockers'] = ['SINA_SHARE_SOURCE_UNAVAILABLE']
-          target = out / 'SINA_SHARE_AMOUNT_PROBE_GP12_V1.json'
-          target.write_text(
+                  structural_blockers.add('SINA_SHARE_PAYLOAD_INVALID')
+                  result['share_amount']['parse_error'] = f'{type(exc).__name__}: {exc}'
+
+          if structure_raw is not None:
+              (out / '600000.SH.stock_structure.raw').write_bytes(structure_raw)
+              try:
+                  structure_rows = structure_mod.parse_stock_structure_bytes(
+                      symbol, structure_raw)
+                  result['stock_structure']['parsed_row_n'] = len(structure_rows)
+              except Exception as exc:
+                  structural_blockers.add('SINA_STOCK_STRUCTURE_PAYLOAD_INVALID')
+                  result['stock_structure']['parse_error'] = f'{type(exc).__name__}: {exc}'
+
+          binding = None
+          if not structural_blockers and share_rows is not None and structure_rows is not None:
+              try:
+                  binding = known_mod.bind_known_at_states(
+                      symbol,
+                      share_rows,
+                      structure_rows,
+                      share_meta['raw_sha256'],
+                      structure_meta['raw_sha256'],
+                  )
+                  result['binding_blockers'] = list(binding['blockers'])
+                  result['matched_state_n'] = binding['matched_state_n']
+                  if binding['states']:
+                      result['first_matched_change_date'] = binding['states'][0]['change_date']
+                      result['last_matched_change_date'] = binding['states'][-1]['change_date']
+                  else:
+                      structural_blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+
+                  delayed = [
+                      state for state in binding['states']
+                      if state['announcement_date'] > state['change_date']
+                  ]
+                  preferred = [
+                      state for state in delayed
+                      if state['change_date'] == '2024-12-31'
+                  ]
+                  target = preferred[0] if preferred else (delayed[-1] if delayed else None)
+                  if target is None:
+                      structural_blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+                  else:
+                      result['target_delayed_state'] = target
+                      known_at_date = date.fromisoformat(target['known_at'])
+                      before = (known_at_date - timedelta(days=1)).isoformat()
+                      pre = known_mod.resolve_known_at_state(binding['states'], before)
+                      on = known_mod.resolve_known_at_state(binding['states'], target['known_at'])
+                      result['pre_known_at_resolved_change_date'] = (
+                          None if pre is None else pre['change_date'])
+                      result['on_known_at_resolved_change_date'] = (
+                          None if on is None else on['change_date'])
+                      if pre is not None and pre['change_date'] == target['change_date']:
+                          structural_blockers.add('TURNOVER_FUTURE_KNOWN_AT_VIOLATION')
+                      if on is None or on['change_date'] != target['change_date']:
+                          structural_blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+              except Exception as exc:
+                  structural_blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+                  result['binding_error'] = f'{type(exc).__name__}: {exc}'
+
+          result['structural_blockers'] = sorted(structural_blockers)
+          all_blockers = set(result['structural_blockers'])
+          all_blockers.update(result['binding_blockers'])
+          result['blockers'] = sorted(all_blockers)
+          result['pit_verified'] = bool(
+              binding is not None
+              and binding.get('pit_verified') is True
+              and not result['structural_blockers']
+          )
+          gate = (
+              'DUAL_SOURCE_STRUCTURAL_PASS'
+              if not result['structural_blockers']
+              and result['matched_state_n'] > 0
+              else 'BLOCKED'
+          )
+          result['data_gate'] = gate
+
+          target_path = out / 'SINA_SHARE_KNOWN_AT_PROBE_GP12_V1.json'
+          target_path.write_text(
               json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
               encoding='utf-8',
           )
           print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
           print('WORKFLOW_STATUS=SUCCESS')
-          print('DATA_GATE=' + result['structural_status'])
+          print('DATA_GATE=' + gate)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as handle:
+              handle.write('dual_source_gate=' + gate + '\n')
           PY
-      - name: Upload probe evidence
+      - name: Upload known-at probe evidence
         uses: actions/upload-artifact@v4
         with:
-          name: gp12-sina-share-amount-probe-v1
-          path: out/probe/
+          name: gp12-sina-known-at-probe-v1
+          path: out/known_at_probe/
           if-no-files-found: error
           retention-days: 30
