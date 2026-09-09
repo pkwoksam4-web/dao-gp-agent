@@ -30,8 +30,7 @@ class RebindingTests(unittest.TestCase):
         fn=require(enrich_raw_audit,self)
         with tempfile.TemporaryDirectory() as td:
             root=pathlib.Path(td)
-            pq=root/'raw.parquet'
-            audit=root/'raw.json'
+            pq=root/'raw.parquet'; audit=root/'raw.json'
             pd.DataFrame([{'symbol':'000001.SZ','date':'2020-06-01','close':10.0}]).to_parquet(pq,index=False)
             audit.write_text(json.dumps({'artifact':'SOHU_RAW_FULL_V482','version':'V4.82','raw_rows':1}),encoding='utf-8')
             out=fn(audit,pq)
@@ -68,19 +67,19 @@ class ManifestBuildTests(unittest.TestCase):
                 'base_head_sha':'b815773d00e4c6bf775b3ce111aef3fc458cd741',
                 'remediation_branch':'gp/audit-remediation-v1',
             },
-            'required_governance_blockers':['PERMANENT_BYTE_ARCHIVE_OPEN','REPOSITORY_BRANCH_PROTECTION_OPEN'],
+            'required_governance_blockers':['PERMANENT_BYTE_ARCHIVE_OPEN','REPOSITORY_BRANCH_PROTECTION_OPEN','STRATEGY_ASSETS_INCOMPLETE'],
             'items':[
                 {
                     'logical_name':'SMALL','class':'SMALL_PERSISTED','path':str(small),
+                    'source_type':'REPOSITORY','source_head_sha':'1'*40,
                     'persisted_repository_path':'evidence/audit-remediation-v1/small.json',
-                    'source_run_id':1,'source_artifact_id':2,'source_artifact_name':'small',
-                    'source_artifact_digest':'sha256:'+'a'*64,'permanent_bytes_available':True,
+                    'permanent_bytes_available':True,
                 },
                 {
                     'logical_name':'LARGE','class':'LARGE_HASH_BOUND','path':str(large),
-                    'source_run_id':3,'source_artifact_id':4,'source_artifact_name':'large',
-                    'source_artifact_digest':'sha256:'+'b'*64,'permanent_bytes_available':False,
-                    'expiry_at':'2026-10-01T00:00:00Z',
+                    'source_type':'GITHUB_ACTIONS','source_run_id':3,'source_artifact_id':4,'source_artifact_name':'large',
+                    'source_artifact_digest':'sha256:'+'b'*64,'source_head_sha':'2'*40,
+                    'permanent_bytes_available':False,'expiry_at':'2026-10-01T00:00:00Z',
                 },
             ],
         }
@@ -91,19 +90,26 @@ class ManifestBuildTests(unittest.TestCase):
             cfg=self._config(pathlib.Path(td)); cfg['canonical_lineage'].pop('base_head_sha')
             with self.assertRaises(ValueError): fn(cfg)
 
-    def test_manifest_rejects_malformed_artifact_digest(self):
+    def test_actions_item_rejects_malformed_artifact_digest(self):
         fn=require(build_manifest,self)
         with tempfile.TemporaryDirectory() as td:
-            cfg=self._config(pathlib.Path(td)); cfg['items'][0]['source_artifact_digest']='bad'
+            cfg=self._config(pathlib.Path(td)); cfg['items'][1]['source_artifact_digest']='bad'
             with self.assertRaises(ValueError): fn(cfg)
+
+    def test_repository_small_evidence_does_not_require_fake_artifact_digest(self):
+        fn=require(build_manifest,self)
+        with tempfile.TemporaryDirectory() as td:
+            cfg=self._config(pathlib.Path(td)); manifest=fn(cfg)
+            small=next(x for x in manifest['evidence_items'] if x['logical_name']=='SMALL')
+            self.assertEqual(small['source_type'],'REPOSITORY')
+            self.assertNotIn('source_artifact_digest',small)
+            self.assertTrue(small['permanent_bytes_available'])
 
     def test_manifest_rejects_conflicting_logical_identity(self):
         fn=require(build_manifest,self)
         with tempfile.TemporaryDirectory() as td:
-            cfg=self._config(pathlib.Path(td))
-            other=pathlib.Path(td)/'other.bin'; other.write_bytes(b'other')
-            dup=dict(cfg['items'][1]); dup['path']=str(other)
-            cfg['items'].append(dup)
+            cfg=self._config(pathlib.Path(td)); other=pathlib.Path(td)/'other.bin'; other.write_bytes(b'other')
+            dup=dict(cfg['items'][1]); dup['path']=str(other); cfg['items'].append(dup)
             with self.assertRaises(ValueError): fn(cfg)
 
     def test_manifest_keeps_required_governance_blockers_visible(self):
@@ -112,9 +118,11 @@ class ManifestBuildTests(unittest.TestCase):
             cfg=self._config(pathlib.Path(td)); manifest=fn(cfg)
             self.assertIn('PERMANENT_BYTE_ARCHIVE_OPEN',manifest['blockers'])
             self.assertIn('REPOSITORY_BRANCH_PROTECTION_OPEN',manifest['blockers'])
+            self.assertIn('STRATEGY_ASSETS_INCOMPLETE',manifest['blockers'])
             self.assertFalse(manifest['formal_promotion_allowed'])
             self.assertFalse(manifest['model_freeze_allowed'])
             self.assertFalse(manifest['oos_metrics_allowed'])
+            self.assertFalse(manifest['baostock_847_scaleout_allowed'])
             self.assertEqual(validate_evidence_manifest(manifest),[])
 
     def test_actions_only_large_bytes_cannot_be_marked_permanent(self):
@@ -124,5 +132,4 @@ class ManifestBuildTests(unittest.TestCase):
             with self.assertRaises(ValueError): fn(cfg)
 
 
-if __name__=='__main__':
-    unittest.main()
+if __name__=='__main__': unittest.main()
