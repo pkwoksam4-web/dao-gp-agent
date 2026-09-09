@@ -23,6 +23,7 @@ SOURCE_URL = (
 DATE_SEMANTICS_KEYS = {
     'source', 'evidence_type', 'verified', 'source_identity',
 }
+SHARE_RECORD_KEYS = {'date', 'amount'}
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -93,13 +94,13 @@ def parse_share_amount_bytes(symbol: str, raw: bytes) -> list[dict]:
     rows: list[dict] = []
     seen: set[str] = set()
     for item in values:
-        if not isinstance(item, list) or len(item) < 2:
+        if not isinstance(item, dict) or set(item) != SHARE_RECORD_KEYS:
             raise ValueError('Sina share record invalid')
-        record_date = _canonical_date(str(item[0]))
+        record_date = _canonical_date(item.get('date'))
         if record_date in seen:
             raise ValueError('duplicate Sina share record date')
         seen.add(record_date)
-        units_10k = _positive_finite(item[1])
+        units_10k = _positive_finite(item.get('amount'))
         rows.append({
             'symbol': normalized,
             'record_date': record_date,
