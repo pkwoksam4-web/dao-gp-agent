@@ -8,7 +8,7 @@ import math
 from datetime import date
 from typing import Any
 
-from gp12_sina_share_amount_v1 import resolve_share_state
+from gp12_share_known_at_v1 import resolve_known_at_state
 
 
 VERSION = '1.0'
@@ -33,8 +33,11 @@ ROW_FIELDS = (
     'raw_volume_source_artifact',
     'raw_volume_source_sha256',
     'share_source',
-    'share_record_date',
-    'share_raw_sha256',
+    'share_change_date',
+    'share_announcement_date',
+    'share_known_at',
+    'share_amount_raw_sha256',
+    'stock_structure_raw_sha256',
 )
 
 
@@ -83,6 +86,16 @@ def _finite_number(value: Any) -> float:
     if not math.isfinite(number):
         raise ValueError('finite numeric value required')
     return number
+
+
+def _sha256(value: Any, name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(ch not in '0123456789abcdef' for ch in value)
+    ):
+        raise ValueError(f'{name} invalid')
+    return value
 
 
 def canonical_turnover_csv_bytes(rows: list[dict]) -> bytes:
@@ -137,6 +150,7 @@ def _summary_template(
         'nonpositive_outstanding_share_n': 0,
         'nonfinite_turnover_n': 0,
         'future_share_record_violation_n': 0,
+        'future_known_at_violation_n': 0,
         'unresolved_prior_share_record_n': 0,
         'pit_state': 'PIT_UNVERIFIED',
         'status': 'BLOCKED_FORMAL_TURNOVER_V1',
@@ -156,6 +170,12 @@ def materialize_turnover(
     *,
     share_date_semantics_verified: bool,
 ) -> tuple[list[dict], dict]:
+    """Materialize Formal turnover from already dual-source-bound known-at states.
+
+    `share_records_by_symbol` is retained as the public argument name for V1
+    compatibility, but Amendment 2 requires its values to be known-at state rows
+    carrying change_date, announcement_date, known_at and both source hashes.
+    """
     if not isinstance(raw_rows, list):
         raise ValueError('raw_rows must be a list')
     if not isinstance(share_records_by_symbol, dict):
@@ -185,7 +205,7 @@ def materialize_turnover(
     materialized: list[dict] = []
     materialized_keys: set[tuple[str, str]] = set()
 
-    normalized_shares = {
+    normalized_states = {
         _normalize_symbol(symbol): records
         for symbol, records in share_records_by_symbol.items()
     }
@@ -218,23 +238,29 @@ def materialize_turnover(
             blockers.add('RAW_VOLUME_UNIT_INVALID')
             continue
 
-        records = normalized_shares.get(symbol, [])
+        states = normalized_states.get(symbol, [])
         try:
-            resolved = resolve_share_state(records, trade_date)
+            resolved = resolve_known_at_state(states, trade_date)
         except ValueError:
-            summary['nonpositive_outstanding_share_n'] += 1
-            blockers.add('SINA_SHARE_VALUE_INVALID')
+            blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
             continue
         if resolved is None:
             summary['unresolved_prior_share_record_n'] += 1
             blockers.add('TURNOVER_PRIOR_SHARE_RECORD_MISSING')
             continue
 
-        record_date = _iso_date(resolved.get('record_date'))
-        if record_date > trade_date:
+        change_date = _iso_date(resolved.get('change_date'))
+        announcement_date = _iso_date(resolved.get('announcement_date'))
+        known_at = _iso_date(resolved.get('known_at'))
+        if change_date > trade_date:
             summary['future_share_record_violation_n'] += 1
             blockers.add('TURNOVER_FUTURE_SHARE_RECORD_VIOLATION')
             continue
+        if known_at > trade_date:
+            summary['future_known_at_violation_n'] += 1
+            blockers.add('TURNOVER_FUTURE_KNOWN_AT_VIOLATION')
+            continue
+
         try:
             outstanding = _finite_number(resolved.get('outstanding_share_shares'))
         except ValueError:
@@ -245,15 +271,26 @@ def materialize_turnover(
             summary['nonpositive_outstanding_share_n'] += 1
             blockers.add('SINA_SHARE_VALUE_INVALID')
             continue
+
+        try:
+            share_amount_sha = _sha256(
+                resolved.get('share_amount_raw_sha256'),
+                'share_amount_raw_sha256',
+            )
+            stock_structure_sha = _sha256(
+                resolved.get('stock_structure_raw_sha256'),
+                'stock_structure_raw_sha256',
+            )
+        except ValueError:
+            blockers.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+            continue
+
         turnover = volume / outstanding
         if not math.isfinite(turnover):
             summary['nonfinite_turnover_n'] += 1
             blockers.add('TURNOVER_NONFINITE_VALUE')
             continue
 
-        share_raw_sha = resolved.get('share_raw_sha256')
-        if not isinstance(share_raw_sha, str) or len(share_raw_sha) != 64:
-            share_raw_sha = '0' * 64
         row = {
             'symbol': symbol,
             'date': trade_date,
@@ -262,9 +299,12 @@ def materialize_turnover(
             'turnover_ratio': turnover,
             'raw_volume_source_artifact': RAW_ARTIFACT_NAME,
             'raw_volume_source_sha256': RAW_ARTIFACT_SHA256,
-            'share_source': 'SINA_STOCKSERVICE_SHARE_AMOUNT',
-            'share_record_date': record_date,
-            'share_raw_sha256': share_raw_sha,
+            'share_source': 'SINA_DUAL_SOURCE_KNOWN_AT',
+            'share_change_date': change_date,
+            'share_announcement_date': announcement_date,
+            'share_known_at': known_at,
+            'share_amount_raw_sha256': share_amount_sha,
+            'stock_structure_raw_sha256': stock_structure_sha,
         }
         materialized.append(row)
         materialized_keys.add(key)
@@ -282,10 +322,15 @@ def materialize_turnover(
         canonical_turnover_csv_bytes(materialized)
     ).hexdigest()
 
+    pit_blockers = {
+        'SINA_SHARE_DATE_SEMANTICS_UNVERIFIED',
+        'SINA_SHARE_KNOWN_AT_UNVERIFIED',
+        'TURNOVER_FUTURE_KNOWN_AT_VIOLATION',
+    }
     if blockers:
         summary['pit_state'] = (
             'PIT_UNVERIFIED'
-            if 'SINA_SHARE_DATE_SEMANTICS_UNVERIFIED' in blockers
+            if blockers.intersection(pit_blockers)
             else 'PIT_VERIFIED' if share_date_semantics_verified else 'PIT_UNVERIFIED'
         )
         summary['status'] = 'BLOCKED_FORMAL_TURNOVER_V1'
