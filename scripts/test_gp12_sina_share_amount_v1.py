@@ -32,13 +32,23 @@ class SinaShareAmountV1Tests(unittest.TestCase):
         self.assertEqual(rows[0]['outstanding_share_shares'], 1_234_500.0)
         self.assertEqual(rows[1]['outstanding_share_shares'], 1_500_000.0)
 
-    def test_parser_rejects_empty_malformed_nonpositive_duplicate_and_postformal(self):
+    def test_parser_accepts_postformal_source_records_but_formal_evidence_filters_them(self):
+        raw = b'var KKE_ShareAmount_sh600000=[["2020-01-01","100"],["2026-05-01","200"]];'
+        rows = mod.parse_share_amount_bytes('600000.SH', raw)
+        self.assertEqual([r['record_date'] for r in rows], ['2020-01-01', '2026-05-01'])
+        ev = mod.build_symbol_evidence('600000.SH', raw, '2026-09-09T08:00:00Z', 200)
+        self.assertEqual(ev['normalized_record_count'], 1)
+        self.assertEqual(ev['post_formal_record_n'], 1)
+        self.assertEqual(ev['record_start'], '2020-01-01')
+        self.assertEqual(ev['record_end'], '2020-01-01')
+        self.assertTrue(all(r['record_date'] <= '2026-04-17' for r in ev['records']))
+
+    def test_parser_rejects_empty_malformed_nonpositive_and_duplicate_dates(self):
         payloads = [
             b'',
             b'not jsonp',
             b'var KKE_ShareAmount_sh600000=[["2020-01-01","0"]];',
             b'var KKE_ShareAmount_sh600000=[["2020-01-01","1"],["2020-01-01","2"]];',
-            b'var KKE_ShareAmount_sh600000=[["2026-04-18","1"]];',
         ]
         for raw in payloads:
             with self.subTest(raw=raw):
@@ -66,6 +76,7 @@ class SinaShareAmountV1Tests(unittest.TestCase):
         self.assertEqual(ev['source_endpoint_family'], 'SINA_STOCKSERVICE_SHARE_AMOUNT')
         self.assertEqual(ev['http_status'], 200)
         self.assertEqual(ev['normalized_record_count'], 2)
+        self.assertEqual(ev['post_formal_record_n'], 0)
 
     def test_manifest_without_date_semantics_stays_blocked(self):
         manifest = mod.build_share_manifest([valid_symbol_evidence()], UNIVERSE_SHA, None)
