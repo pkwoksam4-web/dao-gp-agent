@@ -11,6 +11,23 @@ permissions:
   actions: read
 
 jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install contract dependencies
+        run: pip install -q pandas pyarrow numpy
+      - name: Audit remediation contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_audit_evidence_v1.py
+
   baseline:
     runs-on: ubuntu-latest
     timeout-minutes: 20
