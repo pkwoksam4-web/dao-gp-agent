@@ -6,6 +6,7 @@ import pathlib
 
 import pandas as pd
 
+from audit_evidence_v1 import sha256_file, schema_fingerprint
 from liquidity_replay_v482 import (
     EXPECTED_CALENDAR,
     MIN_ACTUAL_BEFORE,
@@ -208,11 +209,24 @@ def build_eligibility_panel(raw:pd.DataFrame,pitst:pd.DataFrame)->tuple[pd.DataF
 
 
 def run(raw_path:pathlib.Path,pitst_path:pathlib.Path,out_dir:pathlib.Path)->dict:
+    raw_path=pathlib.Path(raw_path)
+    pitst_path=pathlib.Path(pitst_path)
+    raw_sha=sha256_file(raw_path)
+    pitst_sha=sha256_file(pitst_path)
     raw=pd.read_parquet(raw_path)
     pit=pd.read_csv(pitst_path,usecols=['symbol','date','tradestatus','isST'])
-    panel,report=build_eligibility_panel(raw,pit)
+    panel,base_report=build_eligibility_panel(raw,pit)
+    report=dict(base_report)
     out_dir.mkdir(parents=True,exist_ok=True)
-    panel.to_parquet(out_dir/'LIQUIDITY_80M_PANEL_V482.parquet',index=False)
+    panel_path=out_dir/'LIQUIDITY_80M_PANEL_V482.parquet'
+    panel.to_parquet(panel_path,index=False)
+    report.update({
+        'input_full_raw_sha256':raw_sha,
+        'input_pitst_sha256':pitst_sha,
+        'panel_parquet_sha256':sha256_file(panel_path),
+        'panel_parquet_bytes':panel_path.stat().st_size,
+        'schema_fingerprint':schema_fingerprint(panel),
+    })
     (out_dir/'LIQUIDITY_80M_APPLY_AUDIT_V482.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps(report,ensure_ascii=False,indent=2))
     return report
