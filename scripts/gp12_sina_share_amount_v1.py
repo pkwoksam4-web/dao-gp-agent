@@ -20,6 +20,9 @@ SOURCE_URL = (
     'https://stock.finance.sina.com.cn/stock/api/jsonp.php/'
     'var%20KKE_ShareAmount_{symbol}=/StockService.getAmountBySymbol?_=20&symbol={symbol}'
 )
+DATE_SEMANTICS_KEYS = {
+    'source', 'evidence_type', 'verified', 'source_identity',
+}
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -140,8 +143,9 @@ def build_symbol_evidence(
     normalized = normalize_symbol(symbol)
     rows = parse_share_amount_bytes(normalized, raw)
     formal_rows = [dict(row) for row in rows if row['record_date'] <= FORMAL_END]
+    raw_sha256 = hashlib.sha256(bytes(raw)).hexdigest()
     for row in formal_rows:
-        row['share_raw_sha256'] = hashlib.sha256(bytes(raw)).hexdigest()
+        row['share_raw_sha256'] = raw_sha256
     if not formal_rows:
         raise ValueError('Sina share coverage contains no Formal-era record')
     return {
@@ -150,7 +154,7 @@ def build_symbol_evidence(
         'status': 'FETCHED',
         'http_status': int(http_status),
         'fetched_at': str(fetched_at),
-        'raw_sha256': hashlib.sha256(bytes(raw)).hexdigest(),
+        'raw_sha256': raw_sha256,
         'raw_byte_n': len(raw),
         'source_endpoint_family': SOURCE_ENDPOINT_FAMILY,
         'normalized_record_count': len(formal_rows),
@@ -165,6 +169,7 @@ def build_symbol_evidence(
 def _date_semantics_verified(value: dict | None) -> bool:
     return bool(
         isinstance(value, dict)
+        and set(value) == DATE_SEMANTICS_KEYS
         and value.get('source') == 'SINA_STOCK_STRUCTURE_HISTORY'
         and value.get('evidence_type') == 'EFFECTIVE_HISTORICAL_SHARE_STATE'
         and value.get('verified') is True
@@ -269,7 +274,7 @@ def fetch_share_amount(
                 'request_identity': url,
                 'blockers': [],
             }
-        except Exception as exc:  # source/network failures are normalized below
+        except Exception as exc:
             last_error = f'{type(exc).__name__}: {exc}'
             if attempt < max(1, int(retries)):
                 time.sleep(min(2.0, 0.5 * attempt))
