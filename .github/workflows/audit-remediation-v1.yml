@@ -30,7 +30,8 @@ jobs:
             test_audit_evidence_v1.py \
             test_audit_semantics_v1.py \
             test_build_audit_manifest_v1.py \
-            test_audit_manifest_identity_lock_v1.py
+            test_audit_manifest_identity_lock_v1.py \
+            test_permanent_archive_v1.py
 
   baseline:
     runs-on: ubuntu-latest
