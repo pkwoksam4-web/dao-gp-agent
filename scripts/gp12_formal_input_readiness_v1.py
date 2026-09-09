@@ -34,6 +34,9 @@ SUPPORTING_EVIDENCE = (
     'historical_label_provenance',
     'sector_membership_pit',
 )
+SUPPORTING_DEPENDENCIES = {
+    'F5': ('sector_membership_pit',),
+}
 EVIDENCE_KEYS = {
     'artifact',
     'version',
@@ -292,11 +295,76 @@ def _normalize_supporting(evidence_manifest: dict) -> dict[str, dict]:
     return result
 
 
+def derive_factor_dependencies(factors_contract: dict) -> dict[str, tuple[str, ...]]:
+    if not isinstance(factors_contract, dict):
+        raise ValueError('candidate factor contract must be an object')
+    if canonical_json_sha256(factors_contract) != FACTORS_SHA256:
+        raise ValueError('candidate factor dependency contract mismatch')
+    raw_factors = factors_contract.get('factors')
+    if not isinstance(raw_factors, list) or len(raw_factors) != len(FACTOR_IDS):
+        raise ValueError('candidate factor dependency contract mismatch')
+
+    result: dict[str, tuple[str, ...]] = {}
+    allowed_factor_families = set(FEATURE_FAMILIES) - {'market_calendar', 'status'}
+    for factor in raw_factors:
+        if not isinstance(factor, dict):
+            raise ValueError('candidate factor dependency contract mismatch')
+        factor_id = factor.get('id')
+        input_families = factor.get('input_families')
+        if factor_id not in FACTOR_IDS or factor_id in result:
+            raise ValueError('candidate factor dependency contract mismatch')
+        if not isinstance(input_families, list) or not input_families:
+            raise ValueError('candidate factor dependency contract mismatch')
+        dependencies: list[str] = []
+        for family in input_families:
+            if not isinstance(family, str) or family not in allowed_factor_families:
+                raise ValueError('candidate factor dependency contract mismatch')
+            if family in dependencies:
+                raise ValueError('candidate factor dependency contract mismatch')
+            dependencies.append(family)
+        for supporting in SUPPORTING_DEPENDENCIES.get(factor_id, ()):
+            if supporting in dependencies or supporting not in SUPPORTING_EVIDENCE:
+                raise ValueError('candidate factor dependency contract mismatch')
+            dependencies.append(supporting)
+        result[factor_id] = tuple(dependencies)
+
+    if tuple(sorted(result, key=lambda item: int(item[1:]))) != FACTOR_IDS:
+        raise ValueError('candidate factor dependency contract mismatch')
+    return {factor_id: result[factor_id] for factor_id in FACTOR_IDS}
+
+
+def derive_factor_readiness(
+    factors_contract: dict,
+    family_states: dict[str, dict],
+    supporting_states: dict[str, dict],
+) -> dict[str, dict]:
+    dependencies = derive_factor_dependencies(factors_contract)
+    result = {}
+    for factor_id in FACTOR_IDS:
+        missing = []
+        for dependency in dependencies[factor_id]:
+            if dependency in family_states:
+                ready = family_states[dependency].get('formal_feature_ready') is True
+            elif dependency in supporting_states:
+                ready = supporting_states[dependency].get('ready') is True
+            else:
+                raise ValueError('candidate factor dependency contract mismatch')
+            if not ready:
+                missing.append(dependency)
+        result[factor_id] = {
+            'dependencies': list(dependencies[factor_id]),
+            'missing_dependencies': missing,
+            'ready': not missing,
+        }
+    return result
+
+
 def build_readiness_report(parameters: dict, factors: dict, evidence_manifest: dict) -> dict:
     identity = validate_candidate_identity(parameters, factors)
     _validate_evidence_top_level(evidence_manifest)
     families = evaluate_feature_families(evidence_manifest)
     supporting = _normalize_supporting(evidence_manifest)
+    factor_readiness = derive_factor_readiness(factors, families, supporting)
 
     blockers = []
     for state in families.values():
@@ -309,6 +377,19 @@ def build_readiness_report(parameters: dict, factors: dict, evidence_manifest: d
         name for name, state in families.items() if state['formal_feature_ready'])
     missing_or_unvalidated = sorted(
         name for name, state in families.items() if not state['formal_feature_ready'])
+    ready_factor_ids = [
+        factor_id for factor_id in FACTOR_IDS
+        if factor_readiness[factor_id]['ready']
+    ]
+    blocked_factor_ids = [
+        factor_id for factor_id in FACTOR_IDS
+        if not factor_readiness[factor_id]['ready']
+    ]
+    candidate_scoring_ready = (
+        not blocked_factor_ids
+        and families['status']['formal_feature_ready']
+        and supporting['liquidity_contract']['ready']
+    )
 
     return {
         'artifact': ARTIFACT,
@@ -322,15 +403,15 @@ def build_readiness_report(parameters: dict, factors: dict, evidence_manifest: d
         **identity,
         'supporting_evidence': supporting,
         'feature_families': families,
-        'factor_readiness': {},
+        'factor_readiness': factor_readiness,
         'validated_families': validated_families,
         'missing_or_unvalidated_families': missing_or_unvalidated,
-        'ready_factor_ids': [],
-        'blocked_factor_ids': list(FACTOR_IDS),
+        'ready_factor_ids': ready_factor_ids,
+        'blocked_factor_ids': blocked_factor_ids,
         'blockers': blockers,
-        'candidate_scoring_ready': False,
+        'candidate_scoring_ready': candidate_scoring_ready,
         'candidate_freeze_ready': False,
-        'real_feature_inputs_validated': False,
+        'real_feature_inputs_validated': candidate_scoring_ready,
         'model_freeze_allowed': False,
         'oos_metrics_allowed': False,
     }
