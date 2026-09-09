@@ -54,3 +54,129 @@ jobs:
             test_pit_st_final_audit_v480.py \
             test_recalc_global_qfq_from_ledger_v481.py \
             test_oos_admission_v482.py
+
+  production-evidence:
+    needs: [contracts, baseline]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install evidence dependencies
+        run: pip install -q pandas pyarrow numpy
+
+      - name: Verify authoritative GitHub artifact metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          cfg=json.load(open('data/AUDIT_EVIDENCE_SOURCES_V1.json',encoding='utf-8'))
+          repo=os.environ['GITHUB_REPOSITORY']
+          token=os.environ['GITHUB_TOKEN']
+          by_run={}
+          for item in cfg['items']:
+              if item.get('source_type')!='GITHUB_ACTIONS':
+                  continue
+              run=int(item['source_run_id'])
+              if run not in by_run:
+                  req=urllib.request.Request(
+                      f'https://api.github.com/repos/{repo}/actions/runs/{run}/artifacts?per_page=100',
+                      headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json'}
+                  )
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      by_run[run]=json.load(r)['artifacts']
+              found=next((a for a in by_run[run] if a['name']==item['source_artifact_name']),None)
+              assert found is not None, item['logical_name']
+              assert int(found['id'])==int(item['source_artifact_id']), (item,found)
+              assert found.get('digest')==item['source_artifact_digest'], (item,found)
+              assert found.get('expires_at')==item['expiry_at'], (item,found)
+              wr=found.get('workflow_run') or {}
+              assert wr.get('head_sha')==item['source_head_sha'], (item,wr)
+          print('PASS authoritative GitHub artifact metadata')
+          PY
+
+      - name: Download signed 847 Full RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: production/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Download signed frozen 80M liquidity evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-liquidity-80m-v482
+          path: production/liquidity
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Download authoritative merged PIT-ST evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: production/pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+
+      - name: Rebind old production audits to exact bytes and build manifest
+        env:
+          PYTHONPATH: scripts
+          REMEDIATION_HEAD_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p artifact_audit_remediation_v1
+          python - <<'PY'
+          import json, os, pathlib
+          from build_audit_manifest_v1 import build_manifest, enrich_raw_audit, enrich_liquidity_audit
+          from audit_evidence_v1 import validate_evidence_manifest
+
+          raw_a='production/raw/SOHU_RAW_FULL_AUDIT_V482.json'
+          raw_p='production/raw/SOHU_RAW_FULL_V482.parquet'
+          liq_a='production/liquidity/LIQUIDITY_80M_APPLY_AUDIT_V482.json'
+          liq_p='production/liquidity/LIQUIDITY_80M_PANEL_V482.parquet'
+          pit='production/pitst/PIT_ST_DAILY_MERGED_V480.csv'
+
+          raw=enrich_raw_audit(raw_a,raw_p)
+          liq=enrich_liquidity_audit(liq_a,liq_p,raw_p,pit)
+          assert raw['status']=='PASS_FULL_RAW_V482'
+          assert raw['symbol_n']==847 and raw['raw_rows']==1011607
+          assert raw['full_parquet_sha256']==liq['input_full_raw_sha256']
+          assert liq['symbol_n']==847 and liq['panel_rows']==1207822
+          assert liq['raw_pitst_audit']['status']=='PASS_EXACT_RAW_PITST'
+
+          out=pathlib.Path('artifact_audit_remediation_v1')
+          (out/'SOHU_RAW_FULL_AUDIT_REBOUND_V1.json').write_text(json.dumps(raw,ensure_ascii=False,indent=2),encoding='utf-8')
+          (out/'LIQUIDITY_80M_APPLY_AUDIT_REBOUND_V1.json').write_text(json.dumps(liq,ensure_ascii=False,indent=2),encoding='utf-8')
+
+          cfg=json.load(open('data/AUDIT_EVIDENCE_SOURCES_V1.json',encoding='utf-8'))
+          manifest=build_manifest(cfg)
+          manifest['canonical_lineage']['remediation_head_sha']=os.environ['REMEDIATION_HEAD_SHA']
+          errs=validate_evidence_manifest(manifest)
+          assert not errs, errs
+          assert manifest['baostock_847_scaleout_allowed'] is False
+          assert manifest['model_freeze_allowed'] is False
+          assert manifest['oos_metrics_allowed'] is False
+          (out/'AUDIT_EVIDENCE_MANIFEST_V1.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          for p in ('data/AUDIT_STATUS_MODEL_V1.json','data/PIT_ST_EVIDENCE_COVERAGE_V1.json','data/FIXED_PROBE_REGISTRY_V1.json','data/AUDIT_EVIDENCE_SOURCES_V1.json'):
+              src=pathlib.Path(p); (out/src.name).write_bytes(src.read_bytes())
+          print(json.dumps({
+              'raw_sha256':raw['full_parquet_sha256'],
+              'liquidity_sha256':liq['panel_parquet_sha256'],
+              'pitst_sha256':liq['input_pitst_sha256'],
+              'blockers':manifest['blockers'],
+              'baostock_847_scaleout_allowed':manifest['baostock_847_scaleout_allowed'],
+              'model_freeze_allowed':manifest['model_freeze_allowed'],
+              'oos_metrics_allowed':manifest['oos_metrics_allowed'],
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload Audit Remediation V1 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-audit-remediation-v1
+          path: artifact_audit_remediation_v1/
+          if-no-files-found: error
+          retention-days: 30
