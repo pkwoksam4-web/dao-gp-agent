@@ -9,7 +9,11 @@ UNIVERSE_SHA = 'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb
 
 
 def valid_raw():
-    return b'var KKE_ShareAmount_sh600000=[["2020-01-01","123.45"],["2021-01-01","150"]];'
+    return (
+        b"/*<script>location.href='//sina.com';</script>*/\n"
+        b'var KKE_ShareAmount_sh600000=([{"date":"2020-01-01","amount":123.45},'
+        b'{"date":"2021-01-01","amount":150}]);'
+    )
 
 
 def valid_symbol_evidence():
@@ -35,14 +39,19 @@ class SinaShareAmountV1Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.normalize_symbol('600000.HK')
 
-    def test_parse_valid_jsonp_multiplies_10000_share_units(self):
+    def test_parse_live_dict_jsonp_schema_multiplies_10000_share_units(self):
         rows = mod.parse_share_amount_bytes('600000.SH', valid_raw())
         self.assertEqual(rows[0]['record_date'], '2020-01-01')
         self.assertEqual(rows[0]['outstanding_share_shares'], 1_234_500.0)
         self.assertEqual(rows[1]['outstanding_share_shares'], 1_500_000.0)
 
+    def test_parser_rejects_unknown_dict_keys(self):
+        raw = b'var KKE_ShareAmount_sh600000=([{"date":"2020-01-01","amount":100,"mystery":1}]);'
+        with self.assertRaises(ValueError):
+            mod.parse_share_amount_bytes('600000.SH', raw)
+
     def test_parser_accepts_postformal_source_records_but_formal_evidence_filters_them(self):
-        raw = b'var KKE_ShareAmount_sh600000=[["2020-01-01","100"],["2026-05-01","200"]];'
+        raw = b'var KKE_ShareAmount_sh600000=([{"date":"2020-01-01","amount":100},{"date":"2026-05-01","amount":200}]);'
         rows = mod.parse_share_amount_bytes('600000.SH', raw)
         self.assertEqual([r['record_date'] for r in rows], ['2020-01-01', '2026-05-01'])
         ev = mod.build_symbol_evidence('600000.SH', raw, '2026-09-09T08:00:00Z', 200)
@@ -56,8 +65,8 @@ class SinaShareAmountV1Tests(unittest.TestCase):
         payloads = [
             b'',
             b'not jsonp',
-            b'var KKE_ShareAmount_sh600000=[["2020-01-01","0"]];',
-            b'var KKE_ShareAmount_sh600000=[["2020-01-01","1"],["2020-01-01","2"]];',
+            b'var KKE_ShareAmount_sh600000=([{"date":"2020-01-01","amount":0}]);',
+            b'var KKE_ShareAmount_sh600000=([{"date":"2020-01-01","amount":1},{"date":"2020-01-01","amount":2}]);',
         ]
         for raw in payloads:
             with self.subTest(raw=raw):
