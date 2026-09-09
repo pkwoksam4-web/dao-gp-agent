@@ -51,7 +51,7 @@ class ShareKnownAtV1Tests(unittest.TestCase):
     def test_announcement_before_change_uses_change_date_as_known_at(self):
         result = mod.bind_known_at_states(
             '600000.SH',
-            [share_row('2025-06-01', 11043204700.0)],
+            [share_row('2025-06-01', 1104320470.0)],
             [structure_row('2025-06-01', '2025-05-29', '110432.047', 3)],
             'a' * 64,
             'b' * 64,
