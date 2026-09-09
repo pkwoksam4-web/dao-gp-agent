@@ -37,6 +37,34 @@ class SinaStockStructureV1Tests(unittest.TestCase):
         self.assertEqual(rows[1]['circulating_a_10k_display'], '2935217.900')
         self.assertEqual(rows[1]['circulating_a_display_scale'], 3)
 
+    def test_real_page_style_pre_circulation_placeholder_is_skipped(self):
+        rows = mod.parse_stock_structure_bytes(
+            '600000.SH',
+            html_bytes(
+                change_dates=['20011231', '20000112', '19991110', '19990923'],
+                announcement_dates=['19000101', '19000101', '19000101', '19000101'],
+                reasons=['其他', '其他', '上市', '发行前'],
+                amounts=['40000 万股', '40000 万股', '32000 万股', '--'],
+            ),
+        )
+        self.assertEqual(
+            [row['change_date'] for row in rows],
+            ['1999-11-10', '2000-01-12', '2001-12-31'],
+        )
+        self.assertEqual(rows[0]['circulating_a_10k_display'], '32000')
+
+    def test_placeholder_after_first_valid_chronological_state_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'placeholder'):
+            mod.parse_stock_structure_bytes(
+                '600000.SH',
+                html_bytes(
+                    change_dates=['20011231', '20000112', '19991110'],
+                    announcement_dates=['19000101', '19000101', '19000101'],
+                    reasons=['其他', '其他', '上市'],
+                    amounts=['40000 万股', '--', '32000 万股'],
+                ),
+            )
+
     def test_missing_announcement_row_is_rejected(self):
         raw = html_bytes().decode('gb18030').replace(
             '<tr><td>公告日期</td><td>20250104</td><td>20250403</td></tr>', '')
