@@ -9,9 +9,18 @@ import urllib.parse
 import urllib.request
 
 
-KLINE_URL = 'https://push2his.eastmoney.com/api/qt/stock/kline/get'
-FLOW_URL = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get'
-QUOTE_URL = 'https://push2.eastmoney.com/api/qt/stock/get'
+KLINE_URLS = (
+    'https://push2his.eastmoney.com/api/qt/stock/kline/get',
+    'https://push2.eastmoney.com/api/qt/stock/kline/get',
+)
+FLOW_URLS = (
+    'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get',
+    'https://push2.eastmoney.com/api/qt/stock/fflow/daykline/get',
+)
+QUOTE_URLS = (
+    'https://push2his.eastmoney.com/api/qt/stock/get',
+    'https://push2.eastmoney.com/api/qt/stock/get',
+)
 INTERVAL_KLT = {'1d': '101', '15m': '15', '60m': '60'}
 REQUIRED_FAMILIES = (
     'stock_adjusted_close', 'market_adjusted_close', 'sector_adjusted_close',
@@ -189,17 +198,27 @@ def _get_json(url: str, params: dict, timeout: int) -> object:
         return json.loads(response.read().decode('utf-8'))
 
 
+def _get_json_from_hosts(urls: tuple[str, ...], params: dict, timeout: int) -> object:
+    last_error = None
+    for url in urls:
+        try:
+            return _get_json(url, params, timeout)
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f'All Eastmoney endpoint hosts failed: {last_error}') from last_error
+
+
 def fetch_kline(symbol: str, *, interval: str, adjustment: str,
                 begin: str, end: str, timeout: int = 20) -> list[dict]:
     return parse_kline_payload(
         symbol,
-        _get_json(KLINE_URL, {
+        _get_json_from_hosts(KLINE_URLS, {
             'secid': symbol_to_secid(symbol),
             'klt': INTERVAL_KLT[interval],
             'fqt': '1' if adjustment == 'qfq' else '0',
             'beg': begin.replace('-', ''),
             'end': end.replace('-', ''),
-            'lmt': '1000000',
+            'lmt': '1000',
             'fields1': 'f1,f2,f3,f4,f5,f6',
             'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
         }, timeout),
@@ -248,7 +267,7 @@ def fetch_flow(symbol: str, *, limit: int = 1000, timeout: int = 20) -> list[dic
         try:
             return parse_flow_payload(
                 symbol,
-                _get_json(FLOW_URL, {
+                _get_json_from_hosts(FLOW_URLS, {
                     'lmt': str(limit),
                     'klt': '101',
                     'secid': symbol_to_secid(symbol),
@@ -265,7 +284,7 @@ def fetch_flow(symbol: str, *, limit: int = 1000, timeout: int = 20) -> list[dic
 
 
 def fetch_quote(symbol: str, *, timeout: int = 20) -> dict:
-    return parse_quote_payload(symbol, _get_json(QUOTE_URL, {
+    return parse_quote_payload(symbol, _get_json_from_hosts(QUOTE_URLS, {
         'secid': symbol_to_secid(symbol),
         'fields': 'f57,f58,f84,f85,f127,f128,f136,f137,f138,f139,f140,f141',
     }, timeout))
