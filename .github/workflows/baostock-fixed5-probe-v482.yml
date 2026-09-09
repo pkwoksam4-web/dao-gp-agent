@@ -1,0 +1,52 @@
+name: GP BaoStock fixed5 probe V482
+
+on:
+  push:
+    branches:
+      - gp/baostock-fixed5-probe-v482
+    paths:
+      - 'scripts/test_baostock_fixed5_probe_v482.py'
+      - 'scripts/baostock_fixed5_probe_v482.py'
+      - '.github/workflows/baostock-fixed5-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baostock-fixed5-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install BaoStock
+        run: python -m pip install --upgrade pip baostock==0.9.3
+
+      - name: Fixed5 contract tests
+        run: |
+          cd scripts
+          python -m unittest -v test_baostock_fixed5_probe_v482.py
+
+      - name: Run fixed5 BaoStock probe
+        run: |
+          mkdir -p results_baostock_fixed5_v482
+          python scripts/baostock_fixed5_probe_v482.py \
+            --out-dir results_baostock_fixed5_v482 \
+            > >(tee results_baostock_fixed5_v482/probe.stdout.log) \
+            2> >(tee results_baostock_fixed5_v482/probe.stderr.log >&2)
+
+      - name: Upload fixed5 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-baostock-fixed5-probe-v482
+          path: results_baostock_fixed5_v482/
+          if-no-files-found: warn
+          retention-days: 30
