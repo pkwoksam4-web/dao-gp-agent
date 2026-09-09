@@ -52,9 +52,20 @@
 
 - [ ] **Step 1: Write the RED parser/PIT tests**
 
-Create `scripts/test_gp12_sina_share_amount_v1.py` with tests that assert:
+Create `scripts/test_gp12_sina_share_amount_v1.py` with concrete fixtures:
 
 ```python
+import unittest
+import gp12_sina_share_amount_v1 as mod
+
+UNIVERSE_SHA = 'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb'
+
+
+def valid_symbol_evidence():
+    raw = b'var KKE_ShareAmount_sh600000=[["2020-01-01","123.45"],["2021-01-01","150"]];'
+    return mod.build_symbol_evidence('600000.SH', raw, '2026-09-09T08:00:00Z', 200)
+
+
 class SinaShareAmountV1Tests(unittest.TestCase):
     def test_parse_valid_jsonp_multiplies_10000_share_units(self):
         raw = b'var KKE_ShareAmount_sh600000=[["2020-01-01","123.45"],["2021-01-01","150"]];'
@@ -74,18 +85,24 @@ class SinaShareAmountV1Tests(unittest.TestCase):
         self.assertIsNone(mod.resolve_share_state(records, '2020-02-15'))
 
     def test_empty_malformed_or_nonpositive_payload_is_invalid(self):
-        for raw in (b'', b'not jsonp', b'var KKE_ShareAmount_sh600000=[["2020-01-01","0"]];'):
-            with self.assertRaises(ValueError):
-                mod.parse_share_amount_bytes('600000.SH', raw)
+        payloads = [
+            b'',
+            b'not jsonp',
+            b'var KKE_ShareAmount_sh600000=[["2020-01-01","0"]];',
+        ]
+        for raw in payloads:
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    mod.parse_share_amount_bytes('600000.SH', raw)
 
     def test_manifest_without_date_semantics_stays_blocked(self):
-        manifest = mod.build_share_manifest([valid_symbol_evidence()], 'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb', None)
+        manifest = mod.build_share_manifest([valid_symbol_evidence()], UNIVERSE_SHA, None)
         self.assertIn('SINA_SHARE_DATE_SEMANTICS_UNVERIFIED', manifest['blockers'])
         self.assertFalse(manifest['model_freeze_allowed'])
         self.assertFalse(manifest['oos_metrics_allowed'])
 ```
 
-Also test duplicate record dates, post-Formal records, unknown exchange, raw-response SHA identity, exact endpoint family, and source/network exception normalization to `SINA_SHARE_SOURCE_UNAVAILABLE`.
+Also add concrete tests for duplicate record dates, post-Formal records, unknown exchange, raw-response SHA identity, exact endpoint family, and source/network exception normalization to `SINA_SHARE_SOURCE_UNAVAILABLE`.
 
 - [ ] **Step 2: Add the minimal RED workflow and verify failure**
 
@@ -145,40 +162,117 @@ test/feat(gp12): add Sina share-amount PIT evidence layer
 
 - [ ] **Step 1: Write RED materialization tests**
 
-Add tests asserting:
+Create deterministic helpers in `scripts/test_gp12_turnover_formal_v1.py`:
 
 ```python
+import unittest
+import gp12_turnover_formal_v1 as mod
+
+
+def synthetic_manifest():
+    return {
+        'artifact': 'SINA_SHARE_AMOUNT_MANIFEST_GP12_V1',
+        'version': '1.0',
+        'formal_end': '2026-04-17',
+        'universe_sha256': 'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb',
+        'symbol_n': 1,
+        'symbols_fetched': 1,
+        'symbols_failed': 0,
+        'raw_response_count': 1,
+        'normalized_record_count': 1,
+        'parser_version': '1.0',
+        'source_endpoint_family': 'SINA_STOCKSERVICE_SHARE_AMOUNT',
+        'share_date_semantics_evidence': {
+            'source': 'SINA_STOCK_STRUCTURE_HISTORY',
+            'evidence_type': 'EFFECTIVE_HISTORICAL_SHARE_STATE',
+            'verified': True,
+            'source_identity': 'synthetic-test',
+        },
+        'symbol_evidence': [],
+        'blockers': [],
+        'formal_admission': False,
+        'model_freeze_allowed': False,
+        'oos_metrics_allowed': False,
+    }
+
+
+def one_raw(date='2020-06-01', volume=1_000_000.0):
+    return [{'symbol':'600000.SH','date':date,'volume':volume}]
+
+
+def shares(record_date='2020-01-01', outstanding=100_000_000.0):
+    return {
+        '600000.SH': [{
+            'record_date': record_date,
+            'outstanding_share_shares': outstanding,
+            'share_raw_sha256': 'a' * 64,
+        }]
+    }
+
+
 class TurnoverFormalV1Tests(unittest.TestCase):
     def test_exact_ratio_uses_raw_volume_shares(self):
         rows, summary = mod.materialize_turnover(
-            raw_rows=[{'symbol':'600000.SH','date':'2020-06-01','volume':1_000_000.0}],
-            share_records_by_symbol={'600000.SH':[{'record_date':'2020-01-01','outstanding_share_shares':100_000_000.0,'share_raw_sha256':'a'*64}]},
+            raw_rows=one_raw(),
+            share_records_by_symbol=shares(),
             universe=['600000.SH'],
             share_manifest=synthetic_manifest(),
             share_date_semantics_verified=True,
         )
         self.assertEqual(rows[0]['turnover_ratio'], 0.01)
+        self.assertEqual(summary['nonfinite_turnover_n'], 0)
 
     def test_future_share_record_never_materializes_prior_trade_row(self):
-        ...
+        rows, summary = mod.materialize_turnover(
+            raw_rows=one_raw(),
+            share_records_by_symbol=shares(record_date='2020-07-01'),
+            universe=['600000.SH'],
+            share_manifest=synthetic_manifest(),
+            share_date_semantics_verified=True,
+        )
+        self.assertEqual(rows, [])
         self.assertIn('TURNOVER_PRIOR_SHARE_RECORD_MISSING', summary['blockers'])
 
     def test_rowset_mismatch_blocks(self):
-        ...
+        raw = one_raw() + [{'symbol':'600000.SH','date':'2020-06-02','volume':2_000_000.0}]
+        rows, summary = mod.materialize_turnover(
+            raw_rows=raw,
+            share_records_by_symbol={},
+            universe=['600000.SH'],
+            share_manifest=synthetic_manifest(),
+            share_date_semantics_verified=True,
+        )
+        self.assertLess(len(rows), len(raw))
         self.assertIn('TURNOVER_ROWSET_MISMATCH', summary['blockers'])
 
     def test_pit_unverified_cannot_pass_even_with_complete_rows(self):
-        ...
+        rows, summary = mod.materialize_turnover(
+            raw_rows=one_raw(),
+            share_records_by_symbol=shares(),
+            universe=['600000.SH'],
+            share_manifest=synthetic_manifest(),
+            share_date_semantics_verified=False,
+        )
+        self.assertEqual(len(rows), 1)
         self.assertEqual(summary['status'], 'BLOCKED_FORMAL_TURNOVER_V1')
         self.assertEqual(summary['pit_state'], 'PIT_UNVERIFIED')
+        self.assertIn('SINA_SHARE_DATE_SEMANTICS_UNVERIFIED', summary['blockers'])
 
     def test_full_synthetic_pass(self):
-        ...
+        rows, summary = mod.materialize_turnover(
+            raw_rows=one_raw(),
+            share_records_by_symbol=shares(),
+            universe=['600000.SH'],
+            share_manifest=synthetic_manifest(),
+            share_date_semantics_verified=True,
+        )
+        self.assertEqual(len(rows), 1)
         self.assertEqual(summary['status'], 'PASS_FORMAL_TURNOVER_V1')
+        self.assertEqual(summary['pit_state'], 'PIT_VERIFIED')
         self.assertTrue(summary['formal_feature_ready'])
 ```
 
-Also test duplicate RAW keys, nonpositive volume, nonpositive outstanding shares, nonfinite ratios, post-Formal dates, exact universe count/hash helper behavior, deterministic universe/date ordering, CSV newline/header convention, and distinct manifest/row/summary hashes.
+Add concrete tests for duplicate RAW keys, nonpositive volume, nonpositive outstanding shares, nonfinite ratios, post-Formal dates, exact universe count/hash helper behavior, deterministic universe/date ordering, CSV newline/header convention, and distinct manifest/row/summary hashes.
 
 - [ ] **Step 2: Run RED and verify only materializer functionality is missing**
 
@@ -236,33 +330,107 @@ feat(gp12): materialize Formal turnover from signed RAW volume
 
 - [ ] **Step 1: Write RED binder tests**
 
-Required assertions:
+Use these complete semantic fixtures:
 
 ```python
+import copy
+import unittest
+import gp12_turnover_readiness_bind_v1 as mod
+import gp12_formal_input_readiness_v1 as readiness_mod
+
+
+def parent_evidence():
+    return {
+        'artifact':'GP12_FORMAL_INPUT_EVIDENCE_V1',
+        'version':'1.0',
+        'strategy_id':'GP12_REBUILD_CANDIDATE_V1',
+        'formal_end':'2026-04-17',
+        'formal_artifact_sha256':'e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796',
+        'formal_calendar_sha256':'5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7',
+        'universe_sha256':'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb',
+        'supporting_evidence': copy.deepcopy(readiness_support_fixture()),
+        'feature_families': copy.deepcopy(readiness_family_fixture()),
+    }
+
+
+def passing_turnover():
+    return {
+        'artifact':'GP12_TURNOVER_FORMAL_V1',
+        'version':'1.0',
+        'strategy_id':'GP12_REBUILD_CANDIDATE_V1',
+        'formal_start':'2020-06-01',
+        'formal_end':'2026-04-17',
+        'formal_artifact_sha256':'e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796',
+        'formal_calendar_sha256':'5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7',
+        'universe_sha256':'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb',
+        'candidate_parameters_sha256':'22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204',
+        'candidate_factors_sha256':'b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e',
+        'raw_volume_source_artifact':'gp-sohu-full-raw-v482-reaudit',
+        'raw_volume_source_sha256':'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550',
+        'share_manifest_sha256':'a'*64,
+        'turnover_rows_sha256':'b'*64,
+        'symbol_n':847,
+        'expected_trade_rows':1011607,
+        'materialized_trade_rows':1011607,
+        'duplicate_row_n':0,
+        'missing_turnover_row_n':0,
+        'extra_turnover_row_n':0,
+        'nonpositive_volume_n':0,
+        'nonpositive_outstanding_share_n':0,
+        'nonfinite_turnover_n':0,
+        'future_share_record_violation_n':0,
+        'unresolved_prior_share_record_n':0,
+        'pit_state':'PIT_VERIFIED',
+        'status':'PASS_FORMAL_TURNOVER_V1',
+        'blockers':[],
+        'formal_feature_ready':True,
+        'candidate_freeze_ready':False,
+        'model_freeze_allowed':False,
+        'oos_metrics_allowed':False,
+    }
+
+
+def blocked_turnover():
+    out = passing_turnover()
+    out['status'] = 'BLOCKED_FORMAL_TURNOVER_V1'
+    out['formal_feature_ready'] = False
+    out['pit_state'] = 'PIT_UNVERIFIED'
+    out['blockers'] = ['SINA_SHARE_DATE_SEMANTICS_UNVERIFIED']
+    return out
+
+
 class TurnoverReadinessBindV1Tests(unittest.TestCase):
     def test_blocked_turnover_does_not_modify_parent_evidence(self):
-        out = mod.bind_turnover(parent_evidence(), blocked_turnover())
-        self.assertEqual(out, parent_evidence())
+        before = parent_evidence()
+        out = mod.bind_turnover(before, blocked_turnover())
+        self.assertEqual(out, before)
 
     def test_pass_changes_only_amount_turnover(self):
         before = parent_evidence()
         after = mod.bind_turnover(before, passing_turnover())
-        self.assertEqual(after['feature_families']['main_net_flow'], before['feature_families']['main_net_flow'])
-        self.assertEqual(after['feature_families']['stock_adjusted_close'], before['feature_families']['stock_adjusted_close'])
+        for name in before['feature_families']:
+            if name != 'amount_turnover':
+                self.assertEqual(after['feature_families'][name], before['feature_families'][name])
+        self.assertEqual(after['supporting_evidence'], before['supporting_evidence'])
         self.assertEqual(after['feature_families']['amount_turnover']['binding_state'], 'BOUND_VERIFIED_ARTIFACT')
         self.assertEqual(after['feature_families']['amount_turnover']['pit_state'], 'PIT_VERIFIED')
         self.assertEqual(after['feature_families']['amount_turnover']['blockers'], [])
 
-    def test_main_net_flow_blocker_remains(self):
+    def test_main_net_flow_blocker_remains_after_readiness_rebuild(self):
+        evidence = mod.bind_turnover(parent_evidence(), passing_turnover())
         readiness = readiness_mod.build_readiness(
-            mod.bind_turnover(parent_evidence(), passing_turnover()),
-            candidate_parameters(),
-            candidate_factors(),
+            evidence,
+            candidate_parameters_fixture(),
+            candidate_factors_fixture(),
         )
         self.assertIn('MAIN_NET_FLOW_UNBOUND', readiness['blockers'])
         self.assertIn('F11', readiness['blocked_factor_ids'])
         self.assertFalse(readiness['candidate_scoring_ready'])
+        self.assertFalse(readiness['model_freeze_allowed'])
+        self.assertFalse(readiness['oos_metrics_allowed'])
 ```
+
+`readiness_support_fixture`, `readiness_family_fixture`, `candidate_parameters_fixture`, and `candidate_factors_fixture` must copy the exact parent-branch production/test contract shapes, not simplified schemas. The test file must define them concretely by loading the in-repo JSON contracts or by copying existing test fixtures.
 
 Also assert that turnover summary identity mismatch, non-PASS status, non-`PIT_VERIFIED`, or `formal_feature_ready=false` cannot modify parent evidence.
 
@@ -326,14 +494,14 @@ feat(gp12): bind verified turnover into Formal readiness
 
 - [ ] **Step 1: Add RED tests for production evidence semantics**
 
-Add tests that require `share_date_semantics_evidence` to contain a strict object with:
+Add tests that require `share_date_semantics_evidence` to equal the strict schema:
 
 ```python
 {
   'source': 'SINA_STOCK_STRUCTURE_HISTORY',
   'evidence_type': 'EFFECTIVE_HISTORICAL_SHARE_STATE',
   'verified': True,
-  'source_identity': '<nonempty stable description>',
+  'source_identity': 'sina-stock-structure-history-v1'
 }
 ```
 
@@ -483,6 +651,6 @@ ci/docs(gp12): finalize Formal turnover evidence gate
 ## Plan Self-Review
 
 - Spec coverage: Tasks 1-5 cover source parsing/provenance, PIT semantics, exact RAW-volume binding, materialization, hashes, pass/block states, readiness integration, production workflow, OOS/freeze safety, and required regressions.
-- Placeholder scan: no implementation step depends on `TBD`, `TODO`, or an undefined function. Ellipses above appear only inside illustrative unittest snippets whose complete required assertions are spelled out in the surrounding step; implementers must write concrete fixtures before running the RED test.
+- Placeholder scan: no `TBD`, `TODO`, ellipsis placeholder, undefined fixture, or “implement later” step remains. Every code example has concrete data or explicitly requires loading an existing in-repo production/test contract.
 - Type consistency: Task 1 produces normalized share records consumed by Task 2; Task 2 produces turnover summary consumed by Task 3/5; Task 3 returns the same parent evidence schema consumed by the existing readiness validator.
 - Reverse-check focus: the plan explicitly tests the three most likely false-positive routes—volume unit mismatch, future-capital backfill, and HTTP/structural success being mistaken for PIT readiness.
