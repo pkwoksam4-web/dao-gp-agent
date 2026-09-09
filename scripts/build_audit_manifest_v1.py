@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 from copy import deepcopy
 
 import pandas as pd
@@ -15,6 +16,8 @@ from audit_evidence_v1 import (
     validate_artifact_digest,
     validate_evidence_manifest,
 )
+
+SHA40_RE = re.compile(r'^[0-9a-f]{40}$')
 
 
 def _load_json(path: pathlib.Path | str) -> dict:
@@ -65,6 +68,28 @@ def _validate_lineage(lineage: dict) -> None:
             raise ValueError(f'canonical lineage mismatch: {key}')
 
 
+def _validate_source_provenance(item: dict) -> None:
+    source_type = item.get('source_type')
+    if source_type == 'GITHUB_ACTIONS':
+        if not validate_artifact_digest(item.get('source_artifact_digest')):
+            raise ValueError(f"artifact digest invalid: {item.get('logical_name')}")
+        for key in ('source_run_id', 'source_artifact_id', 'source_artifact_name'):
+            if not item.get(key):
+                raise ValueError(f"Actions provenance missing {key}: {item.get('logical_name')}")
+        if not SHA40_RE.fullmatch(str(item.get('source_head_sha') or '')):
+            raise ValueError(f"Actions source head invalid: {item.get('logical_name')}")
+        return
+    if source_type == 'REPOSITORY':
+        if 'source_artifact_digest' in item or 'source_artifact_id' in item or 'source_run_id' in item:
+            raise ValueError(f"repository evidence must not carry fake Actions provenance: {item.get('logical_name')}")
+        if not SHA40_RE.fullmatch(str(item.get('source_head_sha') or '')):
+            raise ValueError(f"repository source head invalid: {item.get('logical_name')}")
+        if not item.get('persisted_repository_path'):
+            raise ValueError(f"repository evidence missing persisted path: {item.get('logical_name')}")
+        return
+    raise ValueError(f"unknown source_type: {source_type}")
+
+
 def build_manifest(config: dict) -> dict:
     if not isinstance(config, dict) or config.get('artifact') != 'AUDIT_EVIDENCE_SOURCES_V1' or config.get('version') != 'V1':
         raise ValueError('evidence source config identity invalid')
@@ -79,8 +104,7 @@ def build_manifest(config: dict) -> dict:
         p = pathlib.Path(str(item.pop('path', '')))
         if not p.is_file():
             raise FileNotFoundError(p)
-        if not validate_artifact_digest(item.get('source_artifact_digest')):
-            raise ValueError(f"artifact digest invalid: {item.get('logical_name')}")
+        _validate_source_provenance(item)
         item['file_name'] = item.get('file_name') or p.name
         item['sha256'] = sha256_file(p)
         item['bytes'] = p.stat().st_size
