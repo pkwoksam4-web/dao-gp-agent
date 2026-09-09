@@ -1,0 +1,230 @@
+name: GP12 Turnover Formal Anchor Pilot V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-formal-v1
+    paths:
+      - 'data/GP12_TURNOVER_PILOT_SYMBOLS_V1.json'
+      - 'scripts/gp12_sina_share_amount_v1.py'
+      - 'scripts/gp12_sina_stock_structure_v1.py'
+      - 'scripts/gp12_share_known_at_v1.py'
+      - 'scripts/gp12_formal_anchor_gate_v1.py'
+      - '.github/workflows/gp12-turnover-formal-anchor-pilot-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Run fixed cross-board Formal-anchor pilot
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/turnover-pilot/raw
+          python - <<'PY'
+          import hashlib
+          import json
+          from datetime import date, timedelta, datetime, timezone
+          from pathlib import Path
+
+          import requests
+          import gp12_sina_share_amount_v1 as share_mod
+          import gp12_sina_stock_structure_v1 as structure_mod
+          import gp12_share_known_at_v1 as known_mod
+          import gp12_formal_anchor_gate_v1 as gate_mod
+
+          manifest_path = Path('data/GP12_TURNOVER_PILOT_SYMBOLS_V1.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          expected = [
+              ('shanghai_main', '600068.SH'),
+              ('shenzhen_main', '000001.SZ'),
+              ('chinext', '300023.SZ'),
+              ('star', '688086.SH'),
+          ]
+          actual = [(x['family'], x['symbol']) for x in manifest['symbols']]
+          if actual != expected:
+              raise SystemExit(f'pilot manifest changed: {actual!r}')
+          if manifest.get('replacement_after_observing_results_allowed') is not False:
+              raise SystemExit('pilot replacement policy must remain false')
+          if manifest.get('frozen_universe_n') != 847:
+              raise SystemExit('pilot manifest must bind frozen universe 847')
+
+          out = Path('out/turnover-pilot')
+          raw_dir = out / 'raw'
+          session = requests.Session()
+          fetched_at = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+          results = []
+
+          for family, symbol in expected:
+              structural = set()
+              item = {
+                  'family': family,
+                  'symbol': symbol,
+                  'share_amount': {},
+                  'stock_structure': {},
+                  'formal_anchor_change_date': None,
+                  'formal_anchor_announcement_date': None,
+                  'formal_anchor_known_at': None,
+                  'pre_anchor_mismatch_n': 0,
+                  'pre_anchor_mismatch_dates': [],
+                  'formal_required_share_row_n': 0,
+                  'formal_matched_state_n': 0,
+                  'formal_chain_mismatch_n': 0,
+                  'formal_chain_mismatch_dates': [],
+                  'delayed_state_test_n': 0,
+                  'future_known_at_violation_n': 0,
+                  'structural_blockers': [],
+                  'binding_blockers': [],
+                  'blockers': [],
+                  'pit_verified': False,
+                  'data_gate': 'BLOCKED',
+              }
+
+              share_raw, share_meta = share_mod.fetch_share_amount(
+                  session, symbol, timeout=20, retries=2)
+              structure_raw, structure_meta = structure_mod.fetch_stock_structure(
+                  session, symbol, timeout=20, retries=2)
+              structural.update(share_meta.get('blockers') or [])
+              structural.update(structure_meta.get('blockers') or [])
+              item['share_amount'] = {
+                  'fetch_status': share_meta.get('status'),
+                  'http_status': share_meta.get('http_status'),
+                  'raw_sha256': share_meta.get('raw_sha256'),
+                  'raw_byte_n': share_meta.get('raw_byte_n', 0),
+                  'request_identity': share_meta.get('request_identity'),
+                  'parsed_row_n': 0,
+              }
+              item['stock_structure'] = {
+                  'fetch_status': structure_meta.get('status'),
+                  'http_status': structure_meta.get('http_status'),
+                  'raw_sha256': structure_meta.get('raw_sha256'),
+                  'raw_byte_n': structure_meta.get('raw_byte_n', 0),
+                  'request_identity': structure_meta.get('request_identity'),
+                  'parsed_row_n': 0,
+              }
+
+              share_rows = None
+              structure_rows = None
+              safe = symbol.replace('.', '_')
+              if share_raw is not None:
+                  (raw_dir / f'{safe}.share_amount.raw').write_bytes(share_raw)
+                  try:
+                      share_rows = share_mod.parse_share_amount_bytes(symbol, share_raw)
+                      item['share_amount']['parsed_row_n'] = len(share_rows)
+                  except Exception as exc:
+                      structural.add('SINA_SHARE_PAYLOAD_INVALID')
+                      item['share_amount']['parse_error'] = f'{type(exc).__name__}: {exc}'
+              if structure_raw is not None:
+                  (raw_dir / f'{safe}.stock_structure.raw').write_bytes(structure_raw)
+                  try:
+                      structure_rows = structure_mod.parse_stock_structure_bytes(symbol, structure_raw)
+                      item['stock_structure']['parsed_row_n'] = len(structure_rows)
+                  except Exception as exc:
+                      structural.add('SINA_STOCK_STRUCTURE_PAYLOAD_INVALID')
+                      item['stock_structure']['parse_error'] = f'{type(exc).__name__}: {exc}'
+
+              binding = None
+              if not structural and share_rows is not None and structure_rows is not None:
+                  try:
+                      binding = known_mod.bind_formal_anchor_states(
+                          symbol,
+                          share_rows,
+                          structure_rows,
+                          share_meta['raw_sha256'],
+                          structure_meta['raw_sha256'],
+                      )
+                      item['binding_blockers'] = list(binding['blockers'])
+                      for key in (
+                          'formal_anchor_change_date',
+                          'formal_anchor_announcement_date',
+                          'formal_anchor_known_at',
+                          'pre_anchor_mismatch_n',
+                          'pre_anchor_mismatch_dates',
+                          'formal_required_share_row_n',
+                          'formal_matched_state_n',
+                          'formal_chain_mismatch_n',
+                          'formal_chain_mismatch_dates',
+                      ):
+                          item[key] = binding[key]
+
+                      for state in binding['states']:
+                          if state['announcement_date'] <= state['change_date']:
+                              continue
+                          item['delayed_state_test_n'] += 1
+                          known_at = date.fromisoformat(state['known_at'])
+                          before = (known_at - timedelta(days=1)).isoformat()
+                          pre = known_mod.resolve_known_at_state(binding['states'], before)
+                          on = known_mod.resolve_known_at_state(binding['states'], state['known_at'])
+                          if pre is not None and pre['change_date'] == state['change_date']:
+                              item['future_known_at_violation_n'] += 1
+                          if on is None or on['change_date'] != state['change_date']:
+                              item['future_known_at_violation_n'] += 1
+                      if item['future_known_at_violation_n']:
+                          structural.add('TURNOVER_FUTURE_KNOWN_AT_VIOLATION')
+                  except Exception as exc:
+                      structural.add('SINA_SHARE_KNOWN_AT_UNVERIFIED')
+                      item['binding_error'] = f'{type(exc).__name__}: {exc}'
+
+              item['structural_blockers'] = sorted(structural)
+              item['pit_verified'] = bool(
+                  binding is not None
+                  and binding.get('pit_verified') is True
+                  and not structural
+              )
+              blockers = set(item['structural_blockers'])
+              blockers.update(item['binding_blockers'])
+              item['blockers'] = sorted(blockers)
+              item['data_gate'] = gate_mod.formal_anchor_probe_gate(
+                  structural_blockers=item['structural_blockers'],
+                  binding_blockers=item['binding_blockers'],
+                  formal_anchor_change_date=item['formal_anchor_change_date'],
+                  formal_chain_mismatch_n=item['formal_chain_mismatch_n'],
+                  pit_verified=item['pit_verified'],
+              )
+              results.append(item)
+
+          pilot_pass = all(x['data_gate'] == 'FORMAL_ANCHOR_PIT_PASS' for x in results)
+          payload = {
+              'artifact': 'GP12_TURNOVER_FORMAL_ANCHOR_PILOT_V1',
+              'version': '1.0',
+              'fetched_at': fetched_at,
+              'formal_start': '2020-06-01',
+              'formal_end': '2026-04-17',
+              'selection_sha256': manifest['selection_sha256'],
+              'pilot_symbols': [x['symbol'] for x in manifest['symbols']],
+              'symbol_n': len(results),
+              'pass_symbol_n': sum(x['data_gate'] == 'FORMAL_ANCHOR_PIT_PASS' for x in results),
+              'blocked_symbol_n': sum(x['data_gate'] != 'FORMAL_ANCHOR_PIT_PASS' for x in results),
+              'data_gate': 'PILOT_PASS' if pilot_pass else 'BLOCKED',
+              'results': results,
+              'turnover_ratio_unbound': True,
+              'candidate_freeze_ready': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+              'oos_data_consumed': False,
+          }
+          canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+          payload['pilot_sha256'] = hashlib.sha256(canonical).hexdigest()
+          target = out / 'GP12_TURNOVER_FORMAL_ANCHOR_PILOT_V1.json'
+          target.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2))
+          print('WORKFLOW_STATUS=SUCCESS')
+          print('DATA_GATE=' + payload['data_gate'])
+          PY
+      - name: Upload fixed pilot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-formal-anchor-pilot-v1
+          path: out/turnover-pilot/
+          if-no-files-found: error
+          retention-days: 30
