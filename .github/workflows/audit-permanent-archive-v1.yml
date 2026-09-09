@@ -1,0 +1,193 @@
+name: GP Permanent Evidence Archive V1
+
+on:
+  push:
+    branches:
+      - gp/audit-remediation-v1
+    paths:
+      - .github/workflows/audit-permanent-archive-v1.yml
+      - scripts/permanent_archive_v1.py
+      - scripts/audit_evidence_v1.py
+      - data/AUDIT_EVIDENCE_SOURCES_V1.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  permanent-archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARCHIVE_TAG: gp-evidence-v482-audit-v1
+      ARCHIVE_TARGET_SHA: ee445e5dae3f2b78328d72de144d15f4c52e77ad
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install evidence dependencies
+        run: pip install -q pandas pyarrow numpy
+
+      - name: Download signed 847 Full RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: production/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Download signed frozen 80M liquidity evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-liquidity-80m-v482
+          path: production/liquidity
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Download authoritative merged PIT-ST evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: production/pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+
+      - name: Verify exact source bytes before archive
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          from build_audit_manifest_v1 import build_manifest
+
+          cfg=json.load(open('data/AUDIT_EVIDENCE_SOURCES_V1.json',encoding='utf-8'))
+          manifest=build_manifest(cfg)
+          large=[x for x in manifest['evidence_items'] if x.get('class')=='LARGE_HASH_BOUND']
+          assert len(large)==3, len(large)
+          for item in large:
+              assert item['sha256']==item['expected_sha256'], item['logical_name']
+              assert int(item['bytes'])==int(item['expected_bytes']), item['logical_name']
+          pathlib.Path('archive_upload').mkdir(exist_ok=True)
+          for item in large:
+              src=pathlib.Path(next(x['path'] for x in cfg['items'] if x['logical_name']==item['logical_name']))
+              dst=pathlib.Path('archive_upload')/item['file_name']
+              dst.write_bytes(src.read_bytes())
+          pathlib.Path('archive_evidence').mkdir(exist_ok=True)
+          pathlib.Path('archive_evidence/AUDIT_EVIDENCE_MANIFEST_PRE_ARCHIVE_V1.json').write_text(
+              json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps({x['logical_name']:{'sha256':x['sha256'],'bytes':x['bytes']} for x in large},indent=2))
+          PY
+
+      - name: Create immutable evidence release if absent
+        run: |
+          if gh release view "$ARCHIVE_TAG" >/dev/null 2>&1; then
+            echo "Release $ARCHIVE_TAG already exists; exact assets will be replaced then reverified."
+          else
+            gh release create "$ARCHIVE_TAG" \
+              --target "$ARCHIVE_TARGET_SHA" \
+              --title "GP V4.82 Audit Evidence Archive V1" \
+              --notes "Permanent byte archive for the sealed Audit Remediation V1 checkpoint. Assets are exact Full RAW, frozen 80M Liquidity panel, and merged PIT/ST bytes. Promotion remains blocked by repository governance and strategy recovery gates."
+          fi
+          git fetch --force origin "refs/tags/$ARCHIVE_TAG:refs/tags/$ARCHIVE_TAG"
+          ACTUAL_TARGET="$(git rev-list -n1 "$ARCHIVE_TAG")"
+          test "$ACTUAL_TARGET" = "$ARCHIVE_TARGET_SHA"
+
+      - name: Upload exact production bytes to GitHub Release
+        run: |
+          gh release upload "$ARCHIVE_TAG" \
+            archive_upload/SOHU_RAW_FULL_V482.parquet \
+            archive_upload/LIQUIDITY_80M_PANEL_V482.parquet \
+            archive_upload/PIT_ST_DAILY_MERGED_V480.csv \
+            --clobber
+
+      - name: Download release assets back and build verified receipt
+        env:
+          PYTHONPATH: scripts
+        run: |
+          rm -rf release_download
+          mkdir -p release_download archive_evidence
+          gh release download "$ARCHIVE_TAG" --dir release_download \
+            --pattern 'SOHU_RAW_FULL_V482.parquet' \
+            --pattern 'LIQUIDITY_80M_PANEL_V482.parquet' \
+            --pattern 'PIT_ST_DAILY_MERGED_V480.csv'
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$ARCHIVE_TAG" > archive_evidence/RELEASE_API_V1.json
+          python - <<'PY'
+          import json, os, pathlib
+          from audit_evidence_v1 import sha256_file
+          from build_audit_manifest_v1 import build_manifest
+          from permanent_archive_v1 import apply_archive_receipt
+
+          cfg=json.load(open('data/AUDIT_EVIDENCE_SOURCES_V1.json',encoding='utf-8'))
+          manifest=build_manifest(cfg)
+          release=json.load(open('archive_evidence/RELEASE_API_V1.json',encoding='utf-8'))
+          assets_meta={a['name']:a for a in release.get('assets',[])}
+          logical={x['logical_name']:x for x in manifest['evidence_items'] if x.get('class')=='LARGE_HASH_BOUND'}
+          receipt={
+              'artifact':'PERMANENT_ARCHIVE_RECEIPT_V1',
+              'version':'V1',
+              'provider':'GITHUB_RELEASE',
+              'repository':os.environ['GITHUB_REPOSITORY'],
+              'release_tag':os.environ['ARCHIVE_TAG'],
+              'release_target_sha':os.environ['ARCHIVE_TARGET_SHA'],
+              'release_id':release.get('id'),
+              'release_url':release.get('html_url'),
+              'assets':[],
+          }
+          for name,item in logical.items():
+              p=pathlib.Path('release_download')/item['file_name']
+              assert p.is_file(), p
+              sha=sha256_file(p); size=p.stat().st_size
+              assert sha==item['sha256']==item['expected_sha256'], (name,sha,item)
+              assert size==int(item['bytes'])==int(item['expected_bytes']), (name,size,item)
+              meta=assets_meta.get(item['file_name']); assert meta is not None, item['file_name']
+              assert int(meta['size'])==size, (meta,size)
+              digest=meta.get('digest')
+              if digest is not None:
+                  assert digest=='sha256:'+sha, (digest,sha)
+              receipt['assets'].append({
+                  'logical_name':name,
+                  'asset_name':item['file_name'],
+                  'sha256':sha,
+                  'bytes':size,
+                  'download_verified':True,
+                  'release_asset_id':meta.get('id'),
+                  'browser_download_url':meta.get('browser_download_url'),
+                  'release_asset_digest':digest,
+              })
+          archived=apply_archive_receipt(manifest,receipt)
+          assert 'PERMANENT_BYTE_ARCHIVE_OPEN' not in archived['blockers']
+          assert 'REPOSITORY_BRANCH_PROTECTION_OPEN' in archived['blockers']
+          assert 'STRATEGY_ASSETS_INCOMPLETE' in archived['blockers']
+          assert archived['model_freeze_allowed'] is False
+          assert archived['oos_metrics_allowed'] is False
+          pathlib.Path('archive_evidence/PERMANENT_ARCHIVE_RECEIPT_V1.json').write_text(
+              json.dumps(receipt,ensure_ascii=False,indent=2),encoding='utf-8')
+          pathlib.Path('archive_evidence/AUDIT_EVIDENCE_MANIFEST_ARCHIVED_V1.json').write_text(
+              json.dumps(archived,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps({
+              'release_tag':receipt['release_tag'],
+              'release_target_sha':receipt['release_target_sha'],
+              'assets':[{k:a[k] for k in ('logical_name','asset_name','sha256','bytes','download_verified')} for a in receipt['assets']],
+              'remaining_blockers':archived['blockers'],
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload receipt and archived manifest as release assets
+        run: |
+          gh release upload "$ARCHIVE_TAG" \
+            archive_evidence/PERMANENT_ARCHIVE_RECEIPT_V1.json \
+            archive_evidence/AUDIT_EVIDENCE_MANIFEST_ARCHIVED_V1.json \
+            --clobber
+
+      - name: Upload archive verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-permanent-archive-v1
+          path: archive_evidence/
+          if-no-files-found: error
+          retention-days: 30
