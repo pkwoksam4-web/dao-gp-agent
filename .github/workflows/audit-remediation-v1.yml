@@ -123,7 +123,7 @@ jobs:
           run-id: 33971534669
           github-token: ${{ github.token }}
 
-      - name: Rebind old production audits to exact bytes and build manifest
+      - name: Rebind exact bytes and apply persistent archive receipt
         env:
           PYTHONPATH: scripts
           REMEDIATION_HEAD_SHA: ${{ github.sha }}
@@ -133,6 +133,7 @@ jobs:
           import json, os, pathlib
           from build_audit_manifest_v1 import build_manifest, enrich_raw_audit, enrich_liquidity_audit
           from audit_evidence_v1 import validate_evidence_manifest
+          from permanent_archive_v1 import apply_archive_receipt
 
           raw_a='production/raw/SOHU_RAW_FULL_AUDIT_V482.json'
           raw_p='production/raw/SOHU_RAW_FULL_V482.parquet'
@@ -157,20 +158,31 @@ jobs:
           manifest['canonical_lineage']['remediation_head_sha']=os.environ['REMEDIATION_HEAD_SHA']
           errs=validate_evidence_manifest(manifest)
           assert not errs, errs
-          assert manifest['baostock_847_scaleout_allowed'] is False
-          assert manifest['model_freeze_allowed'] is False
-          assert manifest['oos_metrics_allowed'] is False
+          receipt=json.load(open('evidence/audit-remediation-v1/PERMANENT_ARCHIVE_RECEIPT_V1.json',encoding='utf-8'))
+          archived=apply_archive_receipt(manifest,receipt)
+          assert 'PERMANENT_BYTE_ARCHIVE_OPEN' not in archived['blockers']
+          assert 'IMMUTABLE_RETENTION_LOCK_OPEN' in archived['blockers']
+          assert 'REPOSITORY_BRANCH_PROTECTION_OPEN' in archived['blockers']
+          assert 'STRATEGY_ASSETS_INCOMPLETE' in archived['blockers']
+          assert archived['baostock_847_scaleout_allowed'] is False
+          assert archived['model_freeze_allowed'] is False
+          assert archived['oos_metrics_allowed'] is False
+
           (out/'AUDIT_EVIDENCE_MANIFEST_V1.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          (out/'AUDIT_EVIDENCE_MANIFEST_ARCHIVED_V1.json').write_text(json.dumps(archived,ensure_ascii=False,indent=2),encoding='utf-8')
+          (out/'PERMANENT_ARCHIVE_RECEIPT_V1.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2),encoding='utf-8')
           for p in ('data/AUDIT_STATUS_MODEL_V1.json','data/PIT_ST_EVIDENCE_COVERAGE_V1.json','data/FIXED_PROBE_REGISTRY_V1.json','data/AUDIT_EVIDENCE_SOURCES_V1.json'):
               src=pathlib.Path(p); (out/src.name).write_bytes(src.read_bytes())
           print(json.dumps({
               'raw_sha256':raw['full_parquet_sha256'],
               'liquidity_sha256':liq['panel_parquet_sha256'],
               'pitst_sha256':liq['input_pitst_sha256'],
-              'blockers':manifest['blockers'],
-              'baostock_847_scaleout_allowed':manifest['baostock_847_scaleout_allowed'],
-              'model_freeze_allowed':manifest['model_freeze_allowed'],
-              'oos_metrics_allowed':manifest['oos_metrics_allowed'],
+              'pre_archive_blockers':manifest['blockers'],
+              'archived_blockers':archived['blockers'],
+              'archive_provider':archived['permanent_archive_receipt']['provider'],
+              'baostock_847_scaleout_allowed':archived['baostock_847_scaleout_allowed'],
+              'model_freeze_allowed':archived['model_freeze_allowed'],
+              'oos_metrics_allowed':archived['oos_metrics_allowed'],
           },ensure_ascii=False,indent=2))
           PY
 
