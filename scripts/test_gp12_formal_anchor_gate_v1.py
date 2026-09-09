@@ -1,12 +1,12 @@
 import pathlib
 import unittest
 
-import gp12_share_known_at_v1 as mod
+import gp12_formal_anchor_gate_v1 as gate_mod
 
 
 class FormalAnchorProbeGateTests(unittest.TestCase):
     def test_structural_blocker_forces_blocked(self):
-        gate = mod.formal_anchor_probe_gate(
+        gate = gate_mod.formal_anchor_probe_gate(
             structural_blockers=['SINA_STOCK_STRUCTURE_PAYLOAD_INVALID'],
             binding_blockers=[],
             formal_anchor_change_date='2018-12-31',
@@ -16,7 +16,7 @@ class FormalAnchorProbeGateTests(unittest.TestCase):
         self.assertEqual(gate, 'BLOCKED')
 
     def test_missing_anchor_forces_blocked(self):
-        gate = mod.formal_anchor_probe_gate(
+        gate = gate_mod.formal_anchor_probe_gate(
             structural_blockers=[],
             binding_blockers=['SINA_FORMAL_ANCHOR_MISSING'],
             formal_anchor_change_date=None,
@@ -26,7 +26,7 @@ class FormalAnchorProbeGateTests(unittest.TestCase):
         self.assertEqual(gate, 'BLOCKED')
 
     def test_formal_chain_mismatch_forces_blocked(self):
-        gate = mod.formal_anchor_probe_gate(
+        gate = gate_mod.formal_anchor_probe_gate(
             structural_blockers=[],
             binding_blockers=['SINA_FORMAL_CHAIN_MATCH_MISSING'],
             formal_anchor_change_date='2018-12-31',
@@ -36,7 +36,7 @@ class FormalAnchorProbeGateTests(unittest.TestCase):
         self.assertEqual(gate, 'BLOCKED')
 
     def test_false_pit_forces_blocked(self):
-        gate = mod.formal_anchor_probe_gate(
+        gate = gate_mod.formal_anchor_probe_gate(
             structural_blockers=[],
             binding_blockers=[],
             formal_anchor_change_date='2018-12-31',
@@ -46,7 +46,7 @@ class FormalAnchorProbeGateTests(unittest.TestCase):
         self.assertEqual(gate, 'BLOCKED')
 
     def test_complete_formal_anchor_chain_passes(self):
-        gate = mod.formal_anchor_probe_gate(
+        gate = gate_mod.formal_anchor_probe_gate(
             structural_blockers=[],
             binding_blockers=[],
             formal_anchor_change_date='2018-12-31',
@@ -63,7 +63,7 @@ class FormalAnchorProbeGateTests(unittest.TestCase):
             / 'gp12-turnover-formal-v1.yml'
         ).read_text(encoding='utf-8')
         self.assertIn('known_mod.bind_formal_anchor_states(', workflow)
-        self.assertIn('known_mod.formal_anchor_probe_gate(', workflow)
+        self.assertIn('gate_mod.formal_anchor_probe_gate(', workflow)
         self.assertNotIn("gate = known_mod.dual_source_probe_gate(", workflow)
 
 
