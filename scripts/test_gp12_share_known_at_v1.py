@@ -160,6 +160,24 @@ class ShareKnownAtV1Tests(unittest.TestCase):
         resolved = mod.resolve_known_at_state(states, '2025-04-02')
         self.assertEqual(resolved['change_date'], '2024-12-31')
 
+    def test_probe_gate_blocks_when_binding_has_blockers(self):
+        gate = mod.dual_source_probe_gate(
+            structural_blockers=[],
+            binding_blockers=['SINA_STOCK_STRUCTURE_MATCH_MISSING'],
+            matched_state_n=63,
+            pit_verified=False,
+        )
+        self.assertEqual(gate, 'BLOCKED')
+
+    def test_probe_gate_passes_only_complete_pit_binding(self):
+        gate = mod.dual_source_probe_gate(
+            structural_blockers=[],
+            binding_blockers=[],
+            matched_state_n=73,
+            pit_verified=True,
+        )
+        self.assertEqual(gate, 'DUAL_SOURCE_STRUCTURAL_PASS')
+
 
 if __name__ == '__main__':
     unittest.main()
