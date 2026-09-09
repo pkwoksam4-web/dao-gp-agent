@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
+import pathlib
 import re
 from datetime import date
 from typing import Any
@@ -124,6 +126,16 @@ def _blockers(value: object, label: str) -> list[str]:
             raise ValueError(f'{label} blocker must be a nonempty string')
         normalized.append(blocker.strip())
     return sorted(set(normalized))
+
+
+def _load_json(path: pathlib.Path | str) -> dict:
+    try:
+        value = json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f'invalid JSON file: {path}') from exc
+    if not isinstance(value, dict):
+        raise ValueError(f'JSON file must contain an object: {path}')
+    return value
 
 
 def validate_candidate_identity(parameters: dict, factors: dict) -> dict:
@@ -335,12 +347,7 @@ def derive_factor_readiness(
 
 
 def validate_production_evidence_manifest(evidence_manifest: dict) -> dict:
-    """Validate identity of the known V4.82 Formal evidence binding.
-
-    This checks that the manifest faithfully identifies the frozen upstream
-    evidence. It intentionally does not require all candidate feature families
-    to be ready; missing/unverified families belong to the readiness report.
-    """
+    """Validate exact identity of the current V4.82 Formal evidence binding."""
     _validate_evidence_top_level(evidence_manifest)
     families = evaluate_feature_families(evidence_manifest)
     supporting = _normalize_supporting(evidence_manifest)
@@ -482,3 +489,46 @@ def build_readiness_report(parameters: dict, factors: dict, evidence_manifest: d
         'model_freeze_allowed': False,
         'oos_metrics_allowed': False,
     }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--parameters', required=True)
+    parser.add_argument('--factors', required=True)
+    parser.add_argument('--evidence', required=True)
+    parser.add_argument('--out', required=True)
+    args = parser.parse_args()
+
+    parameters = _load_json(args.parameters)
+    factors = _load_json(args.factors)
+    evidence = _load_json(args.evidence)
+    manifest_validation = validate_production_evidence_manifest(evidence)
+    if not manifest_validation['production_manifest_valid']:
+        raise ValueError(
+            'production evidence identity mismatch: '
+            + ','.join(manifest_validation['blockers']))
+
+    report = build_readiness_report(parameters, factors, evidence)
+    out = pathlib.Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+        encoding='utf-8',
+    )
+    print(json.dumps({
+        'artifact': report['artifact'],
+        'formal_end': report['formal_end'],
+        'validated_families': report['validated_families'],
+        'missing_or_unvalidated_families': report['missing_or_unvalidated_families'],
+        'ready_factor_ids': report['ready_factor_ids'],
+        'blocked_factor_ids': report['blocked_factor_ids'],
+        'blockers': report['blockers'],
+        'candidate_scoring_ready': report['candidate_scoring_ready'],
+        'candidate_adoption_status': report['candidate_adoption_status'],
+        'model_freeze_allowed': report['model_freeze_allowed'],
+        'oos_metrics_allowed': report['oos_metrics_allowed'],
+    }, ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    main()
