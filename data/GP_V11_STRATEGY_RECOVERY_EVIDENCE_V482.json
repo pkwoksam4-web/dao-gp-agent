@@ -24,9 +24,19 @@
       "finding": "searches for structure_score, inertia_score, execution_score, prob_up, prob_down, score_total, top_n, ranking semantics, mom5/mom10/mom20/mom60, er10/er20, sector_rs and related model-internal columns returned RAW/QFQ/hash-ranking remediation artifacts rather than a GP V1.1 scorer output or parameter/factor package"
     },
     {
+      "surface": "file_library_exact_archive_and_internal_filename_rescan_2026_09_09",
+      "confidence": "ABSENT",
+      "finding": "exact and recall searches for v11_offline_backtest_starter_v2.zip, v11_offline_backtest_v3_1.zip, v11_offline_backtest_v3_4.zip, the candidate v3.4 ZIP SHA256, run_formal_pipeline.py, verify_dataset.py and starter-v2 MFE/MAE/ATR terms did not recover an archive, manifest or scorer source; the only high-confidence legacy code reference remains the later V3.10 auxiliary adjusted-source validator path"
+    },
+    {
       "surface": "gmail_2026_08_20_to_2026_09_02_attachments",
       "confidence": "ABSENT",
       "finding": "read-only search found no matching GP V1.1, Quant_Research, offline_backtest, qfq_v310, or backtest source package"
+    },
+    {
+      "surface": "google_drive_authorized_scope_2026_09_09",
+      "confidence": "ABSENT",
+      "finding": "connected Google Drive search returned zero accessible results for exact package names, Quant_Research, run_formal_pipeline.py, cross_validate_adjusted_sources.py, the candidate v3.4 ZIP SHA256 and broad backtest queries; a blank browse and an August 20 to September 1 modified-time browse also returned zero files, so no GP V1.1 source asset is recoverable from the currently authorized Drive scope"
     },
     {
       "surface": "v3_10_archive_trace",
@@ -79,6 +89,17 @@
       "key": "outcome_leakage_rule",
       "confidence": "USER_CONFIRMED",
       "value": "future labels and post-Formal observations are validation outcomes only and cannot be used to tune or construct pre-exposure strategy decisions"
+    },
+    {
+      "key": "v3_10_adjusted_validator_semantics",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": {
+        "component": "cross_validate_adjusted_sources.py",
+        "role": "auxiliary adjusted-source validator, not the strategy scorer",
+        "p99_return_diff_bp_max": 5.0,
+        "p99_intraday_shape_diff_bp_max": 5.0,
+        "reuse_contract": "V4.71 plan requires importing or reproducing the existing V3.10 compare behavior exactly without changing thresholds"
+      }
     }
   ],
   "candidate_clues": [
