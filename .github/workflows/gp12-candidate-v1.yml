@@ -1,0 +1,63 @@
+name: GP12 Reconstruction Candidate V1
+
+on:
+  push:
+    branches:
+      - gp/strategy-package-candidate-v482
+    paths:
+      - 'scripts/gp12_candidate_v1.py'
+      - 'scripts/test_gp12_candidate_v1.py'
+      - 'data/GP12_CANDIDATE_PARAMETERS_V1.json'
+      - 'data/GP12_CANDIDATE_FACTORS_V1.json'
+      - 'docs/gp12-candidate-review.md'
+      - '.github/workflows/gp12-candidate-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Candidate formulas and original gate regressions
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python -m unittest -v \
+            test_gp12_candidate_v1 \
+            test_strategy_asset_recovery_v482 \
+            test_model_freeze_recovery_v482 \
+            test_oos_admission_v482
+      - name: Review candidate package without model freeze or OOS data
+        run: |
+          mkdir -p out
+          python scripts/gp12_candidate_v1.py --review --out out/GP12_CANDIDATE_REVIEW_V1.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('out/GP12_CANDIDATE_REVIEW_V1.json').read_text())
+          assert report['historical_strategy_recovered'] is False
+          assert report['model_freeze_allowed'] is False
+          assert report['oos_metrics_allowed'] is False
+          assert report['adoption_status'] == 'UNAPPROVED'
+          assert 'NEW_STRATEGY_ADOPTION_REQUIRED' in report['blockers']
+          PY
+      - name: Upload reviewable candidate package
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-reconstruction-candidate-v1
+          path: |
+            out/GP12_CANDIDATE_REVIEW_V1.json
+            scripts/gp12_candidate_v1.py
+            scripts/test_gp12_candidate_v1.py
+            data/GP12_CANDIDATE_PARAMETERS_V1.json
+            data/GP12_CANDIDATE_FACTORS_V1.json
+            docs/gp12-candidate-review.md
+          if-no-files-found: error
+          retention-days: 30
