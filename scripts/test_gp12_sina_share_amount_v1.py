@@ -16,6 +16,15 @@ def valid_symbol_evidence():
     return mod.build_symbol_evidence('600000.SH', valid_raw(), '2026-09-09T08:00:00Z', 200)
 
 
+def valid_date_semantics():
+    return {
+        'source': 'SINA_STOCK_STRUCTURE_HISTORY',
+        'evidence_type': 'EFFECTIVE_HISTORICAL_SHARE_STATE',
+        'verified': True,
+        'source_identity': 'sina-stock-structure-history-v1',
+    }
+
+
 class SinaShareAmountV1Tests(unittest.TestCase):
     def test_normalize_and_sina_symbol(self):
         self.assertEqual(mod.normalize_symbol('600000.sh'), '600000.SH')
@@ -85,6 +94,38 @@ class SinaShareAmountV1Tests(unittest.TestCase):
         self.assertFalse(manifest['model_freeze_allowed'])
         self.assertFalse(manifest['oos_metrics_allowed'])
         self.assertFalse(manifest['formal_admission'])
+
+    def test_exact_date_semantics_schema_can_clear_semantics_blocker(self):
+        manifest = mod.build_share_manifest(
+            [valid_symbol_evidence()], UNIVERSE_SHA, valid_date_semantics())
+        self.assertNotIn('SINA_SHARE_DATE_SEMANTICS_UNVERIFIED', manifest['blockers'])
+        self.assertEqual(manifest['share_date_semantics_evidence'], valid_date_semantics())
+
+    def test_extra_date_semantics_field_is_not_accepted(self):
+        evidence = valid_date_semantics()
+        evidence['note'] = 'extra field must not broaden contract'
+        manifest = mod.build_share_manifest([valid_symbol_evidence()], UNIVERSE_SHA, evidence)
+        self.assertIn('SINA_SHARE_DATE_SEMANTICS_UNVERIFIED', manifest['blockers'])
+
+    def test_missing_or_false_date_semantics_is_not_accepted(self):
+        missing = valid_date_semantics()
+        del missing['source_identity']
+        false_value = valid_date_semantics()
+        false_value['verified'] = False
+        for evidence in (missing, false_value):
+            with self.subTest(evidence=evidence):
+                manifest = mod.build_share_manifest([valid_symbol_evidence()], UNIVERSE_SHA, evidence)
+                self.assertIn('SINA_SHARE_DATE_SEMANTICS_UNVERIFIED', manifest['blockers'])
+
+    def test_generic_akshare_behavior_is_not_pit_evidence(self):
+        evidence = {
+            'source': 'AKSHARE_FORWARD_FILL',
+            'evidence_type': 'IMPLEMENTATION_BEHAVIOR',
+            'verified': True,
+            'source_identity': 'akshare-stock-zh-a-daily',
+        }
+        manifest = mod.build_share_manifest([valid_symbol_evidence()], UNIVERSE_SHA, evidence)
+        self.assertIn('SINA_SHARE_DATE_SEMANTICS_UNVERIFIED', manifest['blockers'])
 
     def test_manifest_rejects_wrong_universe_hash(self):
         with self.assertRaises(ValueError):
