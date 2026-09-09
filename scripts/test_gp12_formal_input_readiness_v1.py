@@ -129,6 +129,29 @@ def minimal_evidence():
     }
 
 
+def mark_ready(evidence, family, marker='d'):
+    evidence['feature_families'][family] = {
+        'binding_state': 'BOUND_VERIFIED_ARTIFACT',
+        'pit_state': 'PIT_VERIFIED',
+        'source_artifact': f'synthetic-{family}',
+        'source_sha256': marker * 64,
+        'coverage_start': '2020-06-01',
+        'coverage_end': '2026-04-17',
+        'blockers': [],
+    }
+
+
+def mark_support_ready(evidence, support, marker='e'):
+    evidence['supporting_evidence'][support] = {
+        'binding_state': 'BOUND_VERIFIED_ARTIFACT',
+        'pit_state': 'PIT_VERIFIED',
+        'source_artifact': f'synthetic-{support}',
+        'source_sha256': marker * 64,
+        'ready': True,
+        'blockers': [],
+    }
+
+
 class FormalInputReadinessIdentityTests(unittest.TestCase):
     def test_exact_candidate_package_identity_is_accepted(self):
         report = mod.build_readiness_report(
@@ -226,6 +249,72 @@ class FormalInputReadinessFamilyStateTests(unittest.TestCase):
         report = mod.build_readiness_report(
             load_parameters(), load_factors(), minimal_evidence())
         self.assertEqual(set(report['feature_families']), set(FEATURE_FAMILIES))
+
+
+class FormalInputReadinessFactorDependencyTests(unittest.TestCase):
+    def test_exact_factor_dependencies_are_derived_from_contract(self):
+        dependencies = mod.derive_factor_dependencies(load_factors())
+        self.assertEqual(dependencies, {
+            'F1': ('market_adjusted_close',),
+            'F2': ('market_breadth',),
+            'F3': ('sector_adjusted_close', 'market_adjusted_close'),
+            'F4': ('sector_adjusted_close',),
+            'F5': ('sector_breadth', 'sector_membership_pit'),
+            'F6': ('stock_adjusted_close',),
+            'F7': ('stock_adjusted_close',),
+            'F8': ('stock_adjusted_close',),
+            'F9': ('stock_adjusted_close',),
+            'F10': ('stock_adjusted_close',),
+            'F11': ('stock_adjusted_close', 'amount_turnover', 'main_net_flow'),
+            'F12': ('intraday_15m', 'intraday_60m'),
+        })
+
+    def test_stock_adjusted_close_only_makes_f6_to_f10_ready(self):
+        evidence = minimal_evidence()
+        mark_ready(evidence, 'stock_adjusted_close')
+        report = mod.build_readiness_report(load_parameters(), load_factors(), evidence)
+        self.assertEqual(report['ready_factor_ids'], ['F6', 'F7', 'F8', 'F9', 'F10'])
+        self.assertFalse(report['candidate_scoring_ready'])
+
+    def test_market_benchmark_missing_blocks_f1_and_f3(self):
+        report = mod.build_readiness_report(load_parameters(), load_factors(), minimal_evidence())
+        self.assertIn('market_adjusted_close', report['factor_readiness']['F1']['missing_dependencies'])
+        self.assertIn('market_adjusted_close', report['factor_readiness']['F3']['missing_dependencies'])
+
+    def test_sector_membership_is_required_for_f5(self):
+        evidence = minimal_evidence()
+        mark_ready(evidence, 'sector_breadth')
+        report = mod.build_readiness_report(load_parameters(), load_factors(), evidence)
+        self.assertFalse(report['factor_readiness']['F5']['ready'])
+        self.assertIn('sector_membership_pit', report['factor_readiness']['F5']['missing_dependencies'])
+
+    def test_turnover_and_flow_block_f11_independently(self):
+        evidence = minimal_evidence()
+        mark_ready(evidence, 'stock_adjusted_close')
+        mark_ready(evidence, 'amount_turnover')
+        report = mod.build_readiness_report(load_parameters(), load_factors(), evidence)
+        self.assertFalse(report['factor_readiness']['F11']['ready'])
+        self.assertEqual(report['factor_readiness']['F11']['missing_dependencies'], ['main_net_flow'])
+
+    def test_f12_requires_both_intraday_families(self):
+        evidence = minimal_evidence()
+        mark_ready(evidence, 'intraday_15m')
+        report = mod.build_readiness_report(load_parameters(), load_factors(), evidence)
+        self.assertFalse(report['factor_readiness']['F12']['ready'])
+        self.assertEqual(report['factor_readiness']['F12']['missing_dependencies'], ['intraday_60m'])
+
+    def test_synthetic_all_family_ready_still_does_not_approve_candidate(self):
+        evidence = minimal_evidence()
+        for index, family in enumerate(FEATURE_FAMILIES):
+            mark_ready(evidence, family, marker=hex(10 + index)[2])
+        mark_support_ready(evidence, 'sector_membership_pit')
+        report = mod.build_readiness_report(load_parameters(), load_factors(), evidence)
+        self.assertEqual(report['ready_factor_ids'], [f'F{i}' for i in range(1, 13)])
+        self.assertTrue(report['candidate_scoring_ready'])
+        self.assertFalse(report['candidate_freeze_ready'])
+        self.assertEqual(report['candidate_adoption_status'], 'UNAPPROVED')
+        self.assertFalse(report['model_freeze_allowed'])
+        self.assertFalse(report['oos_metrics_allowed'])
 
 
 if __name__ == '__main__':
