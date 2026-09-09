@@ -44,6 +44,7 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_gp12_sina_stock_structure_v1.py \
+            test_gp12_share_known_at_v1.py \
             test_gp12_sina_share_amount_v1.py \
             test_gp12_turnover_formal_v1.py \
             test_gp12_turnover_readiness_bind_v1.py \
