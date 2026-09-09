@@ -7,14 +7,20 @@ on:
     paths:
       - 'scripts/gp12_sina_share_amount_v1.py'
       - 'scripts/test_gp12_sina_share_amount_v1.py'
+      - 'scripts/gp12_sina_stock_structure_v1.py'
+      - 'scripts/test_gp12_sina_stock_structure_v1.py'
+      - 'scripts/gp12_share_known_at_v1.py'
+      - 'scripts/test_gp12_share_known_at_v1.py'
       - 'scripts/gp12_turnover_formal_v1.py'
       - 'scripts/test_gp12_turnover_formal_v1.py'
       - 'scripts/gp12_turnover_readiness_bind_v1.py'
       - 'scripts/test_gp12_turnover_readiness_bind_v1.py'
       - '.github/workflows/gp12-turnover-formal-v1.yml'
       - 'docs/superpowers/specs/2026-09-09-gp12-turnover-formal-v1-design.md'
+      - 'docs/superpowers/specs/2026-09-09-gp12-turnover-known-at-pit-amendment-2-design.md'
       - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-v1.md'
       - 'docs/superpowers/plans/2026-09-09-gp12-turnover-formal-v1-amendment-1.md'
+      - 'docs/superpowers/plans/2026-09-09-gp12-turnover-known-at-pit-amendment-2.md'
   workflow_dispatch:
 
 permissions:
@@ -37,6 +43,7 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v \
+            test_gp12_sina_stock_structure_v1.py \
             test_gp12_sina_share_amount_v1.py \
             test_gp12_turnover_formal_v1.py \
             test_gp12_turnover_readiness_bind_v1.py \
