@@ -1,0 +1,37 @@
+{
+  "artifact": "PIT_ST_EVIDENCE_COVERAGE_V1",
+  "version": "V1",
+  "label": "INDEPENDENT_SAMPLE_CROSSCHECK",
+  "observed_source": {
+    "provider": "BaoStock",
+    "merged_run_id": 33971534669,
+    "merged_artifact_id": 9971136795,
+    "merged_artifact_name": "gp-pit-st-v480-merged",
+    "merged_artifact_digest": "sha256:655896cc32483d8372072e014e9cb29c09a947eb587695c10b0c993636beef3c"
+  },
+  "independent_source": {
+    "provider": "CNINFO company disclosures",
+    "contract_file": "data/PIT_ST_TRANSITION_EVIDENCE_V480.json",
+    "method": "Exact effective date and transition direction matched against sampled BaoStock observed transitions"
+  },
+  "observed_transition_symbol_n": 233,
+  "observed_transition_n": 386,
+  "independent_symbol_n": 3,
+  "independent_transition_n": 6,
+  "transition_coverage_pct": 1.5544041450777202,
+  "symbol_coverage_pct": 1.2875536480686696,
+  "sample_transition_ids": [
+    "000007.SZ|2023-05-05|0->1",
+    "000007.SZ|2024-07-02|1->0",
+    "000692.SZ|2023-04-26|0->1",
+    "000692.SZ|2024-05-29|1->0",
+    "002141.SZ|2024-04-29|0->1",
+    "002141.SZ|2025-06-30|1->0"
+  ],
+  "independent_sample_transition_crosscheck_pass": true,
+  "independent_full_transition_audit_pass": false,
+  "interpretation": "BaoStock full-panel PIT/ST remains internally lifecycle-audited; independent CNINFO evidence validates a 6-of-386 transition sample and must not be described as full independent transition coverage.",
+  "formal_admission": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
