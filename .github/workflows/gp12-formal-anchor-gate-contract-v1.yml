@@ -1,0 +1,30 @@
+name: GP12 Formal Anchor Gate Contract V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-formal-v1
+    paths:
+      - 'scripts/gp12_share_known_at_v1.py'
+      - 'scripts/test_gp12_formal_anchor_gate_v1.py'
+      - '.github/workflows/gp12-turnover-formal-v1.yml'
+      - '.github/workflows/gp12-formal-anchor-gate-contract-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Formal-anchor gate contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_formal_anchor_gate_v1.py
