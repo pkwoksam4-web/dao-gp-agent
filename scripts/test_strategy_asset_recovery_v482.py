@@ -120,6 +120,26 @@ class StrategyAssetRecoveryV482Tests(unittest.TestCase):
         self.assertFalse(out['model_freeze_allowed'])
         self.assertFalse(out['oos_metrics_allowed'])
 
+    def test_uninspectable_searched_surface_is_preserved_without_clearing_blockers(self):
+        x = evidence()
+        x['searched_surfaces'].append({
+            'surface': 'replit_random_name_apps',
+            'confidence': 'UNINSPECTABLE',
+            'finding': 'two relevant-window apps exist but read-only inspection timed out',
+        })
+        out = mod.evaluate_strategy_recovery(base_recovery_checkpoint(), x)
+        surface = next(s for s in out['searched_surfaces'] if s['surface'] == 'replit_random_name_apps')
+        self.assertEqual(surface['confidence'], 'UNINSPECTABLE')
+        self.assertEqual(out['blockers'], BASE_BLOCKERS)
+        self.assertFalse(out['model_freeze_allowed'])
+        self.assertFalse(out['oos_metrics_allowed'])
+
+    def test_uninspectable_is_not_valid_for_confirmed_rules(self):
+        x = evidence()
+        x['confirmed_rules'][0]['confidence'] = 'UNINSPECTABLE'
+        with self.assertRaises(ValueError):
+            mod.evaluate_strategy_recovery(base_recovery_checkpoint(), x)
+
     def test_unknown_confidence_is_rejected(self):
         x = evidence()
         x['confirmed_rules'][0]['confidence'] = 'MAYBE'
