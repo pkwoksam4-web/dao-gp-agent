@@ -206,11 +206,11 @@ jobs:
               and binding.get('pit_verified') is True
               and not result['structural_blockers']
           )
-          gate = (
-              'DUAL_SOURCE_STRUCTURAL_PASS'
-              if not result['structural_blockers']
-              and result['matched_state_n'] > 0
-              else 'BLOCKED'
+          gate = known_mod.dual_source_probe_gate(
+              structural_blockers=result['structural_blockers'],
+              binding_blockers=result['binding_blockers'],
+              matched_state_n=result['matched_state_n'],
+              pit_verified=result['pit_verified'],
           )
           result['data_gate'] = gate
 
