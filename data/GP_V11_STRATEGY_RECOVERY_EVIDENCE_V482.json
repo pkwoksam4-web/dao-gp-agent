@@ -16,7 +16,7 @@
     {
       "surface": "current_runtime_local_mount_2026_09_09",
       "confidence": "ABSENT",
-      "finding": "direct filesystem scan of current /mnt/data found no gp_v11 directory, v11_offline_backtest archive, qfq_v310_extract directory, run_formal_pipeline.py, verify_dataset.py, or cross_validate_adjusted_sources.py remnants; current runtime cannot recover the historical archive bytes"
+      "finding": "direct filesystem scan of current /mnt/data plus /home, /mnt and /tmp found no gp_v11 directory, v11_offline_backtest archive, qfq_v310_extract directory, run_formal_pipeline.py, verify_dataset.py, fetch_baostock.py, or cross_validate_adjusted_sources.py remnants; text-cache search for historical archive names and the candidate v3.4 SHA also returned zero"
     },
     {
       "surface": "file_library_2026_08_13_to_2026_08_26",
@@ -31,7 +31,7 @@
     {
       "surface": "file_library_exact_archive_and_internal_filename_rescan_2026_09_09",
       "confidence": "ABSENT",
-      "finding": "exact and recall searches for v11_offline_backtest_starter_v2.zip, v11_offline_backtest_v3_1.zip, v11_offline_backtest_v3_4.zip, the candidate v3.4 ZIP SHA256, run_formal_pipeline.py, fetch_baostock.py, verify_dataset.py, r120, MFE/MAE/ATR and starter-v2 output terms did not recover an archive, manifest or scorer source; only the later V3.10 auxiliary adjusted-source validator reference is file-backed"
+      "finding": "exact, date-bounded and short-token searches for v11_offline_backtest_starter_v2.zip, v11_offline_backtest_v3_1.zip, v11_offline_backtest_v3_4.zip, v11/offline/backtest/v3_1, application/zip, the candidate v3.4 ZIP SHA256, run_formal_pipeline.py, fetch_baostock.py, verify_dataset.py, r120, MFE/MAE/ATR and starter-v2 output terms did not recover an archive, manifest or scorer source; only the later V3.10 auxiliary adjusted-source validator reference is file-backed"
     },
     {
       "surface": "gmail_2026_08_20_to_2026_09_02_attachments",
@@ -51,7 +51,7 @@
     {
       "surface": "replit_relevant_window_apps_2026_09_09",
       "confidence": "UNINSPECTABLE",
-      "finding": "two user-editable Replit apps exist in the relevant historical window: FruitfulStormySign updated 2026-08-29 and AgedCapitalDeclaration updated 2026-08-30; GP and Quant title searches did not identify a matching app, but repeated read-only codebase inspection requests to both apps timed out and public-name searches returned no indexed cache, so these carriers cannot be classified as absent or authoritative and cannot affect strategy recovery blockers"
+      "finding": "two user-editable Replit apps exist in the relevant historical window: FruitfulStormySign updated 2026-08-29 and AgedCapitalDeclaration updated 2026-08-30. FruitfulStormySign has a failed historical deployment; AgedCapitalDeclaration has never been published. Repeated read-only codebase inspection requests to both apps timed out, and the connector exposes no independent file-read API. Historical GP checkpoints describe Replit in this period as a RAW/data-bridge route, not scorer provenance. These carriers therefore cannot positively satisfy any strategy blocker."
     },
     {
       "surface": "v3_10_archive_trace",
@@ -79,6 +79,11 @@
         "frozen_framework_accepted": true,
         "scope_note": "confirms the frozen 12-factor framework identity only; it does not confirm factor names, formulas, weights, normalization, aggregation or trade rules"
       }
+    },
+    {
+      "key": "v31_data_first_walkforward_order",
+      "confidence": "USER_CONFIRMED",
+      "value": "Acquire 2020-2026 full-A daily bars plus historical ST, suspension/trading-status and listing/delisting information first; only after adjustment and dataset audits pass may Daily Base Walk-forward run. Do not jump ahead to Formal/OOS performance."
     },
     {
       "key": "label_clock",
@@ -175,15 +180,16 @@
           "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_starter_v2.zip",
           "reported_features": [
             "r120",
-            "MFE/MAE horizons 1/2/3",
-            "future-3-day Hit thresholds ±2% and +4%",
-            "ATR threshold logic",
-            "UP/DOWN/FLAT/AMBIG adaptive path labels",
+            "MFE/MAE at T+1/T+2/T+3 horizons",
+            "Hit thresholds +2%, +4%, -2% were reported",
+            "ATR-adaptive threshold logic was reported but no multiplier/window is recovered",
+            "UP/DOWN/FLAT/AMBIG path labels; same-day opposing threshold hits are ambiguous because daily bars do not reveal ordering",
             "RAW/EVENT_CLEAN/STRESS modes",
             "Walk-forward skeleton"
           ],
           "reported_outputs": ["summary", "bucket_stats", "walk_forward", "daily_replay"],
-          "reported_selfcheck": "1000 simulated K-lines"
+          "reported_selfcheck": "1000 simulated K-lines",
+          "definition_gap": "the six targets were referenced, but their complete itemized production definitions and formulas are not recovered"
         },
         "v3_1": {
           "archive": "v11_offline_backtest_v3_1.zip",
@@ -191,13 +197,15 @@
           "reported_new_files": ["fetch_baostock.py", "verify_dataset.py", "run_formal_pipeline.py"],
           "reported_pipeline_rules": [
             "2020-2026 full-A daily bars plus amount/history-ST/trading-status/listing-delisting audit",
-            "20-day attendance measured on joint market calendar",
+            "20-day attendance measured on the joint market calendar",
+            "assistant-reported example: missing 6 of 20 joint-calendar days implies attendance 0.70 and exclusion",
             ">=843 historical-bar audit",
             "low-amount threshold must be explicit",
             "Walk-forward starts only after dataset audit passes",
             "RAW/EVENT_CLEAN/STRESS plus six targets and OOS calibration"
           ],
-          "reported_formal_result": "simulation regression passed; no Formal result was produced at that point"
+          "reported_formal_result": "simulation regression passed; no Formal result was produced at that point",
+          "provenance_note": "file names and detailed pipeline behavior are recovered from prior assistant output; the user separately confirmed the data-first-before-Walk-forward stage order, not these exact implementation details"
         },
         "v3_4": {
           "archive": "v11_offline_backtest_v3_4.zip",
