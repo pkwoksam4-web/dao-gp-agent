@@ -72,7 +72,7 @@ class PermanentArchiveReceiptTests(unittest.TestCase):
             'provider': 'GITHUB_RELEASE',
             'repository': 'pkwoksam4-web/dao-gp-agent',
             'release_tag': 'gp-evidence-v482-audit-v1',
-            'release_target_sha': 'e' * 40,
+            'release_target_sha': 'ee445e5dae3f2b78328d72de144d15f4c52e77ad',
             'assets': [
                 {
                     'logical_name': 'FULL_RAW_PARQUET_V482',
