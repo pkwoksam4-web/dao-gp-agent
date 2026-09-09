@@ -10,11 +10,13 @@ on:
       - 'scripts/test_gp12_formal_input_readiness_production_v1.py'
       - 'scripts/test_gp12_formal_input_readiness_cli_v1.py'
       - 'data/GP12_FORMAL_INPUT_EVIDENCE_V1.json'
+      - 'docs/gp12-formal-input-readiness-v1.md'
       - '.github/workflows/gp12-formal-input-readiness-v1.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   contracts:
@@ -24,7 +26,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Formal input readiness contracts
+      - name: Candidate readiness and upstream gate regressions
         env:
           PYTHONPATH: scripts
         run: |
@@ -32,4 +34,246 @@ jobs:
           python -m unittest -v \
             test_gp12_formal_input_readiness_v1.py \
             test_gp12_formal_input_readiness_production_v1.py \
-            test_gp12_formal_input_readiness_cli_v1.py
+            test_gp12_formal_input_readiness_cli_v1.py \
+            test_gp12_candidate_v1.py \
+            test_gp12_eastmoney_adapter_v1.py \
+            test_gp12_sohu_qfq_adapter_v1.py \
+            test_gp12_source_router_v1.py \
+            test_strategy_asset_recovery_v482.py \
+            test_model_freeze_recovery_v482.py \
+            test_oos_admission_v482.py
+
+  production-readiness:
+    needs: contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download authoritative Formal final artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: upstream/formal
+          run-id: 34192462041
+          github-token: ${{ github.token }}
+
+      - name: Download authoritative Formal calendar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: upstream/calendar
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+
+      - name: Download signed Full RAW artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Download signed frozen liquidity artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-liquidity-80m-v482
+          path: upstream/liquidity
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+
+      - name: Re-verify downloaded upstream Formal evidence
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/readiness
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          from pathlib import Path
+          import gp12_formal_input_readiness_v1 as mod
+
+          formal = json.loads(Path('upstream/formal/FORMAL_READINESS_FINAL_V482.json').read_text(encoding='utf-8'))
+          formal_sha = hashlib.sha256(json.dumps(
+              formal, ensure_ascii=False, sort_keys=True, separators=(',', ':')
+          ).encode('utf-8')).hexdigest()
+          assert formal_sha == mod.FORMAL_ARTIFACT_SHA256, formal_sha
+          assert formal['formal_ready'] is True
+          assert formal['oos_metrics_allowed'] is False
+          assert formal['universe_n'] == 847
+          assert formal['formal_symbol_n'] == 844
+          assert formal['full_path_pass_n'] == 844
+          assert formal['full_path_fail_n'] == 0
+
+          calendar_path = Path('upstream/calendar/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv')
+          with calendar_path.open(encoding='utf-8', newline='') as handle:
+              dates = [row['trade_date'].strip() for row in csv.DictReader(handle)]
+          assert len(dates) == 1426
+          assert dates[0] == '2020-06-01' and dates[-1] == '2026-04-17'
+          assert dates == sorted(set(dates))
+          calendar_sha = hashlib.sha256('\n'.join(dates).encode('utf-8')).hexdigest()
+          assert calendar_sha == mod.FORMAL_CALENDAR_SHA256, calendar_sha
+
+          raw = json.loads(Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json').read_text(encoding='utf-8'))
+          assert raw['artifact'] == 'SOHU_RAW_FULL_V482'
+          assert raw['version'] == 'V4.82'
+          assert raw['status'] == 'PASS_FULL_RAW_V482'
+          assert raw['symbol_n'] == 847
+          assert raw['raw_rows'] == 1011607
+          assert raw['expected_trade_rows'] == 1011607
+          assert raw['duplicate_symbol_dates'] == 0
+          assert raw['missing_trade_dates_n'] == 0
+          assert raw['extra_trade_dates_n'] == 0
+          assert raw['bad_ohlc_rows'] == 0
+          assert raw['bad_volume_rows'] == 0
+          assert raw['bad_amount_rows'] == 0
+          assert raw['global_reaudit_pass'] is True
+          assert raw['formal_admission'] is False
+          assert raw['oos_metrics_allowed'] is False
+
+          liquidity = json.loads(Path('upstream/liquidity/LIQUIDITY_80M_APPLY_AUDIT_V482.json').read_text(encoding='utf-8'))
+          assert liquidity['artifact'] == 'LIQUIDITY_80M_APPLY_V482'
+          assert liquidity['version'] == 'V4.82'
+          assert liquidity['threshold_cny'] == 80000000
+          assert liquidity['symbol_n'] == 847
+          assert liquidity['calendar_days'] == 1426
+          assert liquidity['panel_rows'] == 1207822
+          assert liquidity['pitst_source_rows'] == 1022100
+          assert liquidity['lifecycle_padding_rows'] == 185722
+          assert liquidity['corrected_trade_rows'] == 1011607
+          assert liquidity['raw_trade_rows'] == 1011607
+          assert liquidity['current_trade_violation_n'] == 0
+          assert liquidity['st_overlay_violation_n'] == 0
+          assert liquidity['formal_admission'] is False
+          assert liquidity['oos_metrics_allowed'] is False
+          assert liquidity['raw_pitst_audit']['status'] == 'PASS_EXACT_RAW_PITST'
+
+          evidence = json.loads(Path('data/GP12_FORMAL_INPUT_EVIDENCE_V1.json').read_text(encoding='utf-8'))
+          manifest = mod.validate_production_evidence_manifest(evidence)
+          assert manifest['production_manifest_valid'] is True, manifest
+          assert manifest['blockers'] == [], manifest
+
+          binding = {
+              'artifact': 'GP12_FORMAL_UPSTREAM_BINDING_CHECK_V1',
+              'formal_end': '2026-04-17',
+              'sources': {
+                  'formal': {
+                      'run_id': 34192462041,
+                      'artifact_id': 10042687724,
+                      'artifact_name': 'gp-formal-readiness-final-v482',
+                      'artifact_zip_sha256': 'fdd2f45f4c6998ce2e130363aaf49bab16c9f964c28ba3202b552fbe07c5f5c6',
+                      'canonical_json_sha256': formal_sha,
+                  },
+                  'calendar': {
+                      'run_id': 33977325822,
+                      'artifact_id': 9972698555,
+                      'artifact_name': 'gp-pit-st-v480-final-audit',
+                      'artifact_zip_sha256': 'a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58',
+                      'semantic_sha256': calendar_sha,
+                      'date_n': len(dates),
+                  },
+                  'raw': {
+                      'run_id': 34192233633,
+                      'artifact_id': 10042614517,
+                      'artifact_name': 'gp-sohu-full-raw-v482-reaudit',
+                      'artifact_zip_sha256': mod.RAW_ARTIFACT_SHA256,
+                      'raw_rows': raw['raw_rows'],
+                  },
+                  'liquidity': {
+                      'run_id': 34192233633,
+                      'artifact_id': 10042615093,
+                      'artifact_name': 'gp-liquidity-80m-v482',
+                      'artifact_zip_sha256': mod.LIQUIDITY_ARTIFACT_SHA256,
+                      'panel_rows': liquidity['panel_rows'],
+                  },
+              },
+              'production_manifest_valid': True,
+              'oos_data_consumed': False,
+          }
+          Path('out/readiness/GP12_FORMAL_UPSTREAM_BINDING_CHECK_V1.json').write_text(
+              json.dumps(binding, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Materialize Formal-only candidate readiness
+        run: |
+          python scripts/gp12_formal_input_readiness_v1.py \
+            --parameters data/GP12_CANDIDATE_PARAMETERS_V1.json \
+            --factors data/GP12_CANDIDATE_FACTORS_V1.json \
+            --evidence data/GP12_FORMAL_INPUT_EVIDENCE_V1.json \
+            --out out/readiness/GP12_FORMAL_INPUT_READINESS_V1.json
+          cp data/GP12_FORMAL_INPUT_EVIDENCE_V1.json out/readiness/
+
+      - name: Verify production readiness remains fail closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          x = json.loads(Path('out/readiness/GP12_FORMAL_INPUT_READINESS_V1.json').read_text(encoding='utf-8'))
+          expected_blockers = sorted([
+              'ADJUSTED_CLOSE_PIT_UNVERIFIED',
+              'INTRADAY_15M_UNBOUND',
+              'INTRADAY_60M_UNBOUND',
+              'LABEL_PROVENANCE_UNBOUND',
+              'MAIN_NET_FLOW_UNBOUND',
+              'MARKET_BENCHMARK_UNBOUND',
+              'MARKET_BREADTH_UNBOUND',
+              'SECTOR_BREADTH_UNBOUND',
+              'SECTOR_MEMBERSHIP_PIT_UNBOUND',
+              'SECTOR_SERIES_UNBOUND',
+              'STATUS_SEMANTICS_INCOMPLETE',
+              'TURNOVER_RATIO_UNBOUND',
+          ])
+          assert x['artifact'] == 'GP12_FORMAL_INPUT_READINESS_V1'
+          assert x['formal_end'] == '2026-04-17'
+          assert x['candidate_parameters_sha256'] == '22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
+          assert x['candidate_factors_sha256'] == 'b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
+          assert x['formal_artifact_sha256'] == 'e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796'
+          assert x['formal_calendar_sha256'] == '5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7'
+          assert x['universe_sha256'] == 'dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb'
+          assert x['validated_families'] == ['market_calendar']
+          assert x['ready_factor_ids'] == []
+          assert x['blocked_factor_ids'] == [f'F{i}' for i in range(1,13)]
+          assert x['blockers'] == expected_blockers, x['blockers']
+          assert x['candidate_scoring_ready'] is False
+          assert x['real_feature_inputs_validated'] is False
+          assert x['candidate_freeze_ready'] is False
+          assert x['candidate_adoption_status'] == 'UNAPPROVED'
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+
+          forbidden = {'return','returns','pnl','alpha','sharpe','drawdown','hit_rate','win_rate','performance','metrics'}
+          def scan(v):
+              if isinstance(v, dict):
+                  for k, child in v.items():
+                      assert str(k).lower() not in forbidden, k
+                      scan(child)
+              elif isinstance(v, list):
+                  for child in v:
+                      scan(child)
+          scan(x)
+          print(json.dumps({
+              'validated_families': x['validated_families'],
+              'missing_or_unvalidated_families': x['missing_or_unvalidated_families'],
+              'ready_factor_ids': x['ready_factor_ids'],
+              'blocked_factor_ids': x['blocked_factor_ids'],
+              'blockers': x['blockers'],
+              'candidate_scoring_ready': x['candidate_scoring_ready'],
+              'candidate_adoption_status': x['candidate_adoption_status'],
+              'model_freeze_allowed': x['model_freeze_allowed'],
+              'oos_metrics_allowed': x['oos_metrics_allowed'],
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload Formal input readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-formal-input-readiness-v1
+          path: out/readiness/
+          if-no-files-found: error
+          retention-days: 30
