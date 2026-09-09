@@ -7,12 +7,16 @@
 | 文件 | 用途 |
 |---|---|
 | `scripts/gp12_candidate_v1.py` | 12因子计算、归一化、分层总分、候选排序、研究仓位与退出条件、历史标签概率映射、包校验入口 |
+| `scripts/gp12_eastmoney_adapter_v1.py` | Eastmoney 复权日线、资金流与行情元数据的分段请求/重试/解析适配；对未接通的特征族显式报告缺口 |
+| `scripts/test_gp12_eastmoney_adapter_v1.py` | 适配器解析、分段窗口和 fail-closed readiness 测试 |
 | `data/GP12_CANDIDATE_PARAMETERS_V1.json` | 明确提出的权重、分数阈值、Top-N、持有期、仓位及成本规则 |
 | `data/GP12_CANDIDATE_FACTORS_V1.json` | 固定公式版本、全部因子公式、窗口、单位、数据缺失规则 |
 
 三个文件均可读取和校验，校验报告记录真实内容哈希。这里的“补齐”指新候选的工程实现，不能解释为找回了原模型。
 
 另外，`feature_input_readiness()` 与 `raw_panel_gap_report()` 只做接线诊断：它们会区分“快照结构完整”和“来源已实质验证”，并明确指出现有 RAW 日线字段不能替代复权收盘、换手率、主力净流、市场/板块宽度或 15/60 分钟数据。
+
+Eastmoney 适配器已实测到 `300592.SZ` 的复权日线短区间可返回；长区间及资金流/指数接口会间歇性返回 HTTP 502，适配器已改为最多31个自然日分段、重试、去重合并，并将失败保留为来源缺口，不把一次成功响应升级为完整输入验证。
 
 ## 需要采用的具体设计
 

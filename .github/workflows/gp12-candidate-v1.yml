@@ -7,6 +7,8 @@ on:
     paths:
       - 'scripts/gp12_candidate_v1.py'
       - 'scripts/test_gp12_candidate_v1.py'
+      - 'scripts/gp12_eastmoney_adapter_v1.py'
+      - 'scripts/test_gp12_eastmoney_adapter_v1.py'
       - 'data/GP12_CANDIDATE_PARAMETERS_V1.json'
       - 'data/GP12_CANDIDATE_FACTORS_V1.json'
       - 'docs/gp12-candidate-review.md'
@@ -31,6 +33,7 @@ jobs:
         run: |
           python -m unittest -v \
             test_gp12_candidate_v1 \
+            test_gp12_eastmoney_adapter_v1 \
             test_strategy_asset_recovery_v482 \
             test_model_freeze_recovery_v482 \
             test_oos_admission_v482
