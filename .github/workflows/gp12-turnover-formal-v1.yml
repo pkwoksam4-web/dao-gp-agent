@@ -31,11 +31,13 @@ jobs:
           python-version: '3.12'
       - name: Install runtime dependency
         run: python -m pip install --disable-pip-version-check requests
-      - name: Turnover contract tests
+      - name: Turnover and readiness contract tests
         env:
           PYTHONPATH: scripts
         run: |
           cd scripts
           python -m unittest -v \
             test_gp12_sina_share_amount_v1.py \
-            test_gp12_turnover_formal_v1.py
+            test_gp12_turnover_formal_v1.py \
+            test_gp12_turnover_readiness_bind_v1.py \
+            test_gp12_formal_input_readiness_v1.py
