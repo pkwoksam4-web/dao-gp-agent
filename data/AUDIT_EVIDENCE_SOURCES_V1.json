@@ -1,0 +1,86 @@
+{
+  "artifact": "AUDIT_EVIDENCE_SOURCES_V1",
+  "version": "V1",
+  "canonical_lineage": {
+    "repository": "pkwoksam4-web/dao-gp-agent",
+    "base_branch": "gp/gp12-formal-input-readiness-v1",
+    "base_head_sha": "b815773d00e4c6bf775b3ce111aef3fc458cd741",
+    "remediation_branch": "gp/audit-remediation-v1"
+  },
+  "required_governance_blockers": [
+    "PERMANENT_BYTE_ARCHIVE_OPEN",
+    "REPOSITORY_BRANCH_PROTECTION_OPEN",
+    "STRATEGY_ASSETS_INCOMPLETE"
+  ],
+  "items": [
+    {
+      "logical_name": "FULL_RAW_PARQUET_V482",
+      "class": "LARGE_HASH_BOUND",
+      "path": "production/raw/SOHU_RAW_FULL_V482.parquet",
+      "source_type": "GITHUB_ACTIONS",
+      "source_run_id": 34192233633,
+      "source_artifact_id": 10042614517,
+      "source_artifact_name": "gp-sohu-full-raw-v482-reaudit",
+      "source_artifact_digest": "sha256:cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+      "source_head_sha": "8e19520d5d3d942496ac8be75a86197fa8cefbe5",
+      "file_name": "SOHU_RAW_FULL_V482.parquet",
+      "permanent_bytes_available": false,
+      "expiry_at": "2026-10-08T05:51:50Z"
+    },
+    {
+      "logical_name": "LIQUIDITY_80M_PANEL_V482",
+      "class": "LARGE_HASH_BOUND",
+      "path": "production/liquidity/LIQUIDITY_80M_PANEL_V482.parquet",
+      "source_type": "GITHUB_ACTIONS",
+      "source_run_id": 34192233633,
+      "source_artifact_id": 10042615093,
+      "source_artifact_name": "gp-liquidity-80m-v482",
+      "source_artifact_digest": "sha256:a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+      "source_head_sha": "8e19520d5d3d942496ac8be75a86197fa8cefbe5",
+      "file_name": "LIQUIDITY_80M_PANEL_V482.parquet",
+      "permanent_bytes_available": false,
+      "expiry_at": "2026-10-08T05:51:52Z"
+    },
+    {
+      "logical_name": "PIT_ST_DAILY_MERGED_V480",
+      "class": "LARGE_HASH_BOUND",
+      "path": "production/pitst/PIT_ST_DAILY_MERGED_V480.csv",
+      "source_type": "GITHUB_ACTIONS",
+      "source_run_id": 33971534669,
+      "source_artifact_id": 9971136795,
+      "source_artifact_name": "gp-pit-st-v480-merged",
+      "source_artifact_digest": "sha256:655896cc32483d8372072e014e9cb29c09a947eb587695c10b0c993636beef3c",
+      "source_head_sha": "afc4aec3a9b5320a10476451301cfe2630d1581f",
+      "file_name": "PIT_ST_DAILY_MERGED_V480.csv",
+      "permanent_bytes_available": false,
+      "expiry_at": "2026-10-05T14:26:12Z"
+    },
+    {
+      "logical_name": "AUDIT_STATUS_MODEL_V1",
+      "class": "SMALL_PERSISTED",
+      "path": "data/AUDIT_STATUS_MODEL_V1.json",
+      "source_type": "REPOSITORY",
+      "source_head_sha": "56d727e4f4cd349c12e2b47e993727176c67f75b",
+      "persisted_repository_path": "data/AUDIT_STATUS_MODEL_V1.json",
+      "permanent_bytes_available": true
+    },
+    {
+      "logical_name": "PIT_ST_EVIDENCE_COVERAGE_V1",
+      "class": "SMALL_PERSISTED",
+      "path": "data/PIT_ST_EVIDENCE_COVERAGE_V1.json",
+      "source_type": "REPOSITORY",
+      "source_head_sha": "72672ba290a294053147e1791f34439db90f40df",
+      "persisted_repository_path": "data/PIT_ST_EVIDENCE_COVERAGE_V1.json",
+      "permanent_bytes_available": true
+    },
+    {
+      "logical_name": "FIXED_PROBE_REGISTRY_V1",
+      "class": "SMALL_PERSISTED",
+      "path": "data/FIXED_PROBE_REGISTRY_V1.json",
+      "source_type": "REPOSITORY",
+      "source_head_sha": "23ad43d67f9351a0d1c96aa0cc90e010f1146d44",
+      "persisted_repository_path": "data/FIXED_PROBE_REGISTRY_V1.json",
+      "permanent_bytes_available": true
+    }
+  ]
+}
