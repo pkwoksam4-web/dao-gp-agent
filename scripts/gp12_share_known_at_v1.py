@@ -196,6 +196,12 @@ def bind_known_at_states(
 
 
 def resolve_known_at_state(states: list[dict], trade_date: str) -> dict | None:
+    """Select the latest state whose effective and known-at dates are observable.
+
+    This resolver is intentionally temporal-only. Numeric share validation and
+    source-provenance validation belong to the consuming materializer so that
+    those failures retain their exact production blocker/counter categories.
+    """
     target = _canonical_date(trade_date, 'trade_date')
     if not isinstance(states, list):
         raise ValueError('states must be a list')
@@ -209,9 +215,6 @@ def resolve_known_at_state(states: list[dict], trade_date: str) -> dict | None:
         known_at = _canonical_date(raw.get('known_at'), 'known_at')
         if known_at != max(change_date, announcement_date):
             raise ValueError('known_at invariant violation')
-        _positive_shares(raw.get('outstanding_share_shares'))
-        _sha256(raw.get('share_amount_raw_sha256'), 'share_amount_raw_sha256')
-        _sha256(raw.get('stock_structure_raw_sha256'), 'stock_structure_raw_sha256')
         if change_date <= target and known_at <= target:
             eligible.append(dict(raw))
 
