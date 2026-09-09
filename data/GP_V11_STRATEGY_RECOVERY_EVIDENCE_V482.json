@@ -39,6 +39,11 @@
       "finding": "connected Google Drive search returned zero accessible results for exact package names, Quant_Research, run_formal_pipeline.py, cross_validate_adjusted_sources.py, the candidate v3.4 ZIP SHA256 and broad backtest queries; a blank browse and an August 20 to September 1 modified-time browse also returned zero files, so no GP V1.1 source asset is recoverable from the currently authorized Drive scope"
     },
     {
+      "surface": "replit_relevant_window_apps_2026_09_09",
+      "confidence": "UNINSPECTABLE",
+      "finding": "two user-editable Replit apps exist in the relevant historical window: FruitfulStormySign updated 2026-08-29 and AgedCapitalDeclaration updated 2026-08-30; GP and Quant title searches did not identify a matching app, but read-only codebase inspection requests to both apps timed out, so these carriers cannot be classified as absent or authoritative and cannot affect strategy recovery blockers"
+    },
+    {
       "surface": "v3_10_archive_trace",
       "confidence": "AUTHORITATIVE_FILE",
       "finding": "historical v11_offline_backtest_v3_10 trace proves an adjusted-source validation layer and a 50-symbol 27650-row reference sample existed, but archived global factor table and completed independent cross-source result were recorded as not found; this is not strategy-scorer provenance"
