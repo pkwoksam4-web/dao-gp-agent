@@ -180,7 +180,7 @@ class ShareKnownAtV1Tests(unittest.TestCase):
         )
         self.assertEqual(gate, 'DUAL_SOURCE_STRUCTURAL_PASS')
 
-    def test_workflow_uses_centralized_fail_closed_probe_gate(self):
+    def test_workflow_uses_formal_anchor_fail_closed_probe_gate(self):
         workflow_path = (
             pathlib.Path(__file__).resolve().parents[1]
             / '.github'
@@ -188,9 +188,11 @@ class ShareKnownAtV1Tests(unittest.TestCase):
             / 'gp12-turnover-formal-v1.yml'
         )
         workflow = workflow_path.read_text(encoding='utf-8')
-        self.assertIn('known_mod.dual_source_probe_gate(', workflow)
+        self.assertIn('known_mod.bind_formal_anchor_states(', workflow)
+        self.assertIn('gate_mod.formal_anchor_probe_gate(', workflow)
         self.assertIn("binding_blockers=result['binding_blockers']", workflow)
         self.assertIn("pit_verified=result['pit_verified']", workflow)
+        self.assertNotIn("gate = known_mod.dual_source_probe_gate(", workflow)
 
 
 class FormalAnchorBindingTests(unittest.TestCase):
