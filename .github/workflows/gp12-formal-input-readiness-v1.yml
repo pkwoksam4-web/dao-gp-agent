@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/gp12_formal_input_readiness_v1.py'
       - 'scripts/test_gp12_formal_input_readiness_v1.py'
+      - 'scripts/test_gp12_formal_input_readiness_production_v1.py'
       - 'data/GP12_FORMAL_INPUT_EVIDENCE_V1.json'
       - '.github/workflows/gp12-formal-input-readiness-v1.yml'
   workflow_dispatch:
@@ -22,9 +23,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Formal input readiness contract
+      - name: Formal input readiness contracts
         env:
           PYTHONPATH: scripts
         run: |
           cd scripts
-          python -m unittest -v test_gp12_formal_input_readiness_v1.py
+          python -m unittest -v \
+            test_gp12_formal_input_readiness_v1.py \
+            test_gp12_formal_input_readiness_production_v1.py
