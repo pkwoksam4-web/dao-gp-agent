@@ -9,6 +9,8 @@
 | `scripts/gp12_candidate_v1.py` | 12因子计算、归一化、分层总分、候选排序、研究仓位与退出条件、历史标签概率映射、包校验入口 |
 | `scripts/gp12_eastmoney_adapter_v1.py` | Eastmoney 复权日线、资金流与行情元数据的分段请求/重试/解析适配；对未接通的特征族显式报告缺口 |
 | `scripts/test_gp12_eastmoney_adapter_v1.py` | 适配器解析、分段窗口和 fail-closed readiness 测试 |
+| `scripts/gp12_sohu_qfq_adapter_v1.py` | Sohu RAW 日线与 Sina qfq 因子解析、单位规范化、按锚点生成候选 adjusted close；保留 raw/adjusted 双列 |
+| `scripts/test_gp12_sohu_qfq_adapter_v1.py` | Sohu/Sina 解析、锚点边界和 raw/adjusted 分离测试 |
 | `data/GP12_CANDIDATE_PARAMETERS_V1.json` | 明确提出的权重、分数阈值、Top-N、持有期、仓位及成本规则 |
 | `data/GP12_CANDIDATE_FACTORS_V1.json` | 固定公式版本、全部因子公式、窗口、单位、数据缺失规则 |
 
@@ -17,6 +19,8 @@
 另外，`feature_input_readiness()` 与 `raw_panel_gap_report()` 只做接线诊断：它们会区分“快照结构完整”和“来源已实质验证”，并明确指出现有 RAW 日线字段不能替代复权收盘、换手率、主力净流、市场/板块宽度或 15/60 分钟数据。
 
 Eastmoney 适配器已实测到 `300592.SZ` 的复权日线短区间可返回；长区间及资金流/指数接口会间歇性返回 HTTP 502，适配器已改为最多31个自然日分段、重试、去重合并，并将失败保留为来源缺口，不把一次成功响应升级为完整输入验证。
+
+为降低单一来源故障，新增 Sohu RAW + Sina qfq 候选回退路径。该路径复用项目已有的 Sina 因子归一化约定，以显式锚点生成 `adjusted_close`，但 `known_at` 仍为空，且 `point_in_time_known_at=false`、`real_feature_inputs_validated=false`。它只证明解析和候选序列接线，不证明历史时点可得性，也不补齐 ST/可交易状态、市场/板块宽度、主力净流、15/60分钟数据或标签链；不得因此冻结模型或开放 OOS。
 
 ## 需要采用的具体设计
 
@@ -70,6 +74,13 @@ Eastmoney 适配器已实测到 `300592.SZ` 的复权日线短区间可返回；
 ```bash
 PYTHONPATH=scripts python -m unittest -v test_gp12_candidate_v1 test_strategy_asset_recovery_v482 test_model_freeze_recovery_v482 test_oos_admission_v482
 python scripts/gp12_candidate_v1.py --review --out /tmp/GP12_CANDIDATE_REVIEW_V1.json
+```
+
+Sohu/Sina 回退路径的工程回归：
+
+```bash
+PYTHONPATH=scripts python -m unittest -v test_gp12_sohu_qfq_adapter_v1
+python scripts/gp12_sohu_qfq_adapter_v1.py --symbol 300592.SZ --start 2025-10-20 --end 2026-04-17 --out /tmp/GP12_SOHU_SINA_QFQ_300592.json
 ```
 
 远程工作流 `GP12 Reconstruction Candidate V1` 使用确定性合成样本，上传三件套与包校验报告。最终运行记录由关联PR提供。
