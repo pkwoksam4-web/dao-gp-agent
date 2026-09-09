@@ -1,0 +1,35 @@
+{
+  "artifact": "GP12_TURNOVER_PILOT_SYMBOLS_V1",
+  "version": "1.0",
+  "selection_rule": "LEXICOGRAPHIC_FIRST_BY_FIXED_BOARD_PREFIX_FROM_SIGNED_LIQUIDITY_UNIVERSE",
+  "selection_run_id": 34344865624,
+  "selection_artifact": "gp12-turnover-pilot-selection-v1",
+  "selection_artifact_id": 10101251160,
+  "selection_artifact_zip_sha256": "12b743e1c1b1155c9800d401283fd85cf47aef67e055efcc39e05f1da1ff0fd2",
+  "selection_sha256": "8256361f5240e9db22a42bfb683936f6026f679eb5ec88fcb57e5ace541a4fe9",
+  "source_run_id": 34192233633,
+  "source_artifact": "gp-liquidity-80m-v482",
+  "source_artifact_digest": "sha256:a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+  "frozen_universe_n": 847,
+  "symbols": [
+    {
+      "family": "shanghai_main",
+      "symbol": "600068.SH"
+    },
+    {
+      "family": "shenzhen_main",
+      "symbol": "000001.SZ"
+    },
+    {
+      "family": "chinext",
+      "symbol": "300023.SZ"
+    },
+    {
+      "family": "star",
+      "symbol": "688086.SH"
+    }
+  ],
+  "replacement_after_observing_results_allowed": false,
+  "pilot_fetch_executed_at_selection": false,
+  "oos_data_consumed": false
+}
