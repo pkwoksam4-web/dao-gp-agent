@@ -1,0 +1,108 @@
+{
+  "artifact": "AUDIT_REMEDIATION_V1_CHECKPOINT",
+  "version": "V1",
+  "status": "PASS_IDENTITY_REMEDIATION_WITH_GOVERNANCE_BLOCKERS",
+  "canonical_base": {
+    "branch": "gp/gp12-formal-input-readiness-v1",
+    "head_sha": "b815773d00e4c6bf775b3ce111aef3fc458cd741"
+  },
+  "verified_remediation_head_sha": "b7a7772ac026938804f84eb4154eb03b4a186d17",
+  "verification": {
+    "workflow": "GP Audit Remediation V1",
+    "run_id": 34357230269,
+    "contracts": {
+      "status": "SUCCESS",
+      "test_n": 23,
+      "covers": [
+        "byte identity mutation",
+        "schema fingerprint",
+        "repository vs GitHub Actions provenance",
+        "artifact digest validation",
+        "expected production SHA/byte locks",
+        "PIT-ST sampled evidence labeling",
+        "fixed-probe semantic registry",
+        "readiness upward-inference rejection"
+      ]
+    },
+    "baseline_regression": {
+      "status": "SUCCESS",
+      "test_n": 65,
+      "covers": [
+        "Full RAW exact-date and byte identity gates",
+        "Liquidity RAW/PIT-ST byte linkage",
+        "Formal summary-only and hash-mismatch rejection",
+        "PIT-ST lifecycle fail-closed behavior",
+        "QFQ corrected factor-change semantics",
+        "OOS hash linkage and metric-isolation gates"
+      ]
+    },
+    "production_evidence_job": "SUCCESS",
+    "artifact_id": 10106276432,
+    "artifact_name": "gp-audit-remediation-v1",
+    "artifact_digest": "sha256:a16c86f8527f6795df06f8f01cfea1311c56f89d515688aeeebabaca0c491a7a",
+    "manifest_sha256": "fd555a63e77cf5de7bf654eb47f6d09c3ce02354fdb5e6cc7e8eca9bfd12b05a",
+    "independent_artifact_download_inspected": true
+  },
+  "production_byte_bindings": {
+    "full_raw": {
+      "sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "bytes": 20761201,
+      "rows": 1011607,
+      "schema_fingerprint": "f9fa9e598d9e8729380fec764109583c38e1f3f17ea2a29164dc1d35810cfd32",
+      "source_run_id": 34192233633,
+      "source_artifact_id": 10042614517,
+      "source_artifact_digest": "sha256:cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550"
+    },
+    "liquidity_panel": {
+      "sha256": "5c40f0dfbad32e1e9693aad9dfed218aa2d6b2d315b3dd81af409130a00911bf",
+      "bytes": 19873719,
+      "rows": 1207822,
+      "schema_fingerprint": "5311cd2d67183d80f3061fa94e75b2cdeefe1705e86fffbc559c16916e795efb",
+      "input_full_raw_sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "input_pitst_sha256": "ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de",
+      "source_run_id": 34192233633,
+      "source_artifact_id": 10042615093,
+      "source_artifact_digest": "sha256:a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b"
+    },
+    "pit_st": {
+      "sha256": "ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de",
+      "bytes": 36795635,
+      "source_run_id": 33971534669,
+      "source_artifact_id": 9971136795,
+      "source_artifact_digest": "sha256:655896cc32483d8372072e014e9cb29c09a947eb587695c10b0c993636beef3c"
+    }
+  },
+  "pit_st_independent_evidence": {
+    "label": "INDEPENDENT_SAMPLE_CROSSCHECK",
+    "observed_transition_symbol_n": 233,
+    "observed_transition_n": 386,
+    "independently_crosschecked_symbol_n": 3,
+    "independently_crosschecked_transition_n": 6,
+    "event_coverage_pct": 1.5544,
+    "full_independent_transition_audit": false
+  },
+  "gate_state": {
+    "identity_binding_closed": true,
+    "small_evidence_capsule_closed": true,
+    "permanent_byte_archive_closed": false,
+    "repository_branch_protection_closed": false,
+    "formal_data_ready_existing_v482": true,
+    "feature_input_ready": false,
+    "strategy_ready": false,
+    "model_frozen": false,
+    "oos_admitted": false,
+    "baostock_847_scaleout_allowed": false
+  },
+  "remaining_blockers": [
+    "PERMANENT_BYTE_ARCHIVE_OPEN",
+    "REPOSITORY_BRANCH_PROTECTION_OPEN",
+    "STRATEGY_ASSETS_INCOMPLETE"
+  ],
+  "locked_interpretation": [
+    "Audit Remediation V1 closes exact identity binding for the frozen production RAW, Liquidity and PIT-ST bytes without changing their historical data values.",
+    "Repository-persisted small evidence is durable, but the large production bytes remain GitHub Actions-only and expiring; permanent-byte archival is not claimed.",
+    "PIT-ST independent evidence is a 6-of-386 sampled crosscheck, not a full independent audit.",
+    "FORMAL_DATA_READY does not imply FEATURE_INPUT_READY, STRATEGY_READY, MODEL_FROZEN or OOS_ADMITTED.",
+    "BaoStock 847 scale-out remains blocked until the remaining remediation/governance blockers are explicitly resolved or an approved gate revision is recorded."
+  ]
+}
