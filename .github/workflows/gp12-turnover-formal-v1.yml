@@ -41,3 +41,94 @@ jobs:
             test_gp12_turnover_formal_v1.py \
             test_gp12_turnover_readiness_bind_v1.py \
             test_gp12_formal_input_readiness_v1.py
+
+  probe:
+    needs: contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Probe Sina historical share amount for 600000.SH
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/probe
+          python - <<'PY'
+          import json
+          import pathlib
+          from datetime import datetime, timezone
+
+          import requests
+          import gp12_sina_share_amount_v1 as mod
+
+          out = pathlib.Path('out/probe')
+          symbol = '600000.SH'
+          session = requests.Session()
+          raw, fetch_meta = mod.fetch_share_amount(session, symbol, timeout=20, retries=2)
+          result = {
+              'artifact': 'SINA_SHARE_AMOUNT_PROBE_GP12_V1',
+              'version': '1.0',
+              'symbol': symbol,
+              'source_endpoint_family': mod.SOURCE_ENDPOINT_FAMILY,
+              'fetch_status': fetch_meta.get('status'),
+              'http_status': fetch_meta.get('http_status'),
+              'raw_sha256': fetch_meta.get('raw_sha256'),
+              'raw_byte_n': fetch_meta.get('raw_byte_n', 0),
+              'request_identity': fetch_meta.get('request_identity'),
+              'fetched_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'structural_status': 'BLOCKED',
+              'record_count_all': 0,
+              'record_count_formal': 0,
+              'post_formal_record_n': 0,
+              'record_start': None,
+              'record_end': None,
+              'blockers': list(fetch_meta.get('blockers') or []),
+              'pit_verified': False,
+              'formal_feature_ready': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          if raw is not None:
+              (out / '600000.SH.share_amount.raw').write_bytes(raw)
+              try:
+                  rows = mod.parse_share_amount_bytes(symbol, raw)
+                  evidence = mod.build_symbol_evidence(
+                      symbol,
+                      raw,
+                      result['fetched_at'],
+                      int(fetch_meta['http_status']),
+                  )
+                  result.update({
+                      'structural_status': 'STRUCTURAL_PASS',
+                      'record_count_all': len(rows),
+                      'record_count_formal': evidence['normalized_record_count'],
+                      'post_formal_record_n': evidence['post_formal_record_n'],
+                      'record_start': evidence['record_start'],
+                      'record_end': evidence['record_end'],
+                      'blockers': [],
+                  })
+              except Exception as exc:
+                  result['blockers'] = ['SINA_SHARE_PAYLOAD_INVALID']
+                  result['parse_error'] = f'{type(exc).__name__}: {exc}'
+          if result['structural_status'] != 'STRUCTURAL_PASS' and not result['blockers']:
+              result['blockers'] = ['SINA_SHARE_SOURCE_UNAVAILABLE']
+          target = out / 'SINA_SHARE_AMOUNT_PROBE_GP12_V1.json'
+          target.write_text(
+              json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
+          print('WORKFLOW_STATUS=SUCCESS')
+          print('DATA_GATE=' + result['structural_status'])
+          PY
+      - name: Upload probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-sina-share-amount-probe-v1
+          path: out/probe/
+          if-no-files-found: error
+          retention-days: 30
