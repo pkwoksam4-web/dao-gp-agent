@@ -91,6 +91,41 @@ class PermanentArchiveReceiptTests(unittest.TestCase):
             ],
         }
 
+    def _drive_receipt(self):
+        return {
+            'artifact': 'PERMANENT_ARCHIVE_RECEIPT_V1',
+            'version': 'V1',
+            'provider': 'GOOGLE_DRIVE_ARTIFACT_ZIP',
+            'repository': 'pkwoksam4-web/dao-gp-agent',
+            'archive_target_sha': 'ee445e5dae3f2b78328d72de144d15f4c52e77ad',
+            'folder_id': 'folder123',
+            'retention_lock': False,
+            'assets': [
+                {
+                    'logical_name': 'FULL_RAW_PARQUET_V482',
+                    'asset_name': 'SOHU_RAW_FULL_V482.parquet',
+                    'sha256': '1' * 64,
+                    'bytes': 100,
+                    'download_verified': True,
+                    'drive_file_id': 'drive-raw',
+                    'archive_container_name': 'raw.zip',
+                    'archive_container_sha256': 'a' * 64,
+                    'archive_container_bytes': 1000,
+                },
+                {
+                    'logical_name': 'LIQUIDITY_80M_PANEL_V482',
+                    'asset_name': 'LIQUIDITY_80M_PANEL_V482.parquet',
+                    'sha256': '2' * 64,
+                    'bytes': 200,
+                    'download_verified': True,
+                    'drive_file_id': 'drive-liq',
+                    'archive_container_name': 'liq.zip',
+                    'archive_container_sha256': 'b' * 64,
+                    'archive_container_bytes': 2000,
+                },
+            ],
+        }
+
     def test_exact_release_receipt_closes_only_archive_blocker(self):
         fn = require(apply_archive_receipt, self)
         manifest = fn(self._manifest(), self._receipt())
@@ -104,6 +139,28 @@ class PermanentArchiveReceiptTests(unittest.TestCase):
             self.assertEqual(item['archive']['sha256'], item['sha256'])
             self.assertEqual(item['archive']['bytes'], item['bytes'])
         self.assertEqual(validate_evidence_manifest(manifest), [])
+
+    def test_exact_drive_receipt_closes_expiry_blocker_but_keeps_retention_lock_open(self):
+        fn = require(apply_archive_receipt, self)
+        manifest = fn(self._manifest(), self._drive_receipt())
+        self.assertNotIn('PERMANENT_BYTE_ARCHIVE_OPEN', manifest['blockers'])
+        self.assertIn('IMMUTABLE_RETENTION_LOCK_OPEN', manifest['blockers'])
+        self.assertIn('REPOSITORY_BRANCH_PROTECTION_OPEN', manifest['blockers'])
+        for item in manifest['evidence_items']:
+            self.assertTrue(item['permanent_bytes_available'])
+            self.assertEqual(item['archive']['provider'], 'GOOGLE_DRIVE_ARTIFACT_ZIP')
+            self.assertTrue(item['archive']['download_verified'])
+            self.assertEqual(item['archive']['sha256'], item['sha256'])
+            self.assertEqual(item['archive']['bytes'], item['bytes'])
+            self.assertRegex(item['archive']['archive_container_sha256'], r'^[0-9a-f]{64}$')
+        self.assertEqual(validate_evidence_manifest(manifest), [])
+
+    def test_drive_receipt_wrong_container_sha_fails_closed(self):
+        fn = require(validate_archive_receipt, self)
+        receipt = self._drive_receipt()
+        receipt['assets'][0]['archive_container_sha256'] = 'bad'
+        with self.assertRaises(ValueError):
+            fn(self._manifest(), receipt)
 
     def test_wrong_release_download_sha_fails_closed(self):
         fn = require(validate_archive_receipt, self)
