@@ -11,7 +11,7 @@ import pandas as pd
 import requests
 
 from intraday_formal847_inventory_audit_v482 import norm_symbol
-from intraday_minute_materialization_pilot_v482 import REQUIRED_COLUMNS, resample_day
+from intraday_minute_materialization_pilot_v482 import REQUIRED_COLUMNS, _aggregate_chunk, split_and_validate_day
 
 
 FORMAL_START = '2020-06-01'
@@ -94,6 +94,26 @@ def _index_required_days(df: pd.DataFrame, required_dates: list[str]) -> dict[st
     }
 
 
+def _resample_continuous(continuous: pd.DataFrame, interval_minutes: int) -> pd.DataFrame:
+    am = continuous.iloc[:120].reset_index(drop=True)
+    pm = continuous.iloc[120:].reset_index(drop=True)
+    rows = []
+    for session_name, frame in [('AM', am), ('PM', pm)]:
+        if len(frame) != 120:
+            raise ValueError('continuous session minute grid mismatch')
+        for start in range(0, 120, interval_minutes):
+            chunk = frame.iloc[start:start + interval_minutes]
+            if len(chunk) != interval_minutes:
+                raise ValueError('continuous session minute grid mismatch')
+            rows.append(_aggregate_chunk(chunk, session_name, interval_minutes))
+    return pd.DataFrame(rows)
+
+
+def _resample_day_both(day_frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    continuous, _marker = split_and_validate_day(day_frame)
+    return _resample_continuous(continuous, 15), _resample_continuous(continuous, 60)
+
+
 def audit_source_frame(source: pd.DataFrame, required_dates: list[str], symbol: str):
     s = norm_symbol(symbol)
     required = sorted(set(str(d)[:10] for d in required_dates if FORMAL_START <= str(d)[:10] <= FORMAL_END))
@@ -136,8 +156,7 @@ def audit_source_frame(source: pd.DataFrame, required_dates: list[str], symbol: 
         day['symbol'] = s
         try:
             _validate_required_values(day)
-            b15 = resample_day(day, 15)
-            b60 = resample_day(day, 60)
+            b15, b60 = _resample_day_both(day)
             if len(b15) != 16 or len(b60) != 4:
                 raise ValueError(f'bar count mismatch: 15m={len(b15)} 60m={len(b60)}')
             bars15_parts.append(b15)
