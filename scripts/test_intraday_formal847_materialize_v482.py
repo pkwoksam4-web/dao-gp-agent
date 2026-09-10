@@ -3,6 +3,7 @@ import unittest
 import pandas as pd
 
 import intraday_formal847_materialize_v482 as mod
+from intraday_minute_materialization_pilot_v482 import resample_day
 
 
 def make_day(symbol: str, day: str) -> pd.DataFrame:
@@ -58,6 +59,14 @@ class IntradayFormal847MaterializeV482Tests(unittest.TestCase):
         self.assertEqual(len(indexed['2024-01-02']), 241)
         self.assertEqual(len(indexed['2024-01-04']), 241)
         self.assertNotIn('2024-01-03', indexed)
+
+    def test_dual_resample_validates_once_and_matches_legacy_outputs(self):
+        day = make_day('000001', '2024-01-02')
+        got15, got60 = mod._resample_day_both(day)
+        exp15 = resample_day(day, 15)
+        exp60 = resample_day(day, 60)
+        pd.testing.assert_frame_equal(got15.reset_index(drop=True), exp15.reset_index(drop=True), check_dtype=True)
+        pd.testing.assert_frame_equal(got60.reset_index(drop=True), exp60.reset_index(drop=True), check_dtype=True)
 
     def test_valid_required_days_materialize_exact_15m_60m_counts(self):
         src = pd.concat([make_day('000001', '2024-01-02'), make_day('000001', '2024-01-03')], ignore_index=True)
