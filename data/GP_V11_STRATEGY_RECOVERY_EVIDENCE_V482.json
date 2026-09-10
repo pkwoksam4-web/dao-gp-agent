@@ -24,6 +24,11 @@
       "finding": "v11_offline_backtest_v3_10.zip was materialized from Library; archive SHA256 is d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d and contains executable Daily Base, panel and Formal pipeline source plus tests and a package manifest"
     },
     {
+      "surface": "historical_conversation_acceptance_2026_08_25",
+      "confidence": "USER_CONFIRMED",
+      "finding": "the assistant enumerated the fixed V1.0 12-factor library and weights, and the user immediately accepted the proposal and freezing of that fixed 12-factor framework; this is confirmation-by-adjacent-acceptance rather than an independently retyped factor list"
+    },
+    {
       "surface": "gmail_attachment_search",
       "confidence": "ABSENT",
       "finding": "read-only Gmail search found no separate GP V1.1 source attachment; Library is the recovered authoritative package carrier"
@@ -42,8 +47,31 @@
         "framework_version": "V1.0",
         "factor_count": 12,
         "frozen_framework_accepted": true,
-        "scope_note": "this confirms the 12-factor framework identity but not the unrecovered full aggregation formulas, complete weight vector or execution policy"
+        "confirmation_mode": "adjacent acceptance of the enumerated fixed-factor proposal"
       }
+    },
+    {
+      "key": "factor_library_v10",
+      "confidence": "USER_CONFIRMED",
+      "value": [
+        {"name": "Market Regime", "weight_pct": 8},
+        {"name": "Market Breadth/Diffusion", "weight_pct": 4},
+        {"name": "Sector RS", "weight_pct": 10},
+        {"name": "Sector Slope x R2", "weight_pct": 7},
+        {"name": "Sector Breadth", "weight_pct": 8},
+        {"name": "Position", "weight_pct": 12},
+        {"name": "Multi-Momentum", "weight_pct": 10},
+        {"name": "Trend Quality", "weight_pct": 8},
+        {"name": "Efficiency Ratio", "weight_pct": 7},
+        {"name": "Drawdown Recovery", "weight_pct": 8},
+        {"name": "Price/Fund Efficiency", "weight_pct": 10},
+        {"name": "Intraday Confirmation", "weight_pct": 8}
+      ]
+    },
+    {
+      "key": "output_framework",
+      "confidence": "USER_CONFIRMED",
+      "value": "fixed output framework includes Structure, Inertia and Execution scores plus P-up/P-range/P-down and key validation levels; exact probability mapping is not recovered"
     },
     {
       "key": "label_clock",
@@ -96,39 +124,7 @@
       "value": "historical V3.10 README explicitly says this is still the Daily structure layer; Market Regime, Sector RS/Breadth, historical fund direction, 15/60-minute execution and Event Shock scores are not merged"
     }
   ],
-  "candidate_clues": [
-    {
-      "key": "factor_names",
-      "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
-      "value": [
-        "Market Regime",
-        "Market Breadth/Diffusion",
-        "Sector RS",
-        "Sector Slope x R2",
-        "Sector Breadth",
-        "Position",
-        "Multi-Momentum",
-        "Trend Quality",
-        "Efficiency Ratio",
-        "Drawdown Recovery",
-        "Price/Fund Efficiency",
-        "Intraday Confirmation"
-      ],
-      "note": "conversation candidate only; exact full 12-factor definition package is not yet recovered"
-    },
-    {
-      "key": "factor_weights_pct",
-      "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
-      "value": [8, 4, 10, 7, 8, 12, 10, 8, 7, 8, 10, 8],
-      "note": "sums to 100 but was recovered from prior assistant output only; not freeze eligible"
-    },
-    {
-      "key": "score_layers",
-      "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
-      "value": ["Structure", "Inertia", "Execution"],
-      "note": "framework-level clue; exact complete aggregation remains unrecovered"
-    }
-  ],
+  "candidate_clues": [],
   "recovered_assets": [
     {
       "key": "daily_base_strategy_code",
@@ -137,18 +133,9 @@
       "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip",
       "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
       "files": [
-        {
-          "path": "src/run_backtest.py",
-          "sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1"
-        },
-        {
-          "path": "src/run_panel_backtest.py",
-          "sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2"
-        },
-        {
-          "path": "src/run_formal_pipeline.py",
-          "sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"
-        }
+        {"path": "src/run_backtest.py", "sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1"},
+        {"path": "src/run_panel_backtest.py", "sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2"},
+        {"path": "src/run_formal_pipeline.py", "sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"}
       ],
       "complete_12_factor_strategy": false
     }
@@ -157,12 +144,12 @@
     "complete_12_factor_strategy_code_bytes",
     "non_daily_layer_factor_formulas",
     "exact_normalization_and_clipping",
-    "authoritative_weight_vector",
     "score_layer_aggregation",
     "probability_mapping",
     "ranking_topn_semantics",
     "entry_exit_thresholds",
     "holding_and_rebalance_policy",
-    "position_sizing_and_risk_rules"
+    "position_sizing_and_risk_rules",
+    "non_daily_layer_source_bytes"
   ]
 }
