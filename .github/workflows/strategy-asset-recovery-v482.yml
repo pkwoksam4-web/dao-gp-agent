@@ -9,9 +9,11 @@ on:
       - 'scripts/test_strategy_asset_recovery_v482.py'
       - 'scripts/test_strategy_factor_recovery_matrix_v482.py'
       - 'scripts/test_gp12_candidate_historical_crosswalk_v482.py'
+      - 'scripts/test_strategy_policy_recovery_matrix_v482.py'
       - 'data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json'
       - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
       - 'data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json'
+      - 'data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json'
       - '.github/workflows/strategy-asset-recovery-v482.yml'
   workflow_dispatch:
 
@@ -35,7 +37,8 @@ jobs:
           python -m unittest -v \
             test_strategy_asset_recovery_v482.py \
             test_strategy_factor_recovery_matrix_v482.py \
-            test_gp12_candidate_historical_crosswalk_v482.py
+            test_gp12_candidate_historical_crosswalk_v482.py \
+            test_strategy_policy_recovery_matrix_v482.py
       - name: Upstream recovery, calendar, admission and Formal regressions
         env:
           PYTHONPATH: scripts
