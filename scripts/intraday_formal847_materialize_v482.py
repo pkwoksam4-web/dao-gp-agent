@@ -40,26 +40,30 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def required_trade_dates(pitst: pd.DataFrame, symbol: str) -> list[str]:
-    s = norm_symbol(symbol)
-    df = pitst.copy()
-    if not {'symbol', 'date', 'tradestatus'}.issubset(df.columns):
+def prepare_required_trade_date_index(pitst: pd.DataFrame) -> dict[str, list[str]]:
+    if not {'symbol', 'date', 'tradestatus'}.issubset(pitst.columns):
         raise ValueError('PIT/ST must contain symbol,date,tradestatus')
+    df = pitst[['symbol', 'date', 'tradestatus']].copy()
     df['symbol'] = df['symbol'].map(norm_symbol)
     df['date'] = df['date'].astype(str).str[:10]
     df['tradestatus'] = pd.to_numeric(df['tradestatus'], errors='coerce').fillna(0).astype(int)
     for corr_symbol, corr_date in PITST_TRADESTATUS_ONE_CORRECTIONS:
-        if corr_symbol == s:
-            mask = (df['symbol'] == corr_symbol) & (df['date'] == corr_date)
-            if int(mask.sum()) == 1:
-                df.loc[mask, 'tradestatus'] = 1
-    g = df[
-        (df['symbol'] == s)
-        & (df['date'] >= FORMAL_START)
+        mask = (df['symbol'] == corr_symbol) & (df['date'] == corr_date)
+        if int(mask.sum()) == 1:
+            df.loc[mask, 'tradestatus'] = 1
+    df = df[
+        (df['date'] >= FORMAL_START)
         & (df['date'] <= FORMAL_END)
         & (df['tradestatus'] == 1)
     ]
-    return sorted(g['date'].drop_duplicates().tolist())
+    return {
+        str(symbol): sorted(group['date'].drop_duplicates().tolist())
+        for symbol, group in df.groupby('symbol', sort=False)
+    }
+
+
+def required_trade_dates(pitst: pd.DataFrame, symbol: str) -> list[str]:
+    return prepare_required_trade_date_index(pitst).get(norm_symbol(symbol), [])
 
 
 def _empty_bars() -> pd.DataFrame:
@@ -204,6 +208,7 @@ def materialize_shard(
     if shard_count <= 0 or not 0 <= shard_index < shard_count:
         raise ValueError('invalid shard index/count')
     pit = pd.read_csv(pitst_path, dtype={'symbol': 'string', 'date': 'string'})
+    trade_date_index = prepare_required_trade_date_index(pit)
     inventory = pd.read_csv(inventory_path, dtype='string', keep_default_na=False)
     if len(inventory) != 847 or inventory['_norm_symbol'].nunique() != 847:
         raise ValueError('inventory map must contain exactly 847 unique symbols')
@@ -219,7 +224,7 @@ def materialize_shard(
     bars60_parts = []
 
     for i, symbol in enumerate(selected, 1):
-        req = required_trade_dates(pit, symbol)
+        req = trade_date_index.get(symbol, [])
         base = {
             'symbol': symbol,
             'canonical_path': str(inventory.loc[symbol, 'file']),
