@@ -11,12 +11,16 @@ on:
       - 'scripts/test_gp12_candidate_historical_crosswalk_v482.py'
       - 'scripts/test_strategy_policy_recovery_matrix_v482.py'
       - 'scripts/test_strategy_intraday_source_recovery_v482.py'
+      - 'scripts/test_strategy_intraday_inventory_binding_v482.py'
       - 'data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json'
       - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
       - 'data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json'
       - 'data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json'
       - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
       - 'data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json'
+      - 'data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json'
+      - 'data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv'
+      - 'data/FORMAL847_SYMBOLS_V482.txt'
       - '.github/workflows/strategy-asset-recovery-v482.yml'
   workflow_dispatch:
 
@@ -42,7 +46,8 @@ jobs:
             test_strategy_factor_recovery_matrix_v482.py \
             test_gp12_candidate_historical_crosswalk_v482.py \
             test_strategy_policy_recovery_matrix_v482.py \
-            test_strategy_intraday_source_recovery_v482.py
+            test_strategy_intraday_source_recovery_v482.py \
+            test_strategy_intraday_inventory_binding_v482.py
       - name: Upstream recovery, calendar, admission and Formal regressions
         env:
           PYTHONPATH: scripts
@@ -88,6 +93,9 @@ jobs:
           policy_path = Path('data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json')
           intraday_path = Path('data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json')
           intraday_verify_path = Path('data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json')
+          intraday_inventory_audit_path = Path('data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json')
+          intraday_inventory_map_path = Path('data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv')
+          intraday_formal_symbols_path = Path('data/FORMAL847_SYMBOLS_V482.txt')
 
           checkpoint = json.loads(checkpoint_path.read_text(encoding='utf-8'))
           evidence = json.loads(evidence_path.read_text(encoding='utf-8'))
@@ -112,6 +120,23 @@ jobs:
           intraday_verify = json.loads(intraday_verify_bytes.decode('utf-8'))
           intraday_verify_sha256 = hashlib.sha256(intraday_verify_bytes).hexdigest()
           assert intraday_verify_sha256 == '1eb392c8224d13c0b883ea71ec27cd84f73f599c0526107608e0996725c6068a'
+
+          intraday_inventory_audit_bytes = intraday_inventory_audit_path.read_bytes()
+          intraday_inventory_audit = json.loads(intraday_inventory_audit_bytes.decode('utf-8'))
+          intraday_inventory_audit_sha256 = hashlib.sha256(intraday_inventory_audit_bytes).hexdigest()
+          assert intraday_inventory_audit_sha256 == '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'
+          intraday_inventory_map_bytes = intraday_inventory_map_path.read_bytes()
+          intraday_inventory_map_sha256 = hashlib.sha256(intraday_inventory_map_bytes).hexdigest()
+          assert intraday_inventory_map_sha256 == 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'
+          intraday_formal_symbols_bytes = intraday_formal_symbols_path.read_bytes()
+          intraday_formal_symbols_sha256 = hashlib.sha256(intraday_formal_symbols_bytes).hexdigest()
+          assert intraday_formal_symbols_sha256 == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'
+          assert intraday_inventory_audit['formal847_inventory_intersection']['matched_symbols'] == 847
+          assert intraday_inventory_audit['formal847_inventory_intersection']['missing_symbols'] == 0
+          assert intraday_inventory_audit['formal_847_minute_inventory_membership_verified'] is True
+          assert intraday_inventory_audit['formal_847_minute_byte_coverage_verified'] is False
+          assert intraday_inventory_audit['formal_847_15m_coverage_verified'] is False
+          assert intraday_inventory_audit['formal_847_60m_coverage_verified'] is False
 
           expected_factors = [
               ('Market Regime', 8),
@@ -144,6 +169,11 @@ jobs:
           assert isrc['frequency'] == '1min'
           assert isrc['actual_minute_bytes_materialized'] is True
           assert isrc['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert isrc['formal_847_inventory_membership_verified'] is True
+          assert isrc['formal_847_inventory_audit_sha256'] == intraday_inventory_audit_sha256
+          assert isrc['formal_847_inventory_map_sha256'] == intraday_inventory_map_sha256
+          assert isrc['formal_847_inventory_symbols'] == 847
+          assert isrc['formal_847_minute_byte_coverage_verified'] is False
           assert isrc['formal_15m_coverage_verified'] is False
           assert isrc['formal_60m_coverage_verified'] is False
           assert isrc['resampling_contract_recovered'] is False
@@ -214,7 +244,7 @@ jobs:
 
           assert intraday['artifact'] == 'GP_V11_INTRADAY_SOURCE_RECOVERY_V482'
           assert intraday['version'] == 'V4.82'
-          assert intraday['status'] == 'PARTIAL_FILE_BACKED_SINGLE_SYMBOL_RESAMPLING_PILOT'
+          assert intraday['status'] == 'PARTIAL_FILE_BACKED_FORMAL847_INVENTORY_PLUS_SINGLE_SYMBOL_RESAMPLING_PILOT'
           assert intraday['primary_source']['dataset'] == 'neigezhu/china-a-share-1min-ohlcv'
           assert intraday['primary_source']['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
           hist = intraday['historical_delisted_inventory']
@@ -228,6 +258,17 @@ jobs:
           assert intraday['actual_minute_bytes_materialized_in_strategy_recovery'] is True
           assert intraday['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
           assert intraday['single_symbol_session_aware_resampling_pilot_validated'] is True
+          inv_binding = intraday['formal847_inventory_audit']
+          assert inv_binding['audit_sha256'] == intraday_inventory_audit_sha256
+          assert inv_binding['inventory_map_sha256'] == intraday_inventory_map_sha256
+          assert inv_binding['formal_symbols_sha256'] == intraday_formal_symbols_sha256
+          assert inv_binding['formal_universe_symbols'] == 847
+          assert inv_binding['matched_inventory_symbols'] == 847
+          assert inv_binding['missing_inventory_symbols'] == 0
+          assert inv_binding['formal_847_minute_inventory_membership_verified'] is True
+          assert inv_binding['formal_847_minute_byte_coverage_verified'] is False
+          assert intraday['formal_847_minute_inventory_membership_verified'] is True
+          assert intraday['formal_847_minute_byte_coverage_verified'] is False
           assert intraday['formal_847_15m_coverage_verified'] is False
           assert intraday['formal_847_60m_coverage_verified'] is False
           assert intraday['resampling_contract_recovered'] is False
@@ -314,6 +355,11 @@ jobs:
           out['intraday_minute_bytes_materialized'] = intraday['actual_minute_bytes_materialized_in_strategy_recovery']
           out['intraday_minute_bytes_materialized_scope'] = intraday['actual_minute_bytes_materialized_scope']
           out['intraday_single_symbol_resampling_pilot_validated'] = intraday['single_symbol_session_aware_resampling_pilot_validated']
+          out['formal_847_minute_inventory_membership_verified'] = intraday['formal_847_minute_inventory_membership_verified']
+          out['formal_847_minute_inventory_audit_sha256'] = intraday_inventory_audit_sha256
+          out['formal_847_minute_inventory_map_sha256'] = intraday_inventory_map_sha256
+          out['formal_847_symbols_sha256'] = intraday_formal_symbols_sha256
+          out['formal_847_minute_byte_coverage_verified'] = intraday['formal_847_minute_byte_coverage_verified']
           out['intraday_pilot_source_sha256'] = pilot['source_sha256']
           out['intraday_pilot_15m_sha256'] = pilot['bars_15m_sha256']
           out['intraday_pilot_60m_sha256'] = pilot['bars_60m_sha256']
@@ -325,6 +371,11 @@ jobs:
           assert out['intraday_minute_bytes_materialized'] is True
           assert out['intraday_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
           assert out['intraday_single_symbol_resampling_pilot_validated'] is True
+          assert out['formal_847_minute_inventory_membership_verified'] is True
+          assert out['formal_847_minute_inventory_audit_sha256'] == '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'
+          assert out['formal_847_minute_inventory_map_sha256'] == 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'
+          assert out['formal_847_symbols_sha256'] == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'
+          assert out['formal_847_minute_byte_coverage_verified'] is False
           assert out['formal_15m_coverage_verified'] is False
           assert out['formal_60m_coverage_verified'] is False
           assert out['intraday_resampling_contract_recovered'] is False
@@ -343,6 +394,9 @@ jobs:
           Path('out/strategy-recovery/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json').write_bytes(policy_bytes)
           Path('out/strategy-recovery/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json').write_bytes(intraday_bytes)
           Path('out/strategy-recovery/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json').write_bytes(intraday_verify_bytes)
+          Path('out/strategy-recovery/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json').write_bytes(intraday_inventory_audit_bytes)
+          Path('out/strategy-recovery/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv').write_bytes(intraday_inventory_map_bytes)
+          Path('out/strategy-recovery/FORMAL847_SYMBOLS_V482.txt').write_bytes(intraday_formal_symbols_bytes)
 
           print(json.dumps({
               'status': out['status'],
@@ -353,6 +407,11 @@ jobs:
               'intraday_minute_bytes_materialized': out['intraday_minute_bytes_materialized'],
               'intraday_minute_bytes_materialized_scope': out['intraday_minute_bytes_materialized_scope'],
               'intraday_single_symbol_resampling_pilot_validated': out['intraday_single_symbol_resampling_pilot_validated'],
+              'formal_847_minute_inventory_membership_verified': out['formal_847_minute_inventory_membership_verified'],
+              'formal_847_minute_inventory_audit_sha256': out['formal_847_minute_inventory_audit_sha256'],
+              'formal_847_minute_inventory_map_sha256': out['formal_847_minute_inventory_map_sha256'],
+              'formal_847_symbols_sha256': out['formal_847_symbols_sha256'],
+              'formal_847_minute_byte_coverage_verified': out['formal_847_minute_byte_coverage_verified'],
               'intraday_pilot_source_sha256': out['intraday_pilot_source_sha256'],
               'intraday_pilot_15m_sha256': out['intraday_pilot_15m_sha256'],
               'intraday_pilot_60m_sha256': out['intraday_pilot_60m_sha256'],
