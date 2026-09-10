@@ -91,7 +91,12 @@ jobs:
           assert not raw.duplicated(['symbol','date']).any()
           assert raw['date'].between(FORMAL_BEG,FORMAL_END).all()
           assert set(raw['date']).issubset(set(dates))
-          assert raw['symbol'].nunique()==847
+          raw_symbols=set(raw['symbol'].unique())
+          zero_trade_symbols=set(raw_audit.get('zero_trade_symbols',[]))
+          assert len(raw_symbols)==844
+          assert len(zero_trade_symbols)==3
+          assert raw_symbols.isdisjoint(zero_trade_symbols)
+          assert len(raw_symbols | zero_trade_symbols)==raw_audit['symbol_n']==847
           assert len(raw)==1011607
 
           date_to_idx={d:i for i,d in enumerate(dates)}
@@ -102,6 +107,7 @@ jobs:
           for h in HORIZONS:
               base=raw.copy()
               base['calendar_index']=base['date'].map(date_to_idx)
+              assert base['calendar_index'].notna().all()
               base['target_index']=base['calendar_index']+h
               in_window=base['target_index']<len(dates)
               excluded_calendar_end=int((~in_window).sum())
@@ -153,7 +159,9 @@ jobs:
                       'artifact_zip_sha256':RAW_ARTIFACT_ZIP_SHA256,
                       'parquet_sha256':sha256_file(raw_path),
                       'rows':int(len(raw)),
-                      'symbol_n':int(raw['symbol'].nunique()),
+                      'traded_symbol_n':len(raw_symbols),
+                      'logical_universe_n':raw_audit['symbol_n'],
+                      'zero_trade_symbols':sorted(zero_trade_symbols),
                   },
                   'calendar':{
                       'workflow_run_id':33977325822,
@@ -170,6 +178,7 @@ jobs:
                   'max_target_date':max(dates),
                   'target_dates_never_shifted_for_missing_symbol_rows':True,
                   'source_symbol_date_duplicates':0,
+                  'zero_trade_symbols_emit_no_labels':True,
               },
               'promotion':{
                   'historical_label_provenance_candidate_materialized':True,
@@ -181,11 +190,7 @@ jobs:
           }
           audit_path=out/'GP12_FORMAL_LABEL_PROVENANCE_PROBE_V1.json'
           audit_path.write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
-          print(json.dumps({
-              'status':audit['status'],
-              'horizons':summaries,
-              'promotion':audit['promotion']
-          },ensure_ascii=False,indent=2))
+          print(json.dumps({'status':audit['status'],'horizons':summaries,'promotion':audit['promotion']},ensure_ascii=False,indent=2))
           PY
       - name: Verify no OOS or silent promotion
         run: |
@@ -196,6 +201,7 @@ jobs:
           assert x['status']=='PASS_LITERAL_RAW_CLOSE_LABEL_PROVENANCE_PROBE'
           assert x['invariants']['oos_rows_consumed']==0
           assert x['invariants']['max_target_date']=='2026-04-17'
+          assert x['invariants']['zero_trade_symbols_emit_no_labels'] is True
           assert x['promotion']['historical_label_provenance_candidate_materialized'] is True
           assert x['promotion']['label_provenance_blocker_closed'] is False
           assert x['promotion']['model_freeze_allowed'] is False
