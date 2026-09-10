@@ -1,0 +1,311 @@
+name: GP BaoStock turnover Full847 probe V482
+
+on:
+  push:
+    branches:
+      - gp/baostock-fullraw-crosscheck-v482
+    paths:
+      - '.github/workflows/baostock-turnover-full847-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BaoStock
+        run: python -m pip install --upgrade pip baostock==0.9.3 pandas
+      - name: Download frozen PIT-ST universe evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: upstream/pitst
+          run-id: 33977325822
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Collect turnover shard
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p out/turnover_shard
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          import pandas as pd
+          import baostock as bs
+
+          FORMAL_BEG='2020-06-01'
+          FORMAL_END='2026-04-17'
+          EXPECTED_UNIVERSE_SHA='dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb'
+          SHARD_N=12
+          shard=int(os.environ['SHARD'])
+          overlay_path=Path('upstream/pitst/PIT_ST_FORMAL_OVERLAY_V480.csv')
+          out=Path('out/turnover_shard')
+
+          overlay=pd.read_csv(overlay_path,usecols=['symbol'],dtype=str)
+          symbols=sorted(overlay['symbol'].str.strip().dropna().unique().tolist())
+          semantic_sha=hashlib.sha256('\n'.join(symbols).encode('utf-8')).hexdigest()
+          assert len(symbols)==847, len(symbols)
+          assert semantic_sha==EXPECTED_UNIVERSE_SHA, semantic_sha
+          selected=symbols[shard::SHARD_N]
+          assert selected
+
+          fields='date,code,volume,amount,turn,tradestatus,isST'
+          all_rows=[]
+          symbol_summaries=[]
+
+          def bs_code(symbol):
+              code, exch=symbol.split('.')
+              return f'{exch.lower()}.{code}'
+
+          lg=bs.login()
+          if lg.error_code!='0':
+              raise RuntimeError(f'login failed {lg.error_code}: {lg.error_msg}')
+          try:
+              for i,symbol in enumerate(selected,1):
+                  rs=bs.query_history_k_data_plus(
+                      bs_code(symbol),fields,start_date=FORMAL_BEG,end_date=FORMAL_END,
+                      frequency='d',adjustflag='3')
+                  data=[]
+                  while rs.error_code=='0' and rs.next():
+                      data.append(rs.get_row_data())
+                  if rs.error_code!='0':
+                      symbol_summaries.append({
+                          'symbol':symbol,'status':'BLOCKED_QUERY','error_code':rs.error_code,
+                          'error_msg':rs.error_msg,'daily_rows':0,'traded_rows':0,'stopped_rows':0,
+                          'traded_turn_missing':None,'traded_turn_nonpositive':None,'stopped_turn_nonmissing':None,
+                          'duplicate_dates':None,
+                      })
+                      print(json.dumps({'shard':shard,'progress':i,'of':len(selected),'symbol':symbol,'status':'BLOCKED_QUERY','error':rs.error_msg},ensure_ascii=False),flush=True)
+                      continue
+                  df=pd.DataFrame(data,columns=rs.fields)
+                  if df.empty:
+                      symbol_summaries.append({
+                          'symbol':symbol,'status':'EMPTY_SOURCE','error_code':'0','error_msg':'success',
+                          'daily_rows':0,'traded_rows':0,'stopped_rows':0,
+                          'traded_turn_missing':0,'traded_turn_nonpositive':0,'stopped_turn_nonmissing':0,
+                          'duplicate_dates':0,
+                      })
+                      print(json.dumps({'shard':shard,'progress':i,'of':len(selected),'symbol':symbol,'status':'EMPTY_SOURCE'},ensure_ascii=False),flush=True)
+                      continue
+                  for c in ['volume','amount','turn','tradestatus','isST']:
+                      df[c]=pd.to_numeric(df[c],errors='coerce')
+                  df['symbol']=symbol
+                  df['date']=df['date'].astype(str).str.strip()
+                  traded=df[df['tradestatus'].eq(1)].copy()
+                  stopped=df[~df['tradestatus'].eq(1)].copy()
+                  metrics={
+                      'traded_turn_missing':int(traded['turn'].isna().sum()),
+                      'traded_turn_nonpositive':int((traded['turn']<=0).sum()),
+                      'stopped_turn_nonmissing':int(stopped['turn'].notna().sum()),
+                      'duplicate_dates':int(df.duplicated(['date']).sum()),
+                  }
+                  status='PASS_SYMBOL' if not any(metrics.values()) else 'REVIEW_SYMBOL'
+                  symbol_summaries.append({
+                      'symbol':symbol,'status':status,'error_code':'0','error_msg':'success',
+                      'daily_rows':int(len(df)),'traded_rows':int(len(traded)),'stopped_rows':int(len(stopped)),
+                      **metrics,
+                  })
+                  if len(df):
+                      keep=df[['symbol','date','volume','amount','turn','tradestatus','isST']].copy()
+                      all_rows.append(keep)
+                  print(json.dumps({'shard':shard,'progress':i,'of':len(selected),'symbol':symbol,'status':status,'daily_rows':len(df),'traded_rows':len(traded),'stopped_rows':len(stopped)},ensure_ascii=False),flush=True)
+          finally:
+              bs.logout()
+
+          rows=pd.concat(all_rows,ignore_index=True) if all_rows else pd.DataFrame(columns=['symbol','date','volume','amount','turn','tradestatus','isST'])
+          summary={
+              'artifact':'BAOSTOCK_TURNOVER_FULL847_SHARD_V482','version':'V4.82','shard':shard,'shard_n':SHARD_N,
+              'formal_window':[FORMAL_BEG,FORMAL_END],
+              'universe_n':len(symbols),'universe_semantic_sha256':semantic_sha,
+              'selected_symbol_n':len(selected),'selected_symbols':selected,
+              'queried_symbol_n':len(symbol_summaries),
+              'query_blocked_n':sum(s['status']=='BLOCKED_QUERY' for s in symbol_summaries),
+              'review_symbol_n':sum(s['status']=='REVIEW_SYMBOL' for s in symbol_summaries),
+              'empty_source_symbol_n':sum(s['status']=='EMPTY_SOURCE' for s in symbol_summaries),
+              'daily_rows':int(len(rows)),
+              'traded_rows':int(rows['tradestatus'].eq(1).sum()) if len(rows) else 0,
+              'stopped_rows':int((~rows['tradestatus'].eq(1)).sum()) if len(rows) else 0,
+              'symbol_summaries':symbol_summaries,
+              'promotion':{'formal_admission':False,'turnover_ratio_blocker_closed':False,'oos_metrics_allowed':False},
+          }
+          summary['status']='PASS_SHARD_FIELD_INTEGRITY' if summary['query_blocked_n']==0 and summary['review_symbol_n']==0 else 'REVIEW_SHARD_FIELD_INTEGRITY'
+          rows.to_csv(out/f'BAOSTOCK_TURNOVER_FULL847_SHARD_{shard:02d}_ROWS_V482.csv',index=False)
+          (out/f'BAOSTOCK_TURNOVER_FULL847_SHARD_{shard:02d}_AUDIT_V482.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({k:summary[k] for k in ['shard','status','selected_symbol_n','query_blocked_n','review_symbol_n','empty_source_symbol_n','daily_rows','traded_rows','stopped_rows']},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-baostock-turnover-full847-shard-${{ matrix.shard }}
+          path: out/turnover_shard/
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install parquet tools
+        run: python -m pip install --upgrade pip pandas pyarrow
+      - name: Download turnover shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-baostock-turnover-full847-shard-*
+          path: upstream/turnover
+          merge-multiple: true
+      - name: Download sealed Sohu Full RAW
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Aggregate and crosscheck Full847
+        run: |
+          mkdir -p out/turnover_full847
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+
+          EXPECTED_UNIVERSE_SHA='dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb'
+          KNOWN_PITST_CORRECTIONS={
+              ('002087.SZ','2024-06-13'),('300356.SZ','2023-06-20'),('600647.SH','2024-06-13'),
+              ('600766.SH','2024-06-13'),('603133.SH','2024-06-13')
+          }
+          inp=Path('upstream/turnover')
+          out=Path('out/turnover_full847')
+          audit_files=sorted(inp.glob('BAOSTOCK_TURNOVER_FULL847_SHARD_*_AUDIT_V482.json'))
+          row_files=sorted(inp.glob('BAOSTOCK_TURNOVER_FULL847_SHARD_*_ROWS_V482.csv'))
+          shard_audits=[json.loads(p.read_text(encoding='utf-8')) for p in audit_files]
+          assert len(shard_audits)==12, len(shard_audits)
+          assert len(row_files)==12, len(row_files)
+          selected=[s for a in shard_audits for s in a['selected_symbols']]
+          assert len(selected)==847 and len(set(selected))==847
+          assert hashlib.sha256('\n'.join(sorted(selected)).encode('utf-8')).hexdigest()==EXPECTED_UNIVERSE_SHA
+
+          frames=[pd.read_csv(p,dtype={'symbol':str,'date':str}) for p in row_files]
+          bao=pd.concat(frames,ignore_index=True)
+          for c in ['volume','amount','turn','tradestatus','isST']:
+              bao[c]=pd.to_numeric(bao[c],errors='coerce')
+          bao['symbol']=bao['symbol'].str.upper().str.strip()
+          bao['date']=bao['date'].str.strip()
+          duplicate_symbol_dates=int(bao.duplicated(['symbol','date']).sum())
+          traded=bao[bao['tradestatus'].eq(1)].copy()
+          stopped=bao[~bao['tradestatus'].eq(1)].copy()
+
+          raw=pd.read_parquet('upstream/raw/SOHU_RAW_FULL_V482.parquet',columns=['symbol','date'])
+          raw['symbol']=raw['symbol'].astype(str).str.upper().str.strip()
+          raw['date']=pd.to_datetime(raw['date']).dt.strftime('%Y-%m-%d')
+          raw=raw.drop_duplicates(['symbol','date'])
+          lhs=traded[['symbol','date']].drop_duplicates()
+          rhs=raw[['symbol','date']]
+          merged=lhs.merge(rhs,on=['symbol','date'],how='outer',indicator=True)
+          bao_only=merged[merged['_merge']=='left_only'][['symbol','date']].sort_values(['symbol','date'])
+          sohu_only=merged[merged['_merge']=='right_only'][['symbol','date']].sort_values(['symbol','date'])
+          bao_only_set=set(map(tuple,bao_only[['symbol','date']].itertuples(index=False,name=None)))
+          sohu_only_set=set(map(tuple,sohu_only[['symbol','date']].itertuples(index=False,name=None)))
+
+          traded_turn_missing=int(traded['turn'].isna().sum())
+          traded_turn_nonpositive=int((traded['turn']<=0).sum())
+          stopped_turn_nonmissing=int(stopped['turn'].notna().sum())
+          query_blocked_n=sum(a['query_blocked_n'] for a in shard_audits)
+          review_symbol_n=sum(a['review_symbol_n'] for a in shard_audits)
+          queried_symbols=[s for a in shard_audits for s in a['symbol_summaries']]
+          zero_trade_symbols=sorted(s['symbol'] for s in queried_symbols if s['traded_rows']==0)
+
+          traded['turn_pct']=traded['turn']
+          traded['turnover_ratio']=traded['turn']/100.0
+          final_cols=['symbol','date','turn_pct','turnover_ratio','volume','amount','isST']
+          traded[final_cols].sort_values(['symbol','date'],kind='stable').to_parquet(out/'BAOSTOCK_TURNOVER_FULL847_TRADED_V482.parquet',index=False,compression='zstd')
+          bao_only.to_csv(out/'BAOSTOCK_ONLY_TRADED_SYMBOL_DATES_V482.csv',index=False)
+          sohu_only.to_csv(out/'SOHU_ONLY_TRADED_SYMBOL_DATES_V482.csv',index=False)
+
+          exact_coverage=(len(bao_only)==0 and len(sohu_only)==0 and len(traded)==len(raw)==1011607)
+          integrity_pass=(query_blocked_n==0 and review_symbol_n==0 and duplicate_symbol_dates==0 and traded_turn_missing==0 and traded_turn_nonpositive==0 and stopped_turn_nonmissing==0)
+          status='PASS_FULL847_TURNOVER_FIELD_COVERAGE' if integrity_pass and exact_coverage else 'REVIEW_FULL847_TURNOVER_FIELD_COVERAGE'
+
+          audit={
+              'artifact':'BAOSTOCK_TURNOVER_FULL847_PROBE_V482','version':'V4.82','status':status,
+              'scope':'Full frozen 847-symbol Formal-window source/field probe; no production/PIT promotion',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'universe':{'symbol_n':847,'semantic_sha256':EXPECTED_UNIVERSE_SHA},
+              'source_field_semantics':{'turn_unit':'percent','candidate_turnover_ratio_transform':'turn / 100'},
+              'collection':{
+                  'shard_n':12,'query_blocked_n':query_blocked_n,'review_symbol_n':review_symbol_n,
+                  'daily_rows':int(len(bao)),'traded_rows':int(len(traded)),'stopped_rows':int(len(stopped)),
+                  'zero_trade_symbols':zero_trade_symbols,'duplicate_symbol_dates':duplicate_symbol_dates,
+              },
+              'field_integrity':{
+                  'traded_turn_missing':traded_turn_missing,'traded_turn_nonpositive':traded_turn_nonpositive,
+                  'stopped_turn_nonmissing':stopped_turn_nonmissing,
+                  'turn_pct_min':float(traded['turn'].min()) if len(traded) else None,
+                  'turn_pct_max':float(traded['turn'].max()) if len(traded) else None,
+              },
+              'sealed_sohu_crosscheck':{
+                  'sohu_trade_rows':int(len(raw)),'baostock_trade_rows':int(len(traded)),
+                  'baostock_only_trade_dates_n':int(len(bao_only)),'sohu_only_trade_dates_n':int(len(sohu_only)),
+                  'exact_symbol_date_coverage':bool(exact_coverage),
+                  'baostock_only_first20':bao_only.head(20).to_dict('records'),
+                  'sohu_only_first20':sohu_only.head(20).to_dict('records'),
+                  'known_pitst_trade_corrections':sorted([list(x) for x in KNOWN_PITST_CORRECTIONS]),
+                  'mismatches_subset_of_known_pitst_corrections':bool((bao_only_set | sohu_only_set).issubset(KNOWN_PITST_CORRECTIONS)),
+              },
+              'interpretation':[
+                  'PASS proves full-universe source availability, turnover field integrity, and traded-row alignment with the sealed Sohu RAW panel.',
+                  'PASS does not by itself prove point-in-time immutability of BaoStock historical turnover values or close TURNOVER_RATIO_UNBOUND.',
+                  'The candidate input is turnover_ratio, so BaoStock turn percent must be divided by 100.',
+                  'No OOS row or performance metric is consumed.'
+              ],
+              'promotion':{
+                  'formal_admission':False,'turnover_ratio_blocker_closed':False,
+                  'candidate_adoption_status':'UNAPPROVED','model_freeze_allowed':False,'oos_metrics_allowed':False,
+              },
+          }
+          (out/'BAOSTOCK_TURNOVER_FULL847_PROBE_AUDIT_V482.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+      - name: Verify fail-closed boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/turnover_full847/BAOSTOCK_TURNOVER_FULL847_PROBE_AUDIT_V482.json').read_text())
+          assert x['universe']['symbol_n']==847
+          assert x['promotion']['formal_admission'] is False
+          assert x['promotion']['turnover_ratio_blocker_closed'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert x['status'] in {'PASS_FULL847_TURNOVER_FIELD_COVERAGE','REVIEW_FULL847_TURNOVER_FIELD_COVERAGE'}
+          print(json.dumps({'status':x['status'],'collection':x['collection'],'field_integrity':x['field_integrity'],'sealed_sohu_crosscheck':x['sealed_sohu_crosscheck']},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload Full847 turnover evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-baostock-turnover-full847-probe-v482
+          path: out/turnover_full847/
+          if-no-files-found: warn
+          retention-days: 30
