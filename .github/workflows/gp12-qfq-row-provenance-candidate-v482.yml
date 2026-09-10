@@ -1,0 +1,215 @@
+name: GP12 V482 row-level QFQ provenance candidate
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths: ['.github/workflows/gp12-qfq-row-provenance-candidate-v482.yml']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip pandas pyarrow numpy
+
+      - name: Download V482 effective event ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-formal-action-neutral-label-candidate-v482
+          path: upstream/events
+          run-id: 34461955463
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download frozen Sina factor census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: upstream/census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download signed Full RAW
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download V479 frozen Sample50 exact validation
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sample50-official-exact-v479
+          path: upstream/sample50
+          run-id: 33970355639
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download authoritative V482 Formal final
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: upstream/formal
+          run-id: 34192462041
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Materialize every Formal traded-row factor and deterministic provenance id
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/qfq_row_provenance
+          python - <<'PY'
+          import bisect, hashlib, json, math
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+          from sample50_validate import parse_sina_qfq
+
+          BEG='2020-06-01'; END='2026-04-17'; THRESHOLD_BP=5.0
+          DIGESTS={
+            'effective_event_ledger_artifact':'c44c9e7a3eaf77e7ce292f46200efc1ce9affe4350394af4b98fa4599f891851',
+            'sina_source_census_artifact':'6a44b7313fd0a4d1890e9888238436240173b33c9794610890a2ec30f930c7bf',
+            'sohu_full_raw_artifact':'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550',
+            'sample50_v479_artifact':'1d6257eced23fc48b8cfb95e1df5d35673c9fd95d8ad9fec3bcd18c10bb1f66f',
+            'formal_final_v482_artifact':'fdd2f45f4c6998ce2e130363aaf49bab16c9f964c28ba3202b552fbe07c5f5c6',
+          }
+          def sha_bytes(b): return hashlib.sha256(b).hexdigest()
+          def load_json(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,len(hits))
+              return json.loads(hits[0].read_text(encoding='utf-8'))
+          def one_file(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,len(hits)); return hits[0]
+          def canonical(x): return json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':'))
+
+          formal=load_json('upstream/formal','FORMAL_READINESS_FINAL_V482.json')
+          assert formal['formal_ready'] is True and formal['validated_global_provenance_emitted'] is True
+          assert formal['full_path_pass_n']==844 and formal['full_path_fail_n']==0
+          assert formal['checkpoint']=={'PASS':844,'EXACT_TERM_REVIEW':0,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3}
+          assert formal['oos_metrics_allowed'] is False
+
+          sample=load_json('upstream/sample50','sample50_exact_results_v479.json')
+          assert sample['sample_version']=='V3.67_FROZEN' and sample['sample_n']==50
+          assert sample['passed']==50 and sample['failed']==0 and sample['all_pass'] is True
+          assert float(sample['max_diff_bp'])<=5.0
+
+          events=pd.read_parquet(one_file('upstream/events','GP12_V482_EFFECTIVE_EVENT_LEDGER.parquet'))
+          assert set(['symbol','ex_date','event_ratio_v482','override_applied']).issubset(events.columns),events.columns.tolist()
+          events['symbol']=events['symbol'].astype(str).str.upper(); events['ex_date']=events['ex_date'].astype(str).str[:10]
+          events['event_ratio_v482']=pd.to_numeric(events['event_ratio_v482'],errors='raise')
+          assert len(events)==2732 and events['event_ratio_v482'].gt(0).all()
+          assert int(events['override_applied'].sum())==281
+          assert not events.duplicated(['symbol','ex_date']).any()
+
+          raw=pd.read_parquet(one_file('upstream/raw','SOHU_RAW_FULL_V482.parquet'))
+          assert set(['symbol','date']).issubset(raw.columns),raw.columns.tolist()
+          raw['symbol']=raw['symbol'].astype(str).str.upper(); raw['date']=raw['date'].astype(str).str[:10]
+          raw=raw[(raw['date']>=BEG)&(raw['date']<=END)].copy()
+          assert len(raw)==1011607,len(raw)
+          assert raw['symbol'].nunique()==844,raw['symbol'].nunique()
+          assert not raw.duplicated(['symbol','date']).any()
+
+          event_by={s:g.sort_values('ex_date') for s,g in events.groupby('symbol',sort=False)}
+          census_root=Path('upstream/census')
+          outputs=[]; audits=[]; max_bp=-1.0; worst=None; mismatch_rows=0
+          for n,(sym,g) in enumerate(raw.groupby('symbol',sort=True),1):
+              g=g.sort_values('date').copy(); dates=g['date'].to_numpy(dtype='U10'); anchor=str(dates[-1])
+              eg=event_by.get(sym)
+              if eg is None:
+                  ed=np.array([],dtype='U10'); er=np.array([],dtype=float); ov=np.array([],dtype=bool)
+              else:
+                  eg=eg[eg['ex_date']<=anchor]
+                  ed=eg['ex_date'].to_numpy(dtype='U10'); er=eg['event_ratio_v482'].to_numpy(float); ov=eg['override_applied'].to_numpy(bool)
+              cum=np.r_[1.0,np.cumprod(er)]
+              idx=np.searchsorted(ed,dates,side='right') if len(ed) else np.zeros(len(dates),dtype=int)
+              event_factor=cum[len(ed)]/cum[idx]
+
+              code,exch=sym.split('.')
+              qfq=one_file(census_root,f'{code}_{exch}_sina_qfq.js')
+              qraw=qfq.read_bytes(); qsha=sha_bytes(qraw); fac=parse_sina_qfq(qraw)
+              fdates=np.array([str(r['date'])[:10] for r in fac],dtype='U10')
+              fvals=np.array([float(r['factor']) for r in fac],dtype=float)
+              assert len(fdates) and np.all(fvals>0)
+              ia=np.searchsorted(fdates,anchor,side='right')-1; assert ia>=0,(sym,anchor)
+              ir=np.searchsorted(fdates,dates,side='right')-1; assert np.all(ir>=0),(sym,dates[ir<0][:3])
+              sina_factor=fvals[ia]/fvals[ir]
+              bp=np.abs(event_factor/sina_factor-1.0)*10000.0
+              local=float(bp.max())
+              bad=int(np.sum(bp>THRESHOLD_BP)); mismatch_rows+=bad
+              if local>max_bp:
+                  j=int(np.argmax(bp)); max_bp=local; worst={'symbol':sym,'date':str(dates[j]),'anchor_date':anchor,'event_factor':float(event_factor[j]),'sina_factor':float(sina_factor[j]),'diff_bp':float(bp[j])}
+
+              chain=[]
+              if eg is not None:
+                  for r in eg.to_dict('records'):
+                      chain.append({'ex_date':str(r['ex_date']),'event_ratio_v482':float(r['event_ratio_v482']),'override_applied':bool(r['override_applied'])})
+              base_obj={'version':'GP12_QFQ_ROW_PROVENANCE_CANDIDATE_V482','symbol':sym,'anchor_date':anchor,'event_chain':chain,'sina_qfq_sha256':qsha,'artifact_digests':DIGESTS}
+              base_id=hashlib.sha256(canonical(base_obj).encode()).hexdigest()
+              out=pd.DataFrame({'symbol':sym,'date':dates,'qfq_factor':event_factor.astype(float),'independent_sina_factor':sina_factor.astype(float),'factor_diff_bp':bp.astype(float)})
+              out['validation_status']=np.where(bp<=THRESHOLD_BP,'ROW_LEVEL_CANDIDATE_PASS','ROW_LEVEL_CANDIDATE_FAIL')
+              out['provenance_id']=[f'{base_id}:{d}' for d in dates]
+              out['provenance_base_id']=base_id
+              out['anchor_date']=anchor
+              outputs.append(out)
+              audits.append({'symbol':sym,'rows':len(out),'anchor_date':anchor,'event_n':len(ed),'override_event_n':int(ov.sum()) if len(ov) else 0,'sina_qfq_sha256':qsha,'provenance_base_id':base_id,'max_diff_bp':local,'fail_rows':bad})
+              if n%100==0 or n==844: print(json.dumps({'progress':n,'symbol':sym,'rows_done':sum(a['rows'] for a in audits),'max_diff_bp_so_far':max_bp,'fail_rows_so_far':mismatch_rows},ensure_ascii=False),flush=True)
+
+          panel=pd.concat(outputs,ignore_index=True)
+          assert len(panel)==1011607
+          assert panel['symbol'].nunique()==844
+          assert not panel.duplicated(['symbol','date']).any()
+          assert panel['qfq_factor'].gt(0).all()
+          assert panel['provenance_id'].notna().all() and panel['provenance_id'].astype(str).str.len().gt(64).all()
+          assert panel['provenance_id'].nunique()==len(panel)
+          outdir=Path('out/qfq_row_provenance')
+          pq=outdir/'GP12_QFQ_ROW_PROVENANCE_CANDIDATE_V482.parquet'
+          panel.to_parquet(pq,index=False,compression='zstd')
+          pd.DataFrame(audits).to_csv(outdir/'GP12_QFQ_ROW_PROVENANCE_BY_SYMBOL_V482.csv',index=False)
+          audit={
+            'artifact':'GP12_QFQ_ROW_PROVENANCE_CANDIDATE_V482','version':'V4.82','status':'PASS_ROW_LEVEL_MATERIALIZATION' if mismatch_rows==0 else 'REVIEW_ROW_LEVEL_MATERIALIZATION',
+            'formal_window':[BEG,END],'formal_symbol_n':844,'not_applicable_symbol_n':3,'row_n':int(len(panel)),'unique_symbol_date_n':int(panel[['symbol','date']].drop_duplicates().shape[0]),
+            'factor_positive_rows':int(panel['qfq_factor'].gt(0).sum()),'row_provenance_nonempty_n':int(panel['provenance_id'].notna().sum()),'row_provenance_unique_n':int(panel['provenance_id'].nunique()),
+            'event_ledger_n':int(len(events)),'override_event_n':int(events['override_applied'].sum()),'sample50_v479':{'sample_n':50,'pass_n':50,'fail_n':0,'max_diff_bp':float(sample['max_diff_bp'])},
+            'global_row_crosscheck':{'threshold_bp':THRESHOLD_BP,'mismatch_rows':int(mismatch_rows),'max_diff_bp':float(max_bp),'worst':worst},
+            'factor_authority_candidate':'V4.82 event-derived ratio path; independent frozen Sina qfq.js normalized path used only as crosscheck',
+            'provenance_scheme':'row provenance_id = sha256(symbol + anchor + ordered V4.82 event chain + frozen artifact digests + per-symbol Sina raw SHA) : date',
+            'artifact_digests':DIGESTS,
+            'contract_gap_before_this_probe':'V4.82 final emitted only summary validated_global_provenance_emitted=true; no row-level factor/provenance table was present in that final artifact.',
+            'promotion':{'validation_status_promoted_to_VALIDATED_GLOBAL_PROVENANCE':False,'adjustment_provenance_blocker_closed':False,'formal_feature_ready':False,'model_freeze_allowed':False,'oos_metrics_allowed':False}
+          }
+          (outdir/'GP12_QFQ_ROW_PROVENANCE_CANDIDATE_V482.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2),flush=True)
+          PY
+
+      - name: Verify fail-closed candidate and exact row coverage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/qfq_row_provenance/GP12_QFQ_ROW_PROVENANCE_CANDIDATE_V482.json').read_text())
+          assert x['status']=='PASS_ROW_LEVEL_MATERIALIZATION'
+          assert x['formal_symbol_n']==844 and x['row_n']==1011607
+          assert x['unique_symbol_date_n']==1011607
+          assert x['factor_positive_rows']==1011607
+          assert x['row_provenance_nonempty_n']==1011607 and x['row_provenance_unique_n']==1011607
+          assert x['event_ledger_n']==2732 and x['override_event_n']==281
+          assert x['sample50_v479']['pass_n']==50 and x['sample50_v479']['fail_n']==0
+          assert x['global_row_crosscheck']['mismatch_rows']==0 and x['global_row_crosscheck']['max_diff_bp']<=5.0
+          p=x['promotion']; assert p['validation_status_promoted_to_VALIDATED_GLOBAL_PROVENANCE'] is False
+          assert p['adjustment_provenance_blocker_closed'] is False and p['formal_feature_ready'] is False
+          assert p['model_freeze_allowed'] is False and p['oos_metrics_allowed'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-qfq-row-provenance-candidate-v482
+          path: out/qfq_row_provenance/
+          if-no-files-found: error
+          retention-days: 30
