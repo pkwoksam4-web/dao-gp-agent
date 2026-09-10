@@ -49,16 +49,12 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
         self.assertFalse(self.doc['model_freeze_allowed'])
         self.assertFalse(self.doc['oos_metrics_allowed'])
 
-    def test_all_non_intraday_factors_have_file_backed_partial_components(self):
+    def test_all_12_factors_have_file_backed_partial_components(self):
         by_name = {x['name']: x for x in self.doc['factors']}
         for name, _ in EXPECTED:
-            if name == 'Intraday Confirmation':
-                continue
             self.assertEqual(by_name[name]['recovery_status'], 'PARTIAL_FILE_BACKED')
             self.assertTrue(by_name[name]['known_components'])
             self.assertTrue(by_name[name]['missing'])
-        self.assertEqual(by_name['Intraday Confirmation']['recovery_status'], 'MISSING')
-        self.assertTrue(by_name['Intraday Confirmation']['missing'])
 
     def test_matrix_binds_exact_recovered_source_identity(self):
         src = self.doc['daily_base_source']
@@ -93,6 +89,16 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
             missing = ' '.join(by_name[name]['missing']).lower()
             self.assertIn('pit', missing)
             self.assertIn('sector', missing)
+
+    def test_intraday_source_is_partial_only(self):
+        src = self.doc['intraday_source_partial']
+        self.assertEqual(src['snapshot_commit_full'], 'f311a5f11569e9d541386982d15f2214d9970b8a')
+        self.assertEqual(src['frequency'], '1min')
+        self.assertFalse(src['actual_minute_bytes_materialized'])
+        self.assertFalse(src['formal_15m_coverage_verified'])
+        self.assertFalse(src['formal_60m_coverage_verified'])
+        self.assertFalse(src['resampling_contract_recovered'])
+        self.assertFalse(src['factor_formula_recovered'])
 
 
 if __name__ == '__main__':
