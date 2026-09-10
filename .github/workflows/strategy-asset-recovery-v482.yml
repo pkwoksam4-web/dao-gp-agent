@@ -77,11 +77,16 @@ jobs:
           checkpoint_path = Path('input/oos-calendar/MODEL_ASSET_RECOVERY_CHECKPOINT_V482_OOS_CALENDAR.json')
           evidence_path = Path('data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json')
           matrix_path = Path('data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json')
+          crosswalk_path = Path('data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json')
+
           checkpoint = json.loads(checkpoint_path.read_text(encoding='utf-8'))
           evidence = json.loads(evidence_path.read_text(encoding='utf-8'))
           matrix_bytes = matrix_path.read_bytes()
           matrix = json.loads(matrix_bytes.decode('utf-8'))
           matrix_sha256 = hashlib.sha256(matrix_bytes).hexdigest()
+          crosswalk_bytes = crosswalk_path.read_bytes()
+          crosswalk = json.loads(crosswalk_bytes.decode('utf-8'))
+          crosswalk_sha256 = hashlib.sha256(crosswalk_bytes).hexdigest()
 
           expected_factors = [
               ('Market Regime', 8),
@@ -108,6 +113,35 @@ jobs:
           assert matrix['model_freeze_allowed'] is False
           assert matrix['oos_metrics_allowed'] is False
 
+          expected_crosswalk_status = {
+              'F1': 'UNVERIFIED_NEW_PROPOSAL',
+              'F2': 'PARTIAL_OVERLAP',
+              'F3': 'CONFIRMED_IDENTITY_ONLY',
+              'F4': 'CONFIRMED_IDENTITY_ONLY',
+              'F5': 'CONFIRMED_IDENTITY_ONLY',
+              'F6': 'PARTIAL_OVERLAP',
+              'F7': 'CONFLICT_WITH_RECOVERED_SOURCE',
+              'F8': 'CONFLICT_WITH_RECOVERED_SOURCE',
+              'F9': 'PARTIAL_OVERLAP',
+              'F10': 'PARTIAL_OVERLAP',
+              'F11': 'UNVERIFIED_NEW_PROPOSAL',
+              'F12': 'UNVERIFIED_NEW_PROPOSAL',
+          }
+          assert crosswalk['artifact'] == 'GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482'
+          assert crosswalk['version'] == 'V4.82'
+          assert crosswalk['candidate']['strategy_id'] == 'GP12_REBUILD_CANDIDATE_V1'
+          assert crosswalk['candidate']['head_sha'] == 'fbba9345fec544b05da6a14f4c2aff43c81d2c95'
+          assert crosswalk['candidate']['adoption_status'] == 'UNAPPROVED'
+          assert crosswalk['promoted_from_candidate_package'] == ['factor_names_and_weights_v1_0']
+          assert crosswalk['authoritative_weight_vector'] == [8, 4, 10, 7, 8, 12, 10, 8, 7, 8, 10, 8]
+          assert {x['factor_id']: x['historical_status'] for x in crosswalk['factors']} == expected_crosswalk_status
+          assert crosswalk['historical_strategy_recovered'] is False
+          assert crosswalk['candidate_formula_adoption_allowed'] is False
+          assert crosswalk['model_freeze_allowed'] is False
+          assert crosswalk['oos_metrics_allowed'] is False
+          assert crosswalk['candidate_policy_disposition']['historical_status'] == 'REJECT_AS_HISTORICAL_PARAMETERS'
+          assert crosswalk['candidate_policy_disposition']['freeze_eligible'] is False
+
           out = mod.evaluate_strategy_recovery(checkpoint, evidence)
           expected = [
               'FACTOR_DEFINITION_MISSING',
@@ -133,6 +167,11 @@ jobs:
           out['authoritative_weight_vector_recovered'] = matrix['authoritative_weight_vector_recovered']
           out['complete_factor_definitions_recovered'] = matrix['complete_factor_definitions_recovered']
           out['full_strategy_source_recovered'] = matrix['full_strategy_source_recovered']
+          out['candidate_historical_crosswalk_sha256'] = crosswalk_sha256
+          out['candidate_strategy_id'] = crosswalk['candidate']['strategy_id']
+          out['candidate_head_sha'] = crosswalk['candidate']['head_sha']
+          out['candidate_adoption_status'] = crosswalk['candidate']['adoption_status']
+          out['candidate_formula_adoption_allowed'] = crosswalk['candidate_formula_adoption_allowed']
 
           target = Path('out/strategy-recovery/STRATEGY_ASSET_RECOVERY_CHECKPOINT_V482.json')
           target.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
@@ -141,6 +180,7 @@ jobs:
               encoding='utf-8',
           )
           Path('out/strategy-recovery/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json').write_bytes(matrix_bytes)
+          Path('out/strategy-recovery/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json').write_bytes(crosswalk_bytes)
           print(json.dumps({
               'status': out['status'],
               'daily_base_code_recovered': out['daily_base_code_recovered'],
@@ -148,6 +188,11 @@ jobs:
               'complete_factor_definitions_recovered': out['complete_factor_definitions_recovered'],
               'full_strategy_source_recovered': out['full_strategy_source_recovered'],
               'factor_recovery_matrix_sha256': out['factor_recovery_matrix_sha256'],
+              'candidate_historical_crosswalk_sha256': out['candidate_historical_crosswalk_sha256'],
+              'candidate_strategy_id': out['candidate_strategy_id'],
+              'candidate_head_sha': out['candidate_head_sha'],
+              'candidate_adoption_status': out['candidate_adoption_status'],
+              'candidate_formula_adoption_allowed': out['candidate_formula_adoption_allowed'],
               'strategy_code_recovered': out['strategy_code_recovered'],
               'parameter_set_recovered': out['parameter_set_recovered'],
               'factor_definition_recovered': out['factor_definition_recovered'],
