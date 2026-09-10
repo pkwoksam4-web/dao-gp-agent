@@ -1,0 +1,168 @@
+{
+  "artifact": "GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482",
+  "version": "V4.82",
+  "strategy_id": "GP_V11",
+  "candidate": {
+    "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+    "pr_number": 9,
+    "branch": "gp/strategy-package-candidate-v482",
+    "head_sha": "fbba9345fec544b05da6a14f4c2aff43c81d2c95",
+    "adoption_status": "UNAPPROVED",
+    "candidate_factor_file": "data/GP12_CANDIDATE_FACTORS_V1.json",
+    "candidate_parameter_file": "data/GP12_CANDIDATE_PARAMETERS_V1.json",
+    "provenance_boundary": "PR #9 explicitly declares its exact factor formulas and strategy parameters to be newly authored reconstruction proposals, not recovered GP V1.1 authority."
+  },
+  "recovered_history_basis": {
+    "factor_library_version": "V1.0",
+    "factor_names_and_weights": "USER_CONFIRMED_BY_ADJACENT_ACCEPTANCE",
+    "daily_base_archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "run_backtest_sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+    "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+    "factor_recovery_matrix": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json"
+  },
+  "promoted_from_candidate_package": [
+    "factor_names_and_weights_v1_0"
+  ],
+  "authoritative_weight_vector": [8, 4, 10, 7, 8, 12, 10, 8, 7, 8, 10, 8],
+  "factors": [
+    {
+      "factor_id": "F1",
+      "candidate_name": "market_regime",
+      "historical_name": "Market Regime",
+      "weight_pct": 8,
+      "historical_status": "UNVERIFIED_NEW_PROPOSAL",
+      "candidate_formula_summary": "mean of normalized 5-day and 20-day market adjusted-close returns",
+      "recovered_source_difference": "Recovered V3.10 partial regime evidence is based on cross-sectional market breadth state; historical design also requires prior-day limit-up performance and first-30-minute volume for the full regime layer. No exact historical return-only formula is recovered.",
+      "decision": "Do not promote candidate formula as historical."
+    },
+    {
+      "factor_id": "F2",
+      "candidate_name": "market_breadth",
+      "historical_name": "Market Breadth/Diffusion",
+      "weight_pct": 4,
+      "historical_status": "PARTIAL_OVERLAP",
+      "candidate_formula_summary": "2*mean(last five market breadth ratios)-1",
+      "recovered_source_difference": "V3.10 file-backed panel code computes daily advance/decline counts and breadth ratios, so the input family overlaps; the five-day mean mapping, signed normalization and final factor aggregation are not recovered historical rules.",
+      "decision": "Preserve as proposal with file-backed input overlap only."
+    },
+    {
+      "factor_id": "F3",
+      "candidate_name": "sector_rs",
+      "historical_name": "Sector RS",
+      "weight_pct": 10,
+      "historical_status": "CONFIRMED_IDENTITY_ONLY",
+      "candidate_formula_summary": "mean normalized sector-minus-market relative returns for 5/10/20 sessions",
+      "recovered_source_difference": "The accepted V1.0 framework confirms Sector RS and the 5/10/20 sector-minus-market concept, but candidate scales 0.03/0.05/0.10 and arithmetic aggregation are newly authored proposal details.",
+      "decision": "Factor identity and horizons are historical; exact candidate formula is not."
+    },
+    {
+      "factor_id": "F4",
+      "candidate_name": "sector_slope_r2",
+      "historical_name": "Sector Slope x R2",
+      "weight_pct": 7,
+      "historical_status": "CONFIRMED_IDENTITY_ONLY",
+      "candidate_formula_summary": "20-session log-price OLS slope times R-squared normalized by 0.10",
+      "recovered_source_difference": "Slope-times-R2 identity is confirmed, but exact log transform, 20-session production window, scaling and normalization are not recovered from authoritative historical source bytes.",
+      "decision": "Keep candidate mathematics proposal-only."
+    },
+    {
+      "factor_id": "F5",
+      "candidate_name": "sector_breadth",
+      "historical_name": "Sector Breadth",
+      "weight_pct": 8,
+      "historical_status": "CONFIRMED_IDENTITY_ONLY",
+      "candidate_formula_summary": "2*mean(last five sector breadth ratios)-1",
+      "recovered_source_difference": "Sector Breadth identity and weight are user-confirmed, but exact numerator/denominator, PIT sector membership, five-session averaging and signed mapping remain unrecovered.",
+      "decision": "Keep candidate formula unapproved and non-historical."
+    },
+    {
+      "factor_id": "F6",
+      "candidate_name": "position",
+      "historical_name": "Position",
+      "weight_pct": 12,
+      "historical_status": "PARTIAL_OVERLAP",
+      "candidate_formula_summary": "1-2*mean of 20/60/120 rolling range locations",
+      "recovered_source_difference": "V3.10 Daily Base exactly computes pos20, pos60 and pos120 rolling range-location features, so the feature family and windows overlap. The candidate inversion, equal averaging and final score mapping are not recovered historical rules.",
+      "decision": "Reuse only the recovered feature semantics, not candidate aggregation."
+    },
+    {
+      "factor_id": "F7",
+      "candidate_name": "multi_momentum",
+      "historical_name": "Multi-Momentum",
+      "weight_pct": 10,
+      "historical_status": "CONFLICT_WITH_RECOVERED_SOURCE",
+      "candidate_formula_summary": "mean of scaled r5/r10/r20/r60",
+      "recovered_source_difference": "Recovered V3.10 Daily Base raw_strength explicitly uses r5/r10/r20/r60/r120 and awards 20 points for each positive horizon. Candidate omits r120 and replaces raw_strength sign-counting with scaled continuous averaging.",
+      "decision": "Candidate formula cannot be treated as recovered historical Multi-Momentum."
+    },
+    {
+      "factor_id": "F8",
+      "candidate_name": "trend_quality",
+      "historical_name": "Trend Quality",
+      "weight_pct": 8,
+      "historical_status": "CONFLICT_WITH_RECOVERED_SOURCE",
+      "candidate_formula_summary": "60-session log-price slope times R-squared normalized by 0.20",
+      "recovered_source_difference": "Recovered V3.10 trend_quality is an explicit threshold score using slope20, R2_20, er20 and close_loc; candidate instead uses a pure 60-session slope/R2 expression and therefore conflicts with the recovered file-backed Daily Base component.",
+      "decision": "Do not promote candidate F8 formula as historical."
+    },
+    {
+      "factor_id": "F9",
+      "candidate_name": "efficiency_ratio",
+      "historical_name": "Efficiency Ratio",
+      "weight_pct": 7,
+      "historical_status": "PARTIAL_OVERLAP",
+      "candidate_formula_summary": "signed 20-session displacement divided by summed absolute path movement",
+      "recovered_source_difference": "V3.10 Daily Base computes ER10 and ER20 with the same displacement-over-path family, and er20 participates in recovered trend_quality. The final historical Efficiency Ratio horizon selection, sign treatment and score mapping are not recovered.",
+      "decision": "Feature overlap is valid; final candidate factor formula remains proposal-only."
+    },
+    {
+      "factor_id": "F10",
+      "candidate_name": "drawdown_recovery",
+      "historical_name": "Drawdown Recovery",
+      "weight_pct": 8,
+      "historical_status": "PARTIAL_OVERLAP",
+      "candidate_formula_summary": "60-session latest-peak, post-peak-trough recovery mapped to a signed score",
+      "recovered_source_difference": "V3.10 Daily Base file-backed features include dd20 and dd60, proving drawdown inputs existed; the candidate latest-peak/trough recovery formula and normalization are newly authored and are not recovered historical code.",
+      "decision": "Retain partial feature overlap only."
+    },
+    {
+      "factor_id": "F11",
+      "candidate_name": "price_fund_efficiency",
+      "historical_name": "Price/Fund Efficiency",
+      "weight_pct": 10,
+      "historical_status": "UNVERIFIED_NEW_PROPOSAL",
+      "candidate_formula_summary": "five-session price efficiency plus capped main-net-flow intensity and sign persistence",
+      "recovered_source_difference": "V3.10 prepare_ashare21_hf.py only proves a 17-column historical fund-flow input-preservation adapter. It does not recover the candidate main_net_flow/amount scaling, pulse cap, five-session persistence, turnover normalization or final Price/Fund formula.",
+      "decision": "Input adapter is historical partial evidence; candidate F11 scoring formula remains new and unapproved."
+    },
+    {
+      "factor_id": "F12",
+      "candidate_name": "intraday_confirmation",
+      "historical_name": "Intraday Confirmation",
+      "weight_pct": 8,
+      "historical_status": "UNVERIFIED_NEW_PROPOSAL",
+      "candidate_formula_summary": "mean normalized return across exactly five closed 15-minute bars and five closed 60-minute bars",
+      "recovered_source_difference": "Historical architecture confirms separate 15-minute and 60-minute execution confirmation, but no authoritative source recovers candidate five-bar windows, 2-percent/4-percent scales, averaging or confirmation/negation rules.",
+      "decision": "Keep F12 formula proposal-only until historical source or a new explicit adoption decision exists."
+    }
+  ],
+  "candidate_policy_disposition": {
+    "historical_status": "REJECT_AS_HISTORICAL_PARAMETERS",
+    "entry_score_min": 60,
+    "exit_score_below": 45,
+    "top_n": 10,
+    "per_symbol_max_weight": 0.1,
+    "per_sector_max_weight": 0.2,
+    "per_name_capital_risk": 0.01,
+    "adverse_price_move_threshold": 0.08,
+    "max_holding_market_sessions": 3,
+    "one_way_basis_points": 10,
+    "probability_mapping": "candidate decile/add-one mapping is proposal-only",
+    "freeze_eligible": false,
+    "reason": "These exact policy values were newly authored for GP12_REBUILD_CANDIDATE_V1 and are not recovered GP V1.1 parameters."
+  },
+  "historical_strategy_recovered": false,
+  "candidate_formula_adoption_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
