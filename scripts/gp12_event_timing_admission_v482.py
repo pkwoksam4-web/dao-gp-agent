@@ -305,7 +305,7 @@ def collect_observed_events(
         add(symbol, ex_date, source, pit_date, record.get("sha256"))
 
     for record in rights.get("records") or []:
-        if record.get("status") != "PASS_RIGHTS_ALLOTMENT_PIT":
+        if record.get("status") != "PASS":
             continue
         add(
             record.get("symbol"),
