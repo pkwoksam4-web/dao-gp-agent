@@ -98,7 +98,7 @@ class StrategyIntradaySourceRecoveryV482Tests(unittest.TestCase):
 
     def test_intraday_recovery_upgrades_only_single_symbol_materialization(self):
         doc = json.loads((ROOT / 'data' / 'GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json').read_text(encoding='utf-8'))
-        self.assertEqual(doc['status'], 'PARTIAL_FILE_BACKED_SINGLE_SYMBOL_RESAMPLING_PILOT')
+        self.assertEqual(doc['status'], 'PARTIAL_FILE_BACKED_FORMAL847_INVENTORY_PLUS_SINGLE_SYMBOL_RESAMPLING_PILOT')
         self.assertTrue(doc['actual_minute_bytes_materialized_in_strategy_recovery'])
         self.assertEqual(doc['actual_minute_bytes_materialized_scope'], 'SINGLE_SYMBOL_002002_ONLY')
         self.assertTrue(doc['single_symbol_session_aware_resampling_pilot_validated'])
