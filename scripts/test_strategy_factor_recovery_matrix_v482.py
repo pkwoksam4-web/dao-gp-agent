@@ -94,7 +94,8 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
         src = self.doc['intraday_source_partial']
         self.assertEqual(src['snapshot_commit_full'], 'f311a5f11569e9d541386982d15f2214d9970b8a')
         self.assertEqual(src['frequency'], '1min')
-        self.assertFalse(src['actual_minute_bytes_materialized'])
+        self.assertTrue(src['actual_minute_bytes_materialized'])
+        self.assertEqual(src['actual_minute_bytes_materialized_scope'], 'SINGLE_SYMBOL_002002_ONLY')
         self.assertFalse(src['formal_15m_coverage_verified'])
         self.assertFalse(src['formal_60m_coverage_verified'])
         self.assertFalse(src['resampling_contract_recovered'])
