@@ -1,0 +1,153 @@
+name: GP V4.82 Intraday Formal847 Inventory Audit
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-formal847-inventory-audit-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit-fixed-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install audit dependencies
+        run: python -m pip install --disable-pip-version-check --quiet pandas pyarrow
+      - name: Download authoritative Full RAW universe artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: input/formal-raw
+          run-id: 34192233633
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download exact Neigezhu inventory metadata snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p input/neigezhu out/formal847-intraday-inventory
+          URL='https://huggingface.co/datasets/neigezhu/china-a-share-1min-ohlcv/resolve/f311a5f11569e9d541386982d15f2214d9970b8a/metadata/coverage_by_instrument.csv?download=true'
+          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 30 --max-time 600 \
+            --dump-header out/formal847-intraday-inventory/neigezhu_http_headers.txt \
+            --output input/neigezhu/coverage_by_instrument.csv "$URL"
+          test -s input/neigezhu/coverage_by_instrument.csv
+          sha256sum input/neigezhu/coverage_by_instrument.csv | tee out/formal847-intraday-inventory/neigezhu_inventory_sha256.txt
+      - name: Audit Formal847 inventory intersection without downloading minute bytes
+        run: |
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+          import pandas as pd
+          import pyarrow.parquet as pq
+
+          raw_candidates = list(Path('input/formal-raw').rglob('SOHU_RAW_FULL_V482.parquet'))
+          assert len(raw_candidates) == 1, raw_candidates
+          raw_path = raw_candidates[0]
+          raw_sha = hashlib.sha256(raw_path.read_bytes()).hexdigest()
+          assert raw_sha == 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb', raw_sha
+
+          raw_schema = pq.ParquetFile(raw_path).schema_arrow.names
+          symbol_col = next((c for c in ['symbol','code','ticker'] if c in raw_schema), None)
+          assert symbol_col is not None, raw_schema
+          raw_symbols = pd.read_parquet(raw_path, columns=[symbol_col])[symbol_col].dropna().astype(str).drop_duplicates().sort_values().tolist()
+          assert len(raw_symbols) == 847, len(raw_symbols)
+
+          inv_path = Path('input/neigezhu/coverage_by_instrument.csv')
+          inv_bytes = inv_path.read_bytes()
+          inv_sha = hashlib.sha256(inv_bytes).hexdigest()
+          inv = pd.read_csv(inv_path)
+
+          def norm_symbol(x):
+              s = str(x).strip().upper()
+              s = s.replace('.XSHE','.SZ').replace('.XSHG','.SH')
+              if re.fullmatch(r'\d{6}', s):
+                  return s + ('.SH' if s.startswith(('5','6','9')) else '.SZ')
+              m = re.fullmatch(r'(SH|SZ)[._-]?(\d{6})', s)
+              if m:
+                  return f'{m.group(2)}.{m.group(1)}'
+              m = re.fullmatch(r'(\d{6})[._-]?(SH|SZ)', s)
+              if m:
+                  return f'{m.group(1)}.{m.group(2)}'
+              return s
+
+          candidate_cols = [c for c in inv.columns if any(k in c.lower() for k in ['symbol','code','ticker','instrument'])]
+          col_stats = []
+          raw_set = {norm_symbol(x) for x in raw_symbols}
+          best_col = None
+          best_match = -1
+          best_norm = None
+          for c in candidate_cols:
+              vals = inv[c].dropna().map(norm_symbol)
+              val_set = set(vals)
+              matches = len(raw_set & val_set)
+              col_stats.append({'column': c, 'unique': len(val_set), 'formal847_matches': matches})
+              if matches > best_match:
+                  best_match = matches
+                  best_col = c
+                  best_norm = vals
+
+          assert best_col is not None, {'columns': list(inv.columns), 'candidate_cols': candidate_cols}
+          inv_norm = inv.copy()
+          inv_norm['_norm_symbol'] = inv[best_col].map(norm_symbol)
+          inventory_set = set(inv_norm['_norm_symbol'].dropna())
+          matched = sorted(raw_set & inventory_set)
+          missing = sorted(raw_set - inventory_set)
+
+          result = {
+              'artifact': 'INTRADAY_FORMAL847_INVENTORY_AUDIT_V482',
+              'version': 'V4.82',
+              'status': 'INVENTORY_ONLY_NOT_BYTE_COVERAGE',
+              'formal_raw': {
+                  'run_id': 34192233633,
+                  'artifact_id': 10042614517,
+                  'artifact_name': 'gp-sohu-full-raw-v482-reaudit',
+                  'artifact_digest': 'sha256:cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550',
+                  'sha256': raw_sha,
+                  'symbol_column': symbol_col,
+                  'symbols': len(raw_set),
+              },
+              'minute_inventory': {
+                  'dataset': 'neigezhu/china-a-share-1min-ohlcv',
+                  'snapshot_commit': 'f311a5f11569e9d541386982d15f2214d9970b8a',
+                  'metadata_path': 'metadata/coverage_by_instrument.csv',
+                  'sha256': inv_sha,
+                  'bytes': len(inv_bytes),
+                  'rows': int(len(inv)),
+                  'columns': [str(c) for c in inv.columns],
+                  'candidate_symbol_columns': col_stats,
+                  'selected_symbol_column': best_col,
+              },
+              'formal847_inventory_intersection': {
+                  'matched_symbols': len(matched),
+                  'missing_symbols': len(missing),
+                  'matched_pct': len(matched) / len(raw_set),
+                  'missing_symbol_list': missing,
+              },
+              'formal_847_minute_byte_coverage_verified': False,
+              'formal_847_15m_coverage_verified': False,
+              'formal_847_60m_coverage_verified': False,
+              'historical_gp_resampling_contract_recovered': False,
+              'factor_formula_recovered': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          out = Path('out/formal847-intraday-inventory/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json')
+          out.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          Path('out/formal847-intraday-inventory/FORMAL847_SYMBOLS_V482.txt').write_text('\n'.join(sorted(raw_set)) + '\n', encoding='utf-8')
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload Formal847 inventory audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-formal847-inventory-audit-v482
+          path: out/formal847-intraday-inventory/
+          if-no-files-found: error
+          retention-days: 30
