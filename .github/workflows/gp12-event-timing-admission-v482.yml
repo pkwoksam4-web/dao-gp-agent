@@ -25,3 +25,124 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_gp12_event_timing_admission_v482.py
+
+  event-timing-admission:
+    needs: event-timing-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download frozen final V4.81 event ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: upstream/ledger
+          run-id: 34078398130
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download Eastmoney main-source full PIT audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-eastmoney-sharebonus-full-pit-audit-v482
+          path: upstream/main
+          run-id: 34462791819
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download frozen F10 implemented-event evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-f10-missing-event-v481
+          path: upstream/f10
+          run-id: 34075413814
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download frozen F10 unresolved-history evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-f10-unresolved-history-v481
+          path: upstream/f10_frozen
+          run-id: 34075792988
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download frozen supplemental THS Sohu Sina evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-supplemental-missing-event-v481
+          path: upstream/supplemental
+          run-id: 34076028687
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download rights-allotment PIT evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-rights-allotment-pit-probe-v482
+          path: upstream/rights
+          run-id: 34464153949
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Consolidate exact final-ledger event PIT coverage
+        run: |
+          LEDGER="$(find upstream/ledger -name GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json -print -quit)"
+          MAIN_ROWS="$(find upstream/main -name EASTMONEY_SHAREBONUS_FULL_PIT_ROWS_V482.csv -print -quit)"
+          MAIN_AUDIT="$(find upstream/main -name EASTMONEY_SHAREBONUS_FULL_PIT_AUDIT_V482.json -print -quit)"
+          F10="$(find upstream/f10 -name F10_MISSING_EVENT_COVERAGE_V481.json -print -quit)"
+          F10_FROZEN="$(find upstream/f10_frozen -name F10_UNRESOLVED_HISTORY_PROBE_V481.json -print -quit)"
+          SUPP="$(find upstream/supplemental -name SUPPLEMENTAL_MISSING_EVENT_EVIDENCE_V481.json -print -quit)"
+          RIGHTS="$(find upstream/rights -name GP12_RIGHTS_ALLOTMENT_PIT_PROBE_V482.json -print -quit)"
+          test -n "$LEDGER" && test -n "$MAIN_ROWS" && test -n "$MAIN_AUDIT" && test -n "$F10" && test -n "$F10_FROZEN" && test -n "$SUPP" && test -n "$RIGHTS"
+          python scripts/gp12_event_timing_admission_v482.py \
+            --ledger "$LEDGER" \
+            --main-rows "$MAIN_ROWS" \
+            --main-audit "$MAIN_AUDIT" \
+            --f10 "$F10" \
+            --f10-frozen "$F10_FROZEN" \
+            --supplemental "$SUPP" \
+            --rights "$RIGHTS" \
+            --out-dir out/event_timing
+
+      - name: Verify exact 2732-event PIT coverage remains fail-closed downstream
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/event_timing/GP12_EVENT_TIMING_ADMISSION_V482.json').read_text())
+          assert x['status']=='PASS_EVENT_TIMING_ADMISSION'
+          assert x['expected_n']==2732 and x['covered_n']==2732
+          assert x['missing_n']==0 and x['extra_n']==0 and x['late_n']==0
+          assert x['source_partition_exact'] is True
+          assert x['source_counts']=={
+            'EASTMONEY_F10_PAGEAJAX_FROZEN':1,
+            'EASTMONEY_F10_PAGEAJAX_IMPLEMENTED':93,
+            'EASTMONEY_RPT_IPO_ALLOTMENT':7,
+            'EASTMONEY_RPT_SHAREBONUS_DET':2620,
+            'SINA_SHAREBONUS_FROZEN_HTML':8,
+            'SOHU_MAJOR_EVENTS':2,
+            'THS_BONUS_HISTORY':1,
+          }
+          assert x['promotion']['event_availability_time_verified'] is True
+          assert x['promotion']['adjusted_close_blocker_closed'] is False
+          assert x['promotion']['turnover_ratio_blocker_closed'] is False
+          assert x['promotion']['label_provenance_blocker_closed'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in ['status','expected_n','covered_n','missing_n','extra_n','late_n','source_counts']},ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload consolidated event timing evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-event-timing-admission-v482
+          path: out/event_timing/
+          if-no-files-found: error
+          retention-days: 30
