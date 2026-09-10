@@ -6,67 +6,32 @@
     {
       "surface": "github_repository_history",
       "confidence": "AUTHORITATIVE_FILE",
-      "finding": "dao-gp-agent root commit 3ebc43fb1c751a0d21abd14964910e3b6846a669 was created 2026-09-04 and contains only .gitkeep; August GP V1.1 strategy source cannot be recovered from this repository parent history"
+      "finding": "dao-gp-agent repository history begins after the original August GP V1.1 package work, so it is not the carrier of the original offline-backtest archives"
     },
     {
-      "surface": "github_current_tree_strategy_filename_scan",
+      "surface": "file_library_direct_zip_enumeration_2026_09_10",
       "confidence": "AUTHORITATIVE_FILE",
-      "finding": "recursive tree at 5e578f172b6c14569460b755adccae710fd367f4 contains no pre-existing scorer or signal path; scorer/signal filename searches return zero matches and strategy references are limited to the V4.82 recovery evidence layer added after the original data-validation chain"
+      "finding": "direct Library ZIP enumeration recovered the historical GP V1.1 package lineage including starter_v2, v3_1, v3_2, v3_3, v3_4, v3_5, v3_6, v3_7, v3_9, v3_10 and Formal evidence packs; prior index-search ABSENT conclusions are superseded"
     },
     {
-      "surface": "current_runtime_local_mount_2026_09_09",
-      "confidence": "ABSENT",
-      "finding": "direct filesystem scan of current /mnt/data plus /home, /mnt and /tmp found no gp_v11 directory, v11_offline_backtest archive, qfq_v310_extract directory, run_formal_pipeline.py, verify_dataset.py, fetch_baostock.py, or cross_validate_adjusted_sources.py remnants; text-cache search for historical archive names and the candidate v3.4 SHA also returned zero"
-    },
-    {
-      "surface": "file_library_2026_08_13_to_2026_08_26",
-      "confidence": "ABSENT",
-      "finding": "no GP V1.1 strategy/scorer/Quant_Research source bundle was found; GP files visible from 2026-08-27 are data-remediation and gate artifacts"
-    },
-    {
-      "surface": "file_library_model_internal_column_scan_2026_08_27_to_2026_08_31",
-      "confidence": "ABSENT",
-      "finding": "searches for structure_score, inertia_score, execution_score, prob_up, prob_down, score_total, top_n, ranking semantics, mom5/mom10/mom20/mom60, er10/er20, sector_rs and related model-internal columns returned RAW/QFQ/hash-ranking remediation artifacts rather than a GP V1.1 scorer output or parameter/factor package"
-    },
-    {
-      "surface": "file_library_exact_archive_and_internal_filename_rescan_2026_09_09",
-      "confidence": "ABSENT",
-      "finding": "exact, date-bounded and short-token searches for v11_offline_backtest_starter_v2.zip, v11_offline_backtest_v3_1.zip, v11_offline_backtest_v3_4.zip, v11/offline/backtest/v3_1, application/zip, the candidate v3.4 ZIP SHA256, run_formal_pipeline.py, fetch_baostock.py, verify_dataset.py, r120, MFE/MAE/ATR and starter-v2 output terms did not recover an archive, manifest or scorer source; only the later V3.10 auxiliary adjusted-source validator reference is file-backed"
-    },
-    {
-      "surface": "gmail_2026_08_20_to_2026_09_02_attachments",
-      "confidence": "ABSENT",
-      "finding": "read-only search found no matching GP V1.1, Quant_Research, offline_backtest, qfq_v310, or backtest source package"
-    },
-    {
-      "surface": "google_drive_authorized_scope_2026_09_09",
-      "confidence": "ABSENT",
-      "finding": "connected Google Drive search returned zero accessible results for exact package names, Quant_Research, run_formal_pipeline.py, cross_validate_adjusted_sources.py, the candidate v3.4 ZIP SHA256 and broad backtest queries; a blank browse and an August 20 to September 1 modified-time browse also returned zero files, so no GP V1.1 source asset is recoverable from the currently authorized Drive scope"
-    },
-    {
-      "surface": "vercel_connected_team_projects_2026_09_09",
-      "confidence": "ABSENT",
-      "finding": "live Vercel inspection of connected team pangguosen0-8485 returned zero projects; this independently confirms there is no currently visible Vercel project or deployment carrier from which GP V1.1 strategy assets can be recovered"
-    },
-    {
-      "surface": "replit_relevant_window_apps_2026_09_09",
-      "confidence": "UNINSPECTABLE",
-      "finding": "two user-editable Replit apps exist in the relevant historical window: FruitfulStormySign updated 2026-08-29 and AgedCapitalDeclaration updated 2026-08-30. FruitfulStormySign has a failed historical deployment; AgedCapitalDeclaration has never been published. Repeated read-only codebase inspection requests to both apps timed out, and the connector exposes no independent file-read API. Historical GP checkpoints describe Replit in this period as a RAW/data-bridge route, not scorer provenance. These carriers therefore cannot positively satisfy any strategy blocker."
-    },
-    {
-      "surface": "v3_10_archive_trace",
+      "surface": "file_library_v3_4_exact_bytes",
       "confidence": "AUTHORITATIVE_FILE",
-      "finding": "historical v11_offline_backtest_v3_10 trace proves an adjusted-source validation layer and a 50-symbol 27650-row reference sample existed, but archived global factor table and completed independent cross-source result were recorded as not found; this is not strategy-scorer provenance"
+      "finding": "v11_offline_backtest_v3_4.zip was materialized from Library and SHA256 d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba exactly matches the previously recorded historical candidate SHA"
     },
     {
-      "surface": "v3_10_internal_source_path_trace",
+      "surface": "file_library_v3_10_exact_bytes",
       "confidence": "AUTHORITATIVE_FILE",
-      "finding": "the V4.71 implementation plan explicitly references without modification /mnt/data/qfq_v310_extract/v11_offline_backtest_v3_10/src/cross_validate_adjusted_sources.py and requires reproducing its frozen compare behavior exactly; this proves a V3.10 src tree and one auxiliary adjusted-data validator existed, but it is RECOVERED_AUXILIARY_COMPONENT_NOT_SCORER and cannot satisfy STRATEGY_CODE_MISSING"
+      "finding": "v11_offline_backtest_v3_10.zip was materialized from Library; archive SHA256 is d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d and contains executable Daily Base, panel and Formal pipeline source plus tests and a package manifest"
     },
     {
-      "surface": "gp_recovery_checkpoint_20260828",
+      "surface": "gmail_attachment_search",
+      "confidence": "ABSENT",
+      "finding": "read-only Gmail search found no separate GP V1.1 source attachment; Library is the recovered authoritative package carrier"
+    },
+    {
+      "surface": "v3_4_to_v3_10_source_diff",
       "confidence": "AUTHORITATIVE_FILE",
-      "finding": "recovered GP V1.1 assets are V3.73 data-remediation contracts/scripts and astock data, not scorer code, full parameter package, or complete factor-definition package"
+      "finding": "run_backtest.py source comparison shows the Daily Base scoring formula is stable across the inspected historical packages; later change primarily vectorizes the three-market-day first-touch label path"
     }
   ],
   "confirmed_rules": [
@@ -77,13 +42,8 @@
         "framework_version": "V1.0",
         "factor_count": 12,
         "frozen_framework_accepted": true,
-        "scope_note": "confirms the frozen 12-factor framework identity only; it does not confirm factor names, formulas, weights, normalization, aggregation or trade rules"
+        "scope_note": "this confirms the 12-factor framework identity but not the unrecovered full aggregation formulas, complete weight vector or execution policy"
       }
-    },
-    {
-      "key": "v31_data_first_walkforward_order",
-      "confidence": "USER_CONFIRMED",
-      "value": "Acquire 2020-2026 full-A daily bars plus historical ST, suspension/trading-status and listing/delisting information first; only after adjustment and dataset audits pass may Daily Base Walk-forward run. Do not jump ahead to Formal/OOS performance."
     },
     {
       "key": "label_clock",
@@ -111,15 +71,29 @@
       "value": "future labels and post-Formal observations are validation outcomes only and cannot be used to tune or construct pre-exposure strategy decisions"
     },
     {
-      "key": "v3_10_adjusted_validator_semantics",
+      "key": "daily_base_remaining_inertia_formula",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": "remaining_inertia = 0.40*raw_strength + 0.25*life_score + 0.25*trend_quality + 0.10*(100-trend_consumption), clipped to [0,100]; exact executable source is recovered from v11_offline_backtest_v3_10.zip"
+    },
+    {
+      "key": "daily_base_subscore_rules",
       "confidence": "AUTHORITATIVE_FILE",
       "value": {
-        "component": "cross_validate_adjusted_sources.py",
-        "role": "auxiliary adjusted-source validator, not the strategy scorer",
-        "p99_return_diff_bp_max": 5.0,
-        "p99_intraday_shape_diff_bp_max": 5.0,
-        "reuse_contract": "V4.71 plan requires importing or reproducing the existing V3.10 compare behavior exactly without changing thresholds"
+        "raw_strength": "20 points for each positive r5/r10/r20/r60/r120",
+        "life_score": "starts 50; pos120<0.35 +15; 0.35<=pos120<=0.75 +10; pos120>0.90 -20; pos120>0.80 and r20<0 -10; clipped [0,100]",
+        "trend_quality": "starts 50; slope20>0 +15 else -10; r2_20>0.55 +10; er20>0.35 +10; close_loc>0.65 +10; close_loc<0.30 -10; clipped [0,100]",
+        "trend_consumption": "starts 0; pos120>0.85 +25; r5>0.12 +20; r10>0.20 +15; vol_ratio20>1.8 +15; close_loc<0.45 +15; r5<0 and r20>0.15 +10; clipped [0,100]"
       }
+    },
+    {
+      "key": "daily_base_feature_and_label_scope",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": "recovered source includes r5/r10/r20/r60/r120, ER10/20, 20/60/120 position, 20-day slope and R2, ATR14, close location, volume ratio, optional turnover ratio and 20/60-day drawdown; labels include T+1/T+2/T+3, MFE/MAE, fixed-hit thresholds and ATR-adaptive three-day first-touch UP/DOWN/FLAT/AMBIG"
+    },
+    {
+      "key": "daily_base_scope_limitation",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": "historical V3.10 README explicitly says this is still the Daily structure layer; Market Regime, Sector RS/Breadth, historical fund direction, 15/60-minute execution and Event Shock scores are not merged"
     }
   ],
   "candidate_clues": [
@@ -140,7 +114,7 @@
         "Price/Fund Efficiency",
         "Intraday Confirmation"
       ],
-      "note": "recovered from prior assistant output; no user-authored or file-backed exact definition package located"
+      "note": "conversation candidate only; exact full 12-factor definition package is not yet recovered"
     },
     {
       "key": "factor_weights_pct",
@@ -152,93 +126,36 @@
       "key": "score_layers",
       "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
       "value": ["Structure", "Inertia", "Execution"],
-      "note": "prior assistant output only; exact aggregation is not recovered"
-    },
+      "note": "framework-level clue; exact complete aggregation remains unrecovered"
+    }
+  ],
+  "recovered_assets": [
     {
-      "key": "factor_window_clues",
-      "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
-      "value": {
-        "market_regime": "5-20d plus current day",
-        "market_diffusion": "1-5d",
-        "sector_rs": "5/10/20d",
-        "sector_slope_r2": "20d primary, 10d auxiliary",
-        "sector_breadth": "current day plus 5d",
-        "position": "20/60/120d",
-        "multi_momentum": "5/10/20/60d",
-        "trend_quality": "20-60d",
-        "efficiency_ratio": "10/20d",
-        "drawdown_recovery": "20-60d"
-      },
-      "note": "conversation clue only; exact mathematical formulas, normalization and clipping remain unrecovered"
-    },
-    {
-      "key": "offline_backtest_archive_lineage",
-      "confidence": "CONVERSATION_CANDIDATE_UNCONFIRMED",
-      "value": {
-        "starter_v2": {
-          "archive": "v11_offline_backtest_starter_v2.zip",
-          "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_starter_v2.zip",
-          "reported_features": [
-            "r120",
-            "MFE/MAE at T+1/T+2/T+3 horizons",
-            "Hit thresholds +2%, +4%, -2% were reported",
-            "ATR-adaptive threshold logic was reported but no multiplier/window is recovered",
-            "UP/DOWN/FLAT/AMBIG path labels; same-day opposing threshold hits are ambiguous because daily bars do not reveal ordering",
-            "RAW/EVENT_CLEAN/STRESS modes",
-            "Walk-forward skeleton"
-          ],
-          "reported_outputs": ["summary", "bucket_stats", "walk_forward", "daily_replay"],
-          "reported_selfcheck": "1000 simulated K-lines",
-          "definition_gap": "the six targets were referenced, but their complete itemized production definitions and formulas are not recovered"
+      "key": "daily_base_strategy_code",
+      "confidence": "AUTHORITATIVE_FILE",
+      "scope": "DAILY_BASE_ONLY",
+      "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip",
+      "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "files": [
+        {
+          "path": "src/run_backtest.py",
+          "sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1"
         },
-        "v3_1": {
-          "archive": "v11_offline_backtest_v3_1.zip",
-          "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_v3_1.zip",
-          "reported_new_files": ["fetch_baostock.py", "verify_dataset.py", "run_formal_pipeline.py"],
-          "reported_pipeline_rules": [
-            "2020-2026 full-A daily bars plus amount/history-ST/trading-status/listing-delisting audit",
-            "20-day attendance measured on the joint market calendar",
-            "assistant-reported example: missing 6 of 20 joint-calendar days implies attendance 0.70 and exclusion",
-            ">=843 historical-bar audit",
-            "low-amount threshold must be explicit",
-            "Walk-forward starts only after dataset audit passes",
-            "RAW/EVENT_CLEAN/STRESS plus six targets and OOS calibration"
-          ],
-          "reported_formal_result": "simulation regression passed; no Formal result was produced at that point",
-          "provenance_note": "file names and detailed pipeline behavior are recovered from prior assistant output; the user separately confirmed the data-first-before-Walk-forward stage order, not these exact implementation details"
+        {
+          "path": "src/run_panel_backtest.py",
+          "sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2"
         },
-        "v3_4": {
-          "archive": "v11_offline_backtest_v3_4.zip",
-          "historical_sandbox_path": "sandbox:/mnt/data/gp_v11/v11_offline_backtest_v3_4.zip",
-          "candidate_zip_sha256": "d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba",
-          "reported_new_file": "fetch_ashare21_snapshot.py",
-          "reported_snapshot": {
-            "name": "all-prices-with-values-250423.csv",
-            "bytes": 2134704074,
-            "sha256_prefix_suffix": "034f...eea"
-          },
-          "reported_additions": [
-            "dual-proof exchange delisting dates",
-            "single-snapshot locking",
-            "provider-QFQ audit with SHA256 and return reconciliation"
-          ],
-          "reported_tests": "25/25 passed"
-        },
-        "v3_10": {
-          "directory": "v11_offline_backtest_v3_10",
-          "file_backed_auxiliary_component": "src/cross_validate_adjusted_sources.py",
-          "reference_sample_symbols": 50,
-          "reference_sample_rows": 27650,
-          "reference_sample_sha256": "03918c8d649250c3f82a7f786f3a898f35afa20969a784dac9a7b87860192b62",
-          "archive_status": "global factor table and completed independent cross-source result not found in archive audit"
+        {
+          "path": "src/run_formal_pipeline.py",
+          "sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"
         }
-      },
-      "note": "starter_v2, v3_1 and v3_4 lineage/details were recovered from prior assistant outputs, not original archive bytes or an authoritative archive manifest; only the V3.10 auxiliary validator path/sample is file-backed. None of this lineage is freeze eligible for the trading strategy."
+      ],
+      "complete_12_factor_strategy": false
     }
   ],
   "missing_required_fields": [
-    "strategy_code_bytes",
-    "exact_factor_formulas",
+    "complete_12_factor_strategy_code_bytes",
+    "non_daily_layer_factor_formulas",
     "exact_normalization_and_clipping",
     "authoritative_weight_vector",
     "score_layer_aggregation",
