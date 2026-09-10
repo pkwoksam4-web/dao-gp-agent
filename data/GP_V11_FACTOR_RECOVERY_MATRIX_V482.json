@@ -52,11 +52,38 @@
     "historical_delisted_audited_missing_days": 3935,
     "frequency": "1min",
     "price_basis": "RAW_UNADJUSTED",
-    "scope": "SOURCE_AND_INVENTORY_PROOF_ONLY_NOT_15M_60M_PRODUCTION_BINDING",
-    "actual_minute_bytes_materialized": false,
+    "scope": "SOURCE_INVENTORY_PLUS_SINGLE_SYMBOL_BYTE_MATERIALIZATION_ONLY_NOT_FORMAL_847_BINDING",
+    "actual_minute_bytes_materialized": true,
+    "actual_minute_bytes_materialized_scope": "SINGLE_SYMBOL_002002_ONLY",
     "formal_15m_coverage_verified": false,
     "formal_60m_coverage_verified": false,
     "resampling_contract_recovered": false,
+    "factor_formula_recovered": false
+  },
+  "intraday_pilot_partial_source": {
+    "scope": "002002.SZ_ONLY",
+    "source_pilot_run_id": 34431397499,
+    "source_pilot_head_sha": "f3d94fb3c6e668f3de550b4872e2935095609d44",
+    "source_pilot_artifact_id": 10134644253,
+    "source_pilot_artifact_digest": "sha256:a974fbf4d1974cfa16bc97da2fd28d5c12debaf2ae2ca0ccf06d11e034d55e69",
+    "source_sha256": "209907efad308af285f937f913a8c8017ab75eede908a87ce5c109989eb43d92",
+    "source_rows": 820123,
+    "trading_dates": 3403,
+    "bars_15m_rows": 54448,
+    "bars_15m_sha256": "cfd34f09d29bcaac1c0f9d47197fb640d1a9721a6e929e2458e3d6144d3596a8",
+    "bars_60m_rows": 13612,
+    "bars_60m_sha256": "6ac057ed46d99d12864ce301ffa4cbc2939c94c69e7d647242b1a17da9bcef99",
+    "independent_verify_run_id": 34431659116,
+    "independent_verify_head_sha": "b3436aaa31e93ebb0c9fdd9771067419fc7f9ee3",
+    "independent_verify_artifact_id": 10134703581,
+    "independent_verify_artifact_digest": "sha256:a22eaf171b4daec9c2c7d3cadf82de01135e5c1ab0684b17bbdd584bef830cf9",
+    "independent_verify_report_sha256": "1eb392c8224d13c0b883ea71ec27cd84f73f599c0526107608e0996725c6068a",
+    "full_reconstruction_match_15m": true,
+    "full_reconstruction_match_60m": true,
+    "lunch_crossing_count_15m": 0,
+    "lunch_crossing_count_60m": 0,
+    "historical_gp_resampling_contract_recovered": false,
+    "formal_847_coverage_verified": false,
     "factor_formula_recovered": false
   },
   "factors": [
@@ -141,11 +168,11 @@
       "name": "Intraday Confirmation",
       "weight_pct": 8,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": ["Factor identity and 8-percent weight are confirmed, and historical architecture separates daily close from 15m/60m execution confirmation.", "Project evidence binds an immutable Neigezhu 1-minute source snapshot and audited canonical-file inventory for the full 163-symbol historical-delisted subset: all 163 are present, 129 complete and 34 partial.", "A secondary StockChina-Minute route was also historically identified for independent minute evidence, although its bytes were not materialized."],
-      "missing": ["Actual one-minute source bytes for the required Formal scope are not materialized in this strategy-recovery evidence.", "Authoritative 15-minute production input series and full Formal-window coverage audit remain missing.", "Authoritative 60-minute production input series and full Formal-window coverage audit remain missing.", "Exact session-aware 15-minute and 60-minute resampling contract remains missing.", "Exact confirmation/negation formula, closed-bar timing semantics, price-basis decision, normalization/clipping and executable final factor code remain missing."]
+      "known_components": ["Factor identity and 8-percent weight are confirmed, and historical architecture separates daily close from 15m/60m execution confirmation.", "Project evidence binds an immutable Neigezhu 1-minute source snapshot and audited canonical-file inventory for the full 163-symbol historical-delisted subset: all 163 are present, 129 complete and 34 partial.", "For 002002.SZ only, fixed-snapshot 1-minute bytes were materially downloaded and SHA-bound, then session-aware 15m and 60m pilot bars were produced over all 3403 source dates.", "A separate verifier independently reconstructed every pilot 15m and 60m bar from the source minute parquet and matched all rows with zero lunch-session crossings."],
+      "missing": ["Formal-universe 1-minute source-byte materialization and coverage beyond the single 002002.SZ pilot remain missing.", "Formal 847-symbol 15-minute and 60-minute production input identities and full-window coverage audits remain missing.", "Historical GP 15m/60m resampling semantics have not been recovered; the validated single-symbol session-aware contract is a feasibility pilot, not historical authority.", "Exact Intraday Confirmation formula, confirmation/negation rules, historical closed-bar timing, price-basis decision, normalization/clipping and executable final factor code remain missing."]
     }
   ],
-  "remaining_strategy_gaps": ["complete_12_factor_strategy_code_bytes", "non_daily_layer_factor_formulas", "exact_full_strategy_normalization_and_clipping", "score_layer_aggregation", "full_gp12_probability_mapping", "ranking_topn_semantics", "entry_exit_thresholds", "holding_and_rebalance_policy", "position_sizing_and_risk_rules", "pit_sector_membership_and_sector_series", "intraday_15m_60m_materialization_resampling_and_rules", "non_daily_layer_source_bytes"],
+  "remaining_strategy_gaps": ["complete_12_factor_strategy_code_bytes", "non_daily_layer_factor_formulas", "exact_full_strategy_normalization_and_clipping", "score_layer_aggregation", "full_gp12_probability_mapping", "ranking_topn_semantics", "entry_exit_thresholds", "holding_and_rebalance_policy", "position_sizing_and_risk_rules", "pit_sector_membership_and_sector_series", "intraday_formal_847_15m_60m_coverage_historical_contract_and_rules", "non_daily_layer_source_bytes"],
   "model_freeze_allowed": false,
   "oos_metrics_allowed": false
 }
