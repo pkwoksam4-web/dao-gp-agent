@@ -77,6 +77,19 @@ def _validate_required_values(day_frame: pd.DataFrame) -> None:
         raise ValueError('required minute volume/turnover must be non-negative')
 
 
+def _index_required_days(df: pd.DataFrame, required_dates: list[str]) -> dict[str, pd.DataFrame]:
+    if '_date' not in df.columns:
+        raise ValueError('indexed minute frame must contain _date')
+    wanted = {str(d)[:10] for d in required_dates}
+    if not wanted:
+        return {}
+    required_frame = df[df['_date'].isin(wanted)]
+    return {
+        str(day): group.drop(columns=['_date']).copy()
+        for day, group in required_frame.groupby('_date', sort=False)
+    }
+
+
 def audit_source_frame(source: pd.DataFrame, required_dates: list[str], symbol: str):
     s = norm_symbol(symbol)
     required = sorted(set(str(d)[:10] for d in required_dates if FORMAL_START <= str(d)[:10] <= FORMAL_END))
@@ -101,7 +114,7 @@ def audit_source_frame(source: pd.DataFrame, required_dates: list[str], symbol: 
     if df['timestamp'].isna().any():
         raise ValueError('source contains invalid timestamps')
     df['_date'] = df['timestamp'].dt.strftime('%Y-%m-%d')
-    df = df[df['_date'].isin(required)].copy()
+    indexed_days = _index_required_days(df, required)
 
     bars15_parts = []
     bars60_parts = []
@@ -110,11 +123,12 @@ def audit_source_frame(source: pd.DataFrame, required_dates: list[str], symbol: 
     valid = 0
     source_rows_required = 0
     for d in required:
-        day = df[df['_date'] == d].drop(columns=['_date']).copy()
-        if day.empty:
+        day = indexed_days.get(d)
+        if day is None:
             missing.append(d)
             continue
         source_rows_required += int(len(day))
+        day = day.copy()
         day['symbol'] = s
         try:
             _validate_required_values(day)
@@ -215,7 +229,7 @@ def materialize_shard(
             'snapshot_commit': SNAPSHOT_COMMIT,
         }
         if not req:
-            b15, b60, audit = audit_source_frame(pd.DataFrame(), req, symbol)
+            _b15, _b60, audit = audit_source_frame(pd.DataFrame(), req, symbol)
             records.append({**base, **audit, 'source_downloaded': False, 'source_sha256': None, 'source_bytes': 0})
             print(json.dumps({'progress': i, 'total': len(selected), 'symbol': symbol, 'status': audit['status']}, ensure_ascii=False), flush=True)
             continue
@@ -258,7 +272,14 @@ def materialize_shard(
         finally:
             if local.exists():
                 local.unlink()
-        print(json.dumps({'progress': i, 'total': len(selected), 'symbol': symbol, 'status': records[-1]['status'], 'required': len(req), 'valid': records[-1].get('valid_trade_dates', 0)}, ensure_ascii=False), flush=True)
+        print(json.dumps({
+            'progress': i,
+            'total': len(selected),
+            'symbol': symbol,
+            'status': records[-1]['status'],
+            'required': len(req),
+            'valid': records[-1].get('valid_trade_dates', 0),
+        }, ensure_ascii=False), flush=True)
 
     bars15 = pd.concat(bars15_parts, ignore_index=True) if bars15_parts else _empty_bars()
     bars60 = pd.concat(bars60_parts, ignore_index=True) if bars60_parts else _empty_bars()
@@ -309,7 +330,15 @@ def materialize_shard(
     }
     report_path = out_dir / f'INTRADAY_FORMAL847_SHARD_{shard_index:02d}_AUDIT_V482.json'
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-    print(json.dumps({k: report[k] for k in ['status', 'shard_index', 'symbols_selected', 'pass_symbols', 'expected_zero_trade_symbols', 'review_symbols', 'required_trade_dates', 'valid_trade_dates', 'missing_trade_dates', 'invalid_grid_dates', 'source_bytes_downloaded']}, ensure_ascii=False, indent=2), flush=True)
+    print(json.dumps({
+        k: report[k]
+        for k in [
+            'status', 'shard_index', 'symbols_selected', 'pass_symbols',
+            'expected_zero_trade_symbols', 'review_symbols', 'required_trade_dates',
+            'valid_trade_dates', 'missing_trade_dates', 'invalid_grid_dates',
+            'source_bytes_downloaded',
+        ]
+    }, ensure_ascii=False, indent=2), flush=True)
     return report
 
 
@@ -326,8 +355,12 @@ def main() -> None:
     a = ap.parse_args()
     if a.cmd == 'shard':
         materialize_shard(
-            Path(a.pitst), Path(a.inventory), a.shard_index, a.shard_count,
-            Path(a.out_dir), Path(a.cache_dir),
+            Path(a.pitst),
+            Path(a.inventory),
+            a.shard_index,
+            a.shard_count,
+            Path(a.out_dir),
+            Path(a.cache_dir),
         )
 
 
