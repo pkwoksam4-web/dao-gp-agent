@@ -1,0 +1,73 @@
+name: GP12 Eastmoney sharebonus PIT field probe V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths: ['.github/workflows/eastmoney-sharebonus-pit-field-probe-v482.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe raw Eastmoney historical disclosure fields
+        run: |
+          mkdir -p out/eastmoney_sharebonus_pit_probe
+          python - <<'PY'
+          import hashlib,json,urllib.parse,urllib.request
+          from pathlib import Path
+
+          symbols=['000001','000002','002062','300750','600519']
+          base='https://datacenter-web.eastmoney.com/api/data/v1/get'
+          results=[]
+          for code in symbols:
+              params={
+                'reportName':'RPT_SHAREBONUS_DET','columns':'ALL',
+                'filter':f'(SECURITY_CODE="{code}")','pageSize':'100','pageNumber':'1',
+                'sortColumns':'EX_DIVIDEND_DATE','sortTypes':'-1','source':'WEB','client':'WEB'
+              }
+              url=base+'?'+urllib.parse.urlencode(params)
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Referer':'https://data.eastmoney.com/yjfp/'})
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      raw=r.read(); status=r.status
+                  payload=json.loads(raw)
+                  rows=((payload.get('result') or {}).get('data') or [])
+                  formal=[x for x in rows if '2020-06-01' <= str(x.get('EX_DIVIDEND_DATE') or '')[:10] <= '2026-04-17']
+                  keys=sorted({k for x in formal for k in x.keys()})
+                  samples=[]
+                  for x in formal[:8]:
+                      samples.append({k:x.get(k) for k in ['SECURITY_CODE','NOTICE_DATE','PLAN_NOTICE_DATE','PUBLISH_DATE','EX_DIVIDEND_DATE','REGISTER_DATE','ASSIGN_PROGRESS','IMPL_PLAN_PROFILE'] if k in x})
+                  results.append({'code':code,'http_status':status,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'row_n':len(rows),'formal_row_n':len(formal),'available_keys':keys,'samples':samples,'error':None})
+                  Path(f'out/eastmoney_sharebonus_pit_probe/{code}_RPT_SHAREBONUS_DET.json').write_bytes(raw)
+              except Exception as e:
+                  results.append({'code':code,'error':f'{type(e).__name__}: {e}'})
+          audit={'artifact':'EASTMONEY_SHAREBONUS_PIT_FIELD_PROBE_V482','version':'V4.82','results':results,'promotion':{'formal_admission':False,'adjusted_close_blocker_closed':False,'oos_metrics_allowed':False}}
+          Path('out/eastmoney_sharebonus_pit_probe/EASTMONEY_SHAREBONUS_PIT_FIELD_PROBE_V482.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+      - name: Verify fail closed
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('out/eastmoney_sharebonus_pit_probe/EASTMONEY_SHAREBONUS_PIT_FIELD_PROBE_V482.json'))
+          assert x['promotion']['formal_admission'] is False
+          assert x['promotion']['adjusted_close_blocker_closed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert any((r.get('formal_row_n') or 0)>0 for r in x['results'])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-eastmoney-sharebonus-pit-field-probe-v482
+          path: out/eastmoney_sharebonus_pit_probe/
+          if-no-files-found: warn
+          retention-days: 30
