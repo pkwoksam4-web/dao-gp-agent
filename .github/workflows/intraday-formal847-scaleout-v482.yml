@@ -12,6 +12,7 @@ permissions:
   contents: read
   actions: read
 
+# Triggered after dual-resample optimization; semantics unchanged.
 jobs:
   shard:
     strategy:
