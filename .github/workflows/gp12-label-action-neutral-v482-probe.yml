@@ -1,0 +1,331 @@
+name: GP12 V482 action-neutral Formal label candidate
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths: ['.github/workflows/gp12-label-action-neutral-v482-probe.yml']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip pandas pyarrow numpy
+
+      - name: Download raw-close Formal label candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-formal-label-provenance-probe-v1
+          path: upstream/labels
+          run-id: 34459156649
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download frozen V481 event ledger closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: upstream/frozen
+          run-id: 34078398130
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download V482 special ex-right closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-closure-v482
+          path: upstream/special
+          run-id: 34099127574
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download V482 special provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-provenance-direct-v482
+          path: upstream/special_provenance
+          run-id: 34124614666
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download effective standard terms
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: upstream/effective
+          run-id: 34102907115
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download remaining exact terms
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: upstream/secondary
+          run-id: 34106853526
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download reparsed remaining closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: upstream/reparsed
+          run-id: 34109448536
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download reparsed provenance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-reparsed-evidence-v482
+          path: upstream/reparsed_evidence
+          run-id: 34108707726
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download recovered remaining closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: upstream/recovered
+          run-id: 34111100684
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download final-six closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: upstream/final_six
+          run-id: 34116386540
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download final-four closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: upstream/final_four
+          run-id: 34117443729
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download authoritative V482 Formal readiness
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: upstream/formal
+          run-id: 34192462041
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Build V482 effective event ledger and action-neutral labels
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/action_neutral_labels
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+          import formal_readiness_v482 as fr
+          import formal_readiness_finalize_v482 as ff
+
+          def load(root,name):
+              p=next(Path(root).rglob(name))
+              return json.loads(p.read_text(encoding='utf-8'))
+          def file_sha(p):
+              h=hashlib.sha256()
+              with open(p,'rb') as f:
+                  for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
+              return h.hexdigest()
+
+          formal=load('upstream/formal','FORMAL_READINESS_FINAL_V482.json')
+          assert formal['formal_ready'] is True
+          assert formal['validated_global_provenance_emitted'] is True
+          assert formal['full_path_pass_n']==844 and formal['full_path_fail_n']==0
+          assert formal['checkpoint']=={'PASS':844,'EXACT_TERM_REVIEW':0,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3}
+          assert formal['oos_metrics_allowed'] is False
+
+          frozen=load('upstream/frozen','GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json')
+          special=load('upstream/special','SPECIAL_EXRIGHT_CLOSURE_V482.json')
+          special_prov=load('upstream/special_provenance','SPECIAL_EXRIGHT_PROVENANCE_V482.json')
+          effective=load('upstream/effective','EFFECTIVE_TERM_CLOSURE_V482.json')
+          secondary=load('upstream/secondary','REMAINING_EXACT_CLOSURE_V482.json')
+          reparsed=load('upstream/reparsed','REPARSED_REMAINING_CLOSURE_V482.json')
+          reparsed_evidence=load('upstream/reparsed_evidence','REMAINING_EXACT_REPARSED_EVIDENCE_V482.json')
+          recovered=load('upstream/recovered','RECOVERED_REMAINING_CLOSURE_V482.json')
+          final_six=load('upstream/final_six','FINAL_SIX_CLOSURE_V482.json')
+          final_four=load('upstream/final_four','FINAL_FOUR_CLOSURE_V482.json')
+
+          prov_idx=fr._reparse_provenance_index(reparsed_evidence)
+          standard=fr.merge_standard_override_rows([
+              effective.get('event_overrides') or [],
+              secondary.get('accepted_overrides') or [],
+              reparsed.get('new_overrides') or [],
+              recovered.get('accepted_overrides') or [],
+              final_six.get('accepted_overrides') or [],
+              final_four.get('accepted_overrides') or [],
+          ], provenance_index=prov_idx)
+          assert len(standard)==270
+
+          enriched_special=ff.enrich_special_rows(special.get('records') or [],special_prov)
+          assert len(enriched_special)==11
+          assert fr.classify_special_provenance(enriched_special)['blocker_n']==0
+
+          overrides={(k[0],k[1]):float(v['corrected_event_ratio']) for k,v in standard.items()}
+          for r in enriched_special:
+              k=fr._key(r)
+              assert k not in overrides
+              overrides[k]=float(r['corrected_event_ratio'])
+          assert len(overrides)==281
+
+          # Start from the frozen ledger, but replace every corrected event ratio with the V4.82-proven value.
+          event_by={}
+          ledger_rows=[]
+          for rec in frozen.get('records') or []:
+              sym=str(rec.get('symbol') or '').upper()
+              ev=[]
+              for e in rec.get('events') or []:
+                  d=str(e.get('ex_date') or '')[:10]
+                  if not d or e.get('event_ratio') is None: continue
+                  original=float(e['event_ratio'])
+                  ratio=float(overrides.get((sym,d),original))
+                  ev.append((d,ratio))
+                  ledger_rows.append({
+                      'symbol':sym,'ex_date':d,'event_ratio_v482':ratio,
+                      'event_ratio_v481':original,
+                      'override_applied':(sym,d) in overrides,
+                      'override_kind':('standard' if (sym,d) in standard else ('special' if (sym,d) in overrides else 'none')),
+                  })
+              event_by[sym]=sorted(ev)
+          used_override_keys={(r['symbol'],r['ex_date']) for r in ledger_rows if r['override_applied']}
+          assert used_override_keys==set(overrides), (len(used_override_keys),len(overrides),sorted(set(overrides)-used_override_keys)[:10])
+
+          out=Path('out/action_neutral_labels')
+          pd.DataFrame(ledger_rows).sort_values(['symbol','ex_date']).to_parquet(out/'GP12_V482_EFFECTIVE_EVENT_LEDGER.parquet',index=False,compression='zstd')
+
+          summaries=[]
+          flips=[]
+          for h in (1,2,3):
+              src=next(Path('upstream/labels').rglob(f'GP12_FORMAL_LABELS_H{h}_V1.parquet'))
+              df=pd.read_parquet(src)
+              assert df['horizon_market_sessions'].eq(h).all()
+              assert df['target_date'].max()<='2026-04-17'
+              prod=np.ones(len(df),dtype=float)
+              cross=np.zeros(len(df),dtype=bool)
+              for sym, idx_obj in df.groupby('symbol',sort=False).groups.items():
+                  evs=event_by.get(str(sym).upper(),[])
+                  if not evs: continue
+                  idx=np.asarray(idx_obj,dtype=int)
+                  ed=np.asarray([x[0] for x in evs],dtype='U10')
+                  er=np.asarray([x[1] for x in evs],dtype=float)
+                  cum=np.r_[1.0,np.cumprod(er)]
+                  base=df.loc[idx,'date'].astype(str).to_numpy(dtype='U10')
+                  targ=df.loc[idx,'target_date'].astype(str).to_numpy(dtype='U10')
+                  ib=np.searchsorted(ed,base,side='right')
+                  it=np.searchsorted(ed,targ,side='right')
+                  prod[idx]=cum[it]/cum[ib]
+                  cross[idx]=it>ib
+              base=pd.to_numeric(df['close'],errors='raise').to_numpy(float)
+              targ=pd.to_numeric(df['target_close'],errors='raise').to_numpy(float)
+              neutral_ref=base*prod
+              label=np.where(targ>neutral_ref,'UP',np.where(targ<neutral_ref,'DOWN','FLAT'))
+              raw=df['label'].astype(str).to_numpy()
+              diff=raw!=label
+              outdf=df[['symbol','date','horizon_market_sessions','target_date','close','target_close']].copy()
+              outdf['event_ratio_product']=prod
+              outdf['crosses_corporate_action']=cross
+              outdf['action_neutral_reference_close']=neutral_ref
+              outdf['label']=label
+              outdf['source_semantics']='V4.82_proven_horizon_local_action_neutral'
+              op=out/f'GP12_FORMAL_ACTION_NEUTRAL_LABELS_H{h}_V482.parquet'
+              outdf.to_parquet(op,index=False,compression='zstd')
+              pairs=(pd.DataFrame({'raw':raw[diff],'neutral':label[diff]}).value_counts().sort_index())
+              pair_counts={f'{a}->{b}':int(n) for (a,b),n in pairs.items()}
+              summaries.append({
+                  'horizon':h,'rows':int(len(df)),
+                  'crossing_action_rows':int(cross.sum()),
+                  'raw_vs_neutral_diff_rows':int(diff.sum()),
+                  'diff_ratio':float(diff.mean()),
+                  'label_counts':{k:int(v) for k,v in pd.Series(label).value_counts().sort_index().items()},
+                  'flip_pairs':pair_counts,
+                  'output_file':op.name,'output_sha256':file_sha(op),
+              })
+              sel=np.flatnonzero(diff)[:100]
+              for i in sel:
+                  flips.append({
+                      'horizon':h,'symbol':str(df.iloc[i]['symbol']),'date':str(df.iloc[i]['date']),
+                      'target_date':str(df.iloc[i]['target_date']),'raw_label':raw[i],'neutral_label':str(label[i]),
+                      'event_ratio_product':float(prod[i]),
+                  })
+
+          audit={
+              'artifact':'GP12_FORMAL_ACTION_NEUTRAL_LABEL_CANDIDATE_V482',
+              'version':'V4.82',
+              'status':'PASS_V482_PROVENANCE_LABEL_CANDIDATE_MATERIALIZED',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'formal_qfq_checkpoint':formal['checkpoint'],
+              'formal_full_path_pass_n':formal['full_path_pass_n'],
+              'formal_max_full_path_diff_bp':formal['max_full_path_diff_bp'],
+              'standard_override_n':len(standard),
+              'special_override_n':len(enriched_special),
+              'total_override_n':len(overrides),
+              'method':'For each label row, apply only V4.82-proven event ratios with T < ex_date <= target_date. Events after target_date are excluded.',
+              'horizons':summaries,
+              'invariants':{
+                  'events_after_target_date_used':False,
+                  'oos_rows_consumed':0,
+                  'max_target_date':'2026-04-17',
+                  'all_281_overrides_bound_to_ledger':True,
+              },
+              'promotion':{
+                  'label_contract_approved':False,
+                  'label_provenance_blocker_closed':False,
+                  'candidate_adoption_status':'UNAPPROVED',
+                  'model_freeze_allowed':False,
+                  'oos_metrics_allowed':False,
+              },
+          }
+          (out/'GP12_FORMAL_ACTION_NEUTRAL_LABEL_CANDIDATE_V482.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          pd.DataFrame(flips).to_csv(out/'GP12_V482_ACTION_NEUTRAL_LABEL_FLIP_EXAMPLES.csv',index=False)
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Verify fail-closed candidate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/action_neutral_labels/GP12_FORMAL_ACTION_NEUTRAL_LABEL_CANDIDATE_V482.json').read_text())
+          assert x['status']=='PASS_V482_PROVENANCE_LABEL_CANDIDATE_MATERIALIZED'
+          assert x['formal_full_path_pass_n']==844
+          assert x['standard_override_n']==270
+          assert x['special_override_n']==11
+          assert x['total_override_n']==281
+          assert x['invariants']['events_after_target_date_used'] is False
+          assert x['invariants']['oos_rows_consumed']==0
+          assert x['promotion']['label_contract_approved'] is False
+          assert x['promotion']['label_provenance_blocker_closed'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-formal-action-neutral-label-candidate-v482
+          path: out/action_neutral_labels/
+          if-no-files-found: error
+          retention-days: 30
