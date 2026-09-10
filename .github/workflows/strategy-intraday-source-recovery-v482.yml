@@ -6,8 +6,12 @@ on:
       - gp/strategy-asset-recovery-v482
     paths:
       - 'scripts/test_strategy_intraday_source_recovery_v482.py'
+      - 'scripts/test_strategy_intraday_inventory_binding_v482.py'
       - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
       - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
+      - 'data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json'
+      - 'data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv'
+      - 'data/FORMAL847_SYMBOLS_V482.txt'
       - '.github/workflows/strategy-intraday-source-recovery-v482.yml'
   workflow_dispatch:
 
@@ -27,4 +31,6 @@ jobs:
           PYTHONPATH: scripts
         run: |
           cd scripts
-          python -m unittest -v test_strategy_intraday_source_recovery_v482.py
+          python -m unittest -v \
+            test_strategy_intraday_source_recovery_v482.py \
+            test_strategy_intraday_inventory_binding_v482.py
