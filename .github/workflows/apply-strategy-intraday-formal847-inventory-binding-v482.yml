@@ -1,0 +1,135 @@
+name: Apply GP V4.82 Strategy Intraday Formal847 Inventory Binding
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/apply-strategy-intraday-formal847-inventory-binding-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-binding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply exact Formal847 inventory binding without promoting downstream gates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          src_path = Path('data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json')
+          matrix_path = Path('data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json')
+          audit_path = Path('data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json')
+
+          src = json.loads(src_path.read_text(encoding='utf-8'))
+          matrix = json.loads(matrix_path.read_text(encoding='utf-8'))
+          audit = json.loads(audit_path.read_text(encoding='utf-8'))
+
+          assert src['artifact'] == 'GP_V11_INTRADAY_SOURCE_RECOVERY_V482'
+          assert src['primary_source']['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
+          assert src['formal_847_15m_coverage_verified'] is False
+          assert src['formal_847_60m_coverage_verified'] is False
+          assert src['resampling_contract_recovered'] is False
+          assert src['factor_formula_recovered'] is False
+          assert src['model_freeze_allowed'] is False
+          assert src['oos_metrics_allowed'] is False
+
+          inter = audit['formal847_inventory_intersection']
+          assert audit['formal_847_minute_inventory_membership_verified'] is True
+          assert inter['matched_symbols'] == 847
+          assert inter['missing_symbols'] == 0
+          assert audit['formal_847_minute_byte_coverage_verified'] is False
+          assert audit['formal_847_15m_coverage_verified'] is False
+          assert audit['formal_847_60m_coverage_verified'] is False
+
+          src['status'] = 'PARTIAL_FILE_BACKED_FORMAL847_INVENTORY_PLUS_SINGLE_SYMBOL_RESAMPLING_PILOT'
+          src['scope'] = 'FORMAL847_FIXED_SNAPSHOT_INVENTORY_MEMBERSHIP_PLUS_SINGLE_SYMBOL_BYTE_BOUND_15M_60M_PILOT_NOT_FORMAL847_BYTE_COVERAGE_NOT_HISTORICAL_GP_FACTOR_LOGIC'
+          src['formal847_inventory_audit'] = {
+              'audit_artifact': 'INTRADAY_FORMAL847_INVENTORY_AUDIT_V482',
+              'audit_sha256': '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83',
+              'inventory_map_sha256': 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed',
+              'formal_symbols_sha256': '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8',
+              'source_snapshot_commit': 'f311a5f11569e9d541386982d15f2214d9970b8a',
+              'source_inventory_sha256': '31a058c1019e1b097d99e862db68a028ec9d191adb09839c35365f4cb390dc32',
+              'formal_universe_symbols': 847,
+              'matched_inventory_symbols': 847,
+              'missing_inventory_symbols': 0,
+              'formal_847_minute_inventory_membership_verified': True,
+              'formal_847_minute_byte_coverage_verified': False,
+              'formal_847_15m_coverage_verified': False,
+              'formal_847_60m_coverage_verified': False,
+              'interpretation': 'All 847 audited Formal-universe symbols have canonical 1-minute file membership in the exact f311a5f snapshot. This is an inventory certificate only; it does not prove Formal-window byte completeness or 15m/60m production coverage.'
+          }
+          src['formal_847_minute_inventory_membership_verified'] = True
+          src['formal_847_minute_byte_coverage_verified'] = False
+          src['remaining_intraday_gaps'] = [
+              'formal_window_1min_source_byte_materialization_and_required_trade_date_coverage_for_all_847_symbols',
+              'formal_847_15min_materialized_input_identity_and_coverage',
+              'formal_847_60min_materialized_input_identity_and_coverage',
+              'historical_gp_or_newly_approved_production_15min_60min_resampling_contract',
+              'price_basis_decision_for_intraday_factor_inputs',
+              'exact_confirmation_negation_formula',
+              'historical_closed_bar_timing_semantics',
+              'normalization_and_clipping',
+              'complete_strategy_source_code'
+          ]
+
+          isrc = matrix['intraday_source_partial']
+          assert isrc['actual_minute_bytes_materialized'] is True
+          assert isrc['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert isrc['formal_15m_coverage_verified'] is False
+          assert isrc['formal_60m_coverage_verified'] is False
+          assert isrc['resampling_contract_recovered'] is False
+          assert isrc['factor_formula_recovered'] is False
+          isrc['scope'] = 'FORMAL847_FIXED_SNAPSHOT_INVENTORY_MEMBERSHIP_PLUS_SINGLE_SYMBOL_BYTE_MATERIALIZATION_ONLY_NOT_FORMAL847_BYTE_OR_15M_60M_BINDING'
+          isrc['formal_847_inventory_membership_verified'] = True
+          isrc['formal_847_inventory_audit_sha256'] = '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'
+          isrc['formal_847_inventory_map_sha256'] = 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'
+          isrc['formal_847_inventory_symbols'] = 847
+          isrc['formal_847_minute_byte_coverage_verified'] = False
+
+          intraday = next(x for x in matrix['factors'] if x['name'] == 'Intraday Confirmation')
+          new_known = 'Exact fixed-snapshot Formal-universe inventory audit binds all 847/847 canonical 1-minute file paths in f311a5f with zero inventory members missing; this is inventory membership, not byte/window coverage.'
+          if new_known not in intraday['known_components']:
+              intraday['known_components'].append(new_known)
+          intraday['missing'] = [
+              'Formal-window 1-minute source-byte materialization and required-trade-date coverage across all 847 symbols remain unverified despite 847/847 fixed-snapshot inventory membership.',
+              'Formal 847-symbol 15-minute and 60-minute production input identities and full-window coverage audits remain missing.',
+              'Historical GP 15m/60m resampling semantics have not been recovered; the validated single-symbol session-aware contract is a feasibility pilot, not historical authority.',
+              'Exact Intraday Confirmation formula, confirmation/negation rules, historical closed-bar timing, price-basis decision, normalization/clipping and executable final factor code remain missing.'
+          ]
+
+          assert src['formal_847_minute_inventory_membership_verified'] is True
+          assert src['formal_847_minute_byte_coverage_verified'] is False
+          assert src['formal_847_15m_coverage_verified'] is False
+          assert src['formal_847_60m_coverage_verified'] is False
+          assert src['resampling_contract_recovered'] is False
+          assert src['factor_formula_recovered'] is False
+          assert src['model_freeze_allowed'] is False
+          assert src['oos_metrics_allowed'] is False
+          assert matrix['model_freeze_allowed'] is False
+          assert matrix['oos_metrics_allowed'] is False
+
+          src_path.write_text(json.dumps(src, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          matrix_path.write_text(json.dumps(matrix, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Commit inventory binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'evidence(strategy): bind Formal847 minute inventory membership'
+          git push origin HEAD:gp/strategy-asset-recovery-v482
