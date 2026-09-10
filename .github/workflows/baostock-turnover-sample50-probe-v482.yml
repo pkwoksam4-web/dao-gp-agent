@@ -1,0 +1,146 @@
+name: GP BaoStock turnover Sample50 probe V482
+
+on:
+  push:
+    branches:
+      - gp/baostock-fullraw-crosscheck-v482
+    paths:
+      - '.github/workflows/baostock-turnover-sample50-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install BaoStock
+        run: python -m pip install --upgrade pip baostock==0.9.3 pandas
+      - name: Probe frozen Sample50 turnover fields
+        run: |
+          mkdir -p out/baostock_turnover_sample50
+          PYTHONPATH=scripts python - <<'PY'
+          import csv, json, math
+          from pathlib import Path
+          import pandas as pd
+          import baostock as bs
+          from run_sample50_nominal import SAMPLE50, FORMAL_BEG, FORMAL_END
+
+          fields='date,code,volume,amount,turn,tradestatus,isST'
+          out=Path('out/baostock_turnover_sample50')
+          rows=[]
+          symbols=[]
+
+          def bs_code(symbol):
+              code, exch=symbol.split('.')
+              return f'{exch.lower()}.{code}'
+
+          lg=bs.login()
+          if lg.error_code!='0':
+              raise RuntimeError(f'login failed {lg.error_code}: {lg.error_msg}')
+          try:
+              for i,symbol in enumerate(SAMPLE50,1):
+                  rs=bs.query_history_k_data_plus(
+                      bs_code(symbol),fields,start_date=FORMAL_BEG,end_date=FORMAL_END,
+                      frequency='d',adjustflag='3')
+                  data=[]
+                  while rs.error_code=='0' and rs.next():
+                      data.append(rs.get_row_data())
+                  if rs.error_code!='0':
+                      symbols.append({'symbol':symbol,'query_error_code':rs.error_code,'query_error_msg':rs.error_msg,'row_n':0,'status':'BLOCKED_QUERY'})
+                      print(json.dumps({'progress':i,'symbol':symbol,'status':'BLOCKED_QUERY','error':rs.error_msg},ensure_ascii=False),flush=True)
+                      continue
+                  df=pd.DataFrame(data,columns=rs.fields)
+                  if df.empty:
+                      symbols.append({'symbol':symbol,'query_error_code':'0','query_error_msg':'success','row_n':0,'status':'BLOCKED_EMPTY'})
+                      print(json.dumps({'progress':i,'symbol':symbol,'status':'BLOCKED_EMPTY'},ensure_ascii=False),flush=True)
+                      continue
+                  for c in ['volume','amount','turn','tradestatus','isST']:
+                      df[c]=pd.to_numeric(df[c],errors='coerce')
+                  df['symbol']=symbol
+                  traded=df[df.tradestatus.eq(1)].copy()
+                  stopped=df[df.tradestatus.ne(1)].copy()
+                  traded_turn_missing=int(traded['turn'].isna().sum())
+                  stopped_turn_nonmissing=int(stopped['turn'].notna().sum())
+                  nonpositive=int((traded['turn']<=0).sum())
+                  bad_volume=int((traded['volume'].isna() | (traded['volume']<=0)).sum())
+                  bad_amount=int((traded['amount'].isna() | (traded['amount']<=0)).sum())
+                  dup=int(df.duplicated(['date']).sum())
+                  status='PASS_SAMPLE_SYMBOL' if not any([traded_turn_missing,stopped_turn_nonmissing,nonpositive,bad_volume,bad_amount,dup]) else 'REVIEW_SAMPLE_SYMBOL'
+                  symbols.append({
+                      'symbol':symbol,'query_error_code':'0','query_error_msg':'success','row_n':int(len(df)),
+                      'traded_rows':int(len(traded)),'stopped_rows':int(len(stopped)),
+                      'traded_turn_missing':traded_turn_missing,'stopped_turn_nonmissing':stopped_turn_nonmissing,
+                      'traded_turn_nonpositive':nonpositive,'bad_volume_rows':bad_volume,'bad_amount_rows':bad_amount,
+                      'duplicate_dates':dup,'turn_pct_min':float(traded.turn.min()) if len(traded) else None,
+                      'turn_pct_max':float(traded.turn.max()) if len(traded) else None,'status':status,
+                  })
+                  for r in df.to_dict('records'):
+                      r['turn_ratio']=None if pd.isna(r['turn']) else float(r['turn'])/100.0
+                      rows.append(r)
+                  print(json.dumps({'progress':i,'symbol':symbol,'status':status,'rows':len(df),'traded':len(traded),'stopped':len(stopped)},ensure_ascii=False),flush=True)
+          finally:
+              bs.logout()
+
+          all_df=pd.DataFrame(rows)
+          traded=all_df[all_df.tradestatus.eq(1)].copy() if not all_df.empty else pd.DataFrame()
+          stopped=all_df[all_df.tradestatus.ne(1)].copy() if not all_df.empty else pd.DataFrame()
+          audit={
+              'artifact':'BAOSTOCK_TURNOVER_SAMPLE50_PROBE_V482','version':'V4.82',
+              'sample_version':'V3.67_FROZEN','sample_n':len(SAMPLE50),
+              'formal_window':[FORMAL_BEG,FORMAL_END],
+              'field_semantics':{'turn_source_unit':'percent','candidate_turnover_ratio_transform':'turn / 100'},
+              'summary':{
+                  'queried_symbol_n':len(symbols),
+                  'pass_symbol_n':sum(s['status']=='PASS_SAMPLE_SYMBOL' for s in symbols),
+                  'review_or_blocked_symbol_n':sum(s['status']!='PASS_SAMPLE_SYMBOL' for s in symbols),
+                  'daily_rows':int(len(all_df)),
+                  'traded_rows':int(len(traded)),
+                  'stopped_rows':int(len(stopped)),
+                  'traded_turn_missing':int(traded['turn'].isna().sum()) if len(traded) else None,
+                  'stopped_turn_nonmissing':int(stopped['turn'].notna().sum()) if len(stopped) else None,
+                  'traded_turn_nonpositive':int((traded['turn']<=0).sum()) if len(traded) else None,
+                  'turn_pct_min':float(traded.turn.min()) if len(traded) else None,
+                  'turn_pct_max':float(traded.turn.max()) if len(traded) else None,
+              },
+              'symbols':symbols,
+              'interpretation':[
+                  'This is a source-capability and field-integrity probe over the frozen Sample50, not a production binding.',
+                  'A PASS does not close TURNOVER_RATIO_UNBOUND because full 847-symbol coverage and PIT provenance are still required.',
+                  'No OOS data or performance metric is read or computed.'
+              ],
+              'promotion':{'formal_admission':False,'turnover_ratio_blocker_closed':False,'oos_metrics_allowed':False},
+          }
+          overall=(audit['summary']['pass_symbol_n']==len(SAMPLE50) and audit['summary']['review_or_blocked_symbol_n']==0)
+          audit['status']='PASS_SAMPLE50_TURNOVER_FIELD_PROBE' if overall else 'REVIEW_SAMPLE50_TURNOVER_FIELD_PROBE'
+          (out/'BAOSTOCK_TURNOVER_SAMPLE50_PROBE_V482.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          all_df.to_csv(out/'BAOSTOCK_TURNOVER_SAMPLE50_ROWS_V482.csv',index=False)
+          pd.DataFrame(symbols).to_csv(out/'BAOSTOCK_TURNOVER_SAMPLE50_SYMBOL_SUMMARY_V482.csv',index=False)
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+      - name: Verify fail-closed boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/baostock_turnover_sample50/BAOSTOCK_TURNOVER_SAMPLE50_PROBE_V482.json').read_text())
+          assert x['promotion']['formal_admission'] is False
+          assert x['promotion']['turnover_ratio_blocker_closed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert x['summary']['queried_symbol_n']==50
+          print(json.dumps({'status':x['status'],'summary':x['summary']},ensure_ascii=False,indent=2))
+          PY
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-baostock-turnover-sample50-probe-v482
+          path: out/baostock_turnover_sample50/
+          if-no-files-found: warn
+          retention-days: 30
