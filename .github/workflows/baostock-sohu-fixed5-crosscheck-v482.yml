@@ -1,0 +1,266 @@
+name: GP BaoStock vs Sohu fixed5 crosscheck V482
+
+on:
+  push:
+    branches:
+      - gp/baostock-fullraw-crosscheck-v482
+    paths:
+      - '.github/workflows/baostock-sohu-fixed5-crosscheck-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install parquet reader
+        run: python -m pip install --upgrade pip pandas pyarrow
+
+      - name: Download BaoStock fixed5 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-baostock-fixed5-probe-v482
+          path: upstream/baostock
+          run-id: 34350541625
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download sealed Sohu Full RAW artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/sohu
+          run-id: 34192233633
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Crosscheck all fixed5 overlapping RAW rows
+        run: |
+          mkdir -p out/baostock_sohu_fixed5_crosscheck
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          import numpy as np
+          import pandas as pd
+
+          BAO_ARTIFACT_ID = 10103537004
+          BAO_ARTIFACT_ZIP_SHA256 = '2d50cc6f1a4644ebd3afa0b766eb4ae87e08f9a70e30991240f9b6bda8d84ce9'
+          SOHU_ARTIFACT_ID = 10042614517
+          SOHU_ARTIFACT_ZIP_SHA256 = 'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550'
+          FIXED5 = ['000001.SZ', '000014.SZ', '001201.SZ', '002001.SZ', '002002.SZ']
+
+          out = Path('out/baostock_sohu_fixed5_crosscheck')
+          bao_path = Path('upstream/baostock/BAOSTOCK_FIXED5_RAW_TRADED_V482.csv')
+          sohu_path = Path('upstream/sohu/SOHU_RAW_FULL_V482.parquet')
+          bao_audit_path = Path('upstream/baostock/BAOSTOCK_FIXED5_PROBE_AUDIT_V482.json')
+          sohu_audit_path = Path('upstream/sohu/SOHU_RAW_FULL_AUDIT_V482.json')
+
+          bao = pd.read_csv(bao_path)
+          sohu = pd.read_parquet(sohu_path)
+          bao_audit = json.loads(bao_audit_path.read_text(encoding='utf-8'))
+          sohu_audit = json.loads(sohu_audit_path.read_text(encoding='utf-8'))
+
+          def pick(df, candidates):
+              for name in candidates:
+                  if name in df.columns:
+                      return name
+              raise AssertionError(f'none of columns found: {candidates}; actual={list(df.columns)}')
+
+          sohu_symbol = pick(sohu, ['symbol', 'ticker', 'code'])
+          sohu_date = pick(sohu, ['date', 'trade_date', 'datetime'])
+          sohu_open = pick(sohu, ['open'])
+          sohu_high = pick(sohu, ['high'])
+          sohu_low = pick(sohu, ['low'])
+          sohu_close = pick(sohu, ['close'])
+          sohu_volume = next((c for c in ['volume', 'vol'] if c in sohu.columns), None)
+          sohu_amount = next((c for c in ['amount', 'turnover', 'money'] if c in sohu.columns), None)
+
+          bao['symbol_key'] = bao['symbol'].astype(str).str.upper().str.strip()
+          bao['date_key'] = pd.to_datetime(bao['date']).dt.strftime('%Y-%m-%d')
+          sohu['symbol_key'] = sohu[sohu_symbol].astype(str).str.upper().str.strip()
+          sohu['date_key'] = pd.to_datetime(sohu[sohu_date]).dt.strftime('%Y-%m-%d')
+          sohu5 = sohu[sohu['symbol_key'].isin(FIXED5)].copy()
+
+          if sorted(bao['symbol_key'].unique().tolist()) != sorted(FIXED5):
+              raise AssertionError('BaoStock fixed5 symbol set changed')
+          if bao.duplicated(['symbol_key', 'date_key']).any():
+              raise AssertionError('BaoStock duplicate symbol-date rows')
+          if sohu5.duplicated(['symbol_key', 'date_key']).any():
+              raise AssertionError('Sohu fixed5 duplicate symbol-date rows')
+          if set(bao['tradestatus'].dropna().astype(int).unique()) != {1}:
+              raise AssertionError('BaoStock RAW traded artifact contains non-trading status')
+
+          keep = [sohu_open, sohu_high, sohu_low, sohu_close]
+          if sohu_volume:
+              keep.append(sohu_volume)
+          if sohu_amount:
+              keep.append(sohu_amount)
+          rhs = sohu5[['symbol_key', 'date_key'] + keep].copy()
+          rename = {
+              sohu_open: 'open_sohu',
+              sohu_high: 'high_sohu',
+              sohu_low: 'low_sohu',
+              sohu_close: 'close_sohu',
+          }
+          if sohu_volume:
+              rename[sohu_volume] = 'volume_sohu'
+          if sohu_amount:
+              rename[sohu_amount] = 'amount_sohu'
+          rhs = rhs.rename(columns=rename)
+
+          lhs = bao[['symbol_key', 'date_key', 'open', 'high', 'low', 'close', 'volume', 'amount']].rename(
+              columns={c: f'{c}_bao' for c in ['open', 'high', 'low', 'close', 'volume', 'amount']}
+          )
+          merged = lhs.merge(rhs, on=['symbol_key', 'date_key'], how='outer', indicator=True)
+          both = merged[merged['_merge'] == 'both'].copy()
+          bao_only = merged[merged['_merge'] == 'left_only'][['symbol_key', 'date_key']].copy()
+          sohu_only = merged[merged['_merge'] == 'right_only'][['symbol_key', 'date_key']].copy()
+
+          def numeric_stats(a, b):
+              x = pd.to_numeric(a, errors='coerce')
+              y = pd.to_numeric(b, errors='coerce')
+              valid = x.notna() & y.notna()
+              x = x[valid]
+              y = y[valid]
+              diff = (x - y).abs()
+              denom = pd.concat([x.abs(), y.abs()], axis=1).max(axis=1).replace(0, np.nan)
+              rel = diff / denom
+              return {
+                  'n': int(valid.sum()),
+                  'exact_n': int((diff == 0).sum()),
+                  'exact_ratio': float((diff == 0).mean()) if len(diff) else None,
+                  'max_abs_diff': float(diff.max()) if len(diff) else None,
+                  'p99_abs_diff': float(diff.quantile(0.99)) if len(diff) else None,
+                  'max_relative_error': float(rel.max()) if rel.notna().any() else None,
+                  'p99_relative_error': float(rel.quantile(0.99)) if rel.notna().any() else None,
+              }
+
+          field_stats = {}
+          for field in ['open', 'high', 'low', 'close']:
+              field_stats[field] = numeric_stats(both[f'{field}_bao'], both[f'{field}_sohu'])
+          if 'volume_sohu' in both.columns:
+              field_stats['volume_raw_units'] = numeric_stats(both['volume_bao'], both['volume_sohu'])
+          if 'amount_sohu' in both.columns:
+              field_stats['amount'] = numeric_stats(both['amount_bao'], both['amount_sohu'])
+
+          per_symbol = []
+          for symbol in FIXED5:
+              g = both[both['symbol_key'] == symbol].copy()
+              exact_ohlc = np.ones(len(g), dtype=bool)
+              max_ohlc_abs = np.zeros(len(g), dtype=float)
+              for field in ['open', 'high', 'low', 'close']:
+                  x = pd.to_numeric(g[f'{field}_bao'], errors='coerce').to_numpy(float)
+                  y = pd.to_numeric(g[f'{field}_sohu'], errors='coerce').to_numpy(float)
+                  d = np.abs(x - y)
+                  exact_ohlc &= (d == 0)
+                  max_ohlc_abs = np.maximum(max_ohlc_abs, d)
+              per_symbol.append({
+                  'symbol': symbol,
+                  'baostock_rows': int((bao['symbol_key'] == symbol).sum()),
+                  'sohu_rows': int((sohu5['symbol_key'] == symbol).sum()),
+                  'overlap_rows': int(len(g)),
+                  'ohlc_exact_rows': int(exact_ohlc.sum()),
+                  'ohlc_exact_ratio': float(exact_ohlc.mean()) if len(g) else None,
+                  'max_ohlc_abs_diff': float(max_ohlc_abs.max()) if len(g) else None,
+              })
+
+          overlap_exact = (
+              len(both) == len(bao)
+              and len(both) == len(sohu5)
+              and len(bao_only) == 0
+              and len(sohu_only) == 0
+          )
+          max_ohlc_abs = max(field_stats[f]['max_abs_diff'] or 0 for f in ['open', 'high', 'low', 'close'])
+          status = 'PASS_FIXED5_FULL_RAW_CROSSCHECK' if overlap_exact and max_ohlc_abs <= 0.01 else 'REVIEW_FIXED5_FULL_RAW_CROSSCHECK'
+
+          audit = {
+              'artifact': 'BAOSTOCK_SOHU_FIXED5_FULL_RAW_CROSSCHECK_V482',
+              'version': 'V4.82',
+              'status': status,
+              'scope': 'all fixed5 traded rows in the sealed Formal window; evidence-only; no Formal/OOS promotion',
+              'formal_window': ['2020-06-01', '2026-04-17'],
+              'fixed5_symbols': FIXED5,
+              'baostock': {
+                  'workflow_run_id': 34350541625,
+                  'artifact_id': BAO_ARTIFACT_ID,
+                  'artifact_zip_sha256': BAO_ARTIFACT_ZIP_SHA256,
+                  'source_audit_status': bao_audit.get('status'),
+                  'raw_traded_rows': int(len(bao)),
+              },
+              'sohu': {
+                  'workflow_run_id': 34192233633,
+                  'artifact_id': SOHU_ARTIFACT_ID,
+                  'artifact_zip_sha256': SOHU_ARTIFACT_ZIP_SHA256,
+                  'source_audit_status': sohu_audit.get('status'),
+                  'full_raw_rows': int(sohu_audit.get('raw_rows', len(sohu))),
+                  'fixed5_rows': int(len(sohu5)),
+                  'schema': list(sohu.columns),
+              },
+              'overlap': {
+                  'rows': int(len(both)),
+                  'baostock_only_rows': int(len(bao_only)),
+                  'sohu_only_rows': int(len(sohu_only)),
+                  'exact_symbol_date_coverage': bool(overlap_exact),
+              },
+              'field_stats': field_stats,
+              'per_symbol': per_symbol,
+              'promotion': {
+                  'formal_admission': False,
+                  'oos_metrics_allowed': False,
+              },
+              'locked_interpretation': [
+                  'This crosscheck tests whether the BaoStock fixed5 traded-row lifecycle aligns with the already sealed Sohu Full RAW artifact.',
+                  'PASS does not replace the sealed Sohu Full RAW artifact and does not promote BaoStock into Formal.',
+                  'Any unit mismatch in volume/amount is reported diagnostically and is not silently normalized into a PASS.',
+                  'OOS remains isolated and no OOS performance metric is read or computed.',
+              ],
+          }
+
+          (out / 'BAOSTOCK_SOHU_FIXED5_FULL_RAW_CROSSCHECK_V482.json').write_text(
+              json.dumps(audit, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8'
+          )
+          both.to_csv(out / 'BAOSTOCK_SOHU_FIXED5_OVERLAP_V482.csv', index=False)
+          bao_only.to_csv(out / 'BAOSTOCK_ONLY_SYMBOL_DATES_V482.csv', index=False)
+          sohu_only.to_csv(out / 'SOHU_ONLY_SYMBOL_DATES_V482.csv', index=False)
+          print(json.dumps(audit, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Verify fail-closed boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path('out/baostock_sohu_fixed5_crosscheck/BAOSTOCK_SOHU_FIXED5_FULL_RAW_CROSSCHECK_V482.json').read_text(encoding='utf-8'))
+          assert x['promotion']['formal_admission'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert x['status'] in {'PASS_FIXED5_FULL_RAW_CROSSCHECK', 'REVIEW_FIXED5_FULL_RAW_CROSSCHECK'}
+          assert x['overlap']['rows'] > 0
+          print(json.dumps({
+              'status': x['status'],
+              'overlap': x['overlap'],
+              'per_symbol': x['per_symbol'],
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Upload crosscheck evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-baostock-sohu-fixed5-crosscheck-v482
+          path: out/baostock_sohu_fixed5_crosscheck/
+          if-no-files-found: error
+          retention-days: 30
