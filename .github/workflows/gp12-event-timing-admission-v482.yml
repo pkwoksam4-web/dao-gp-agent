@@ -1,0 +1,27 @@
+name: GP12 Event Timing Admission V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths:
+      - 'scripts/test_gp12_event_timing_admission_v482.py'
+      - 'scripts/gp12_event_timing_admission_v482.py'
+      - '.github/workflows/gp12-event-timing-admission-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  event-timing-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run GP12 event timing admission unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_event_timing_admission_v482.py
