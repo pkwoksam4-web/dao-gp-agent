@@ -1,0 +1,27 @@
+name: GP12 Adjusted Close PIT Promotion V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths:
+      - 'scripts/test_gp12_adjusted_close_pit_promotion_v482.py'
+      - 'scripts/gp12_adjusted_close_pit_promotion_v482.py'
+      - '.github/workflows/gp12-adjusted-close-pit-promotion-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  promotion-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run GP12 adjusted-close PIT promotion unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_adjusted_close_pit_promotion_v482.py
