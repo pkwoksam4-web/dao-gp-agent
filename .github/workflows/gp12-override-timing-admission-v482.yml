@@ -25,3 +25,173 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_gp12_override_timing_admission_v482.py
+
+  override-timing-admission:
+    needs: override-timing-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download V4.82 effective-term closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: upstream/stage_effective
+          run-id: 34102907115
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download V4.82 remaining-exact closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: upstream/stage_secondary
+          run-id: 34106853526
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download V4.82 reparsed closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: upstream/stage_reparsed
+          run-id: 34109448536
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download V4.82 recovered closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: upstream/stage_recovered
+          run-id: 34111100684
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download V4.82 final-six closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: upstream/stage_final_six
+          run-id: 34116386540
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download V4.82 final-four closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: upstream/stage_final_four
+          run-id: 34117443729
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download exact-term effective CNINFO evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-exact-term-effective-evidence-v482
+          path: upstream/evidence_effective
+          run-id: 34102756363
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download remaining-exact reparsed evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-reparsed-evidence-v482
+          path: upstream/evidence_reparsed
+          run-id: 34107706790
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download recovered remaining PDF evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-pdf-evidence-v482
+          path: upstream/evidence_recovered
+          run-id: 34110833992
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download offline rematch PDF evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-cninfo-unresolved-offline-rematch-pdfs-v482
+          path: upstream/evidence_offline
+          run-id: 34116142580
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download 11-row special materialized provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-special-exright-provenance-direct-v482
+          path: upstream/special
+          run-id: 34124614666
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download two same-day pre-open timing proofs
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-special-sameday-timestamp-pit-v482
+          path: upstream/sameday
+          run-id: 34465961833
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Consolidate exact 281 corrected-term timing records
+        run: |
+          EFFECTIVE="$(find upstream/stage_effective -name EFFECTIVE_TERM_CLOSURE_V482.json -print -quit)"
+          SECONDARY="$(find upstream/stage_secondary -name REMAINING_EXACT_CLOSURE_V482.json -print -quit)"
+          REPARSED="$(find upstream/stage_reparsed -name REPARSED_REMAINING_CLOSURE_V482.json -print -quit)"
+          RECOVERED="$(find upstream/stage_recovered -name RECOVERED_REMAINING_CLOSURE_V482.json -print -quit)"
+          FINAL_SIX="$(find upstream/stage_final_six -name FINAL_SIX_CLOSURE_V482.json -print -quit)"
+          FINAL_FOUR="$(find upstream/stage_final_four -name FINAL_FOUR_CLOSURE_V482.json -print -quit)"
+          EVID_EFFECTIVE="$(find upstream/evidence_effective -name CNINFO_STANDARD_EXACT_PDF_EVIDENCE_V481.json -print -quit)"
+          EVID_REPARSED="$(find upstream/evidence_reparsed -name REMAINING_EXACT_REPARSED_EVIDENCE_V482.json -print -quit)"
+          EVID_RECOVERED="$(find upstream/evidence_recovered -name RECOVERED_REMAINING_PDF_EVIDENCE_V482.json -print -quit)"
+          EVID_OFFLINE="$(find upstream/evidence_offline -name RECOVERED_REMAINING_PDF_EVIDENCE_V482.json -print -quit)"
+          SPECIAL="$(find upstream/special -name SPECIAL_EXRIGHT_PROVENANCE_V482.json -print -quit)"
+          SAMEDAY="$(find upstream/sameday -name GP12_SPECIAL_SAMEDAY_TIMESTAMP_PIT_V482.json -print -quit)"
+          for f in "$EFFECTIVE" "$SECONDARY" "$REPARSED" "$RECOVERED" "$FINAL_SIX" "$FINAL_FOUR" "$EVID_EFFECTIVE" "$EVID_REPARSED" "$EVID_RECOVERED" "$EVID_OFFLINE" "$SPECIAL" "$SAMEDAY"; do test -n "$f"; done
+          python scripts/gp12_override_timing_admission_v482.py \
+            --stage-json "$EFFECTIVE" \
+            --stage-json "$SECONDARY" \
+            --stage-json "$REPARSED" \
+            --stage-json "$RECOVERED" \
+            --stage-json "$FINAL_SIX" \
+            --stage-json "$FINAL_FOUR" \
+            --evidence-json "$EVID_EFFECTIVE" \
+            --evidence-json "$EVID_REPARSED" \
+            --evidence-json "$EVID_RECOVERED" \
+            --evidence-json "$EVID_OFFLINE" \
+            --special-json "$SPECIAL" \
+            --sameday-json "$SAMEDAY" \
+            --out-dir out/override_timing
+
+      - name: Verify all corrected terms are PIT-safe while downstream stays closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/override_timing/GP12_OVERRIDE_TIMING_ADMISSION_V482.json').read_text())
+          assert x['status']=='PASS_OVERRIDE_TIMING_ADMISSION'
+          assert x['standard_expected_n']==270 and x['standard_pass_n']==270
+          assert x['special_expected_n']==11 and x['special_pass_n']==11
+          assert x['total_expected_n']==281 and x['total_pass_n']==281
+          assert x['missing_n']==0 and x['binding_mismatch_n']==0 and x['late_n']==0
+          assert x['missing_preopen_n']==0 and x['same_day_preopen_pass_n']==2
+          p=x['promotion']
+          assert p['corrected_term_availability_time_verified'] is True
+          assert p['adjusted_close_blocker_closed'] is False
+          assert p['turnover_ratio_blocker_closed'] is False
+          assert p['label_provenance_blocker_closed'] is False
+          assert p['model_freeze_allowed'] is False
+          assert p['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in ['status','standard_pass_n','special_pass_n','total_pass_n','missing_n','late_n','same_day_preopen_pass_n']},ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload consolidated override timing evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-override-timing-admission-v482
+          path: out/override_timing/
+          if-no-files-found: error
+          retention-days: 30
