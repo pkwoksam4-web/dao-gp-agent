@@ -10,10 +10,12 @@ on:
       - 'scripts/test_strategy_factor_recovery_matrix_v482.py'
       - 'scripts/test_gp12_candidate_historical_crosswalk_v482.py'
       - 'scripts/test_strategy_policy_recovery_matrix_v482.py'
+      - 'scripts/test_strategy_intraday_source_recovery_v482.py'
       - 'data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json'
       - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
       - 'data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json'
       - 'data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json'
+      - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
       - '.github/workflows/strategy-asset-recovery-v482.yml'
   workflow_dispatch:
 
@@ -38,7 +40,8 @@ jobs:
             test_strategy_asset_recovery_v482.py \
             test_strategy_factor_recovery_matrix_v482.py \
             test_gp12_candidate_historical_crosswalk_v482.py \
-            test_strategy_policy_recovery_matrix_v482.py
+            test_strategy_policy_recovery_matrix_v482.py \
+            test_strategy_intraday_source_recovery_v482.py
       - name: Upstream recovery, calendar, admission and Formal regressions
         env:
           PYTHONPATH: scripts
@@ -82,18 +85,26 @@ jobs:
           matrix_path = Path('data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json')
           crosswalk_path = Path('data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json')
           policy_path = Path('data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json')
+          intraday_path = Path('data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json')
 
           checkpoint = json.loads(checkpoint_path.read_text(encoding='utf-8'))
           evidence = json.loads(evidence_path.read_text(encoding='utf-8'))
+
           matrix_bytes = matrix_path.read_bytes()
           matrix = json.loads(matrix_bytes.decode('utf-8'))
           matrix_sha256 = hashlib.sha256(matrix_bytes).hexdigest()
+
           crosswalk_bytes = crosswalk_path.read_bytes()
           crosswalk = json.loads(crosswalk_bytes.decode('utf-8'))
           crosswalk_sha256 = hashlib.sha256(crosswalk_bytes).hexdigest()
+
           policy_bytes = policy_path.read_bytes()
           policy = json.loads(policy_bytes.decode('utf-8'))
           policy_sha256 = hashlib.sha256(policy_bytes).hexdigest()
+
+          intraday_bytes = intraday_path.read_bytes()
+          intraday = json.loads(intraday_bytes.decode('utf-8'))
+          intraday_sha256 = hashlib.sha256(intraday_bytes).hexdigest()
 
           expected_factors = [
               ('Market Regime', 8),
@@ -114,11 +125,21 @@ jobs:
           assert matrix['factor_library_version'] == 'V1.0'
           assert [(x['name'], x['weight_pct']) for x in matrix['factors']] == expected_factors
           assert sum(x['weight_pct'] for x in matrix['factors']) == 100
+          assert all(x['recovery_status'] == 'PARTIAL_FILE_BACKED' for x in matrix['factors'])
           assert matrix['authoritative_weight_vector_recovered'] is True
           assert matrix['complete_factor_definitions_recovered'] is False
           assert matrix['full_strategy_source_recovered'] is False
           assert matrix['model_freeze_allowed'] is False
           assert matrix['oos_metrics_allowed'] is False
+
+          isrc = matrix['intraday_source_partial']
+          assert isrc['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
+          assert isrc['frequency'] == '1min'
+          assert isrc['actual_minute_bytes_materialized'] is False
+          assert isrc['formal_15m_coverage_verified'] is False
+          assert isrc['formal_60m_coverage_verified'] is False
+          assert isrc['resampling_contract_recovered'] is False
+          assert isrc['factor_formula_recovered'] is False
 
           expected_crosswalk_status = {
               'F1': 'UNVERIFIED_NEW_PROPOSAL',
@@ -166,6 +187,27 @@ jobs:
           assert policy['model_freeze_allowed'] is False
           assert policy['oos_metrics_allowed'] is False
 
+          assert intraday['artifact'] == 'GP_V11_INTRADAY_SOURCE_RECOVERY_V482'
+          assert intraday['version'] == 'V4.82'
+          assert intraday['status'] == 'PARTIAL_FILE_BACKED_SOURCE_INVENTORY_ONLY'
+          assert intraday['primary_source']['dataset'] == 'neigezhu/china-a-share-1min-ohlcv'
+          assert intraday['primary_source']['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
+          hist = intraday['historical_delisted_inventory']
+          assert hist['evidence_sha256'] == 'e4ef39e67de755c41605e869338a55b722cc0fc146a64c662bae4b82c260d839'
+          assert hist['symbols'] == 163
+          assert hist['found_in_inventory'] == 163
+          assert hist['complete'] == 129
+          assert hist['partial'] == 34
+          assert hist['audited_missing_trading_days'] == 3935
+          assert hist['unique_canonical_files'] == 163
+          assert intraday['actual_minute_bytes_materialized_in_strategy_recovery'] is False
+          assert intraday['formal_847_15m_coverage_verified'] is False
+          assert intraday['formal_847_60m_coverage_verified'] is False
+          assert intraday['resampling_contract_recovered'] is False
+          assert intraday['factor_formula_recovered'] is False
+          assert intraday['model_freeze_allowed'] is False
+          assert intraday['oos_metrics_allowed'] is False
+
           out = mod.evaluate_strategy_recovery(checkpoint, evidence)
           expected = [
               'FACTOR_DEFINITION_MISSING',
@@ -189,6 +231,7 @@ jobs:
           out['factor_recovery_matrix_sha256'] = matrix_sha256
           out['factor_library_version'] = matrix['factor_library_version']
           out['authoritative_weight_vector_recovered'] = matrix['authoritative_weight_vector_recovered']
+          out['all_12_factors_have_partial_file_backed_evidence'] = True
           out['complete_factor_definitions_recovered'] = matrix['complete_factor_definitions_recovered']
           out['full_strategy_source_recovered'] = matrix['full_strategy_source_recovered']
           out['candidate_historical_crosswalk_sha256'] = crosswalk_sha256
@@ -200,6 +243,13 @@ jobs:
           out['daily_base_probability_calibration_recovered'] = True
           out['full_strategy_probability_mapping_recovered'] = policy['full_strategy_probability_mapping_recovered']
           out['full_parameter_set_recovered'] = policy['full_parameter_set_recovered']
+          out['intraday_source_recovery_sha256'] = intraday_sha256
+          out['intraday_source_inventory_recovered'] = True
+          out['intraday_minute_bytes_materialized'] = intraday['actual_minute_bytes_materialized_in_strategy_recovery']
+          out['formal_15m_coverage_verified'] = intraday['formal_847_15m_coverage_verified']
+          out['formal_60m_coverage_verified'] = intraday['formal_847_60m_coverage_verified']
+          out['intraday_resampling_contract_recovered'] = intraday['resampling_contract_recovered']
+          out['intraday_factor_formula_recovered'] = intraday['factor_formula_recovered']
 
           target = Path('out/strategy-recovery/STRATEGY_ASSET_RECOVERY_CHECKPOINT_V482.json')
           target.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
@@ -210,10 +260,19 @@ jobs:
           Path('out/strategy-recovery/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json').write_bytes(matrix_bytes)
           Path('out/strategy-recovery/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json').write_bytes(crosswalk_bytes)
           Path('out/strategy-recovery/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json').write_bytes(policy_bytes)
+          Path('out/strategy-recovery/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json').write_bytes(intraday_bytes)
+
           print(json.dumps({
               'status': out['status'],
               'daily_base_code_recovered': out['daily_base_code_recovered'],
+              'all_12_factors_have_partial_file_backed_evidence': out['all_12_factors_have_partial_file_backed_evidence'],
               'daily_base_probability_calibration_recovered': out['daily_base_probability_calibration_recovered'],
+              'intraday_source_inventory_recovered': out['intraday_source_inventory_recovered'],
+              'intraday_minute_bytes_materialized': out['intraday_minute_bytes_materialized'],
+              'formal_15m_coverage_verified': out['formal_15m_coverage_verified'],
+              'formal_60m_coverage_verified': out['formal_60m_coverage_verified'],
+              'intraday_resampling_contract_recovered': out['intraday_resampling_contract_recovered'],
+              'intraday_factor_formula_recovered': out['intraday_factor_formula_recovered'],
               'full_strategy_probability_mapping_recovered': out['full_strategy_probability_mapping_recovered'],
               'full_parameter_set_recovered': out['full_parameter_set_recovered'],
               'authoritative_weight_vector_recovered': out['authoritative_weight_vector_recovered'],
@@ -222,6 +281,7 @@ jobs:
               'factor_recovery_matrix_sha256': out['factor_recovery_matrix_sha256'],
               'candidate_historical_crosswalk_sha256': out['candidate_historical_crosswalk_sha256'],
               'decision_policy_recovery_matrix_sha256': out['decision_policy_recovery_matrix_sha256'],
+              'intraday_source_recovery_sha256': out['intraday_source_recovery_sha256'],
               'candidate_strategy_id': out['candidate_strategy_id'],
               'candidate_head_sha': out['candidate_head_sha'],
               'candidate_adoption_status': out['candidate_adoption_status'],
