@@ -46,7 +46,7 @@ def evidence():
             {
                 'surface': 'file_library',
                 'confidence': 'AUTHORITATIVE_FILE',
-                'finding': 'August 13-26 contains no GP strategy source bundle; GP files begin with data-remediation assets on August 27',
+                'finding': 'historical package discovery is represented separately in recovered_assets',
             },
             {
                 'surface': 'gmail',
@@ -80,8 +80,23 @@ def evidence():
                 'note': 'recovered from prior assistant output only; not freeze eligible',
             },
         ],
+        'recovered_assets': [
+            {
+                'key': 'daily_base_strategy_code',
+                'confidence': 'AUTHORITATIVE_FILE',
+                'scope': 'DAILY_BASE_ONLY',
+                'source_id': 'library:v11_offline_backtest_v3_10.zip',
+                'archive_sha256': 'a' * 64,
+                'files': [
+                    {'path': 'src/run_backtest.py', 'sha256': 'b' * 64},
+                    {'path': 'src/run_panel_backtest.py', 'sha256': 'c' * 64},
+                    {'path': 'src/run_formal_pipeline.py', 'sha256': 'd' * 64},
+                ],
+                'complete_12_factor_strategy': False,
+            }
+        ],
         'missing_required_fields': [
-            'strategy_code_bytes',
+            'complete_12_factor_strategy_code_bytes',
             'exact_factor_formulas',
             'exact_normalization_and_clipping',
             'authoritative_weight_vector',
@@ -108,10 +123,20 @@ class StrategyAssetRecoveryV482Tests(unittest.TestCase):
         self.assertIn('FACTOR_DEFINITION_MISSING', out['blockers'])
         self.assertFalse(out['factor_definition_recovered'])
 
-    def test_missing_strategy_code_remains_blocked(self):
+    def test_missing_complete_strategy_code_remains_blocked(self):
         out = mod.evaluate_strategy_recovery(base_recovery_checkpoint(), evidence())
         self.assertIn('STRATEGY_CODE_MISSING', out['blockers'])
         self.assertFalse(out['strategy_code_recovered'])
+
+    def test_authoritative_daily_base_archive_is_preserved_but_does_not_clear_full_strategy_blocker(self):
+        out = mod.evaluate_strategy_recovery(base_recovery_checkpoint(), evidence())
+        self.assertTrue(out['daily_base_code_recovered'])
+        self.assertEqual(out['recovered_assets'][0]['scope'], 'DAILY_BASE_ONLY')
+        self.assertFalse(out['recovered_assets'][0]['complete_12_factor_strategy'])
+        self.assertFalse(out['strategy_code_recovered'])
+        self.assertIn('STRATEGY_CODE_MISSING', out['blockers'])
+        self.assertFalse(out['model_freeze_allowed'])
+        self.assertFalse(out['oos_metrics_allowed'])
 
     def test_production_evidence_keeps_exact_three_blockers(self):
         out = mod.evaluate_strategy_recovery(base_recovery_checkpoint(), evidence())
@@ -155,6 +180,18 @@ class StrategyAssetRecoveryV482Tests(unittest.TestCase):
     def test_recursive_oos_metric_field_is_rejected(self):
         x = evidence()
         x['candidate_clues'][0]['value'] = {'nested': {'sharpe': 3.0}}
+        with self.assertRaises(ValueError):
+            mod.evaluate_strategy_recovery(base_recovery_checkpoint(), x)
+
+    def test_recovered_asset_rejects_invalid_hash(self):
+        x = evidence()
+        x['recovered_assets'][0]['archive_sha256'] = 'not-a-hash'
+        with self.assertRaises(ValueError):
+            mod.evaluate_strategy_recovery(base_recovery_checkpoint(), x)
+
+    def test_recovered_asset_cannot_claim_full_strategy_under_daily_base_scope(self):
+        x = evidence()
+        x['recovered_assets'][0]['complete_12_factor_strategy'] = True
         with self.assertRaises(ValueError):
             mod.evaluate_strategy_recovery(base_recovery_checkpoint(), x)
 
