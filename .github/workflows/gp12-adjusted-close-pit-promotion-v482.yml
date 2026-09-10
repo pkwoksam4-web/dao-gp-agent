@@ -25,3 +25,106 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_gp12_adjusted_close_pit_promotion_v482.py
+
+  promotion-integration:
+    needs: promotion-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download exact 2732-event PIT admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-event-timing-admission-v482
+          path: upstream/event_timing
+          run-id: 34470443439
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download exact 281-override PIT admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-override-timing-admission-v482
+          path: upstream/override_timing
+          run-id: 34471061403
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download exact row-level QFQ provenance candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-qfq-row-provenance-candidate-v482
+          path: upstream/row_provenance
+          run-id: 34465663322
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download authoritative V4.82 formal final
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: upstream/formal_final
+          run-id: 34192462041
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Promote adjusted-close PIT provenance only
+        run: |
+          EVENT="$(find upstream/event_timing -name GP12_EVENT_TIMING_ADMISSION_V482.json -print -quit)"
+          OVERRIDE="$(find upstream/override_timing -name GP12_OVERRIDE_TIMING_ADMISSION_V482.json -print -quit)"
+          ROW="$(find upstream/row_provenance -name GP12_QFQ_ROW_PROVENANCE_CANDIDATE_V482.json -print -quit)"
+          FORMAL="$(find upstream/formal_final -name FORMAL_READINESS_FINAL_V482.json -print -quit)"
+          for f in "$EVENT" "$OVERRIDE" "$ROW" "$FORMAL"; do test -n "$f"; done
+          python scripts/gp12_adjusted_close_pit_promotion_v482.py \
+            --event-timing "$EVENT" \
+            --override-timing "$OVERRIDE" \
+            --row-provenance "$ROW" \
+            --formal-final "$FORMAL" \
+            --out-dir out/adjusted_close_promotion
+
+      - name: Verify VALIDATED_GLOBAL_PROVENANCE with downstream fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/adjusted_close_promotion/GP12_ADJUSTED_CLOSE_PIT_PROMOTION_V482.json').read_text())
+          assert x['status']=='VALIDATED_GLOBAL_PROVENANCE'
+          assert x['scope']=={
+            'formal_symbol_n':844,
+            'not_applicable_symbol_n':3,
+            'row_n':1011607,
+            'event_n':2732,
+            'corrected_override_n':281,
+            'same_day_preopen_n':2,
+          }
+          p=x['promotion']
+          assert p['validation_status_promoted_to_VALIDATED_GLOBAL_PROVENANCE'] is True
+          assert p['event_availability_time_verified'] is True
+          assert p['corrected_term_availability_time_verified'] is True
+          assert p['row_level_factor_provenance_verified'] is True
+          assert p['adjusted_close_blocker_closed'] is True
+          assert p['adjustment_provenance_blocker_closed'] is True
+          assert p['adjusted_close_feature_ready'] is True
+          assert p['turnover_ratio_blocker_closed'] is False
+          assert p['label_provenance_blocker_closed'] is False
+          assert p['formal_feature_ready'] is False
+          assert p['model_freeze_allowed'] is False
+          assert p['oos_metrics_allowed'] is False
+          assert x['remaining_gp12_blockers']==['TURNOVER_RATIO_UNBOUND','LABEL_PROVENANCE_UNBOUND']
+          print(json.dumps({
+            'status':x['status'],
+            'scope':x['scope'],
+            'remaining_gp12_blockers':x['remaining_gp12_blockers'],
+            'promotion':p,
+          },ensure_ascii=False,indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-adjusted-close-pit-promotion-v482
+          path: out/adjusted_close_promotion/
+          if-no-files-found: error
+          retention-days: 30
