@@ -1,0 +1,152 @@
+name: GP12 V482 adjusted-close multi-snapshot PIT math probe
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths: ['.github/workflows/gp12-adjusted-close-multisnapshot-v482-probe.yml']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip pandas pyarrow
+      - name: Download V4.82 effective event ledger candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-formal-action-neutral-label-candidate-v482
+          path: upstream/events
+          run-id: 34461955463
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download frozen Sina source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: upstream/census
+          run-id: 34009079533
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download authoritative V4.82 Formal readiness
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-formal-readiness-final-v482
+          path: upstream/formal
+          run-id: 34192462041
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Validate every intermediate factor/event snapshot pair
+        run: |
+          mkdir -p out/adjusted_close_multisnapshot
+          python - <<'PY'
+          import bisect,json,math
+          from pathlib import Path
+          import pandas as pd
+
+          BEG='2020-06-01'; END='2026-04-17'; THRESHOLD_BP=5.0
+          formal=json.loads(next(Path('upstream/formal').rglob('FORMAL_READINESS_FINAL_V482.json')).read_text())
+          assert formal['formal_ready'] is True
+          assert formal['full_path_pass_n']==844 and formal['full_path_fail_n']==0
+          assert formal['checkpoint']=={'PASS':844,'EXACT_TERM_REVIEW':0,'MISSING_EVENT_REVIEW':0,'NOT_APPLICABLE':3}
+          assert formal['oos_metrics_allowed'] is False
+
+          events=pd.read_parquet(next(Path('upstream/events').rglob('GP12_V482_EFFECTIVE_EVENT_LEDGER.parquet')))
+          events['symbol']=events['symbol'].astype(str).str.upper()
+          events['ex_date']=events['ex_date'].astype(str).str[:10]
+          assert events['event_ratio_v482'].notna().all()
+          event_by={s:sorted(zip(g['ex_date'],g['event_ratio_v482'].astype(float))) for s,g in events.groupby('symbol')}
+
+          census=json.loads(next(Path('upstream/census').rglob('GLOBAL_QFQ_SOURCE_COVERAGE_V481.json')).read_text())
+          assert census['sina_ready_n']==847 and census['unresolved_n']==0
+          recs={str(r['symbol']).upper():r for r in census['records']}
+          na={'600074.SH','600485.SH','600677.SH'}
+          formal_symbols=sorted(set(recs)-na)
+          assert len(formal_symbols)==844
+
+          def factor_series(rec):
+              rows=[]
+              for r in rec.get('parsed_factor_rows') or []:
+                  d=str(r.get('date') or r.get('d') or '')[:10]
+                  v=r.get('factor',r.get('f'))
+                  if d and v is not None:
+                      x=float(v); assert math.isfinite(x) and x>0
+                      rows.append((d,x))
+              rows.sort(); assert rows
+              return [d for d,_ in rows],[v for _,v in rows]
+          def factor_at(ds,vs,d):
+              i=bisect.bisect_right(ds,d)-1
+              assert i>=0,(d,ds[:3]); return vs[i]
+
+          results=[]; failures=[]; total_pairs=0; max_bp=-1.0; worst=None
+          for sym in formal_symbols:
+              ds,vs=factor_series(recs[sym]); ev=event_by.get(sym,[])
+              ed=[d for d,_ in ev]; er=[float(r) for _,r in ev]
+              probes={BEG,END}
+              probes.update(d for d in ds if BEG<=d<=END)
+              probes.update(d for d in ed if BEG<=d<=END)
+              probes=sorted(probes)
+              local_max=-1.0; local_worst=None; pairs=0
+              for ti,T in enumerate(probes):
+                  fT=factor_at(ds,vs,T)
+                  for d in probes[:ti+1]:
+                      expected=1.0
+                      for event_date,ratio in ev:
+                          if d < event_date <= T: expected*=ratio
+                      actual=fT/factor_at(ds,vs,d)
+                      bp=abs(actual/expected-1.0)*10000.0
+                      pairs+=1
+                      if bp>local_max: local_max=bp; local_worst={'d':d,'T':T,'expected':expected,'actual':actual,'bp':bp}
+                      if bp>max_bp: max_bp=bp; worst={'symbol':sym,**local_worst}
+              row={'symbol':sym,'probe_dates':len(probes),'pair_n':pairs,'max_diff_bp':local_max,'worst':local_worst,'status':'PASS' if local_max<=THRESHOLD_BP else 'FAIL'}
+              results.append(row); total_pairs+=pairs
+              if row['status']!='PASS': failures.append(row)
+
+          audit={
+            'artifact':'GP12_ADJUSTED_CLOSE_MULTISNAPSHOT_MATH_PROBE_V482','version':'V4.82',
+            'formal_window':[BEG,END],'threshold_bp':THRESHOLD_BP,
+            'formal_symbol_n':844,'pass_n':sum(r['status']=='PASS' for r in results),'fail_n':len(failures),
+            'snapshot_pair_n':total_pairs,'max_diff_bp':max_bp,'worst':worst,
+            'method':'For every union factor/event boundary snapshot T and every prior boundary d in Formal, compare Sina factor(T)/factor(d) with product of V4.82-proven event ratios satisfying d < ex_date <= T.',
+            'pit_property':{'events_after_snapshot_used':False,'future_after_T_factor_used_in_computation':False,'math_identity_only':True,'event_availability_time_verified':False},
+            'failures':failures[:50],
+            'promotion':{'stock_adjusted_close_blocker_closed':False,'formal_feature_ready':False,'candidate_adoption_status':'UNAPPROVED','model_freeze_allowed':False,'oos_metrics_allowed':False}
+          }
+          status='PASS_MULTISNAPSHOT_ADJUSTMENT_MATH' if not failures else 'REVIEW_MULTISNAPSHOT_ADJUSTMENT_MATH'
+          audit['status']=status
+          out=Path('out/adjusted_close_multisnapshot')
+          (out/'GP12_ADJUSTED_CLOSE_MULTISNAPSHOT_MATH_PROBE_V482.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          pd.DataFrame([{k:v for k,v in r.items() if k!='worst'} for r in results]).to_csv(out/'GP12_ADJUSTED_CLOSE_MULTISNAPSHOT_BY_SYMBOL_V482.csv',index=False)
+          print(json.dumps({k:audit[k] for k in ['status','formal_symbol_n','pass_n','fail_n','snapshot_pair_n','max_diff_bp','worst','pit_property','promotion']},ensure_ascii=False,indent=2))
+          PY
+      - name: Verify fail-closed result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/adjusted_close_multisnapshot/GP12_ADJUSTED_CLOSE_MULTISNAPSHOT_MATH_PROBE_V482.json').read_text())
+          assert x['status']=='PASS_MULTISNAPSHOT_ADJUSTMENT_MATH'
+          assert x['pass_n']==844 and x['fail_n']==0
+          assert x['max_diff_bp']<=5.0
+          assert x['pit_property']['events_after_snapshot_used'] is False
+          assert x['pit_property']['event_availability_time_verified'] is False
+          assert x['promotion']['stock_adjusted_close_blocker_closed'] is False
+          assert x['promotion']['formal_feature_ready'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-adjusted-close-multisnapshot-math-probe-v482
+          path: out/adjusted_close_multisnapshot/
+          if-no-files-found: error
+          retention-days: 30
