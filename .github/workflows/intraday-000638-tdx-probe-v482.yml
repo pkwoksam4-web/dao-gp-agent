@@ -1,0 +1,192 @@
+name: GP V4.82 Intraday 000638 TDX Probe
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-000638-tdx-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pytdx3
+        run: python -m pip install --disable-pip-version-check --quiet git+https://github.com/lierwang19/pytdx3.git
+      - name: Probe 000638.SZ 2026-04-13
+        run: |
+          mkdir -p out/tdx-probe
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from pytdx3.hq import TdxHq_API
+
+          code = '000638'
+          market = 0
+          target_date = '2026-04-13'
+          target_date_int = 20260413
+          hosts = [
+              ('180.153.18.170', 7709),
+              ('119.147.212.81', 7709),
+              ('124.74.236.50', 7709),
+              ('221.231.141.60', 7709),
+              ('101.227.73.20', 7709),
+              ('101.227.77.254', 7709),
+              ('14.215.128.18', 7709),
+              ('47.103.48.45', 7709),
+          ]
+
+          def jdefault(x):
+              try:
+                  return x.item()
+              except Exception:
+                  return str(x)
+
+          result = {
+              'artifact': 'INTRADAY_000638_TDX_PROBE_V482',
+              'version': 'V4.82',
+              'symbol': '000638.SZ',
+              'date': target_date,
+              'provider': 'TongDaXin/pytdx3',
+              'scope': 'READ_ONLY_THIRD_SOURCE_PROBE_NOT_FORMAL_FILL',
+              'servers': [],
+              'selected_server': None,
+              'history_minute_time_data': None,
+              'one_minute_bars': [],
+              'five_minute_bars': [],
+              'transactions_1458_1459': [],
+              'formal_fill_allowed': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+
+          for host, port in hosts:
+              attempt = {'host': host, 'port': port, 'connected': False, 'error': None}
+              api = TdxHq_API(raise_exception=True)
+              try:
+                  conn = api.connect(host, port, time_out=3)
+                  if not conn:
+                      attempt['error'] = 'connect returned false'
+                      result['servers'].append(attempt)
+                      continue
+                  attempt['connected'] = True
+
+                  hist = api.get_history_minute_time_data(market, code, target_date_int) or []
+                  attempt['history_minute_count'] = len(hist)
+                  if result['history_minute_time_data'] is None and hist:
+                      result['history_minute_time_data'] = {
+                          'count': len(hist),
+                          'sha256': hashlib.sha256(json.dumps(hist, ensure_ascii=False, sort_keys=True, default=jdefault, separators=(',', ':')).encode()).hexdigest(),
+                          'records': hist,
+                      }
+
+                  # Locate historical 1m bars by walking backwards from newest bars.
+                  found_1m = []
+                  scanned_ranges = []
+                  for start in range(0, 50001, 800):
+                      bars = api.get_security_bars(8, market, code, start, 800) or []
+                      if not bars:
+                          break
+                      dts = [str(x.get('datetime', '')) for x in bars]
+                      valid = [x for x in dts if len(x) >= 10]
+                      if valid:
+                          scanned_ranges.append({'start': start, 'count': len(bars), 'min': min(valid), 'max': max(valid)})
+                      hit = [x for x in bars if str(x.get('datetime', '')).startswith(target_date)]
+                      if hit:
+                          found_1m = hit
+                          break
+                      if valid and min(valid)[:10] < target_date:
+                          break
+                  attempt['one_minute_scan_ranges'] = scanned_ranges
+                  attempt['one_minute_target_count'] = len(found_1m)
+                  if found_1m and not result['one_minute_bars']:
+                      result['one_minute_bars'] = found_1m
+                      result['selected_server'] = f'{host}:{port}'
+
+                  # Direct 5m bars as a secondary aggregate cross-check.
+                  found_5m = []
+                  for start in range(0, 12001, 800):
+                      bars5 = api.get_security_bars(0, market, code, start, 800) or []
+                      if not bars5:
+                          break
+                      hit5 = [x for x in bars5 if str(x.get('datetime', '')).startswith(target_date)]
+                      if hit5:
+                          found_5m = hit5
+                          break
+                      valid5 = [str(x.get('datetime', '')) for x in bars5 if len(str(x.get('datetime', ''))) >= 10]
+                      if valid5 and min(valid5)[:10] < target_date:
+                          break
+                  attempt['five_minute_target_count'] = len(found_5m)
+                  if found_5m and not result['five_minute_bars']:
+                      result['five_minute_bars'] = found_5m
+
+                  # Historical transaction pages. Keep only target two minutes in user-visible evidence.
+                  target_tx = []
+                  tx_pages = []
+                  for start in range(0, 20000, 2000):
+                      tx = api.get_history_transaction_data(market, code, start, 2000, target_date_int) or []
+                      tx_pages.append({'start': start, 'count': len(tx)})
+                      if not tx:
+                          break
+                      for row in tx:
+                          t = str(row.get('time', '')).replace(':', '')
+                          if t.startswith('1458') or t.startswith('1459'):
+                              target_tx.append(row)
+                      if len(tx) < 2000:
+                          break
+                  attempt['transaction_pages'] = tx_pages
+                  attempt['transactions_1458_1459_count'] = len(target_tx)
+                  if target_tx and not result['transactions_1458_1459']:
+                      result['transactions_1458_1459'] = target_tx
+
+                  result['servers'].append(attempt)
+                  # One complete OHLCV source is enough; preserve previous attempts and stop.
+                  if len(found_1m) >= 200:
+                      break
+              except Exception as e:
+                  attempt['error'] = repr(e)
+                  result['servers'].append(attempt)
+              finally:
+                  try:
+                      api.disconnect()
+                  except Exception:
+                      pass
+
+          result['one_minute_count'] = len(result['one_minute_bars'])
+          result['one_minute_times'] = [str(x.get('datetime', '')) for x in result['one_minute_bars']]
+          result['has_1458_1m'] = any(x.endswith('14:58') or x.endswith('14:58:00') for x in result['one_minute_times'])
+          result['has_1459_1m'] = any(x.endswith('14:59') or x.endswith('14:59:00') for x in result['one_minute_times'])
+          result['one_minute_response_sha256'] = hashlib.sha256(json.dumps(result['one_minute_bars'], ensure_ascii=False, sort_keys=True, default=jdefault, separators=(',', ':')).encode()).hexdigest()
+          result['transaction_evidence_sha256'] = hashlib.sha256(json.dumps(result['transactions_1458_1459'], ensure_ascii=False, sort_keys=True, default=jdefault, separators=(',', ':')).encode()).hexdigest()
+
+          path = Path('out/tdx-probe/INTRADAY_000638_TDX_PROBE_V482.json')
+          path.write_text(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2, default=jdefault) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'selected_server': result['selected_server'],
+              'connected_servers': sum(1 for x in result['servers'] if x['connected']),
+              'history_minute_count': None if result['history_minute_time_data'] is None else result['history_minute_time_data']['count'],
+              'one_minute_count': result['one_minute_count'],
+              'has_1458_1m': result['has_1458_1m'],
+              'has_1459_1m': result['has_1459_1m'],
+              'five_minute_count': len(result['five_minute_bars']),
+              'transactions_1458_1459_count': len(result['transactions_1458_1459']),
+              'formal_fill_allowed': False,
+          }, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload TDX probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-000638-tdx-probe-v482
+          path: out/tdx-probe/INTRADAY_000638_TDX_PROBE_V482.json
+          if-no-files-found: error
+          retention-days: 30
