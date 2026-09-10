@@ -1,0 +1,195 @@
+name: GP12 label corporate-action impact probe V1
+
+on:
+  push:
+    branches:
+      - gp/baostock-fullraw-crosscheck-v482
+    paths:
+      - '.github/workflows/gp12-label-corporate-action-impact-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install parquet tools
+        run: python -m pip install --upgrade pip pandas pyarrow numpy
+      - name: Download raw-close Formal labels
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-formal-label-provenance-probe-v1
+          path: upstream/labels
+          run-id: 34459156649
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download QFQ event-ledger recalc evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-ledger-recalc-v481
+          path: upstream/qfq
+          run-id: 34073572831
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Quantify horizon-local corporate-action label impact
+        run: |
+          mkdir -p out/label_action_impact
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+
+          out=Path('out/label_action_impact')
+          qfq=json.loads(Path('upstream/qfq/GLOBAL_QFQ_LEDGER_RECALC_V481.json').read_text(encoding='utf-8'))
+          assert qfq['scope_n']==847
+          assert qfq['record_n']==847
+          assert qfq['formal_promotion'] is False
+          assert qfq['oos_metrics_allowed'] is False
+
+          trusted_status={'PASS_GLOBAL_LEDGER_NOMINAL_FACTOR','PASS_GLOBAL_LEDGER_PROVEN_NO_ACTION'}
+          status_by={r['symbol']:r['status'] for r in qfq['records']}
+          event_by={}
+          for r in qfq['records']:
+              ev=[]
+              for e in r.get('events',[]):
+                  if e.get('ex_date') and e.get('event_ratio') is not None:
+                      ev.append((str(e['ex_date']),float(e['event_ratio'])))
+              event_by[r['symbol']]=sorted(ev)
+
+          horizon_summaries=[]
+          examples=[]
+          for h in (1,2,3):
+              p=Path(f'upstream/labels/GP12_FORMAL_LABELS_H{h}_V1.parquet')
+              df=pd.read_parquet(p)
+              assert df['horizon_market_sessions'].eq(h).all()
+              assert df['target_date'].max()<='2026-04-17'
+              df['qfq_status']=df['symbol'].map(status_by)
+              assert df['qfq_status'].notna().all()
+              cross=np.zeros(len(df),dtype=bool)
+              event_prod=np.ones(len(df),dtype=float)
+
+              for sym, idx_obj in df.groupby('symbol',sort=False).groups.items():
+                  evs=event_by.get(sym,[])
+                  if not evs:
+                      continue
+                  idx=np.asarray(idx_obj,dtype=int)
+                  ed=np.array([d for d,_ in evs],dtype='U10')
+                  er=np.array([r for _,r in evs],dtype=float)
+                  cum=np.r_[1.0,np.cumprod(er)]
+                  base=df.loc[idx,'date'].to_numpy(dtype='U10')
+                  targ=df.loc[idx,'target_date'].to_numpy(dtype='U10')
+                  ib=np.searchsorted(ed,base,side='right')
+                  it=np.searchsorted(ed,targ,side='right')
+                  cross[idx]=it>ib
+                  event_prod[idx]=cum[it]/cum[ib]
+
+              base_close=pd.to_numeric(df['close'],errors='raise').to_numpy(float)
+              target_close=pd.to_numeric(df['target_close'],errors='raise').to_numpy(float)
+              neutral_ref=base_close*event_prod
+              neutral_label=np.where(target_close>neutral_ref,'UP',np.where(target_close<neutral_ref,'DOWN','FLAT'))
+              raw_label=df['label'].to_numpy(dtype=str)
+              diff=raw_label!=neutral_label
+              trusted=df['qfq_status'].isin(trusted_status).to_numpy()
+              review=~trusted
+
+              pair_counts=(pd.DataFrame({'raw':raw_label[cross & diff],'neutral':neutral_label[cross & diff]})
+                           .value_counts().sort_index())
+              pair_counts={f'{a}->{b}':int(n) for (a,b),n in pair_counts.items()}
+              summary={
+                  'horizon_market_sessions':h,
+                  'label_rows':int(len(df)),
+                  'rows_crossing_known_corporate_action':int(cross.sum()),
+                  'crossing_ratio':float(cross.mean()),
+                  'raw_vs_action_neutral_label_diff_rows':int(diff.sum()),
+                  'diff_ratio_all_labels':float(diff.mean()),
+                  'diff_rows_among_crossing':int((cross & diff).sum()),
+                  'diff_ratio_among_crossing':float((cross & diff).sum()/cross.sum()) if cross.sum() else 0.0,
+                  'trusted_qfq_crossing_rows':int((cross & trusted).sum()),
+                  'trusted_qfq_label_diff_rows':int((cross & trusted & diff).sum()),
+                  'review_qfq_crossing_rows':int((cross & review).sum()),
+                  'review_qfq_label_diff_rows':int((cross & review & diff).sum()),
+                  'label_flip_pairs':pair_counts,
+              }
+              horizon_summaries.append(summary)
+
+              take=np.flatnonzero(cross & diff)[:20]
+              for i in take:
+                  examples.append({
+                      'horizon_market_sessions':h,
+                      'symbol':str(df.iloc[i]['symbol']),
+                      'date':str(df.iloc[i]['date']),
+                      'target_date':str(df.iloc[i]['target_date']),
+                      'raw_label':str(raw_label[i]),
+                      'action_neutral_label':str(neutral_label[i]),
+                      'base_close':float(base_close[i]),
+                      'target_close':float(target_close[i]),
+                      'event_ratio_product':float(event_prod[i]),
+                      'qfq_status':str(df.iloc[i]['qfq_status']),
+                  })
+
+          audit={
+              'artifact':'GP12_LABEL_CORPORATE_ACTION_IMPACT_PROBE_V1',
+              'version':'1.0',
+              'status':'PASS_IMPACT_QUANTIFIED',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'method':'For each raw-close label row, multiply the T close by only corporate-action event_ratio values whose ex_date is in (T, target_date]. Compare target raw close to that horizon-local neutral reference. No event after target_date is used.',
+              'qfq_source':{
+                  'run_id':34073572831,
+                  'artifact':'gp-global-qfq-ledger-recalc-v481',
+                  'status_counts':qfq['status_counts'],
+                  'trusted_statuses':sorted(trusted_status),
+                  'review_n':qfq['review_n'],
+                  'validated_global_provenance_emitted':qfq['validated_global_provenance_emitted'],
+              },
+              'horizons':horizon_summaries,
+              'examples_first20_per_horizon':examples,
+              'interpretation':[
+                  'This quantifies semantic sensitivity; it does not approve raw-close or action-neutral labels.',
+                  'Rows attached to QFQ REVIEW symbols remain diagnostically useful but cannot be treated as fully validated adjustment evidence.',
+                  'No event after the target date is used, so this probe avoids future-after-label-horizon adjustment leakage.',
+                  'No OOS row or performance metric is consumed.'
+              ],
+              'promotion':{
+                  'label_contract_changed':False,
+                  'label_provenance_blocker_closed':False,
+                  'formal_admission':False,
+                  'model_freeze_allowed':False,
+                  'oos_metrics_allowed':False,
+              },
+          }
+          (out/'GP12_LABEL_CORPORATE_ACTION_IMPACT_PROBE_V1.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          pd.DataFrame(examples).to_csv(out/'GP12_LABEL_CORPORATE_ACTION_IMPACT_EXAMPLES_V1.csv',index=False)
+          print(json.dumps({'status':audit['status'],'horizons':horizon_summaries,'promotion':audit['promotion']},ensure_ascii=False,indent=2))
+          PY
+      - name: Verify fail-closed boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/label_action_impact/GP12_LABEL_CORPORATE_ACTION_IMPACT_PROBE_V1.json').read_text())
+          assert x['status']=='PASS_IMPACT_QUANTIFIED'
+          assert x['promotion']['label_contract_changed'] is False
+          assert x['promotion']['label_provenance_blocker_closed'] is False
+          assert x['promotion']['formal_admission'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert len(x['horizons'])==3
+          print('fail-closed corporate-action impact probe verified')
+          PY
+      - name: Upload impact evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-label-corporate-action-impact-probe-v1
+          path: out/label_action_impact/
+          if-no-files-found: error
+          retention-days: 30
