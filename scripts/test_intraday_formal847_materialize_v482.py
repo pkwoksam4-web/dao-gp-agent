@@ -33,6 +33,18 @@ class IntradayFormal847MaterializeV482Tests(unittest.TestCase):
         got = mod.required_trade_dates(pit, '002087.SZ')
         self.assertEqual(got, ['2020-06-01', '2024-06-13'])
 
+    def test_pitst_trade_date_index_prepares_once_with_corrections_and_boundaries(self):
+        pit = pd.DataFrame({
+            'symbol': ['002087.SZ', '002087.SZ', '002087.SZ', '000001.SZ', '000001.SZ', '600074.SH'],
+            'date': ['2020-05-29', '2020-06-01', '2024-06-13', '2026-04-17', '2026-04-18', '2024-01-02'],
+            'tradestatus': [1, 1, 0, 1, 1, 0],
+        })
+        indexed = mod.prepare_required_trade_date_index(pit)
+        self.assertEqual(indexed['002087.SZ'], ['2020-06-01', '2024-06-13'])
+        self.assertEqual(indexed['000001.SZ'], ['2026-04-17'])
+        self.assertNotIn('600074.SH', indexed)
+        self.assertNotIn('2026-04-18', indexed['000001.SZ'])
+
     def test_required_day_index_groups_once_and_ignores_nonrequired_dates(self):
         src = pd.concat([
             make_day('000001', '2024-01-02'),
