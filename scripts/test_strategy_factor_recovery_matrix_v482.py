@@ -18,6 +18,12 @@ EXPECTED = [
     ('Intraday Confirmation', 8),
 ]
 
+EXPECTED_FLOW_COLS = [
+    'dde_l', 'l_net_value', 'net_flow_rate', 'act_buy_xl', 'pas_buy_xl', 'act_sell_xl', 'pas_sell_xl',
+    'act_buy_l', 'pas_buy_l', 'act_sell_l', 'pas_sell_l', 'act_buy_m', 'pas_buy_m', 'act_sell_m',
+    'pas_sell_m', 'buy_l', 'sell_l',
+]
+
 
 class FactorRecoveryMatrixV482Tests(unittest.TestCase):
     @classmethod
@@ -43,15 +49,20 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
         self.assertFalse(self.doc['model_freeze_allowed'])
         self.assertFalse(self.doc['oos_metrics_allowed'])
 
-    def test_daily_source_components_are_explicit_and_non_daily_gaps_remain(self):
+    def test_daily_and_fund_source_components_are_explicit_and_non_daily_gaps_remain(self):
         by_name = {x['name']: x for x in self.doc['factors']}
-        for name in ('Market Regime', 'Market Breadth/Diffusion', 'Position', 'Multi-Momentum', 'Trend Quality', 'Efficiency Ratio', 'Drawdown Recovery'):
+        for name in (
+            'Market Regime', 'Market Breadth/Diffusion', 'Position', 'Multi-Momentum',
+            'Trend Quality', 'Efficiency Ratio', 'Drawdown Recovery', 'Price/Fund Efficiency',
+        ):
             self.assertEqual(by_name[name]['recovery_status'], 'PARTIAL_FILE_BACKED')
             self.assertTrue(by_name[name]['known_components'])
             self.assertTrue(by_name[name]['missing'])
-        for name in ('Sector RS', 'Sector Slope x R2', 'Sector Breadth', 'Price/Fund Efficiency', 'Intraday Confirmation'):
-            self.assertIn(by_name[name]['recovery_status'], {'USER_CONFIRMED_DEFINITION_ONLY', 'MISSING'})
+        for name in ('Sector RS', 'Sector Slope x R2', 'Sector Breadth'):
+            self.assertEqual(by_name[name]['recovery_status'], 'USER_CONFIRMED_DEFINITION_ONLY')
             self.assertTrue(by_name[name]['missing'])
+        self.assertEqual(by_name['Intraday Confirmation']['recovery_status'], 'MISSING')
+        self.assertTrue(by_name['Intraday Confirmation']['missing'])
 
     def test_matrix_binds_exact_recovered_source_identity(self):
         src = self.doc['daily_base_source']
@@ -59,6 +70,15 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
         self.assertEqual(src['run_backtest_sha256'], '6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1')
         self.assertEqual(src['run_panel_backtest_sha256'], '62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2')
         self.assertEqual(src['market_breadth_function_sha256'], 'b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a')
+
+    def test_fund_flow_adapter_identity_and_columns_are_exact(self):
+        src = self.doc['fund_flow_partial_source']
+        self.assertEqual(src['archive_sha256'], 'd526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d')
+        self.assertEqual(src['prepare_ashare21_hf_sha256'], '739e5e24a817283dcd6234e067a73c2ee12b46cb1e13bd9e3857cf864ec3cfe7')
+        self.assertEqual(src['flow_columns'], EXPECTED_FLOW_COLS)
+        self.assertEqual(len(src['flow_columns']), 17)
+        self.assertEqual(src['scope'], 'INPUT_PRESERVATION_ONLY_NOT_FACTOR_FORMULA')
+        self.assertFalse(src['factor_formula_recovered'])
 
 
 if __name__ == '__main__':
