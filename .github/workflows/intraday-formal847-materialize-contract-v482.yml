@@ -1,5 +1,6 @@
 name: GP V4.82 Intraday Formal847 Materialize Contract
 
+# Freshness checkpoint: optimized required-day index verification.
 on:
   push:
     branches:
