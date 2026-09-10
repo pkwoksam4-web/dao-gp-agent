@@ -6,6 +6,7 @@ from gp12_turnover_pit_admission_v482 import (
     audit_prefix_invariance,
     audit_replay,
     build_turnover_pit_admission,
+    select_turnover_probe_symbols,
 )
 
 
@@ -70,6 +71,14 @@ class GP12TurnoverPitAdmissionV482Test(unittest.TestCase):
         x=audit_adjustflag_invariance({"2":f2,"3":f3})
         self.assertEqual(x["status"],"REVIEW_ADJUSTFLAG_INVARIANCE")
         self.assertEqual(x["mismatch_n"],1)
+
+    def test_probe_sample_is_deterministic_subset_of_row_bearing_universe(self):
+        universe=["000003.SZ","000001.SZ","000002.SZ","000001.SZ","000004.SZ"]
+        self.assertEqual(select_turnover_probe_symbols(universe,3),["000001.SZ","000002.SZ","000003.SZ"])
+
+    def test_probe_sample_rejects_oversize_request(self):
+        with self.assertRaisesRegex(ValueError,"probe sample"):
+            select_turnover_probe_symbols(["000001.SZ"],2)
 
     def test_admission_closes_turnover_only_for_844_row_bearing_plus_3_na(self):
         x=build_turnover_pit_admission(self._structural(),self._replay(),self._prefix(),self._flag())
