@@ -25,3 +25,314 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_gp12_turnover_pit_admission_v482.py
+
+  replay-shard:
+    needs: turnover-pit-tests
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip baostock==0.9.3 pandas pyarrow
+      - name: Download frozen PIT-ST aligned turnover baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-baostock-turnover-pitst-aligned-v482
+          path: upstream/baseline
+          run-id: 34461329222
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Replay frozen history and test per-symbol query horizon
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p out/replay_shard
+          PYTHONPATH=scripts python - <<'PY'
+          import json, os
+          from pathlib import Path
+          import pandas as pd
+          import baostock as bs
+          from gp12_turnover_pit_admission_v482 import audit_replay, audit_prefix_invariance
+
+          BEG='2020-06-01'; END='2026-04-17'; SHARD_N=12; shard=int(os.environ['SHARD'])
+          baseline=pd.read_parquet(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.parquet')))
+          baseline['symbol']=baseline['symbol'].astype(str).str.upper().str.strip()
+          baseline['date']=baseline['date'].astype(str).str[:10]
+          symbols=sorted(baseline['symbol'].unique())
+          assert len(symbols)==847
+          selected=symbols[shard::SHARD_N]
+          fields='date,code,volume,amount,turn,tradestatus,isST'
+          replay_frames=[]; symbol_audits=[]; prefix_audits=[]; query_errors=[]
+
+          def bs_code(symbol):
+              code,ex=symbol.split('.')
+              return f'{ex.lower()}.{code}'
+
+          def query(symbol,end_date,adjustflag='3'):
+              rs=bs.query_history_k_data_plus(bs_code(symbol),fields,start_date=BEG,end_date=end_date,frequency='d',adjustflag=adjustflag)
+              data=[]
+              while rs.error_code=='0' and rs.next(): data.append(rs.get_row_data())
+              if rs.error_code!='0': raise RuntimeError(f'{rs.error_code}:{rs.error_msg}')
+              d=pd.DataFrame(data,columns=rs.fields)
+              if d.empty:
+                  return pd.DataFrame(columns=['symbol','date','volume','amount','turn','tradestatus','isST'])
+              d['symbol']=symbol; d['date']=d['date'].astype(str).str[:10]
+              for c in ['volume','amount','turn','tradestatus','isST']: d[c]=pd.to_numeric(d[c],errors='coerce')
+              return d[['symbol','date','volume','amount','turn','tradestatus','isST']]
+
+          lg=bs.login()
+          if lg.error_code!='0': raise RuntimeError(f'login failed {lg.error_code}:{lg.error_msg}')
+          try:
+              for i,symbol in enumerate(selected,1):
+                  b=baseline[baseline['symbol'].eq(symbol)].copy().sort_values('date')
+                  keys=set(b['date'])
+                  try:
+                      full=query(symbol,END,'3')
+                      full=full[full['date'].isin(keys)].copy().sort_values('date')
+                      r=audit_replay(b.to_dict('records'),full.to_dict('records'))
+                      r['symbol']=symbol; symbol_audits.append(r); replay_frames.append(full)
+
+                      dates=b['date'].tolist()
+                      assert len(dates)>=2,(symbol,len(dates))
+                      cutoff=dates[min(len(dates)-2,max(0,int(len(dates)*0.60)-1))]
+                      prefix=query(symbol,cutoff,'3')
+                      prefix=prefix[prefix['date'].isin(keys)].copy().sort_values('date')
+                      p=audit_prefix_invariance(full.to_dict('records'),prefix.to_dict('records'),cutoff)
+                      p['symbol']=symbol; prefix_audits.append(p)
+                  except Exception as exc:
+                      query_errors.append({'symbol':symbol,'error':repr(exc)})
+                  print(json.dumps({'shard':shard,'progress':i,'of':len(selected),'symbol':symbol,
+                    'replay':symbol_audits[-1]['status'] if symbol_audits and symbol_audits[-1].get('symbol')==symbol else 'ERROR',
+                    'prefix':prefix_audits[-1]['status'] if prefix_audits and prefix_audits[-1].get('symbol')==symbol else 'ERROR'},ensure_ascii=False),flush=True)
+          finally:
+              bs.logout()
+
+          replay=pd.concat(replay_frames,ignore_index=True) if replay_frames else pd.DataFrame(columns=['symbol','date','volume','amount','turn','tradestatus','isST'])
+          summary={
+            'artifact':'GP12_TURNOVER_PIT_REPLAY_SHARD_V482','version':'V4.82','shard':shard,'shard_n':SHARD_N,
+            'selected_symbol_n':len(selected),'selected_symbols':selected,'query_error_n':len(query_errors),'query_errors':query_errors,
+            'replay_symbol_n':len(symbol_audits),'replay_pass_symbol_n':sum(x['status']=='PASS_REPLAY_EXACT' for x in symbol_audits),
+            'replay_expected_n':sum(x['expected_n'] for x in symbol_audits),'replay_missing_n':sum(x['missing_n'] for x in symbol_audits),
+            'replay_extra_n':sum(x['extra_n'] for x in symbol_audits),'replay_mismatch_n':sum(x['mismatch_n'] for x in symbol_audits),
+            'prefix_probe_n':len(prefix_audits),'prefix_pass_n':sum(x['status']=='PASS_PREFIX_INVARIANCE' for x in prefix_audits),
+            'prefix_missing_n':sum(x['missing_n'] for x in prefix_audits),'prefix_extra_n':sum(x['extra_n'] for x in prefix_audits),
+            'prefix_mismatch_n':sum(x['mismatch_n'] for x in prefix_audits),
+            'prefix_cutoffs':[{"symbol":x['symbol'],"cutoff":x['cutoff'],"expected_n":x['expected_n']} for x in prefix_audits],
+            'replay_failures':[x for x in symbol_audits if x['status']!='PASS_REPLAY_EXACT'][:50],
+            'prefix_failures':[x for x in prefix_audits if x['status']!='PASS_PREFIX_INVARIANCE'][:50],
+          }
+          summary['status']='PASS_TURNOVER_PIT_REPLAY_SHARD' if (not query_errors and summary['replay_pass_symbol_n']==len(selected) and summary['prefix_pass_n']==len(selected)) else 'REVIEW_TURNOVER_PIT_REPLAY_SHARD'
+          out=Path('out/replay_shard')
+          replay.to_parquet(out/f'GP12_TURNOVER_REPLAY_SHARD_{shard:02d}_ROWS_V482.parquet',index=False,compression='zstd')
+          (out/f'GP12_TURNOVER_REPLAY_SHARD_{shard:02d}_AUDIT_V482.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({k:summary[k] for k in ['status','shard','selected_symbol_n','query_error_n','replay_expected_n','replay_missing_n','replay_extra_n','replay_mismatch_n','prefix_probe_n','prefix_missing_n','prefix_extra_n','prefix_mismatch_n']},ensure_ascii=False,indent=2))
+          if summary['status']!='PASS_TURNOVER_PIT_REPLAY_SHARD': raise SystemExit(1)
+          PY
+      - name: Upload replay shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-pit-replay-shard-${{ matrix.shard }}-v482
+          path: out/replay_shard/
+          if-no-files-found: error
+          retention-days: 30
+
+  adjustflag-sample50:
+    needs: turnover-pit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip baostock==0.9.3 pandas pyarrow
+      - name: Download frozen PIT-ST aligned turnover baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-baostock-turnover-pitst-aligned-v482
+          path: upstream/baseline
+          run-id: 34461329222
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Verify turnover is independent of price adjustment mode on frozen Sample50
+        run: |
+          mkdir -p out/adjustflag
+          PYTHONPATH=scripts python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import baostock as bs
+          from run_sample50_nominal import SAMPLE50, FORMAL_BEG, FORMAL_END
+          from gp12_turnover_pit_admission_v482 import audit_adjustflag_invariance
+
+          baseline=pd.read_parquet(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.parquet')))
+          baseline['symbol']=baseline['symbol'].astype(str).str.upper().str.strip(); baseline['date']=baseline['date'].astype(str).str[:10]
+          fields='date,code,volume,amount,turn,tradestatus,isST'
+          rows_by_flag={f:[] for f in ['1','2','3']}; errors=[]
+          def bs_code(symbol):
+              code,ex=symbol.split('.'); return f'{ex.lower()}.{code}'
+          lg=bs.login()
+          if lg.error_code!='0': raise RuntimeError(f'login failed {lg.error_code}:{lg.error_msg}')
+          try:
+              for i,symbol in enumerate(SAMPLE50,1):
+                  keys=set(baseline[baseline['symbol'].eq(symbol)]['date'])
+                  for flag in ['1','2','3']:
+                      try:
+                          rs=bs.query_history_k_data_plus(bs_code(symbol),fields,start_date=FORMAL_BEG,end_date=FORMAL_END,frequency='d',adjustflag=flag)
+                          data=[]
+                          while rs.error_code=='0' and rs.next(): data.append(rs.get_row_data())
+                          if rs.error_code!='0': raise RuntimeError(f'{rs.error_code}:{rs.error_msg}')
+                          d=pd.DataFrame(data,columns=rs.fields)
+                          if not d.empty:
+                              d['symbol']=symbol; d['date']=d['date'].astype(str).str[:10]
+                              for c in ['volume','amount','turn','tradestatus','isST']: d[c]=pd.to_numeric(d[c],errors='coerce')
+                              d=d[d['date'].isin(keys)]
+                              rows_by_flag[flag].extend(d[['symbol','date','volume','amount','turn','tradestatus','isST']].to_dict('records'))
+                      except Exception as exc:
+                          errors.append({'symbol':symbol,'flag':flag,'error':repr(exc)})
+                  print(json.dumps({'progress':i,'of':len(SAMPLE50),'symbol':symbol,'errors':len(errors)},ensure_ascii=False),flush=True)
+          finally:
+              bs.logout()
+          audit=audit_adjustflag_invariance(rows_by_flag)
+          audit.update({'artifact':'GP12_TURNOVER_ADJUSTFLAG_SAMPLE50_V482','version':'V4.82','query_error_n':len(errors),'query_errors':errors})
+          if errors: audit['status']='REVIEW_ADJUSTFLAG_INVARIANCE'
+          Path('out/adjustflag/GP12_TURNOVER_ADJUSTFLAG_SAMPLE50_V482.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          for flag,rows in rows_by_flag.items(): pd.DataFrame(rows).to_parquet(f'out/adjustflag/GP12_TURNOVER_ADJUSTFLAG_{flag}_SAMPLE50_V482.parquet',index=False,compression='zstd')
+          print(json.dumps({k:audit[k] for k in ['status','symbol_n','flags','mismatch_n','missing_n','extra_n','query_error_n']},ensure_ascii=False,indent=2))
+          if audit['status']!='PASS_ADJUSTFLAG_INVARIANCE': raise SystemExit(1)
+          PY
+      - name: Upload adjustflag evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-adjustflag-sample50-v482
+          path: out/adjustflag/
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: [replay-shard, adjustflag-sample50]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pandas pyarrow
+      - name: Download frozen PIT-ST aligned turnover baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-baostock-turnover-pitst-aligned-v482
+          path: upstream/baseline
+          run-id: 34461329222
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download replay shards from this run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp12-turnover-pit-replay-shard-*-v482
+          path: upstream/replay
+          merge-multiple: true
+      - name: Download adjustflag evidence from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-turnover-adjustflag-sample50-v482
+          path: upstream/adjustflag
+      - name: Download closed adjusted-close promotion
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-adjusted-close-pit-promotion-v482
+          path: upstream/adjusted_close
+          run-id: 34498632498
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Recompute global replay and promote turnover only
+        run: |
+          mkdir -p out/admission
+          PYTHONPATH=scripts python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          from gp12_turnover_pit_admission_v482 import audit_replay, build_turnover_pit_admission
+
+          structural=json.loads(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.json')).read_text())
+          baseline=pd.read_parquet(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.parquet')))
+          audits=[json.loads(p.read_text()) for p in sorted(Path('upstream/replay').glob('GP12_TURNOVER_REPLAY_SHARD_*_AUDIT_V482.json'))]
+          frames=[pd.read_parquet(p) for p in sorted(Path('upstream/replay').glob('GP12_TURNOVER_REPLAY_SHARD_*_ROWS_V482.parquet'))]
+          assert len(audits)==12 and len(frames)==12,(len(audits),len(frames))
+          replay_rows=pd.concat(frames,ignore_index=True)
+          replay=audit_replay(baseline.to_dict('records'),replay_rows.to_dict('records'))
+          prefix={
+            'status':'PASS_PREFIX_MATRIX_INVARIANCE' if all(a['status']=='PASS_TURNOVER_PIT_REPLAY_SHARD' for a in audits) and sum(a['prefix_mismatch_n']+a['prefix_missing_n']+a['prefix_extra_n'] for a in audits)==0 else 'REVIEW_PREFIX_MATRIX_INVARIANCE',
+            'symbol_n':sum(a['selected_symbol_n'] for a in audits),
+            'probe_n':sum(a['prefix_probe_n'] for a in audits),
+            'missing_n':sum(a['prefix_missing_n'] for a in audits),
+            'extra_n':sum(a['prefix_extra_n'] for a in audits),
+            'mismatch_n':sum(a['prefix_mismatch_n'] for a in audits),
+            'query_error_n':sum(a['query_error_n'] for a in audits),
+            'cutoffs':[x for a in audits for x in a['prefix_cutoffs']],
+          }
+          adjustflag=json.loads(next(Path('upstream/adjustflag').rglob('GP12_TURNOVER_ADJUSTFLAG_SAMPLE50_V482.json')).read_text())
+          adjusted=json.loads(next(Path('upstream/adjusted_close').rglob('GP12_ADJUSTED_CLOSE_PIT_PROMOTION_V482.json')).read_text())
+          assert adjusted['status']=='VALIDATED_GLOBAL_PROVENANCE'
+          assert adjusted['promotion']['adjusted_close_blocker_closed'] is True
+          assert adjusted['promotion']['turnover_ratio_blocker_closed'] is False
+          assert adjusted['promotion']['label_provenance_blocker_closed'] is False
+          result=build_turnover_pit_admission(structural,replay,prefix,adjustflag)
+          result['upstream_adjusted_close_status']=adjusted['status']
+          result['promotion']['adjusted_close_blocker_closed']=True
+          result['promotion']['adjustment_provenance_blocker_closed']=True
+          result['evidence']={
+            'structural_status':structural['status'],
+            'global_replay':replay,
+            'prefix_matrix':{k:v for k,v in prefix.items() if k!='cutoffs'},
+            'adjustflag_sample50':{k:adjustflag[k] for k in ['status','symbol_n','mismatch_n','missing_n','extra_n','query_error_n']},
+            'prefix_cutoffs':prefix['cutoffs'],
+          }
+          result['frozen_inputs']={
+            'structural_baseline':{'workflow_run_id':34461329222,'artifact_id':10145661334,'artifact_name':'gp-baostock-turnover-pitst-aligned-v482','artifact_zip_sha256':'9d3d4f3caee59ac41a45c9c94856e77c127d32f3414029692bcfa52240d5caa4'},
+            'adjusted_close_promotion':{'workflow_run_id':34498632498,'artifact_id':10160868998,'artifact_name':'gp12-adjusted-close-pit-promotion-v482','artifact_zip_sha256':'cd887c1723b1344bb429328b58327de2284ab9e5e45a3498b89e49d54a61afe3'},
+          }
+          out=Path('out/admission')
+          (out/'GP12_TURNOVER_RATIO_PIT_ADMISSION_V482.json').write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          replay_rows.sort_values(['symbol','date']).to_parquet(out/'GP12_TURNOVER_RATIO_PIT_REPLAY_V482.parquet',index=False,compression='zstd')
+          print(json.dumps({'status':result['status'],'scope':result['scope'],'replay':{k:replay[k] for k in ['status','expected_n','matched_n','missing_n','extra_n','mismatch_n']},'prefix':{k:prefix[k] for k in ['status','symbol_n','probe_n','missing_n','extra_n','mismatch_n','query_error_n']},'adjustflag':{k:adjustflag[k] for k in ['status','symbol_n','mismatch_n','missing_n','extra_n','query_error_n']},'remaining_gp12_blockers':result['remaining_gp12_blockers'],'promotion':result['promotion']},ensure_ascii=False,indent=2))
+          PY
+      - name: Verify turnover closes without opening Label or OOS
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/admission/GP12_TURNOVER_RATIO_PIT_ADMISSION_V482.json').read_text())
+          assert x['status']=='PASS_TURNOVER_RATIO_PIT_ADMISSION'
+          assert x['scope']['symbol_n']==847 and x['scope']['trade_row_n']==1011607
+          r=x['evidence']['global_replay']; assert r['expected_n']==1011607 and r['matched_n']==1011607 and r['missing_n']==r['extra_n']==r['mismatch_n']==0
+          p=x['evidence']['prefix_matrix']; assert p['symbol_n']==847 and p['probe_n']==847 and p['missing_n']==p['extra_n']==p['mismatch_n']==p['query_error_n']==0
+          a=x['evidence']['adjustflag_sample50']; assert a['symbol_n']==50 and a['mismatch_n']==a['missing_n']==a['extra_n']==a['query_error_n']==0
+          assert x['promotion']['adjusted_close_blocker_closed'] is True
+          assert x['promotion']['turnover_ratio_blocker_closed'] is True
+          assert x['promotion']['label_provenance_blocker_closed'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert x['remaining_gp12_blockers']==['LABEL_PROVENANCE_UNBOUND']
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-turnover-ratio-pit-admission-v482
+          path: out/admission/
+          if-no-files-found: error
+          retention-days: 30
