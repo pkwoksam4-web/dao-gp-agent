@@ -1,0 +1,114 @@
+name: GP V4.82 Intraday Formal847 Scaleout
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-formal847-scaleout-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 17
+      matrix:
+        shard_index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install materialization dependencies
+        run: python -m pip install --disable-pip-version-check --quiet pandas pyarrow requests
+      - name: Contract smoke test
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_intraday_formal847_materialize_v482.py
+      - name: Download authoritative PIT-ST input
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: input/pitst
+          run-id: 33971534669
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Materialize Formal847 shard
+        shell: bash
+        env:
+          PYTHONPATH: scripts
+          SHARD_INDEX: ${{ matrix.shard_index }}
+        run: |
+          set -euo pipefail
+          PIT="$(find input/pitst -name 'PIT_ST_DAILY_MERGED_V480.csv' -print -quit)"
+          test -n "$PIT"
+          echo 'ffb2967872836d0669db3ce0804ca38df1fde9c220f8e63bb4bbf5eafb4f97de  '"$PIT" | sha256sum -c -
+          SHARD_PADDED=$(printf '%02d' "$SHARD_INDEX")
+          rm -rf "out/shard${SHARD_PADDED}" "cache/shard${SHARD_PADDED}"
+          python scripts/intraday_formal847_materialize_v482.py shard \
+            --pitst "$PIT" \
+            --inventory data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv \
+            --shard-index "$SHARD_INDEX" \
+            --shard-count 17 \
+            --out-dir "out/shard${SHARD_PADDED}" \
+            --cache-dir "cache/shard${SHARD_PADDED}"
+          rm -rf "cache/shard${SHARD_PADDED}"
+      - name: Upload shard audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-formal847-audit-${{ matrix.shard_index }}-v482
+          path: |
+            out/shard*/INTRADAY_FORMAL847_SHARD_*_AUDIT_V482.json
+            out/shard*/INTRADAY_FORMAL847_SHARD_*_COVERAGE_V482.csv
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload shard bars
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-formal847-bars-${{ matrix.shard_index }}-v482
+          path: |
+            out/shard*/INTRADAY_FORMAL847_SHARD_*_15M_V482.parquet
+            out/shard*/INTRADAY_FORMAL847_SHARD_*_60M_V482.parquet
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download all shard audits
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-intraday-formal847-audit-*-v482
+          path: input/shard-audits
+          merge-multiple: true
+      - name: Fail-closed Formal847 aggregate coverage
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/intraday_formal847_merge_v482.py \
+            --reports-dir input/shard-audits \
+            --out out/INTRADAY_FORMAL847_COVERAGE_AUDIT_V482.json \
+            --expected-shards 17 \
+            --expected-symbols 847
+      - name: Upload global coverage audit
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-formal847-coverage-v482
+          path: out/INTRADAY_FORMAL847_COVERAGE_AUDIT_V482.json
+          if-no-files-found: error
+          retention-days: 30
