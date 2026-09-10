@@ -33,6 +33,20 @@ class IntradayFormal847MaterializeV482Tests(unittest.TestCase):
         got = mod.required_trade_dates(pit, '002087.SZ')
         self.assertEqual(got, ['2020-06-01', '2024-06-13'])
 
+    def test_required_day_index_groups_once_and_ignores_nonrequired_dates(self):
+        src = pd.concat([
+            make_day('000001', '2024-01-02'),
+            make_day('000001', '2024-01-03'),
+            make_day('000001', '2024-01-04'),
+        ], ignore_index=True)
+        src['timestamp'] = pd.to_datetime(src['timestamp'])
+        src['_date'] = src['timestamp'].dt.strftime('%Y-%m-%d')
+        indexed = mod._index_required_days(src, ['2024-01-02', '2024-01-04'])
+        self.assertEqual(sorted(indexed), ['2024-01-02', '2024-01-04'])
+        self.assertEqual(len(indexed['2024-01-02']), 241)
+        self.assertEqual(len(indexed['2024-01-04']), 241)
+        self.assertNotIn('2024-01-03', indexed)
+
     def test_valid_required_days_materialize_exact_15m_60m_counts(self):
         src = pd.concat([make_day('000001', '2024-01-02'), make_day('000001', '2024-01-03')], ignore_index=True)
         bars15, bars60, audit = mod.audit_source_frame(src, ['2024-01-02', '2024-01-03'], '000001.SZ')
