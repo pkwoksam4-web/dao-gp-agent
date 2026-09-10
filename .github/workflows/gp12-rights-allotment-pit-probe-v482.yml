@@ -1,0 +1,120 @@
+name: GP12 Rights Allotment PIT Probe V482
+
+on:
+  push:
+    branches:
+      - gp/baostock-fullraw-crosscheck-v482
+    paths:
+      - '.github/workflows/gp12-rights-allotment-pit-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe seven frozen rights-allotment events
+        run: |
+          mkdir -p out/gp12_rights_pit/raw
+          python - <<'PY'
+          import datetime as dt, hashlib, json, re, urllib.request
+          from pathlib import Path
+
+          targets = [
+            {'symbol':'000049.SZ','ex_date':'2023-12-08','rights_per_10':3.0,'rights_price':21.16},
+            {'symbol':'000065.SZ','ex_date':'2022-04-14','rights_per_10':3.0,'rights_price':5.16},
+            {'symbol':'000088.SZ','ex_date':'2020-08-19','rights_per_10':1.6,'rights_price':3.86},
+            {'symbol':'000728.SZ','ex_date':'2020-10-22','rights_per_10':3.0,'rights_price':5.44},
+            {'symbol':'000885.SZ','ex_date':'2020-08-13','rights_per_10':3.0,'rights_price':8.0},
+            {'symbol':'000970.SZ','ex_date':'2022-02-24','rights_per_10':1.5,'rights_price':4.5},
+            {'symbol':'002142.SZ','ex_date':'2021-12-02','rights_per_10':1.0,'rights_price':19.97},
+          ]
+
+          def d10(v):
+              s=str(v or '')[:10]
+              try: return dt.date.fromisoformat(s)
+              except Exception: return None
+
+          def parse_rights_per10(text):
+              s=str(text or '')
+              m=re.search(r'每\s*10\s*股\s*配\s*([0-9.]+)\s*股', s)
+              return float(m.group(1)) if m else None
+
+          out=[]
+          for t in targets:
+              code=t['symbol'].split('.')[0]
+              ex=t['symbol'].split('.')[1]
+              market='SZ' if ex=='SZ' else 'SH'
+              url=f'https://emweb.securities.eastmoney.com/PC_HSF10/BonusFinancing/PageAjax?code={market}{code}'
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Referer':'https://emweb.securities.eastmoney.com/'})
+              with urllib.request.urlopen(req,timeout=30) as r:
+                  raw=r.read(); status=r.status
+              sha=hashlib.sha256(raw).hexdigest()
+              Path(f'out/gp12_rights_pit/raw/{code}_{market}_pageajax.json').write_bytes(raw)
+              payload=json.loads(raw)
+              pgmx=payload.get('pgmx') or []
+              candidates=[]
+              for row in pgmx:
+                  exd=str(row.get('EX_DIVIDEND_DATEE') or row.get('EX_DIVIDEND_DATE') or '')[:10]
+                  if exd==t['ex_date']:
+                      candidates.append(row)
+              row=candidates[0] if len(candidates)==1 else None
+              notice=d10((row or {}).get('NOTICE_DATE'))
+              exd=d10(t['ex_date'])
+              got_price=None if row is None or row.get('ISSUE_PRICE') in (None,'') else float(row.get('ISSUE_PRICE'))
+              got_per10=parse_rights_per10((row or {}).get('EVENT_EXPLAIN'))
+              checks={
+                'exact_one_match': len(candidates)==1,
+                'notice_present': notice is not None,
+                'notice_not_after_ex': bool(notice and exd and notice<=exd),
+                'price_match': bool(got_price is not None and abs(got_price-float(t['rights_price']))<=1e-9),
+                'ratio_match': bool(got_per10 is not None and abs(got_per10-float(t['rights_per_10']))<=1e-9),
+              }
+              out.append({
+                **t,'url':url,'http_status':status,'bytes':len(raw),'sha256':sha,
+                'pgmx_n':len(pgmx),'candidate_n':len(candidates),
+                'notice_date':notice.isoformat() if notice else None,
+                'notice_lag_days':(exd-notice).days if notice and exd else None,
+                'equity_record_date':str((row or {}).get('EQUITY_RECORD_DATE') or '')[:10] or None,
+                'event_explain':(row or {}).get('EVENT_EXPLAIN'),
+                'source_issue_price':got_price,'source_rights_per_10':got_per10,
+                'checks':checks,'status':'PASS' if all(checks.values()) else 'REVIEW'
+              })
+
+          audit={
+            'artifact':'GP12_RIGHTS_ALLOTMENT_PIT_PROBE_V482','version':'V4.82',
+            'target_event_n':len(targets),'pass_n':sum(r['status']=='PASS' for r in out),
+            'review_n':sum(r['status']!='PASS' for r in out),
+            'all_notice_not_after_ex':all(r['checks']['notice_not_after_ex'] for r in out),
+            'all_term_linkage_match':all(r['checks']['price_match'] and r['checks']['ratio_match'] for r in out),
+            'records':out,
+            'promotion':{'event_timing_pit_verified':False,'adjusted_close_blocker_closed':False,'formal_feature_ready':False,'model_freeze_allowed':False,'oos_metrics_allowed':False}
+          }
+          Path('out/gp12_rights_pit/GP12_RIGHTS_ALLOTMENT_PIT_PROBE_V482.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+      - name: Keep production gates fail-closed
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('out/gp12_rights_pit/GP12_RIGHTS_ALLOTMENT_PIT_PROBE_V482.json'))
+          assert x['target_event_n']==7
+          assert x['promotion']['event_timing_pit_verified'] is False
+          assert x['promotion']['adjusted_close_blocker_closed'] is False
+          assert x['promotion']['formal_feature_ready'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-rights-allotment-pit-probe-v482
+          path: out/gp12_rights_pit/
+          if-no-files-found: error
+          retention-days: 30
