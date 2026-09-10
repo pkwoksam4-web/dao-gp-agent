@@ -79,6 +79,10 @@ jobs:
           ]
           assert out['status'] == 'STRATEGY_ASSETS_INCOMPLETE_V482', out
           assert out['blockers'] == expected, out['blockers']
+          assert out['daily_base_code_recovered'] is True
+          assert len(out['recovered_assets']) == 1
+          assert out['recovered_assets'][0]['scope'] == 'DAILY_BASE_ONLY'
+          assert out['recovered_assets'][0]['complete_12_factor_strategy'] is False
           assert out['strategy_code_recovered'] is False
           assert out['parameter_set_recovered'] is False
           assert out['factor_definition_recovered'] is False
@@ -95,6 +99,7 @@ jobs:
           )
           print(json.dumps({
               'status': out['status'],
+              'daily_base_code_recovered': out['daily_base_code_recovered'],
               'strategy_code_recovered': out['strategy_code_recovered'],
               'parameter_set_recovered': out['parameter_set_recovered'],
               'factor_definition_recovered': out['factor_definition_recovered'],
