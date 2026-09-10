@@ -1,0 +1,29 @@
+name: GP V4.82 Intraday Formal847 Merge Contract
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - 'scripts/intraday_formal847_merge_v482.py'
+      - 'scripts/test_intraday_formal847_merge_v482.py'
+      - '.github/workflows/intraday-formal847-merge-contract-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Formal847 aggregate coverage contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_intraday_formal847_merge_v482.py
