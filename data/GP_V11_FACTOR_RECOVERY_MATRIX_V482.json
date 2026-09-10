@@ -20,29 +20,23 @@
     "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
     "scope": "DAILY_BASE_ONLY"
   },
+  "sector_membership_partial_source": {
+    "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip:src/prepare_datalake_silver.py",
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "prepare_datalake_silver_sha256": "4e41c7f0da2de74f3243b3ab433c94c87fe38fc344eb4f87834d898afdbb2175",
+    "normalize_silver_sha256": "913988b740fe64f5bf406e2689afa4ca165dc5959dccbb444a760168f5f1c797",
+    "sector_columns": ["citic_l1", "citic_l3"],
+    "adapter_semantics": "normalize_silver passes citic_l1 and citic_l3 through row-for-row when present in the source daily panel; the implementation is byte-identical across inspected V3.4, V3.5, V3.6, V3.7, V3.9 and V3.10 packages.",
+    "scope": "ROW_LEVEL_PASSTHROUGH_ONLY_NOT_PIT_MEMBERSHIP_PROOF",
+    "pit_membership_verified": false,
+    "sector_series_recovered": false,
+    "factor_formula_recovered": false
+  },
   "fund_flow_partial_source": {
     "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip:src/prepare_ashare21_hf.py",
     "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
     "prepare_ashare21_hf_sha256": "739e5e24a817283dcd6234e067a73c2ee12b46cb1e13bd9e3857cf864ec3cfe7",
-    "flow_columns": [
-      "dde_l",
-      "l_net_value",
-      "net_flow_rate",
-      "act_buy_xl",
-      "pas_buy_xl",
-      "act_sell_xl",
-      "pas_sell_xl",
-      "act_buy_l",
-      "pas_buy_l",
-      "act_sell_l",
-      "pas_sell_l",
-      "act_buy_m",
-      "pas_buy_m",
-      "act_sell_m",
-      "pas_sell_m",
-      "buy_l",
-      "sell_l"
-    ],
+    "flow_columns": ["dde_l", "l_net_value", "net_flow_rate", "act_buy_xl", "pas_buy_xl", "act_sell_xl", "pas_sell_xl", "act_buy_l", "pas_buy_l", "act_sell_l", "pas_sell_l", "act_buy_m", "pas_buy_m", "act_sell_m", "pas_sell_m", "buy_l", "sell_l"],
     "adapter_semantics": "--keep-fund-flow preserves the listed historical large/medium-order flow fields and converts present fields with pandas.to_numeric; the source help text says they are retained for a later incremental layer.",
     "scope": "INPUT_PRESERVATION_ONLY_NOT_FACTOR_FORMULA",
     "factor_formula_recovered": false
@@ -52,192 +46,88 @@
       "name": "Market Regime",
       "weight_pct": 8,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 run_panel_backtest.py computes daily market breadth state from active-stock advance/decline counts.",
-        "Partial state mapping is HOT when adv_all > 3000, NEUTRAL when adv_all >= 1000, otherwise COLD.",
-        "Accepted V1.0 framework uses market regime as a position/risk environment control rather than individual-stock alpha ordering."
-      ],
-      "missing": [
-        "Exact full attack/range/defense regime formula and normalization.",
-        "Exact index-trend thresholds and volatility/risk-release mapping.",
-        "Prior-day limit-up performance input binding.",
-        "First-30-minute volume input binding and source bytes.",
-        "Exact mapping from full regime state to the 8-percent factor score."
-      ]
+      "known_components": ["V3.10 computes daily market breadth state: HOT if adv_all>3000, NEUTRAL if adv_all>=1000, otherwise COLD."],
+      "missing": ["Exact full attack/range/defense regime formula, index-trend and volatility mapping, prior-day limit-up input, first-30-minute volume input, and final 8-percent score mapping remain unrecovered."]
     },
     {
       "name": "Market Breadth/Diffusion",
       "weight_pct": 4,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 file-backed panel code computes adv_all, dec_all, flat_all, adv_ratio_all and eligible-universe analogues.",
-        "The same daily panel component computes median cross-sectional return."
-      ],
-      "missing": [
-        "Exact breadth/diffusion factor normalization and clipping.",
-        "Exact aggregation of all-versus-eligible breadth inputs.",
-        "Exact conversion to the final 4-percent weighted factor score."
-      ]
+      "known_components": ["V3.10 computes adv_all, dec_all, flat_all, adv_ratio_all, eligible-universe analogues and median cross-sectional return."],
+      "missing": ["Exact breadth aggregation, normalization, clipping and final 4-percent score conversion remain unrecovered."]
     },
     {
       "name": "Sector RS",
       "weight_pct": 10,
-      "recovery_status": "USER_CONFIRMED_DEFINITION_ONLY",
-      "known_components": [
-        "Accepted framework defines Sector RS from sector-minus-market relative returns over 5/10/20-day horizons."
-      ],
-      "missing": [
-        "Authoritative PIT sector-membership source bytes.",
-        "Authoritative sector and market series bindings.",
-        "Exact 5/10/20 aggregation weights, normalization and clipping.",
-        "Executable final-strategy source code."
-      ]
+      "recovery_status": "PARTIAL_FILE_BACKED",
+      "known_components": ["Accepted V1.0 definition uses sector-minus-market relative returns over 5/10/20 days.", "Recovered V3.10 Silver adapter preserves row-level citic_l1 and citic_l3 sector labels when present."],
+      "missing": ["Authoritative PIT sector-membership source bytes and PIT validation remain missing.", "Authoritative sector and market series construction remains missing.", "Exact 5/10/20 aggregation, normalization, clipping and executable final factor code remain missing."]
     },
     {
       "name": "Sector Slope x R2",
       "weight_pct": 7,
-      "recovery_status": "USER_CONFIRMED_DEFINITION_ONLY",
-      "known_components": [
-        "Accepted factor identity uses slope as trend speed and R2 as trend stability.",
-        "Historical design material mentions a 20-day primary and 10-day auxiliary window, but that window detail is not promoted to an exact authoritative production formula."
-      ],
-      "missing": [
-        "Exact sector price series and PIT membership binding.",
-        "Exact regression input transformation and window contract for the final strategy.",
-        "Exact slope-times-R2 normalization, clipping and 7-percent score mapping.",
-        "Executable final-strategy source code."
-      ]
+      "recovery_status": "PARTIAL_FILE_BACKED",
+      "known_components": ["Accepted factor identity is sector trend slope multiplied by R2 stability.", "Recovered V3.10 Silver adapter preserves row-level citic_l1 and citic_l3 labels when present."],
+      "missing": ["Authoritative PIT sector-membership history remains missing.", "Authoritative sector price/return series remains missing.", "Exact regression transform/window, normalization, clipping and executable final factor code remain missing."]
     },
     {
       "name": "Sector Breadth",
       "weight_pct": 8,
-      "recovery_status": "USER_CONFIRMED_DEFINITION_ONLY",
-      "known_components": [
-        "Factor identity and 8-percent weight are confirmed in the frozen V1.0 library.",
-        "The strategy architecture requires a sector-level breadth state separate from whole-market breadth."
-      ],
-      "missing": [
-        "Exact sector breadth numerator/denominator definition.",
-        "Exact PIT sector membership history.",
-        "Thresholds, normalization and clipping.",
-        "Executable final-strategy source code."
-      ]
+      "recovery_status": "PARTIAL_FILE_BACKED",
+      "known_components": ["Factor identity and weight are confirmed in V1.0.", "Recovered V3.10 Silver adapter preserves row-level citic_l1 and citic_l3 labels, providing a historical sector-label input path."],
+      "missing": ["Exact PIT sector membership history and validation remain missing.", "Exact sector breadth numerator/denominator, sector series, thresholds, normalization, clipping and executable final factor code remain missing."]
     },
     {
       "name": "Position",
       "weight_pct": 12,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 Daily Base computes pos20, pos60 and pos120 as (close - rolling_min) / (rolling_max - rolling_min).",
-        "The file-backed Daily Base life/consumption subscores use pos120 thresholds, preserving a real position-state implementation."
-      ],
-      "missing": [
-        "Proof that the Daily Base position implementation is identical to the final 12-percent factor definition.",
-        "Exact aggregation of 20/60/120 positions in the full strategy.",
-        "Final factor normalization/clipping and full-strategy source bytes."
-      ]
+      "known_components": ["V3.10 computes pos20, pos60 and pos120 as rolling range locations and uses pos120 in Daily Base life/consumption subscores."],
+      "missing": ["Exact full-strategy 20/60/120 aggregation, normalization and final 12-percent factor mapping remain unrecovered."]
     },
     {
       "name": "Multi-Momentum",
       "weight_pct": 10,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 Daily Base computes r5, r10, r20, r60 and r120 exact close-to-close returns.",
-        "Daily raw_strength awards 20 points for each positive r5/r10/r20/r60/r120."
-      ],
-      "missing": [
-        "Proof that Daily raw_strength is the final 10-percent Multi-Momentum factor.",
-        "Exact horizon aggregation and normalization in the full 12-factor strategy.",
-        "Executable final-strategy source code."
-      ]
+      "known_components": ["V3.10 computes r5/r10/r20/r60/r120 and Daily raw_strength awards 20 points for each positive horizon."],
+      "missing": ["Proof of identity with the final 10-percent factor and the full-strategy aggregation/normalization remain unrecovered."]
     },
     {
       "name": "Trend Quality",
       "weight_pct": 8,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 Daily Base has an executable trend_quality subscore using slope20, r2_20, er20 and close_loc.",
-        "Recovered thresholds: slope20 > 0 adds 15 otherwise subtracts 10; r2_20 > 0.55 adds 10; er20 > 0.35 adds 10; close_loc > 0.65 adds 10; close_loc < 0.30 subtracts 10; score clips to 0..100."
-      ],
-      "missing": [
-        "Proof that this Daily Base subscore is exactly the final 8-percent Trend Quality factor.",
-        "Any non-Daily overlays or regime-conditioned normalization.",
-        "Executable complete-strategy source code."
-      ]
+      "known_components": ["V3.10 trend_quality uses slope20, r2_20, er20 and close_loc with recovered threshold scoring and clips to 0..100."],
+      "missing": ["Proof this Daily Base subscore exactly equals the final 8-percent factor and any non-Daily overlays remain unrecovered."]
     },
     {
       "name": "Efficiency Ratio",
       "weight_pct": 7,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 Daily Base computes ER10 and ER20 as absolute displacement divided by summed absolute path movement.",
-        "The recovered trend_quality subscore explicitly uses ER20 > 0.35 as a positive condition."
-      ],
-      "missing": [
-        "Exact ER horizon selection/aggregation for the final 7-percent factor.",
-        "Exact normalization/clipping of the factor in the full strategy.",
-        "Executable complete-strategy source code."
-      ]
+      "known_components": ["V3.10 computes ER10/ER20 as absolute displacement divided by summed absolute path movement; ER20 is used in trend_quality."],
+      "missing": ["Final factor horizon selection, sign treatment, normalization/clipping and 7-percent mapping remain unrecovered."]
     },
     {
       "name": "Drawdown Recovery",
       "weight_pct": 8,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "V3.10 Daily Base computes dd20 and dd60 drawdown features.",
-        "An earlier short-term inertia prototype also contains drawdown/recovery concepts, but it is treated only as historical precursor evidence, not as full GP V1.1 authority."
-      ],
-      "missing": [
-        "Exact full-strategy recovery scoring formula from dd20/dd60 or other horizons.",
-        "Exact normalization, clipping and 8-percent score mapping.",
-        "Executable complete-strategy source code."
-      ]
+      "known_components": ["V3.10 computes dd20 and dd60 drawdown features; earlier short-term inertia prototype also contains drawdown/recovery concepts."],
+      "missing": ["Exact full-strategy recovery scoring, normalization/clipping and 8-percent mapping remain unrecovered."]
     },
     {
       "name": "Price/Fund Efficiency",
       "weight_pct": 10,
       "recovery_status": "PARTIAL_FILE_BACKED",
-      "known_components": [
-        "Factor identity and 10-percent weight are confirmed in the frozen V1.0 library.",
-        "V3.10 src/prepare_ashare21_hf.py is recovered byte-for-byte and explicitly supports preserving 17 historical large/medium-order flow fields for a later incremental layer.",
-        "The adapter converts retained flow fields to numeric values without inventing missing flow data."
-      ],
-      "missing": [
-        "Authoritative historical source dataset snapshot bytes containing the retained flow fields, with PIT/provenance validation.",
-        "Exact price-to-fund efficiency formula, pulse/outlier handling and sustained-flow semantics.",
-        "Normalization, clipping and final 10-percent score mapping.",
-        "Executable complete-strategy source code."
-      ]
+      "known_components": ["V3.10 prepare_ashare21_hf.py preserves 17 historical large/medium-order flow fields for a later incremental layer without inventing missing flow values."],
+      "missing": ["Actual historical flow dataset snapshot with PIT/provenance, exact price/fund efficiency formula, pulse/outlier handling, sustained-flow semantics, normalization/clipping and final code remain unrecovered."]
     },
     {
       "name": "Intraday Confirmation",
       "weight_pct": 8,
       "recovery_status": "MISSING",
-      "known_components": [
-        "Factor identity and 8-percent weight are confirmed in the frozen V1.0 library.",
-        "User-confirmed architecture separates daily close snapshot from 15-minute and 60-minute execution confirmation.",
-        "V3.10 README explicitly states the 15/60-minute execution layer is not merged into Daily Base."
-      ],
-      "missing": [
-        "Authoritative 15-minute input series and provenance binding.",
-        "Authoritative 60-minute input series and provenance binding.",
-        "Exact confirmation/negation rules, timing semantics, normalization and clipping.",
-        "Executable complete-strategy source code."
-      ]
+      "known_components": ["Factor identity/weight are confirmed and architecture separates daily close from 15m/60m execution confirmation; V3.10 explicitly says that layer is not merged."],
+      "missing": ["Authoritative 15-minute and 60-minute input series/provenance, exact confirmation/negation rules, timing, normalization/clipping and executable final code remain missing."]
     }
   ],
-  "remaining_strategy_gaps": [
-    "complete_12_factor_strategy_code_bytes",
-    "non_daily_layer_factor_formulas",
-    "exact_full_strategy_normalization_and_clipping",
-    "score_layer_aggregation",
-    "probability_mapping",
-    "ranking_topn_semantics",
-    "entry_exit_thresholds",
-    "holding_and_rebalance_policy",
-    "position_sizing_and_risk_rules",
-    "non_daily_layer_source_bytes"
-  ],
+  "remaining_strategy_gaps": ["complete_12_factor_strategy_code_bytes", "non_daily_layer_factor_formulas", "exact_full_strategy_normalization_and_clipping", "score_layer_aggregation", "full_gp12_probability_mapping", "ranking_topn_semantics", "entry_exit_thresholds", "holding_and_rebalance_policy", "position_sizing_and_risk_rules", "pit_sector_membership_and_sector_series", "intraday_15m_60m_source_and_rules", "non_daily_layer_source_bytes"],
   "model_freeze_allowed": false,
   "oos_metrics_allowed": false
 }
