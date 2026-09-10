@@ -16,6 +16,7 @@ on:
       - 'data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json'
       - 'data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json'
       - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
+      - 'data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json'
       - '.github/workflows/strategy-asset-recovery-v482.yml'
   workflow_dispatch:
 
@@ -86,6 +87,7 @@ jobs:
           crosswalk_path = Path('data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json')
           policy_path = Path('data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json')
           intraday_path = Path('data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json')
+          intraday_verify_path = Path('data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json')
 
           checkpoint = json.loads(checkpoint_path.read_text(encoding='utf-8'))
           evidence = json.loads(evidence_path.read_text(encoding='utf-8'))
@@ -105,6 +107,11 @@ jobs:
           intraday_bytes = intraday_path.read_bytes()
           intraday = json.loads(intraday_bytes.decode('utf-8'))
           intraday_sha256 = hashlib.sha256(intraday_bytes).hexdigest()
+
+          intraday_verify_bytes = intraday_verify_path.read_bytes()
+          intraday_verify = json.loads(intraday_verify_bytes.decode('utf-8'))
+          intraday_verify_sha256 = hashlib.sha256(intraday_verify_bytes).hexdigest()
+          assert intraday_verify_sha256 == '1eb392c8224d13c0b883ea71ec27cd84f73f599c0526107608e0996725c6068a'
 
           expected_factors = [
               ('Market Regime', 8),
@@ -135,11 +142,29 @@ jobs:
           isrc = matrix['intraday_source_partial']
           assert isrc['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
           assert isrc['frequency'] == '1min'
-          assert isrc['actual_minute_bytes_materialized'] is False
+          assert isrc['actual_minute_bytes_materialized'] is True
+          assert isrc['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
           assert isrc['formal_15m_coverage_verified'] is False
           assert isrc['formal_60m_coverage_verified'] is False
           assert isrc['resampling_contract_recovered'] is False
           assert isrc['factor_formula_recovered'] is False
+
+          ipilot = matrix['intraday_pilot_partial_source']
+          assert ipilot['scope'] == '002002.SZ_ONLY'
+          assert ipilot['source_pilot_run_id'] == 34431397499
+          assert ipilot['source_pilot_artifact_id'] == 10134644253
+          assert ipilot['source_pilot_artifact_digest'] == 'sha256:a974fbf4d1974cfa16bc97da2fd28d5c12debaf2ae2ca0ccf06d11e034d55e69'
+          assert ipilot['source_sha256'] == '209907efad308af285f937f913a8c8017ab75eede908a87ce5c109989eb43d92'
+          assert ipilot['bars_15m_rows'] == 54448
+          assert ipilot['bars_15m_sha256'] == 'cfd34f09d29bcaac1c0f9d47197fb640d1a9721a6e929e2458e3d6144d3596a8'
+          assert ipilot['bars_60m_rows'] == 13612
+          assert ipilot['bars_60m_sha256'] == '6ac057ed46d99d12864ce301ffa4cbc2939c94c69e7d647242b1a17da9bcef99'
+          assert ipilot['independent_verify_report_sha256'] == intraday_verify_sha256
+          assert ipilot['full_reconstruction_match_15m'] is True
+          assert ipilot['full_reconstruction_match_60m'] is True
+          assert ipilot['historical_gp_resampling_contract_recovered'] is False
+          assert ipilot['formal_847_coverage_verified'] is False
+          assert ipilot['factor_formula_recovered'] is False
 
           expected_crosswalk_status = {
               'F1': 'UNVERIFIED_NEW_PROPOSAL',
@@ -189,7 +214,7 @@ jobs:
 
           assert intraday['artifact'] == 'GP_V11_INTRADAY_SOURCE_RECOVERY_V482'
           assert intraday['version'] == 'V4.82'
-          assert intraday['status'] == 'PARTIAL_FILE_BACKED_SOURCE_INVENTORY_ONLY'
+          assert intraday['status'] == 'PARTIAL_FILE_BACKED_SINGLE_SYMBOL_RESAMPLING_PILOT'
           assert intraday['primary_source']['dataset'] == 'neigezhu/china-a-share-1min-ohlcv'
           assert intraday['primary_source']['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
           hist = intraday['historical_delisted_inventory']
@@ -200,13 +225,53 @@ jobs:
           assert hist['partial'] == 34
           assert hist['audited_missing_trading_days'] == 3935
           assert hist['unique_canonical_files'] == 163
-          assert intraday['actual_minute_bytes_materialized_in_strategy_recovery'] is False
+          assert intraday['actual_minute_bytes_materialized_in_strategy_recovery'] is True
+          assert intraday['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert intraday['single_symbol_session_aware_resampling_pilot_validated'] is True
           assert intraday['formal_847_15m_coverage_verified'] is False
           assert intraday['formal_847_60m_coverage_verified'] is False
           assert intraday['resampling_contract_recovered'] is False
           assert intraday['factor_formula_recovered'] is False
           assert intraday['model_freeze_allowed'] is False
           assert intraday['oos_metrics_allowed'] is False
+
+          pilot = intraday['single_symbol_resampling_pilot']
+          assert pilot['source_pilot_run_id'] == 34431397499
+          assert pilot['source_pilot_head_sha'] == 'f3d94fb3c6e668f3de550b4872e2935095609d44'
+          assert pilot['source_pilot_artifact_id'] == 10134644253
+          assert pilot['source_pilot_artifact_digest'] == 'sha256:a974fbf4d1974cfa16bc97da2fd28d5c12debaf2ae2ca0ccf06d11e034d55e69'
+          assert pilot['source_sha256'] == intraday_verify['source_sha256']
+          assert pilot['source_rows'] == intraday_verify['source_rows']
+          assert pilot['trading_dates'] == intraday_verify['trading_dates']
+          assert pilot['continuous_rows'] == intraday_verify['continuous_rows']
+          assert pilot['bars_15m_rows'] == intraday_verify['bars_15m_rows']
+          assert pilot['bars_15m_sha256'] == intraday_verify['bars_15m_sha256']
+          assert pilot['bars_60m_rows'] == intraday_verify['bars_60m_rows']
+          assert pilot['bars_60m_sha256'] == intraday_verify['bars_60m_sha256']
+          assert pilot['independent_verify_run_id'] == 34431659116
+          assert pilot['independent_verify_head_sha'] == 'b3436aaa31e93ebb0c9fdd9771067419fc7f9ee3'
+          assert pilot['independent_verify_artifact_id'] == 10134703581
+          assert pilot['independent_verify_artifact_digest'] == 'sha256:a22eaf171b4daec9c2c7d3cadf82de01135e5c1ab0684b17bbdd584bef830cf9'
+          assert pilot['independent_verify_report_sha256'] == intraday_verify_sha256
+          assert pilot['full_reconstruction_match_15m'] is True
+          assert pilot['full_reconstruction_match_60m'] is True
+          assert pilot['lunch_crossing_count_15m'] == 0
+          assert pilot['lunch_crossing_count_60m'] == 0
+          assert pilot['historical_authority'] is False
+
+          assert intraday_verify['artifact'] == 'INTRADAY_MINUTE_PILOT_INDEPENDENT_VERIFY_V482'
+          assert intraday_verify['status'] == 'PASS_INDEPENDENT_FULL_RECONSTRUCTION_SINGLE_SYMBOL_PILOT_NOT_FORMAL'
+          assert intraday_verify['verification_head_sha'] == 'b3436aaa31e93ebb0c9fdd9771067419fc7f9ee3'
+          assert intraday_verify['source_pilot_run_id'] == 34431397499
+          assert intraday_verify['source_pilot_artifact_id'] == 10134644253
+          assert intraday_verify['full_row_by_row_reconstruction_match_15m'] is True
+          assert intraday_verify['full_row_by_row_reconstruction_match_60m'] is True
+          assert intraday_verify['lunch_crossing_count_15m'] == 0
+          assert intraday_verify['lunch_crossing_count_60m'] == 0
+          assert intraday_verify['formal_847_coverage_verified'] is False
+          assert intraday_verify['historical_gp_formula_recovered'] is False
+          assert intraday_verify['model_freeze_allowed'] is False
+          assert intraday_verify['oos_metrics_allowed'] is False
 
           out = mod.evaluate_strategy_recovery(checkpoint, evidence)
           expected = [
@@ -244,12 +309,28 @@ jobs:
           out['full_strategy_probability_mapping_recovered'] = policy['full_strategy_probability_mapping_recovered']
           out['full_parameter_set_recovered'] = policy['full_parameter_set_recovered']
           out['intraday_source_recovery_sha256'] = intraday_sha256
+          out['intraday_pilot_independent_verify_sha256'] = intraday_verify_sha256
           out['intraday_source_inventory_recovered'] = True
           out['intraday_minute_bytes_materialized'] = intraday['actual_minute_bytes_materialized_in_strategy_recovery']
+          out['intraday_minute_bytes_materialized_scope'] = intraday['actual_minute_bytes_materialized_scope']
+          out['intraday_single_symbol_resampling_pilot_validated'] = intraday['single_symbol_session_aware_resampling_pilot_validated']
+          out['intraday_pilot_source_sha256'] = pilot['source_sha256']
+          out['intraday_pilot_15m_sha256'] = pilot['bars_15m_sha256']
+          out['intraday_pilot_60m_sha256'] = pilot['bars_60m_sha256']
           out['formal_15m_coverage_verified'] = intraday['formal_847_15m_coverage_verified']
           out['formal_60m_coverage_verified'] = intraday['formal_847_60m_coverage_verified']
           out['intraday_resampling_contract_recovered'] = intraday['resampling_contract_recovered']
           out['intraday_factor_formula_recovered'] = intraday['factor_formula_recovered']
+
+          assert out['intraday_minute_bytes_materialized'] is True
+          assert out['intraday_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert out['intraday_single_symbol_resampling_pilot_validated'] is True
+          assert out['formal_15m_coverage_verified'] is False
+          assert out['formal_60m_coverage_verified'] is False
+          assert out['intraday_resampling_contract_recovered'] is False
+          assert out['intraday_factor_formula_recovered'] is False
+          assert out['model_freeze_allowed'] is False
+          assert out['oos_metrics_allowed'] is False
 
           target = Path('out/strategy-recovery/STRATEGY_ASSET_RECOVERY_CHECKPOINT_V482.json')
           target.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
@@ -261,6 +342,7 @@ jobs:
           Path('out/strategy-recovery/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json').write_bytes(crosswalk_bytes)
           Path('out/strategy-recovery/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json').write_bytes(policy_bytes)
           Path('out/strategy-recovery/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json').write_bytes(intraday_bytes)
+          Path('out/strategy-recovery/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json').write_bytes(intraday_verify_bytes)
 
           print(json.dumps({
               'status': out['status'],
@@ -269,6 +351,12 @@ jobs:
               'daily_base_probability_calibration_recovered': out['daily_base_probability_calibration_recovered'],
               'intraday_source_inventory_recovered': out['intraday_source_inventory_recovered'],
               'intraday_minute_bytes_materialized': out['intraday_minute_bytes_materialized'],
+              'intraday_minute_bytes_materialized_scope': out['intraday_minute_bytes_materialized_scope'],
+              'intraday_single_symbol_resampling_pilot_validated': out['intraday_single_symbol_resampling_pilot_validated'],
+              'intraday_pilot_source_sha256': out['intraday_pilot_source_sha256'],
+              'intraday_pilot_15m_sha256': out['intraday_pilot_15m_sha256'],
+              'intraday_pilot_60m_sha256': out['intraday_pilot_60m_sha256'],
+              'intraday_pilot_independent_verify_sha256': out['intraday_pilot_independent_verify_sha256'],
               'formal_15m_coverage_verified': out['formal_15m_coverage_verified'],
               'formal_60m_coverage_verified': out['formal_60m_coverage_verified'],
               'intraday_resampling_contract_recovered': out['intraday_resampling_contract_recovered'],
