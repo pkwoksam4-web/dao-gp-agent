@@ -1,0 +1,215 @@
+name: GP12 Formal label provenance probe V1
+
+on:
+  push:
+    branches:
+      - gp/baostock-fullraw-crosscheck-v482
+    paths:
+      - '.github/workflows/gp12-formal-label-provenance-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install parquet tools
+        run: python -m pip install --upgrade pip pandas pyarrow
+      - name: Download sealed Sohu Full RAW
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Download Formal calendar
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: upstream/calendar
+          run-id: 33977325822
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Build literal-contract Formal labels
+        run: |
+          mkdir -p out/gp12_formal_labels
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+
+          FORMAL_BEG='2020-06-01'
+          FORMAL_END='2026-04-17'
+          HORIZONS=(1,2,3)
+          RAW_ARTIFACT_ID=10042614517
+          RAW_ARTIFACT_ZIP_SHA256='cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550'
+          CAL_ARTIFACT_ID=9972698555
+          CAL_ARTIFACT_ZIP_SHA256='a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58'
+          CAL_SEMANTIC_SHA256='5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7'
+
+          out=Path('out/gp12_formal_labels')
+          raw_path=Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          raw_audit_path=Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json')
+          cal_path=Path('upstream/calendar/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv')
+
+          def sha256_file(path):
+              h=hashlib.sha256()
+              with path.open('rb') as f:
+                  for chunk in iter(lambda:f.read(1024*1024),b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          raw=pd.read_parquet(raw_path)
+          raw_audit=json.loads(raw_audit_path.read_text(encoding='utf-8'))
+          cal=pd.read_csv(cal_path,dtype=str)
+          dates=cal['trade_date'].str.strip().tolist()
+          assert len(dates)==1426
+          assert dates[0]==FORMAL_BEG and dates[-1]==FORMAL_END
+          assert dates==sorted(set(dates))
+          cal_sem=hashlib.sha256('\n'.join(dates).encode('utf-8')).hexdigest()
+          assert cal_sem==CAL_SEMANTIC_SHA256
+          assert raw_audit['status']=='PASS_FULL_RAW_V482'
+          assert raw_audit['raw_rows']==1011607
+          assert raw_audit['symbol_n']==847
+          assert raw_audit['formal_admission'] is False
+          assert raw_audit['oos_metrics_allowed'] is False
+
+          raw=raw[['symbol','date','close']].copy()
+          raw['symbol']=raw['symbol'].astype(str).str.upper().str.strip()
+          raw['date']=pd.to_datetime(raw['date']).dt.strftime('%Y-%m-%d')
+          raw['close']=pd.to_numeric(raw['close'],errors='coerce')
+          assert raw['close'].notna().all()
+          assert not raw.duplicated(['symbol','date']).any()
+          assert raw['date'].between(FORMAL_BEG,FORMAL_END).all()
+          assert set(raw['date']).issubset(set(dates))
+          assert raw['symbol'].nunique()==847
+          assert len(raw)==1011607
+
+          date_to_idx={d:i for i,d in enumerate(dates)}
+          target_lookup=raw.rename(columns={'date':'target_date','close':'target_close'})[['symbol','target_date','target_close']]
+          summaries=[]
+          output_files=[]
+
+          for h in HORIZONS:
+              base=raw.copy()
+              base['calendar_index']=base['date'].map(date_to_idx)
+              base['target_index']=base['calendar_index']+h
+              in_window=base['target_index']<len(dates)
+              excluded_calendar_end=int((~in_window).sum())
+              base=base[in_window].copy()
+              base['target_date']=base['target_index'].map(lambda i:dates[int(i)])
+              merged=base.merge(target_lookup,on=['symbol','target_date'],how='left',validate='many_to_one')
+              missing_target=merged['target_close'].isna()
+              excluded_missing_target=int(missing_target.sum())
+              valid=merged[~missing_target].copy()
+              valid['label']=pd.Series('FLAT',index=valid.index,dtype='object')
+              valid.loc[valid['target_close']>valid['close'],'label']='UP'
+              valid.loc[valid['target_close']<valid['close'],'label']='DOWN'
+              valid['horizon_market_sessions']=h
+              valid['source_close_type']='unadjusted_raw_close_literal_contract'
+              cols=['symbol','date','horizon_market_sessions','target_date','close','target_close','label','source_close_type']
+              valid=valid[cols].sort_values(['symbol','date'],kind='stable').reset_index(drop=True)
+              path=out/f'GP12_FORMAL_LABELS_H{h}_V1.parquet'
+              valid.to_parquet(path,index=False,compression='zstd')
+              digest=sha256_file(path)
+              counts={k:int(v) for k,v in valid['label'].value_counts().sort_index().to_dict().items()}
+              summary={
+                  'horizon_market_sessions':h,
+                  'source_rows':int(len(raw)),
+                  'eligible_base_rows_before_target_presence':int(len(merged)),
+                  'label_rows':int(len(valid)),
+                  'excluded_calendar_end_rows':excluded_calendar_end,
+                  'excluded_missing_or_suspended_target_rows':excluded_missing_target,
+                  'label_counts':counts,
+                  'output_file':path.name,
+                  'output_sha256':digest,
+              }
+              summaries.append(summary)
+              output_files.append({'file':path.name,'sha256':digest})
+              print(json.dumps(summary,ensure_ascii=False))
+
+          audit={
+              'artifact':'GP12_FORMAL_LABEL_PROVENANCE_PROBE_V1',
+              'version':'1.0',
+              'strategy_id':'GP12_REBUILD_CANDIDATE_V1',
+              'status':'PASS_LITERAL_RAW_CLOSE_LABEL_PROVENANCE_PROBE',
+              'formal_window':[FORMAL_BEG,FORMAL_END],
+              'literal_label_contract':'Close-to-close signed return from T to T+h market-calendar trading sessions: UP greater than zero, DOWN less than zero, FLAT equal to zero. Suspended or missing target closes are excluded, never shifted to a later bar.',
+              'source_close_semantics':'unadjusted Sohu Full RAW close; no adjusted-close substitution',
+              'semantic_risk':'The current unapproved GP12 candidate contract says close-to-close but does not explicitly say adjusted close. This probe preserves the literal raw-close interpretation and does not approve that semantic choice.',
+              'inputs':{
+                  'raw':{
+                      'workflow_run_id':34192233633,
+                      'artifact_id':RAW_ARTIFACT_ID,
+                      'artifact_zip_sha256':RAW_ARTIFACT_ZIP_SHA256,
+                      'parquet_sha256':sha256_file(raw_path),
+                      'rows':int(len(raw)),
+                      'symbol_n':int(raw['symbol'].nunique()),
+                  },
+                  'calendar':{
+                      'workflow_run_id':33977325822,
+                      'artifact_id':CAL_ARTIFACT_ID,
+                      'artifact_zip_sha256':CAL_ARTIFACT_ZIP_SHA256,
+                      'semantic_sha256':cal_sem,
+                      'date_n':len(dates),
+                  },
+              },
+              'horizons':summaries,
+              'output_files':output_files,
+              'invariants':{
+                  'oos_rows_consumed':0,
+                  'max_target_date':max(dates),
+                  'target_dates_never_shifted_for_missing_symbol_rows':True,
+                  'source_symbol_date_duplicates':0,
+              },
+              'promotion':{
+                  'historical_label_provenance_candidate_materialized':True,
+                  'label_provenance_blocker_closed':False,
+                  'candidate_adoption_status':'UNAPPROVED',
+                  'model_freeze_allowed':False,
+                  'oos_metrics_allowed':False,
+              },
+          }
+          audit_path=out/'GP12_FORMAL_LABEL_PROVENANCE_PROBE_V1.json'
+          audit_path.write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({
+              'status':audit['status'],
+              'horizons':summaries,
+              'promotion':audit['promotion']
+          },ensure_ascii=False,indent=2))
+          PY
+      - name: Verify no OOS or silent promotion
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/gp12_formal_labels/GP12_FORMAL_LABEL_PROVENANCE_PROBE_V1.json').read_text())
+          assert x['status']=='PASS_LITERAL_RAW_CLOSE_LABEL_PROVENANCE_PROBE'
+          assert x['invariants']['oos_rows_consumed']==0
+          assert x['invariants']['max_target_date']=='2026-04-17'
+          assert x['promotion']['historical_label_provenance_candidate_materialized'] is True
+          assert x['promotion']['label_provenance_blocker_closed'] is False
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          for h in x['horizons']:
+              assert h['label_rows']>0
+              assert sum(h['label_counts'].values())==h['label_rows']
+          print('fail-closed label provenance probe verified')
+          PY
+      - name: Upload label provenance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-formal-label-provenance-probe-v1
+          path: out/gp12_formal_labels/
+          if-no-files-found: error
+          retention-days: 30
