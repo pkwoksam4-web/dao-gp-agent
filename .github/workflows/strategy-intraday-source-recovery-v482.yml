@@ -1,0 +1,30 @@
+name: GP V4.82 Intraday Source Recovery Contract
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - 'scripts/test_strategy_intraday_source_recovery_v482.py'
+      - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
+      - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
+      - '.github/workflows/strategy-intraday-source-recovery-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  intraday-source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Intraday source recovery contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_strategy_intraday_source_recovery_v482.py
