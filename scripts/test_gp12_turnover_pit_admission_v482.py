@@ -17,6 +17,18 @@ class GP12TurnoverPitAdmissionV482Test(unittest.TestCase):
             {"symbol":"000002.SZ","date":"2024-01-02","turn":0.0,"volume":100,"amount":200.0,"tradestatus":1,"isST":0},
         ]
 
+    def _structural(self):
+        return {"status":"PASS_STRUCTURAL_PITST_ALIGNED_TURNOVER","aligned_trade_rows":1011607,"sohu_trade_rows":1011607,"exact_symbol_date_coverage":True,"turn_missing_n":0,"turn_negative_n":0}
+
+    def _replay(self):
+        return {"status":"PASS_REPLAY_EXACT","expected_n":1011607,"matched_n":1011607,"missing_n":0,"extra_n":0,"mismatch_n":0}
+
+    def _prefix(self):
+        return {"status":"PASS_PREFIX_MATRIX_INVARIANCE","symbol_n":844,"probe_n":844,"missing_n":0,"extra_n":0,"mismatch_n":0}
+
+    def _flag(self):
+        return {"status":"PASS_ADJUSTFLAG_INVARIANCE","symbol_n":50,"mismatch_n":0,"missing_n":0,"extra_n":0}
+
     def test_exact_replay_passes(self):
         x=audit_replay(self._rows(), copy.deepcopy(self._rows()))
         self.assertEqual(x["status"],"PASS_REPLAY_EXACT")
@@ -59,13 +71,16 @@ class GP12TurnoverPitAdmissionV482Test(unittest.TestCase):
         self.assertEqual(x["status"],"REVIEW_ADJUSTFLAG_INVARIANCE")
         self.assertEqual(x["mismatch_n"],1)
 
-    def test_admission_closes_turnover_only(self):
-        structural={"status":"PASS_STRUCTURAL_PITST_ALIGNED_TURNOVER","aligned_trade_rows":1011607,"sohu_trade_rows":1011607,"exact_symbol_date_coverage":True,"turn_missing_n":0,"turn_negative_n":0}
-        replay={"status":"PASS_REPLAY_EXACT","expected_n":1011607,"matched_n":1011607,"missing_n":0,"extra_n":0,"mismatch_n":0}
-        prefix={"status":"PASS_PREFIX_MATRIX_INVARIANCE","symbol_n":847,"probe_n":847,"missing_n":0,"extra_n":0,"mismatch_n":0}
-        flag={"status":"PASS_ADJUSTFLAG_INVARIANCE","symbol_n":50,"mismatch_n":0,"missing_n":0,"extra_n":0}
-        x=build_turnover_pit_admission(structural,replay,prefix,flag)
+    def test_admission_closes_turnover_only_for_844_row_bearing_plus_3_na(self):
+        x=build_turnover_pit_admission(self._structural(),self._replay(),self._prefix(),self._flag())
         self.assertEqual(x["status"],"PASS_TURNOVER_RATIO_PIT_ADMISSION")
+        self.assertEqual(x["scope"],{
+            "universe_symbol_n":847,
+            "row_bearing_symbol_n":844,
+            "not_applicable_symbol_n":3,
+            "trade_row_n":1011607,
+            "sample_adjustflag_symbol_n":50,
+        })
         self.assertTrue(x["promotion"]["turnover_ratio_blocker_closed"])
         self.assertFalse(x["promotion"]["label_provenance_blocker_closed"])
         self.assertFalse(x["promotion"]["model_freeze_allowed"])
@@ -73,12 +88,14 @@ class GP12TurnoverPitAdmissionV482Test(unittest.TestCase):
         self.assertEqual(x["remaining_gp12_blockers"],["LABEL_PROVENANCE_UNBOUND"])
 
     def test_admission_fails_closed_on_prefix_mismatch(self):
-        structural={"status":"PASS_STRUCTURAL_PITST_ALIGNED_TURNOVER","aligned_trade_rows":1011607,"sohu_trade_rows":1011607,"exact_symbol_date_coverage":True,"turn_missing_n":0,"turn_negative_n":0}
-        replay={"status":"PASS_REPLAY_EXACT","expected_n":1011607,"matched_n":1011607,"missing_n":0,"extra_n":0,"mismatch_n":0}
-        prefix={"status":"REVIEW_PREFIX_MATRIX_INVARIANCE","symbol_n":847,"probe_n":847,"missing_n":0,"extra_n":0,"mismatch_n":1}
-        flag={"status":"PASS_ADJUSTFLAG_INVARIANCE","symbol_n":50,"mismatch_n":0,"missing_n":0,"extra_n":0}
+        prefix=self._prefix(); prefix["status"]="REVIEW_PREFIX_MATRIX_INVARIANCE"; prefix["mismatch_n"]=1
         with self.assertRaisesRegex(ValueError,"prefix"):
-            build_turnover_pit_admission(structural,replay,prefix,flag)
+            build_turnover_pit_admission(self._structural(),self._replay(),prefix,self._flag())
+
+    def test_admission_rejects_847_row_bearing_symbols(self):
+        prefix=self._prefix(); prefix["symbol_n"]=847; prefix["probe_n"]=847
+        with self.assertRaisesRegex(ValueError,"prefix"):
+            build_turnover_pit_admission(self._structural(),self._replay(),prefix,self._flag())
 
 
 if __name__ == "__main__":
