@@ -49,17 +49,13 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
         self.assertFalse(self.doc['model_freeze_allowed'])
         self.assertFalse(self.doc['oos_metrics_allowed'])
 
-    def test_daily_and_fund_source_components_are_explicit_and_non_daily_gaps_remain(self):
+    def test_all_non_intraday_factors_have_file_backed_partial_components(self):
         by_name = {x['name']: x for x in self.doc['factors']}
-        for name in (
-            'Market Regime', 'Market Breadth/Diffusion', 'Position', 'Multi-Momentum',
-            'Trend Quality', 'Efficiency Ratio', 'Drawdown Recovery', 'Price/Fund Efficiency',
-        ):
+        for name, _ in EXPECTED:
+            if name == 'Intraday Confirmation':
+                continue
             self.assertEqual(by_name[name]['recovery_status'], 'PARTIAL_FILE_BACKED')
             self.assertTrue(by_name[name]['known_components'])
-            self.assertTrue(by_name[name]['missing'])
-        for name in ('Sector RS', 'Sector Slope x R2', 'Sector Breadth'):
-            self.assertEqual(by_name[name]['recovery_status'], 'USER_CONFIRMED_DEFINITION_ONLY')
             self.assertTrue(by_name[name]['missing'])
         self.assertEqual(by_name['Intraday Confirmation']['recovery_status'], 'MISSING')
         self.assertTrue(by_name['Intraday Confirmation']['missing'])
@@ -79,6 +75,24 @@ class FactorRecoveryMatrixV482Tests(unittest.TestCase):
         self.assertEqual(len(src['flow_columns']), 17)
         self.assertEqual(src['scope'], 'INPUT_PRESERVATION_ONLY_NOT_FACTOR_FORMULA')
         self.assertFalse(src['factor_formula_recovered'])
+
+    def test_sector_membership_adapter_identity_is_exact_and_pit_remains_unverified(self):
+        src = self.doc['sector_membership_partial_source']
+        self.assertEqual(src['archive_sha256'], 'd526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d')
+        self.assertEqual(src['prepare_datalake_silver_sha256'], '4e41c7f0da2de74f3243b3ab433c94c87fe38fc344eb4f87834d898afdbb2175')
+        self.assertEqual(src['normalize_silver_sha256'], '913988b740fe64f5bf406e2689afa4ca165dc5959dccbb444a760168f5f1c797')
+        self.assertEqual(src['sector_columns'], ['citic_l1', 'citic_l3'])
+        self.assertEqual(src['scope'], 'ROW_LEVEL_PASSTHROUGH_ONLY_NOT_PIT_MEMBERSHIP_PROOF')
+        self.assertFalse(src['pit_membership_verified'])
+        self.assertFalse(src['sector_series_recovered'])
+        self.assertFalse(src['factor_formula_recovered'])
+
+    def test_sector_factor_gaps_still_include_pit_and_series_requirements(self):
+        by_name = {x['name']: x for x in self.doc['factors']}
+        for name in ('Sector RS', 'Sector Slope x R2', 'Sector Breadth'):
+            missing = ' '.join(by_name[name]['missing']).lower()
+            self.assertIn('pit', missing)
+            self.assertIn('sector', missing)
 
 
 if __name__ == '__main__':
