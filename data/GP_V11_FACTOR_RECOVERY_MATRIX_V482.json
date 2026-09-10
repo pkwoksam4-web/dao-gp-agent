@@ -20,6 +20,33 @@
     "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
     "scope": "DAILY_BASE_ONLY"
   },
+  "fund_flow_partial_source": {
+    "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip:src/prepare_ashare21_hf.py",
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "prepare_ashare21_hf_sha256": "739e5e24a817283dcd6234e067a73c2ee12b46cb1e13bd9e3857cf864ec3cfe7",
+    "flow_columns": [
+      "dde_l",
+      "l_net_value",
+      "net_flow_rate",
+      "act_buy_xl",
+      "pas_buy_xl",
+      "act_sell_xl",
+      "pas_sell_xl",
+      "act_buy_l",
+      "pas_buy_l",
+      "act_sell_l",
+      "pas_sell_l",
+      "act_buy_m",
+      "pas_buy_m",
+      "act_sell_m",
+      "pas_sell_m",
+      "buy_l",
+      "sell_l"
+    ],
+    "adapter_semantics": "--keep-fund-flow preserves the listed historical large/medium-order flow fields and converts present fields with pandas.to_numeric; the source help text says they are retained for a later incremental layer.",
+    "scope": "INPUT_PRESERVATION_ONLY_NOT_FACTOR_FORMULA",
+    "factor_formula_recovered": false
+  },
   "factors": [
     {
       "name": "Market Regime",
@@ -169,15 +196,16 @@
     {
       "name": "Price/Fund Efficiency",
       "weight_pct": 10,
-      "recovery_status": "USER_CONFIRMED_DEFINITION_ONLY",
+      "recovery_status": "PARTIAL_FILE_BACKED",
       "known_components": [
         "Factor identity and 10-percent weight are confirmed in the frozen V1.0 library.",
-        "Historical architecture separates price efficiency from real fund-direction evidence; V3.10 explicitly says the historical fund layer is not merged."
+        "V3.10 src/prepare_ashare21_hf.py is recovered byte-for-byte and explicitly supports preserving 17 historical large/medium-order flow fields for a later incremental layer.",
+        "The adapter converts retained flow fields to numeric values without inventing missing flow data."
       ],
       "missing": [
-        "Authoritative historical main-net-flow/fund-direction source bytes.",
-        "Exact price-to-fund efficiency formula and anomaly handling.",
-        "Normalization, clipping and final score mapping.",
+        "Authoritative historical source dataset snapshot bytes containing the retained flow fields, with PIT/provenance validation.",
+        "Exact price-to-fund efficiency formula, pulse/outlier handling and sustained-flow semantics.",
+        "Normalization, clipping and final 10-percent score mapping.",
         "Executable complete-strategy source code."
       ]
     },
