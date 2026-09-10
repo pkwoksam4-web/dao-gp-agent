@@ -3,6 +3,7 @@ import unittest
 from gp12_event_timing_admission_v482 import (
     audit_event_timing,
     build_expected_events,
+    collect_observed_events,
     infer_supplemental_pit_date,
 )
 
@@ -157,6 +158,30 @@ class GP12EventTimingAdmissionV482Test(unittest.TestCase):
                 "2022-02-25",
                 "SOHU_MAJOR_EVENTS",
             )
+
+    def test_rights_artifact_pass_status_is_collected(self):
+        expected = [
+            {
+                "symbol": "000049.SZ",
+                "ex_date": "2023-12-08",
+                "source": "EASTMONEY_RPT_IPO_ALLOTMENT",
+            }
+        ]
+        rights = {
+            "records": [
+                {
+                    "symbol": "000049.SZ",
+                    "ex_date": "2023-12-08",
+                    "notice_date": "2023-11-27",
+                    "sha256": "abc123",
+                    "status": "PASS",
+                }
+            ]
+        }
+        observed = collect_observed_events(expected, [], {"records": []}, {"records": []}, {"records": []}, rights)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(observed[0]["pit_date"], "2023-11-27")
+        self.assertEqual(observed[0]["evidence_id"], "abc123")
 
 
 if __name__ == "__main__":
