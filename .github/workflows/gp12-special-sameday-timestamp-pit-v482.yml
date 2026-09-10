@@ -1,0 +1,70 @@
+name: GP12 V482 special same-day PIT timestamp proof
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths: ['.github/workflows/gp12-special-sameday-timestamp-pit-v482.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Query CNINFO exact announcement metadata and freeze raw responses
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/sameday_timestamp/raw
+          python - <<'PY'
+          import datetime as dt, hashlib, json
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+          from cninfo_exact_term_v481 import resolve_orgid, query_cninfo
+
+          targets=[
+            {'symbol':'000697.SZ','ex_date':'2025-11-28','announcement_id':'1224831706','adjusted_reference_price':8.05,'start':'2025-11-20','end':'2025-11-28'},
+            {'symbol':'600306.SH','ex_date':'2023-12-26','announcement_id':'1218716690','adjusted_reference_price':8.14,'start':'2023-12-18','end':'2023-12-26'},
+          ]
+          tz=ZoneInfo('Asia/Shanghai'); out=[]
+          for t in targets:
+              code=t['symbol'].split('.')[0]
+              org=resolve_orgid(code)
+              q=query_cninfo(code,t['start'],t['end'],orgid=org['orgid'],searchkey='',timeout=30,attempts=3)
+              raw=q['raw']; fn=f'{code}_{t["announcement_id"]}_cninfo_index.json'; Path('out/sameday_timestamp/raw',fn).write_bytes(raw)
+              items=(q['json'] or {}).get('announcements') or []
+              hits=[x for x in items if str(x.get('announcementId') or '')==t['announcement_id']]
+              item=hits[0] if len(hits)==1 else None
+              ms=(item or {}).get('announcementTime')
+              ts=None
+              if ms is not None:
+                  ts=dt.datetime.fromtimestamp(float(ms)/1000,tz=dt.timezone.utc).astimezone(tz)
+              ex_open=dt.datetime.combine(dt.date.fromisoformat(t['ex_date']),dt.time(9,30),tzinfo=tz)
+              title=str((item or {}).get('announcementTitle') or '')
+              rec={**t,'orgid':org['orgid'],'http_status':q.get('http_status'),'query_sha256':hashlib.sha256(raw).hexdigest(),'query_bytes':len(raw),'announcement_n':len(items),'exact_hit_n':len(hits),'announcement_time_ms':ms,'announcement_time_asia_shanghai':ts.isoformat() if ts else None,'ex_date_open_asia_shanghai':ex_open.isoformat(),'published_before_ex_open':bool(ts and ts<=ex_open),'announcement_title':title,'adjunct_url':(item or {}).get('adjunctUrl'),'status':'PASS' if len(hits)==1 and ts and ts<=ex_open else 'REVIEW'}
+              out.append(rec)
+          audit={'artifact':'GP12_SPECIAL_SAMEDAY_TIMESTAMP_PIT_V482','version':'V4.82','target_n':2,'pass_n':sum(r['status']=='PASS' for r in out),'review_n':sum(r['status']!='PASS' for r in out),'records':out,'promotion':{'adjustment_provenance_blocker_closed':False,'formal_feature_ready':False,'model_freeze_allowed':False,'oos_metrics_allowed':False}}
+          Path('out/sameday_timestamp/GP12_SPECIAL_SAMEDAY_TIMESTAMP_PIT_V482.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+      - name: Fail closed unless exact metadata proves pre-open publication
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('out/sameday_timestamp/GP12_SPECIAL_SAMEDAY_TIMESTAMP_PIT_V482.json'))
+          assert x['target_n']==2
+          p=x['promotion']; assert p['adjustment_provenance_blocker_closed'] is False and p['formal_feature_ready'] is False and p['model_freeze_allowed'] is False and p['oos_metrics_allowed'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-special-sameday-timestamp-pit-v482
+          path: out/sameday_timestamp/
+          if-no-files-found: error
+          retention-days: 30
