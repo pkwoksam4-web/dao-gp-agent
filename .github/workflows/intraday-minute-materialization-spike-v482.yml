@@ -33,17 +33,37 @@ jobs:
           test -s out/intraday-spike/002002.parquet
           sha256sum out/intraday-spike/002002.parquet | tee out/intraday-spike/sha256.txt
           wc -c out/intraday-spike/002002.parquet | tee out/intraday-spike/bytes.txt
-      - name: Inspect parquet without schema assumptions
+      - name: Inspect parquet and session boundaries without resampling assumptions
         run: |
           python - <<'PY'
           import hashlib, json
+          from collections import Counter
+          from datetime import time
           from pathlib import Path
           import pyarrow.parquet as pq
+          import pandas as pd
 
           p = Path('out/intraday-spike/002002.parquet')
           pf = pq.ParquetFile(p)
-          schema = pf.schema_arrow
-          rows = pf.metadata.num_rows
+          table = pq.read_table(p, columns=['symbol','timestamp','open','high','low','close','volume','turnover'])
+          df = table.to_pandas().sort_values('timestamp').reset_index(drop=True)
+          ts = pd.to_datetime(df['timestamp'])
+          df['trade_date'] = ts.dt.date
+          df['trade_time'] = ts.dt.time
+
+          morning = df[(df['trade_time'] >= time(9,30)) & (df['trade_time'] <= time(11,30))]
+          afternoon = df[(df['trade_time'] >= time(13,0)) & (df['trade_time'] <= time(15,0))]
+          outside = df[~df.index.isin(morning.index) & ~df.index.isin(afternoon.index)]
+
+          day_counts = df.groupby('trade_date').size()
+          morning_counts = morning.groupby('trade_date').size()
+          afternoon_counts = afternoon.groupby('trade_date').size()
+
+          boundary_times = {'09:30:00','11:30:00','13:00:00','15:00:00'}
+          first_date = df['trade_date'].iloc[0]
+          last_date = df['trade_date'].iloc[-1]
+          boundary = df[(df['trade_date'].isin([first_date,last_date])) & (df['trade_time'].astype(str).isin(boundary_times))]
+
           meta = {
               'status': 'PILOT_NOT_FORMAL',
               'dataset': 'neigezhu/china-a-share-1min-ohlcv',
@@ -52,9 +72,21 @@ jobs:
               'symbol': '002002.SZ',
               'sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
               'bytes': p.stat().st_size,
-              'rows': rows,
-              'schema': [{'name': f.name, 'type': str(f.type)} for f in schema],
+              'rows': len(df),
               'row_groups': pf.metadata.num_row_groups,
+              'schema': [{'name': f.name, 'type': str(f.type)} for f in pf.schema_arrow],
+              'timestamp_min': str(ts.min()),
+              'timestamp_max': str(ts.max()),
+              'trading_dates': int(day_counts.size),
+              'day_row_count_distribution': {str(k): int(v) for k,v in sorted(Counter(day_counts.tolist()).items())},
+              'morning_row_count_distribution': {str(k): int(v) for k,v in sorted(Counter(morning_counts.tolist()).items())},
+              'afternoon_row_count_distribution': {str(k): int(v) for k,v in sorted(Counter(afternoon_counts.tolist()).items())},
+              'outside_regular_session_rows': int(len(outside)),
+              'first_date': str(first_date),
+              'last_date': str(last_date),
+              'first_date_times_head': [str(x) for x in df[df.trade_date==first_date].trade_time.head(10).tolist()],
+              'first_date_times_tail': [str(x) for x in df[df.trade_date==first_date].trade_time.tail(10).tolist()],
+              'boundary_rows_first_last_date': boundary[['trade_date','timestamp','open','high','low','close','volume','turnover']].astype(str).to_dict(orient='records'),
               'minute_bytes_materialized': True,
               'resampling_15m_validated': False,
               'resampling_60m_validated': False,
@@ -62,21 +94,6 @@ jobs:
               'formal_admission': False,
               'oos_metrics_allowed': False,
           }
-
-          names = set(schema.names)
-          candidate_cols = [c for c in ['datetime','timestamp','date','time','trade_time','trading_time'] if c in names]
-          meta['candidate_time_columns'] = candidate_cols
-
-          read_cols = list(dict.fromkeys(candidate_cols + [c for c in ['open','high','low','close','volume','amount','code','symbol'] if c in names]))
-          table = pq.read_table(p, columns=read_cols) if read_cols else pq.read_table(p)
-          df = table.to_pandas()
-          meta['sample_head'] = df.head(5).astype(str).to_dict(orient='records')
-          meta['sample_tail'] = df.tail(5).astype(str).to_dict(orient='records')
-          for c in candidate_cols:
-              s = df[c].dropna()
-              if len(s):
-                  meta.setdefault('time_column_ranges', {})[c] = {'min': str(s.min()), 'max': str(s.max())}
-
           out = Path('out/intraday-spike/INSPECT_002002_F311A5F_V482.json')
           out.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
           print(json.dumps(meta, ensure_ascii=False, indent=2))
