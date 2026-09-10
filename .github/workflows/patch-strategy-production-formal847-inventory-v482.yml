@@ -1,0 +1,98 @@
+name: Patch GP V4.82 Strategy Production Formal847 Inventory Binding
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/patch-strategy-production-formal847-inventory-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch production checkpoint with exact Formal847 inventory evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('.github/workflows/strategy-asset-recovery-v482.yml')
+          s = p.read_text(encoding='utf-8')
+
+          def once(old, new):
+              global s
+              n = s.count(old)
+              assert n == 1, (n, old[:120])
+              s = s.replace(old, new, 1)
+
+          once(
+              "      - 'scripts/test_strategy_intraday_source_recovery_v482.py'\n",
+              "      - 'scripts/test_strategy_intraday_source_recovery_v482.py'\n      - 'scripts/test_strategy_intraday_inventory_binding_v482.py'\n"
+          )
+          once(
+              "      - 'data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json'\n",
+              "      - 'data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json'\n      - 'data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json'\n      - 'data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv'\n      - 'data/FORMAL847_SYMBOLS_V482.txt'\n"
+          )
+          once(
+              "            test_strategy_policy_recovery_matrix_v482.py \\\n            test_strategy_intraday_source_recovery_v482.py\n",
+              "            test_strategy_policy_recovery_matrix_v482.py \\\n            test_strategy_intraday_source_recovery_v482.py \\\n            test_strategy_intraday_inventory_binding_v482.py\n"
+          )
+          once(
+              "          intraday_verify_path = Path('data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json')\n",
+              "          intraday_verify_path = Path('data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json')\n          intraday_inventory_audit_path = Path('data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json')\n          intraday_inventory_map_path = Path('data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv')\n          intraday_formal_symbols_path = Path('data/FORMAL847_SYMBOLS_V482.txt')\n"
+          )
+          once(
+              "          assert intraday_verify_sha256 == '1eb392c8224d13c0b883ea71ec27cd84f73f599c0526107608e0996725c6068a'\n",
+              "          assert intraday_verify_sha256 == '1eb392c8224d13c0b883ea71ec27cd84f73f599c0526107608e0996725c6068a'\n\n          intraday_inventory_audit_bytes = intraday_inventory_audit_path.read_bytes()\n          intraday_inventory_audit = json.loads(intraday_inventory_audit_bytes.decode('utf-8'))\n          intraday_inventory_audit_sha256 = hashlib.sha256(intraday_inventory_audit_bytes).hexdigest()\n          assert intraday_inventory_audit_sha256 == '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'\n          intraday_inventory_map_bytes = intraday_inventory_map_path.read_bytes()\n          intraday_inventory_map_sha256 = hashlib.sha256(intraday_inventory_map_bytes).hexdigest()\n          assert intraday_inventory_map_sha256 == 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'\n          intraday_formal_symbols_bytes = intraday_formal_symbols_path.read_bytes()\n          intraday_formal_symbols_sha256 = hashlib.sha256(intraday_formal_symbols_bytes).hexdigest()\n          assert intraday_formal_symbols_sha256 == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'\n          assert intraday_inventory_audit['formal847_inventory_intersection']['matched_symbols'] == 847\n          assert intraday_inventory_audit['formal847_inventory_intersection']['missing_symbols'] == 0\n          assert intraday_inventory_audit['formal_847_minute_inventory_membership_verified'] is True\n          assert intraday_inventory_audit['formal_847_minute_byte_coverage_verified'] is False\n          assert intraday_inventory_audit['formal_847_15m_coverage_verified'] is False\n          assert intraday_inventory_audit['formal_847_60m_coverage_verified'] is False\n"
+          )
+          once(
+              "          assert isrc['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'\n          assert isrc['formal_15m_coverage_verified'] is False\n",
+              "          assert isrc['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'\n          assert isrc['formal_847_inventory_membership_verified'] is True\n          assert isrc['formal_847_inventory_audit_sha256'] == intraday_inventory_audit_sha256\n          assert isrc['formal_847_inventory_map_sha256'] == intraday_inventory_map_sha256\n          assert isrc['formal_847_inventory_symbols'] == 847\n          assert isrc['formal_847_minute_byte_coverage_verified'] is False\n          assert isrc['formal_15m_coverage_verified'] is False\n"
+          )
+          once(
+              "          assert intraday['status'] == 'PARTIAL_FILE_BACKED_SINGLE_SYMBOL_RESAMPLING_PILOT'\n",
+              "          assert intraday['status'] == 'PARTIAL_FILE_BACKED_FORMAL847_INVENTORY_PLUS_SINGLE_SYMBOL_RESAMPLING_PILOT'\n"
+          )
+          once(
+              "          assert intraday['single_symbol_session_aware_resampling_pilot_validated'] is True\n          assert intraday['formal_847_15m_coverage_verified'] is False\n",
+              "          assert intraday['single_symbol_session_aware_resampling_pilot_validated'] is True\n          inv_binding = intraday['formal847_inventory_audit']\n          assert inv_binding['audit_sha256'] == intraday_inventory_audit_sha256\n          assert inv_binding['inventory_map_sha256'] == intraday_inventory_map_sha256\n          assert inv_binding['formal_symbols_sha256'] == intraday_formal_symbols_sha256\n          assert inv_binding['formal_universe_symbols'] == 847\n          assert inv_binding['matched_inventory_symbols'] == 847\n          assert inv_binding['missing_inventory_symbols'] == 0\n          assert inv_binding['formal_847_minute_inventory_membership_verified'] is True\n          assert inv_binding['formal_847_minute_byte_coverage_verified'] is False\n          assert intraday['formal_847_minute_inventory_membership_verified'] is True\n          assert intraday['formal_847_minute_byte_coverage_verified'] is False\n          assert intraday['formal_847_15m_coverage_verified'] is False\n"
+          )
+          once(
+              "          out['intraday_single_symbol_resampling_pilot_validated'] = intraday['single_symbol_session_aware_resampling_pilot_validated']\n",
+              "          out['intraday_single_symbol_resampling_pilot_validated'] = intraday['single_symbol_session_aware_resampling_pilot_validated']\n          out['formal_847_minute_inventory_membership_verified'] = intraday['formal_847_minute_inventory_membership_verified']\n          out['formal_847_minute_inventory_audit_sha256'] = intraday_inventory_audit_sha256\n          out['formal_847_minute_inventory_map_sha256'] = intraday_inventory_map_sha256\n          out['formal_847_symbols_sha256'] = intraday_formal_symbols_sha256\n          out['formal_847_minute_byte_coverage_verified'] = intraday['formal_847_minute_byte_coverage_verified']\n"
+          )
+          once(
+              "          assert out['intraday_single_symbol_resampling_pilot_validated'] is True\n          assert out['formal_15m_coverage_verified'] is False\n",
+              "          assert out['intraday_single_symbol_resampling_pilot_validated'] is True\n          assert out['formal_847_minute_inventory_membership_verified'] is True\n          assert out['formal_847_minute_inventory_audit_sha256'] == '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'\n          assert out['formal_847_minute_inventory_map_sha256'] == 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'\n          assert out['formal_847_symbols_sha256'] == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'\n          assert out['formal_847_minute_byte_coverage_verified'] is False\n          assert out['formal_15m_coverage_verified'] is False\n"
+          )
+          once(
+              "          Path('out/strategy-recovery/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json').write_bytes(intraday_verify_bytes)\n",
+              "          Path('out/strategy-recovery/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json').write_bytes(intraday_verify_bytes)\n          Path('out/strategy-recovery/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json').write_bytes(intraday_inventory_audit_bytes)\n          Path('out/strategy-recovery/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv').write_bytes(intraday_inventory_map_bytes)\n          Path('out/strategy-recovery/FORMAL847_SYMBOLS_V482.txt').write_bytes(intraday_formal_symbols_bytes)\n"
+          )
+          once(
+              "              'intraday_single_symbol_resampling_pilot_validated': out['intraday_single_symbol_resampling_pilot_validated'],\n",
+              "              'intraday_single_symbol_resampling_pilot_validated': out['intraday_single_symbol_resampling_pilot_validated'],\n              'formal_847_minute_inventory_membership_verified': out['formal_847_minute_inventory_membership_verified'],\n              'formal_847_minute_inventory_audit_sha256': out['formal_847_minute_inventory_audit_sha256'],\n              'formal_847_minute_inventory_map_sha256': out['formal_847_minute_inventory_map_sha256'],\n              'formal_847_symbols_sha256': out['formal_847_symbols_sha256'],\n              'formal_847_minute_byte_coverage_verified': out['formal_847_minute_byte_coverage_verified'],\n"
+          )
+
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit production checkpoint binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/strategy-asset-recovery-v482.yml
+          git diff --cached --quiet && exit 0
+          git commit -m 'ci(strategy): bind Formal847 inventory into production checkpoint'
+          git push origin HEAD:gp/strategy-asset-recovery-v482
