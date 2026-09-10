@@ -63,11 +63,14 @@ jobs:
           from gp12_turnover_pit_admission_v482 import audit_replay, audit_prefix_invariance
 
           BEG='2020-06-01'; END='2026-04-17'; SHARD_N=12; shard=int(os.environ['SHARD'])
+          NA_SYMBOLS={'600074.SH','600485.SH','600677.SH'}
           baseline=pd.read_parquet(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.parquet')))
           baseline['symbol']=baseline['symbol'].astype(str).str.upper().str.strip()
           baseline['date']=baseline['date'].astype(str).str[:10]
+          assert len(baseline)==1011607
           symbols=sorted(baseline['symbol'].unique())
-          assert len(symbols)==847
+          assert len(symbols)==844, len(symbols)
+          assert not (set(symbols) & NA_SYMBOLS), sorted(set(symbols) & NA_SYMBOLS)
           selected=symbols[shard::SHARD_N]
           fields='date,code,volume,amount,turn,tradestatus,isST'
           replay_frames=[]; symbol_audits=[]; prefix_audits=[]; query_errors=[]
@@ -118,6 +121,7 @@ jobs:
           replay=pd.concat(replay_frames,ignore_index=True) if replay_frames else pd.DataFrame(columns=['symbol','date','volume','amount','turn','tradestatus','isST'])
           summary={
             'artifact':'GP12_TURNOVER_PIT_REPLAY_SHARD_V482','version':'V4.82','shard':shard,'shard_n':SHARD_N,
+            'universe_symbol_n':847,'row_bearing_symbol_n':844,'not_applicable_symbols':sorted(NA_SYMBOLS),
             'selected_symbol_n':len(selected),'selected_symbols':selected,'query_error_n':len(query_errors),'query_errors':query_errors,
             'replay_symbol_n':len(symbol_audits),'replay_pass_symbol_n':sum(x['status']=='PASS_REPLAY_EXACT' for x in symbol_audits),
             'replay_expected_n':sum(x['expected_n'] for x in symbol_audits),'replay_missing_n':sum(x['missing_n'] for x in symbol_audits),
@@ -186,6 +190,7 @@ jobs:
           try:
               for i,symbol in enumerate(SAMPLE50,1):
                   keys=set(baseline[baseline['symbol'].eq(symbol)]['date'])
+                  assert keys, f'Sample50 symbol missing from row-bearing baseline: {symbol}'
                   for flag in ['1','2','3']:
                       try:
                           rs=bs.query_history_k_data_plus(bs_code(symbol),fields,start_date=FORMAL_BEG,end_date=FORMAL_END,frequency='d',adjustflag=flag)
@@ -268,15 +273,20 @@ jobs:
           import pandas as pd
           from gp12_turnover_pit_admission_v482 import audit_replay, build_turnover_pit_admission
 
+          NA_SYMBOLS=['600074.SH','600485.SH','600677.SH']
           structural=json.loads(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.json')).read_text())
           baseline=pd.read_parquet(next(Path('upstream/baseline').rglob('BAOSTOCK_TURNOVER_PITST_ALIGNED_V482.parquet')))
+          baseline['symbol']=baseline['symbol'].astype(str).str.upper().str.strip(); baseline['date']=baseline['date'].astype(str).str[:10]
+          assert len(baseline)==1011607
+          assert baseline['symbol'].nunique()==844
+          assert not (set(NA_SYMBOLS) & set(baseline['symbol'].unique()))
           audits=[json.loads(p.read_text()) for p in sorted(Path('upstream/replay').glob('GP12_TURNOVER_REPLAY_SHARD_*_AUDIT_V482.json'))]
           frames=[pd.read_parquet(p) for p in sorted(Path('upstream/replay').glob('GP12_TURNOVER_REPLAY_SHARD_*_ROWS_V482.parquet'))]
           assert len(audits)==12 and len(frames)==12,(len(audits),len(frames))
           replay_rows=pd.concat(frames,ignore_index=True)
           replay=audit_replay(baseline.to_dict('records'),replay_rows.to_dict('records'))
           prefix={
-            'status':'PASS_PREFIX_MATRIX_INVARIANCE' if all(a['status']=='PASS_TURNOVER_PIT_REPLAY_SHARD' for a in audits) and sum(a['prefix_mismatch_n']+a['prefix_missing_n']+a['prefix_extra_n'] for a in audits)==0 else 'REVIEW_PREFIX_MATRIX_INVARIANCE',
+            'status':'PASS_PREFIX_MATRIX_INVARIANCE' if all(a['status']=='PASS_TURNOVER_PIT_REPLAY_SHARD' for a in audits) and sum(a['prefix_mismatch_n']+a['prefix_missing_n']+a['prefix_extra_n']+a['query_error_n'] for a in audits)==0 else 'REVIEW_PREFIX_MATRIX_INVARIANCE',
             'symbol_n':sum(a['selected_symbol_n'] for a in audits),
             'probe_n':sum(a['prefix_probe_n'] for a in audits),
             'missing_n':sum(a['prefix_missing_n'] for a in audits),
@@ -292,6 +302,7 @@ jobs:
           assert adjusted['promotion']['turnover_ratio_blocker_closed'] is False
           assert adjusted['promotion']['label_provenance_blocker_closed'] is False
           result=build_turnover_pit_admission(structural,replay,prefix,adjustflag)
+          result['scope']['not_applicable_symbols']=NA_SYMBOLS
           result['upstream_adjusted_close_status']=adjusted['status']
           result['promotion']['adjusted_close_blocker_closed']=True
           result['promotion']['adjustment_provenance_blocker_closed']=True
@@ -318,9 +329,13 @@ jobs:
           from pathlib import Path
           x=json.loads(Path('out/admission/GP12_TURNOVER_RATIO_PIT_ADMISSION_V482.json').read_text())
           assert x['status']=='PASS_TURNOVER_RATIO_PIT_ADMISSION'
-          assert x['scope']['symbol_n']==847 and x['scope']['trade_row_n']==1011607
+          assert x['scope']['universe_symbol_n']==847
+          assert x['scope']['row_bearing_symbol_n']==844
+          assert x['scope']['not_applicable_symbol_n']==3
+          assert x['scope']['not_applicable_symbols']==['600074.SH','600485.SH','600677.SH']
+          assert x['scope']['trade_row_n']==1011607
           r=x['evidence']['global_replay']; assert r['expected_n']==1011607 and r['matched_n']==1011607 and r['missing_n']==r['extra_n']==r['mismatch_n']==0
-          p=x['evidence']['prefix_matrix']; assert p['symbol_n']==847 and p['probe_n']==847 and p['missing_n']==p['extra_n']==p['mismatch_n']==p['query_error_n']==0
+          p=x['evidence']['prefix_matrix']; assert p['symbol_n']==844 and p['probe_n']==844 and p['missing_n']==p['extra_n']==p['mismatch_n']==p['query_error_n']==0
           a=x['evidence']['adjustflag_sample50']; assert a['symbol_n']==50 and a['mismatch_n']==a['missing_n']==a['extra_n']==a['query_error_n']==0
           assert x['promotion']['adjusted_close_blocker_closed'] is True
           assert x['promotion']['turnover_ratio_blocker_closed'] is True
