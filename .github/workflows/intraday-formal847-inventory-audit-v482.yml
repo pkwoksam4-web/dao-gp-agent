@@ -5,6 +5,8 @@ on:
     branches:
       - gp/strategy-asset-recovery-v482
     paths:
+      - 'scripts/intraday_formal847_inventory_audit_v482.py'
+      - 'scripts/test_intraday_formal847_inventory_audit_v482.py'
       - '.github/workflows/intraday-formal847-inventory-audit-v482.yml'
   workflow_dispatch:
 
@@ -22,6 +24,12 @@ jobs:
           python-version: '3.12'
       - name: Install audit dependencies
         run: python -m pip install --disable-pip-version-check --quiet pandas pyarrow
+      - name: Inventory parsing contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_intraday_formal847_inventory_audit_v482.py
       - name: Download authoritative Full RAW universe artifact
         uses: actions/download-artifact@v4
         with:
@@ -41,25 +49,15 @@ jobs:
           test -s input/neigezhu/coverage_by_instrument.csv
           sha256sum input/neigezhu/coverage_by_instrument.csv | tee out/formal847-intraday-inventory/neigezhu_inventory_sha256.txt
       - name: Audit Formal847 inventory intersection without downloading minute bytes
+        env:
+          PYTHONPATH: scripts
         run: |
           python - <<'PY'
-          import hashlib, json, re
+          import hashlib, json
           from pathlib import Path
           import pandas as pd
           import pyarrow.parquet as pq
-
-          def norm_symbol(x):
-              s = str(x).strip().upper()
-              s = s.replace('.XSHE','.SZ').replace('.XSHG','.SH')
-              if re.fullmatch(r'\d{6}', s):
-                  return s + ('.SH' if s.startswith(('5','6','9')) else '.SZ')
-              m = re.fullmatch(r'(SH|SZ)[._-]?(\d{6})', s)
-              if m:
-                  return f'{m.group(2)}.{m.group(1)}'
-              m = re.fullmatch(r'(\d{6})[._-]?(SH|SZ)', s)
-              if m:
-                  return f'{m.group(1)}.{m.group(2)}'
-              return s
+          import intraday_formal847_inventory_audit_v482 as invmod
 
           raw_candidates = list(Path('input/formal-raw').rglob('SOHU_RAW_FULL_V482.parquet'))
           assert len(raw_candidates) == 1, raw_candidates
@@ -68,47 +66,43 @@ jobs:
           assert raw_sha == 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb', raw_sha
 
           raw_schema = pq.ParquetFile(raw_path).schema_arrow.names
-          symbol_col = next((c for c in ['symbol','code','ticker'] if c in raw_schema), None)
+          symbol_col = next((c for c in ['symbol', 'code', 'ticker'] if c in raw_schema), None)
           assert symbol_col is not None, raw_schema
           raw_symbols = pd.read_parquet(raw_path, columns=[symbol_col])[symbol_col].dropna().astype(str).drop_duplicates().tolist()
-          raw_row_level_set = {norm_symbol(x) for x in raw_symbols}
+          raw_row_level_set = {invmod.norm_symbol(x) for x in raw_symbols}
 
-          # Full RAW global audit already classifies these three names as expected zero-trade symbols.
-          # They are members of the audited 847-symbol Formal universe but, by definition, have no row-level RAW records.
           expected_zero_trade_symbols = {'600074.SH', '600485.SH', '600677.SH'}
           assert len(raw_row_level_set) == 844, len(raw_row_level_set)
           assert raw_row_level_set.isdisjoint(expected_zero_trade_symbols), sorted(raw_row_level_set & expected_zero_trade_symbols)
           formal_universe_set = raw_row_level_set | expected_zero_trade_symbols
           assert len(formal_universe_set) == 847, len(formal_universe_set)
-          assert formal_universe_set - raw_row_level_set == expected_zero_trade_symbols
 
           inv_path = Path('input/neigezhu/coverage_by_instrument.csv')
           inv_bytes = inv_path.read_bytes()
           inv_sha = hashlib.sha256(inv_bytes).hexdigest()
           assert inv_sha == '31a058c1019e1b097d99e862db68a028ec9d191adb09839c35365f4cb390dc32', inv_sha
-          inv = pd.read_csv(inv_path)
+          inv = invmod.read_inventory_csv(inv_path)
+          best_col, inventory_set, col_stats = invmod.select_inventory_symbol_column(inv, formal_universe_set)
 
-          candidate_cols = [c for c in inv.columns if any(k in c.lower() for k in ['symbol','code','ticker','instrument'])]
-          col_stats = []
-          best_col = None
-          best_match = -1
-          for c in candidate_cols:
-              vals = inv[c].dropna().map(norm_symbol)
-              val_set = set(vals)
-              matches = len(formal_universe_set & val_set)
-              col_stats.append({'column': c, 'unique': len(val_set), 'formal847_matches': matches})
-              if matches > best_match:
-                  best_match = matches
-                  best_col = c
-
-          assert best_col is not None, {'columns': list(inv.columns), 'candidate_cols': candidate_cols}
           inv_norm = inv.copy()
-          inv_norm['_norm_symbol'] = inv[best_col].map(norm_symbol)
-          inventory_set = set(inv_norm['_norm_symbol'].dropna())
+          inv_norm['_norm_symbol'] = inv[best_col].map(invmod.norm_symbol)
           matched = sorted(formal_universe_set & inventory_set)
           missing = sorted(formal_universe_set - inventory_set)
           zero_trade_in_inventory = sorted(expected_zero_trade_symbols & inventory_set)
           row_level_missing = sorted(raw_row_level_set - inventory_set)
+
+          matched_rows = inv_norm[inv_norm['_norm_symbol'].isin(formal_universe_set)].copy()
+          matched_rows = matched_rows.sort_values('_norm_symbol').drop_duplicates('_norm_symbol', keep='first')
+          selected_columns = ['_norm_symbol'] + [c for c in [
+              'symbol', 'exchange', 'file', 'records', 'first_timestamp', 'last_timestamp',
+              'listing_date', 'delisting_date', 'universe_status', 'expected_trading_days',
+              'observed_trading_days', 'missing_trading_days', 'coverage_status',
+              'audited_expected_trading_days', 'audited_missing_trading_days', 'audited_coverage_status'
+          ] if c in matched_rows.columns]
+          matched_rows[selected_columns].to_csv(
+              'out/formal847-intraday-inventory/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv',
+              index=False,
+          )
 
           result = {
               'artifact': 'INTRADAY_FORMAL847_INVENTORY_AUDIT_V482',
@@ -136,7 +130,8 @@ jobs:
                   'rows': int(len(inv)),
                   'columns': [str(c) for c in inv.columns],
                   'candidate_symbol_columns': col_stats,
-                  'selected_symbol_column': best_col,
+                  'selected_symbol_column': str(best_col),
+                  'symbol_dtype_preserved_as_string': True,
               },
               'formal847_inventory_intersection': {
                   'matched_symbols': len(matched),
