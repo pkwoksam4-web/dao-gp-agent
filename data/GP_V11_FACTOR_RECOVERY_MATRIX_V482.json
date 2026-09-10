@@ -41,6 +41,24 @@
     "scope": "INPUT_PRESERVATION_ONLY_NOT_FACTOR_FORMULA",
     "factor_formula_recovered": false
   },
+  "intraday_source_partial": {
+    "evidence_artifact": "GP_V11_INTRADAY_SOURCE_RECOVERY_V482",
+    "primary_dataset": "neigezhu/china-a-share-1min-ohlcv",
+    "snapshot_commit_full": "f311a5f11569e9d541386982d15f2214d9970b8a",
+    "historical_delisted_inventory_sha256": "e4ef39e67de755c41605e869338a55b722cc0fc146a64c662bae4b82c260d839",
+    "historical_delisted_symbols_in_inventory": 163,
+    "historical_delisted_complete": 129,
+    "historical_delisted_partial": 34,
+    "historical_delisted_audited_missing_days": 3935,
+    "frequency": "1min",
+    "price_basis": "RAW_UNADJUSTED",
+    "scope": "SOURCE_AND_INVENTORY_PROOF_ONLY_NOT_15M_60M_PRODUCTION_BINDING",
+    "actual_minute_bytes_materialized": false,
+    "formal_15m_coverage_verified": false,
+    "formal_60m_coverage_verified": false,
+    "resampling_contract_recovered": false,
+    "factor_formula_recovered": false
+  },
   "factors": [
     {
       "name": "Market Regime",
@@ -122,12 +140,12 @@
     {
       "name": "Intraday Confirmation",
       "weight_pct": 8,
-      "recovery_status": "MISSING",
-      "known_components": ["Factor identity/weight are confirmed and architecture separates daily close from 15m/60m execution confirmation; V3.10 explicitly says that layer is not merged."],
-      "missing": ["Authoritative 15-minute and 60-minute input series/provenance, exact confirmation/negation rules, timing, normalization/clipping and executable final code remain missing."]
+      "recovery_status": "PARTIAL_FILE_BACKED",
+      "known_components": ["Factor identity and 8-percent weight are confirmed, and historical architecture separates daily close from 15m/60m execution confirmation.", "Project evidence binds an immutable Neigezhu 1-minute source snapshot and audited canonical-file inventory for the full 163-symbol historical-delisted subset: all 163 are present, 129 complete and 34 partial.", "A secondary StockChina-Minute route was also historically identified for independent minute evidence, although its bytes were not materialized."],
+      "missing": ["Actual one-minute source bytes for the required Formal scope are not materialized in this strategy-recovery evidence.", "Authoritative 15-minute production input series and full Formal-window coverage audit remain missing.", "Authoritative 60-minute production input series and full Formal-window coverage audit remain missing.", "Exact session-aware 15-minute and 60-minute resampling contract remains missing.", "Exact confirmation/negation formula, closed-bar timing semantics, price-basis decision, normalization/clipping and executable final factor code remain missing."]
     }
   ],
-  "remaining_strategy_gaps": ["complete_12_factor_strategy_code_bytes", "non_daily_layer_factor_formulas", "exact_full_strategy_normalization_and_clipping", "score_layer_aggregation", "full_gp12_probability_mapping", "ranking_topn_semantics", "entry_exit_thresholds", "holding_and_rebalance_policy", "position_sizing_and_risk_rules", "pit_sector_membership_and_sector_series", "intraday_15m_60m_source_and_rules", "non_daily_layer_source_bytes"],
+  "remaining_strategy_gaps": ["complete_12_factor_strategy_code_bytes", "non_daily_layer_factor_formulas", "exact_full_strategy_normalization_and_clipping", "score_layer_aggregation", "full_gp12_probability_mapping", "ranking_topn_semantics", "entry_exit_thresholds", "holding_and_rebalance_policy", "position_sizing_and_risk_rules", "pit_sector_membership_and_sector_series", "intraday_15m_60m_materialization_resampling_and_rules", "non_daily_layer_source_bytes"],
   "model_freeze_allowed": false,
   "oos_metrics_allowed": false
 }
