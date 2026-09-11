@@ -1,0 +1,278 @@
+name: GP12 Label Provenance Admission V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths:
+      - 'scripts/test_gp12_label_provenance_admission_v482.py'
+      - 'scripts/gp12_label_provenance_admission_v482.py'
+      - '.github/workflows/gp12-label-provenance-admission-v482.yml'
+      - '.github/label-integration-trigger-v482.txt'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  label-admission-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run label provenance admission unit tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_label_provenance_admission_v482.py
+
+  integrate-label-admission:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[label-integration]') }}
+    needs: label-admission-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip pandas pyarrow numpy
+
+      - name: Download raw-close label probe
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-formal-label-provenance-probe-v1
+          path: upstream/raw_labels
+          run-id: 34459156649
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download V482 action-neutral label candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-formal-action-neutral-label-candidate-v482
+          path: upstream/candidate
+          run-id: 34461955463
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download event timing admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-event-timing-admission-v482
+          path: upstream/event_timing
+          run-id: 34470443439
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download override timing admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-override-timing-admission-v482
+          path: upstream/override_timing
+          run-id: 34471061403
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download adjusted-close promotion
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-adjusted-close-pit-promotion-v482
+          path: upstream/adjusted_close
+          run-id: 34498632498
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download turnover PIT admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-turnover-ratio-pit-admission-v482
+          path: upstream/turnover
+          run-id: 34567149056
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Independently recompute label semantics and promote label only
+        run: |
+          mkdir -p out/label_admission
+          PYTHONPATH=scripts python - <<'PY'
+          import hashlib, json, shutil
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+          from gp12_label_provenance_admission_v482 import build_label_provenance_admission
+
+          FORMAL_END='2026-04-17'
+          SOURCE_SEM='V4.82_proven_horizon_local_action_neutral'
+          EXPECTED_ROWS={1:1010002,2:1008825,3:1007667}
+
+          def load(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,len(hits))
+              return json.loads(hits[0].read_text(encoding='utf-8'))
+
+          def first_json_with_status(root,status):
+              hits=[]
+              for p in Path(root).rglob('*.json'):
+                  try: x=json.loads(p.read_text(encoding='utf-8'))
+                  except Exception: continue
+                  if x.get('status')==status: hits.append((p,x))
+              assert len(hits)==1,(root,status,[str(x[0]) for x in hits])
+              return hits[0][1]
+
+          def sha256_file(path):
+              h=hashlib.sha256()
+              with open(path,'rb') as f:
+                  for b in iter(lambda:f.read(1024*1024),b''): h.update(b)
+              return h.hexdigest()
+
+          raw=load('upstream/raw_labels','GP12_FORMAL_LABEL_PROVENANCE_PROBE_V1.json')
+          candidate=load('upstream/candidate','GP12_FORMAL_ACTION_NEUTRAL_LABEL_CANDIDATE_V482.json')
+          event=first_json_with_status('upstream/event_timing','PASS_EVENT_TIMING_ADMISSION')
+          override=first_json_with_status('upstream/override_timing','PASS_OVERRIDE_TIMING_ADMISSION')
+          adjusted=load('upstream/adjusted_close','GP12_ADJUSTED_CLOSE_PIT_PROMOTION_V482.json')
+          turnover=load('upstream/turnover','GP12_TURNOVER_RATIO_PIT_ADMISSION_V482.json')
+
+          ledger_path=next(Path('upstream/candidate').rglob('GP12_V482_EFFECTIVE_EVENT_LEDGER.parquet'))
+          ledger=pd.read_parquet(ledger_path).copy()
+          ledger['symbol']=ledger['symbol'].astype(str).str.upper().str.strip()
+          ledger['ex_date']=ledger['ex_date'].astype(str).str[:10]
+          ledger['event_ratio_v482']=pd.to_numeric(ledger['event_ratio_v482'],errors='coerce')
+          assert len(ledger)==2732,len(ledger)
+          assert not ledger.duplicated(['symbol','ex_date']).any()
+          assert ledger['event_ratio_v482'].notna().all() and np.isfinite(ledger['event_ratio_v482']).all() and (ledger['event_ratio_v482']>0).all()
+          assert int(ledger['override_applied'].astype(bool).sum())==281
+          event_by={}
+          for sym,g in ledger.groupby('symbol',sort=False):
+              g=g.sort_values('ex_date')
+              event_by[sym]=(g['ex_date'].to_numpy(dtype='U10'),g['event_ratio_v482'].to_numpy(float))
+
+          cand_h={int(x['horizon']):x for x in candidate['horizons']}
+          raw_h={int(x['horizon_market_sessions']):x for x in raw['horizons']}
+          row_audits=[]
+          out=Path('out/label_admission')
+          for h in (1,2,3):
+              p=next(Path('upstream/candidate').rglob(f'GP12_FORMAL_ACTION_NEUTRAL_LABELS_H{h}_V482.parquet'))
+              digest=sha256_file(p)
+              df=pd.read_parquet(p).reset_index(drop=True)
+              required={'symbol','date','horizon_market_sessions','target_date','close','target_close','event_ratio_product','crosses_corporate_action','action_neutral_reference_close','label','source_semantics'}
+              assert required.issubset(df.columns),sorted(required-set(df.columns))
+              df['symbol']=df['symbol'].astype(str).str.upper().str.strip()
+              df['date']=df['date'].astype(str).str[:10]
+              df['target_date']=df['target_date'].astype(str).str[:10]
+              for c in ['close','target_close','event_ratio_product','action_neutral_reference_close']:
+                  df[c]=pd.to_numeric(df[c],errors='coerce')
+
+              n=len(df)
+              unique_n=n-int(df.duplicated(['symbol','date']).sum())
+              invalid_numeric=(
+                  ~np.isfinite(df['close'].to_numpy(float)) |
+                  ~np.isfinite(df['target_close'].to_numpy(float)) |
+                  ~np.isfinite(df['event_ratio_product'].to_numpy(float)) |
+                  ~np.isfinite(df['action_neutral_reference_close'].to_numpy(float)) |
+                  (df['close'].to_numpy(float)<=0) |
+                  (df['target_close'].to_numpy(float)<=0) |
+                  (df['event_ratio_product'].to_numpy(float)<=0) |
+                  (df['action_neutral_reference_close'].to_numpy(float)<=0)
+              )
+              horizon_mismatch=int((df['horizon_market_sessions'].astype(int)!=h).sum())
+              target_nonforward=int((df['target_date']<=df['date']).sum())
+              target_oos=int((df['target_date']>FORMAL_END).sum())
+              source_mismatch=int((df['source_semantics'].astype(str)!=SOURCE_SEM).sum())
+              invalid_label=int((~df['label'].astype(str).isin(['UP','DOWN','FLAT'])).sum())
+
+              expected_prod=np.ones(n,float); expected_cross=np.zeros(n,bool)
+              for sym,idx_obj in df.groupby('symbol',sort=False).groups.items():
+                  ev=event_by.get(sym)
+                  if ev is None: continue
+                  ed,er=ev
+                  idx=np.asarray(idx_obj,dtype=int)
+                  cum=np.r_[1.0,np.cumprod(er)]
+                  base=df.loc[idx,'date'].to_numpy(dtype='U10')
+                  targ=df.loc[idx,'target_date'].to_numpy(dtype='U10')
+                  ib=np.searchsorted(ed,base,side='right')
+                  it=np.searchsorted(ed,targ,side='right')
+                  expected_prod[idx]=cum[it]/cum[ib]
+                  expected_cross[idx]=it>ib
+
+              stored_prod=df['event_ratio_product'].to_numpy(float)
+              product_mismatch=int((~np.isclose(stored_prod,expected_prod,rtol=1e-12,atol=1e-12,equal_nan=False)).sum())
+              stored_cross=df['crosses_corporate_action'].astype(bool).to_numpy()
+              cross_mismatch=int((stored_cross!=expected_cross).sum())
+              expected_ref=df['close'].to_numpy(float)*expected_prod
+              stored_ref=df['action_neutral_reference_close'].to_numpy(float)
+              formula_mismatch=int((~np.isclose(stored_ref,expected_ref,rtol=1e-12,atol=1e-12,equal_nan=False)).sum())
+              target=df['target_close'].to_numpy(float)
+              expected_label=np.where(target>expected_ref,'UP',np.where(target<expected_ref,'DOWN','FLAT'))
+              label_mismatch=int((df['label'].astype(str).to_numpy()!=expected_label).sum())
+
+              fail=sum([int(invalid_numeric.sum()),horizon_mismatch,target_nonforward,target_oos,source_mismatch,invalid_label,product_mismatch,cross_mismatch,formula_mismatch,label_mismatch])
+              audit={
+                  'status':'PASS_ACTION_NEUTRAL_LABEL_ROWS' if fail==0 and n==EXPECTED_ROWS[h] and unique_n==n else 'REVIEW_ACTION_NEUTRAL_LABEL_ROWS',
+                  'horizon':h,'rows':n,'unique_symbol_date_n':unique_n,
+                  'invalid_numeric_n':int(invalid_numeric.sum()),'horizon_mismatch_n':horizon_mismatch,
+                  'target_nonforward_n':target_nonforward,'target_oos_n':target_oos,
+                  'source_semantics_mismatch_n':source_mismatch,'invalid_label_n':invalid_label,
+                  'event_product_mismatch_n':product_mismatch,'cross_flag_mismatch_n':cross_mismatch,
+                  'formula_mismatch_n':formula_mismatch,'label_mismatch_n':label_mismatch,
+                  'crossing_action_rows':int(expected_cross.sum()),'file_sha256':digest,
+              }
+              assert n==raw_h[h]['label_rows']==candidate['horizons'][h-1]['rows']==EXPECTED_ROWS[h]
+              assert digest==cand_h[h]['output_sha256']
+              row_audits.append(audit)
+              shutil.copy2(p,out/p.name)
+              print(json.dumps(audit,ensure_ascii=False))
+
+          result=build_label_provenance_admission(raw,candidate,row_audits,event,override,adjusted,turnover)
+          result['evidence']={
+              'effective_event_ledger_rows':int(len(ledger)),
+              'effective_event_ledger_override_rows':int(ledger['override_applied'].astype(bool).sum()),
+              'row_audits':row_audits,
+          }
+          result['frozen_inputs']={
+              'raw_label_probe':{'workflow_run_id':34459156649,'artifact_id':10144765831,'artifact_zip_sha256':'43704351b6c7ee2fad4bbd2a41fbc953b23a3fd3a12e571318a53c7fedb65ba9'},
+              'action_neutral_candidate':{'workflow_run_id':34461955463,'artifact_id':10145919764,'artifact_zip_sha256':'c44c9e7a3eaf77e7ce292f46200efc1ce9affe4350394af4b98fa4599f891851'},
+              'event_timing':{'workflow_run_id':34470443439,'artifact_id':10149283589,'artifact_zip_sha256':'d63c2e7c4aa094b47a3a311de6eda690a3c4082f58185963d4f57cb87af7401d'},
+              'override_timing':{'workflow_run_id':34471061403,'artifact_id':10149533619,'artifact_zip_sha256':'16824e45ea35c286bdf503e1d10dce8886fb6c08375e507859b4c86830e4c0de'},
+              'adjusted_close':{'workflow_run_id':34498632498,'artifact_id':10160868998,'artifact_zip_sha256':'cd887c1723b1344bb429328b58327de2284ab9e5e45a3498b89e49d54a61afe3'},
+              'turnover':{'workflow_run_id':34567149056,'artifact_id':10186653365,'artifact_zip_sha256':'cf2e4c02da6302148ac2ebd7311f48faf7965ee34dd649525a5f3b239dad2c34'},
+          }
+          shutil.copy2(ledger_path,out/'GP12_V482_EFFECTIVE_EVENT_LEDGER.parquet')
+          (out/'GP12_LABEL_PROVENANCE_ADMISSION_V482.json').write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({'status':result['status'],'promotion':result['promotion'],'next_gate':result['next_gate'],'row_audits':row_audits},ensure_ascii=False,indent=2))
+          PY
+
+      - name: Verify Label closes while Model Freeze and OOS stay closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/label_admission/GP12_LABEL_PROVENANCE_ADMISSION_V482.json').read_text())
+          assert x['status']=='PASS_LABEL_PROVENANCE_ADMISSION'
+          assert x['promotion']['adjusted_close_blocker_closed'] is True
+          assert x['promotion']['turnover_ratio_blocker_closed'] is True
+          assert x['promotion']['label_contract_approved'] is True
+          assert x['promotion']['label_provenance_blocker_closed'] is True
+          assert x['promotion']['formal_feature_ready'] is True
+          assert x['promotion']['model_freeze_allowed'] is False
+          assert x['promotion']['oos_metrics_allowed'] is False
+          assert x['remaining_gp12_feature_blockers']==[]
+          assert x['next_gate']=='MODEL_FREEZE_PROVENANCE_ADMISSION'
+          for a in x['evidence']['row_audits']:
+              assert a['status']=='PASS_ACTION_NEUTRAL_LABEL_ROWS'
+              assert a['event_product_mismatch_n']==0
+              assert a['cross_flag_mismatch_n']==0
+              assert a['formula_mismatch_n']==0
+              assert a['label_mismatch_n']==0
+          print('Label provenance admission closed; Model Freeze/OOS remain fail-closed')
+          PY
+
+      - name: Upload final label provenance admission
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-label-provenance-admission-v482
+          path: out/label_admission/
+          if-no-files-found: error
+          retention-days: 30
