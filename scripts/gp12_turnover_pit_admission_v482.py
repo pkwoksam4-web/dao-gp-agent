@@ -124,6 +124,13 @@ def audit_adjustflag_invariance(rows_by_flag: dict[str, Iterable[dict]]) -> dict
     }
 
 
+def select_turnover_probe_symbols(symbols: Iterable[str], sample_n: int = 50) -> list[str]:
+    universe = sorted({str(s).strip().upper() for s in symbols if str(s).strip()})
+    if sample_n <= 0 or sample_n > len(universe):
+        raise ValueError(f"probe sample size {sample_n} is invalid for universe size {len(universe)}")
+    return universe[:sample_n]
+
+
 def build_turnover_pit_admission(structural: dict, replay: dict, prefix: dict, adjustflag: dict) -> dict:
     structural_ok = (
         structural.get("status") == "PASS_STRUCTURAL_PITST_ALIGNED_TURNOVER"
