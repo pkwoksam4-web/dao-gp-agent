@@ -1,0 +1,126 @@
+name: GP12 Model Freeze Provenance Admission V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths:
+      - 'scripts/test_gp12_model_freeze_provenance_admission_v482.py'
+      - 'scripts/gp12_model_freeze_provenance_admission_v482.py'
+      - '.github/workflows/gp12-model-freeze-provenance-admission-v482.yml'
+      - '.github/model-freeze-integration-trigger-v482.txt'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  model-freeze-admission-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Model Freeze provenance admission tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_model_freeze_provenance_admission_v482.py
+
+  integrate-current-provenance:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[model-freeze-integration]') }}
+    needs: model-freeze-admission-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download final Label provenance admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-label-provenance-admission-v482
+          path: upstream/label
+          run-id: 34609078336
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download official OOS calendar evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-oos-calendar-v482
+          path: upstream/calendar
+          run-id: 34209105455
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Materialize exact strategy recovery evidence commit
+        run: |
+          mkdir -p upstream/strategy
+          git fetch --no-tags --depth=1 origin 189ee5cde4fa77d8881dd651080dd19a15852561
+          for f in \
+            GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json \
+            GP_V11_FACTOR_RECOVERY_MATRIX_V482.json \
+            GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json \
+            GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json; do
+            git show 189ee5cde4fa77d8881dd651080dd19a15852561:data/$f > upstream/strategy/$f
+          done
+
+      - name: Build canonical fail-closed Model Freeze checkpoint
+        run: |
+          mkdir -p out/model_freeze
+          PYTHONPATH=scripts python - <<'PY'
+          import json
+          from pathlib import Path
+          from gp12_model_freeze_provenance_admission_v482 import build_model_freeze_provenance_admission
+
+          def one(root, name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits)
+              return json.loads(hits[0].read_text(encoding='utf-8'))
+
+          label=one('upstream/label','GP12_LABEL_PROVENANCE_ADMISSION_V482.json')
+          calendar=one('upstream/calendar','OOS_CALENDAR_V482.json')
+          strategy=one('upstream/strategy','GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json')
+          factor=one('upstream/strategy','GP_V11_FACTOR_RECOVERY_MATRIX_V482.json')
+          decision=one('upstream/strategy','GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json')
+          intraday=one('upstream/strategy','GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json')
+          result=build_model_freeze_provenance_admission(label,calendar,strategy,factor,decision,intraday)
+          result['frozen_inputs']={
+            'label_provenance':{'workflow_run_id':34609078336,'artifact_id':10267217161,'artifact_zip_sha256':'1e4d3142823bce2163e4394dad2b7380e821081cc4b3c6249c41e92b9fac5f62'},
+            'oos_calendar':{'workflow_run_id':34209105455,'artifact_id':10049029128,'artifact_zip_sha256':'20c982ad7709195e7235e412275e29d3c946f027d991675e4d0dc7cd6ba8e94e'},
+            'strategy_recovery_commit':'189ee5cde4fa77d8881dd651080dd19a15852561',
+          }
+          p=Path('out/model_freeze/GP12_MODEL_FREEZE_PROVENANCE_CHECKPOINT_V482.json')
+          p.write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Verify fail-closed semantics
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/model_freeze/GP12_MODEL_FREEZE_PROVENANCE_CHECKPOINT_V482.json').read_text())
+          assert x['status']=='BLOCKED_MODEL_FREEZE_PROVENANCE'
+          assert x['formal_feature_ready'] is True
+          assert x['oos_calendar_ready'] is True
+          assert x['old_oos_calendar_blocker_closed'] is True
+          assert x['strategy_provenance_complete'] is False
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert x['candidate_substitution_allowed'] is False
+          assert len(x['remaining_blockers'])==10
+          print('Model Freeze remains correctly fail-closed with 10 canonical provenance blockers')
+          PY
+
+      - name: Upload Model Freeze provenance checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-model-freeze-provenance-checkpoint-v482
+          path: out/model_freeze/
+          if-no-files-found: error
+          retention-days: 30
