@@ -1,0 +1,78 @@
+{
+  "artifact": "GP12_CANDIDATE_PARAMETERS_V1",
+  "contract_version": "1.0",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "proposal_identity": {
+    "status": "UNAPPROVED",
+    "authored_on": "2026-09-09",
+    "provenance": "Newly authored reconstruction candidate; not recovered GP V1.1 and not an authoritative historical parameter set."
+  },
+  "formal_boundary": {
+    "formal_end": "2026-04-17",
+    "scoring_scope": "Formal-only through the inclusive formal_end date",
+    "probability_scope": "Independently labelled Formal-only rows available by the query as_of"
+  },
+  "formula_contract": {
+    "formula_set_id": "GP12_FIXED_FORMULAS",
+    "formula_set_version": "1.0"
+  },
+  "factor_weights_percent": {
+    "F1": 8,
+    "F2": 4,
+    "F3": 10,
+    "F4": 7,
+    "F5": 8,
+    "F6": 12,
+    "F7": 10,
+    "F8": 8,
+    "F9": 7,
+    "F10": 8,
+    "F11": 10,
+    "F12": 8
+  },
+  "factor_layers": {
+    "structure": ["F1", "F2", "F3", "F4", "F5", "F6"],
+    "inertia": ["F7", "F8", "F9", "F10"],
+    "execution": ["F11", "F12"]
+  },
+  "liquidity_rule": {
+    "lookback_market_sessions": 20,
+    "statistic": "median",
+    "minimum_amount_cny": 80000000,
+    "required_prior_traded_sessions": 120,
+    "minimum_trade_density_20": 0.8,
+    "current_session_must_be_traded": true,
+    "frozen_rule_provenance": "market_day_zero_prior120_positive_summary"
+  },
+  "policy": {
+    "entry_score_min": 60,
+    "exit_score_below": 45,
+    "top_n": 10,
+    "per_symbol_max_weight": 0.1,
+    "per_sector_max_weight": 0.2,
+    "per_name_capital_risk": 0.01,
+    "adverse_price_move_threshold": 0.08,
+    "max_holding_market_sessions": 3,
+    "require_positive_stock_return_20": true,
+    "portfolio_context": "Fresh paper portfolio; no existing holdings are assumed."
+  },
+  "execution_contract": {
+    "decision_frequency": "One daily snapshot decision",
+    "earliest_execution": "Next market session open",
+    "blocked_entry_behavior": "No assumed execution when suspended, non-tradable, or at the upper limit",
+    "fill_validation": "A future approved backtest executor must validate all fills; this scorer does not implement fill simulation.",
+    "live_trading": false
+  },
+  "cost_assumption": {
+    "one_way_basis_points": 10,
+    "application": "Proposal for a future approved backtest executor; no cost is calculated by this scorer."
+  },
+  "probability_mapping": {
+    "allowed_horizons_market_sessions": [1, 2, 3],
+    "score_bucket": "Fixed integer decile min(9, int(score/10))",
+    "minimum_matching_observations": 30,
+    "smoothing": "Add one to UP, DOWN, and FLAT counts",
+    "label_definition": "Close-to-close signed return from T to T+h market-calendar trading sessions: UP greater than zero, DOWN less than zero, FLAT equal to zero. Suspended or missing target closes are excluded, never shifted to a later bar.",
+    "label_collection": "External; separate provenance verification is required."
+  }
+}
