@@ -18,6 +18,11 @@ MIXED_BLOCKERS = [SECTOR_FUND_BLOCKER, INTRADAY_BLOCKER]
 CANONICAL_BLOCKERS = HISTORICAL_CONTRACT_BLOCKERS + MIXED_BLOCKERS
 
 EXPECTED_INTRADAY_SEMANTIC_SHA256 = '355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b'
+EXPECTED_FUND_FLOW_SHA256 = '034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea'
+EXPECTED_FUND_FLOW_SIZE_BYTES = 2134704074
+EXPECTED_FUND_FLOW_ROWS = 4934625
+EXPECTED_FUND_FLOW_SYMBOLS = 5148
+EXPECTED_FUND_FLOW_COVERAGE = ['2021-01-04','2025-04-23']
 
 
 def _require(condition: bool, message: str) -> None:
@@ -72,13 +77,22 @@ def _validate_sector_fund(evidence: dict) -> None:
         and sector.get('pit_membership_verified') is False,
         'sector/fund sector-state mismatch',
     )
-    _require(
+    fund_ok = (
         fund.get('candidate_snapshot_identity_locked') is True
+        and fund.get('remote_pointer_identity_verified') is True
+        and fund.get('actual_snapshot_bytes_verified_in_current_recovery') is True
+        and int(fund.get('verified_rows',-1)) == EXPECTED_FUND_FLOW_ROWS
+        and int(fund.get('verified_symbols',-1)) == EXPECTED_FUND_FLOW_SYMBOLS
+        and list(fund.get('verified_coverage') or []) == EXPECTED_FUND_FLOW_COVERAGE
+        and int(fund.get('verified_payload_size_bytes',-1)) == EXPECTED_FUND_FLOW_SIZE_BYTES
+        and fund.get('verified_payload_sha256') == EXPECTED_FUND_FLOW_SHA256
         and fund.get('formal_window_coverage_complete') is False
-        and fund.get('pit_provenance_complete') is False,
-        'sector/fund fund-flow-state mismatch',
+        and fund.get('pit_provenance_complete') is False
     )
-    _require(bool(evidence.get('remaining_data_gaps')), 'sector/fund remaining data gaps missing')
+    _require(fund_ok, 'sector/fund fund-flow-state mismatch')
+    remaining_data = list(evidence.get('remaining_data_gaps') or [])
+    _require(bool(remaining_data), 'sector/fund remaining data gaps missing')
+    _require('FUND_FLOW_SOURCE_BYTES_NOT_VERIFIED_IN_CURRENT_RECOVERY' not in remaining_data, 'sector/fund stale source-byte gap')
     _require(bool(evidence.get('remaining_contract_gaps')), 'sector/fund remaining contract gaps missing')
     _require_fail_closed('sector/fund', evidence)
 
@@ -139,6 +153,7 @@ def build_model_freeze_blocker_ledger(
             },
         })
 
+    fund = sector_fund_partial['fund_flow']
     blockers.append({
         'blocker': SECTOR_FUND_BLOCKER,
         'category': 'MIXED_DATA_AND_HISTORICAL_CONTRACT',
@@ -149,6 +164,12 @@ def build_model_freeze_blocker_ledger(
             'sector_source_snapshot_identity_locked': False,
             'sector_pit_membership_verified': False,
             'fund_flow_candidate_snapshot_identity_locked': True,
+            'fund_flow_source_bytes_verified': True,
+            'fund_flow_verified_rows': fund['verified_rows'],
+            'fund_flow_verified_symbols': fund['verified_symbols'],
+            'fund_flow_verified_coverage': list(fund['verified_coverage']),
+            'fund_flow_verified_payload_size_bytes': fund['verified_payload_size_bytes'],
+            'fund_flow_verified_payload_sha256': fund['verified_payload_sha256'],
             'fund_flow_formal_window_coverage_complete': False,
             'fund_flow_pit_provenance_complete': False,
             'remaining_data_gaps': list(sector_fund_partial.get('remaining_data_gaps') or []),
