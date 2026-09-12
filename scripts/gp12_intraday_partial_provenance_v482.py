@@ -70,6 +70,7 @@ def _validate_shards(shard_reports: list[dict]) -> tuple[dict, list[dict]]:
     evidence = []
     review_records = []
     zero_trade_records = []
+    source_bindings = []
 
     totals = {
         'symbol_n': 0,
@@ -116,7 +117,19 @@ def _validate_shards(shard_reports: list[dict]) -> tuple[dict, list[dict]]:
             status = record.get('status')
             if status == 'EXPECTED_ZERO_TRADE_NA':
                 zero_trade_records.append(record)
-            elif status != 'PASS_REQUIRED_TRADE_DATES_EXACT':
+                continue
+
+            _require(record.get('source_downloaded') is True, 'source byte binding requires downloaded row-bearing source')
+            _require(_is_sha256(record.get('source_sha256')), 'source byte binding requires valid source sha256')
+            _require(int(record.get('source_bytes', 0)) > 0, 'source byte binding requires positive source bytes')
+            _require(bool(record.get('canonical_path')), 'source byte binding requires canonical path')
+            source_bindings.append({
+                'symbol': record.get('symbol'),
+                'canonical_path': record.get('canonical_path'),
+                'source_sha256': record.get('source_sha256'),
+                'source_bytes': int(record.get('source_bytes', 0)),
+            })
+            if status != 'PASS_REQUIRED_TRADE_DATES_EXACT':
                 review_records.append(record)
 
         evidence.append({
@@ -146,6 +159,16 @@ def _validate_shards(shard_reports: list[dict]) -> tuple[dict, list[dict]]:
     zero_symbols = {r.get('symbol') for r in zero_trade_records}
     _require(zero_symbols == ZERO_TRADE_SYMBOLS, 'zero-trade symbol set mismatch')
     _require(len(zero_trade_records) == 3, 'zero-trade record cardinality mismatch')
+
+    _require(len(source_bindings) == 844, 'source byte binding must cover exactly 844 row-bearing symbols')
+    _require(len({x['symbol'] for x in source_bindings}) == 844, 'source byte binding symbols must be unique')
+    source_bindings.sort(key=lambda x: str(x['symbol']))
+    source_binding_semantic = hashlib.sha256(
+        json.dumps(source_bindings, sort_keys=True, separators=(',', ':')).encode()
+    ).hexdigest()
+    totals['source_files_hash_bound'] = len(source_bindings)
+    totals['source_bytes_hash_bound'] = sum(x['source_bytes'] for x in source_bindings)
+    totals['source_file_binding_semantic_sha256'] = source_binding_semantic
 
     evidence.sort(key=lambda x: x['shard_index'])
     semantic = hashlib.sha256(json.dumps(evidence, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -192,7 +215,7 @@ def build_intraday_partial_provenance(shard_reports: list[dict], baostock_probe:
         'version': VERSION,
         'strategy_id': STRATEGY_ID,
         'status': 'PASS_FORMAL847_15M_60M_COVERAGE_PARTIAL_INTRADAY_PROVENANCE',
-        'scope': 'FORMAL847_AGGREGATE_BAR_COVERAGE_ONLY_NOT_HISTORICAL_GP_FACTOR_AUTHORITY',
+        'scope': 'FORMAL847_AGGREGATE_BAR_COVERAGE_WITH_HASH_BOUND_SOURCE_FILES_NOT_HISTORICAL_GP_FACTOR_AUTHORITY',
         'primary_snapshot': {
             'dataset': DATASET,
             'snapshot_commit': SNAPSHOT_COMMIT,
@@ -233,13 +256,15 @@ def build_intraday_partial_provenance(shard_reports: list[dict], baostock_probe:
             'target_rows_sha256': SINA['target_rows_sha256'],
             'eligible_as_fallback_source': False,
         },
+        'formal_847_source_files_bytes_hash_bound': True,
+        'formal_847_required_minute_date_coverage_complete': False,
         'formal_847_15m_coverage_verified': True,
         'formal_847_60m_coverage_verified': True,
         'formal_847_minute_byte_coverage_verified': False,
         'historical_gp_intraday_resampling_contract_recovered': False,
         'factor_formula_recovered': False,
         'remaining_subgaps': [
-            'FORMAL847_MINUTE_BYTE_COVERAGE_SINGLE_DAY_GAP_000638_SZ_2026_04_13',
+            'FORMAL847_REQUIRED_MINUTE_DATE_COVERAGE_SINGLE_DAY_GAP_000638_SZ_2026_04_13',
             'HISTORICAL_GP_INTRADAY_RESAMPLING_CONTRACT_MISSING',
             'EXACT_INTRADAY_CONFIRMATION_FACTOR_FORMULA_MISSING',
         ],
@@ -271,9 +296,13 @@ def main() -> None:
     print(json.dumps({
         'status': result['status'],
         'symbol_n': result['primary_snapshot']['symbol_n'],
+        'source_files_hash_bound': result['primary_snapshot']['source_files_hash_bound'],
+        'source_bytes_hash_bound': result['primary_snapshot']['source_bytes_hash_bound'],
         'required_trade_dates': result['primary_snapshot']['required_trade_dates'],
         'valid_trade_dates': result['primary_snapshot']['valid_trade_dates'],
         'exact_gap': result['exact_gap'],
+        'formal_847_source_files_bytes_hash_bound': result['formal_847_source_files_bytes_hash_bound'],
+        'formal_847_required_minute_date_coverage_complete': result['formal_847_required_minute_date_coverage_complete'],
         'formal_847_15m_coverage_verified': result['formal_847_15m_coverage_verified'],
         'formal_847_60m_coverage_verified': result['formal_847_60m_coverage_verified'],
         'formal_847_minute_byte_coverage_verified': result['formal_847_minute_byte_coverage_verified'],
