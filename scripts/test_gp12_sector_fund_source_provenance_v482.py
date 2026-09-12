@@ -4,6 +4,36 @@ from gp12_sector_fund_source_provenance_v482 import build_sector_fund_source_pro
 
 
 class SectorFundSourceProvenanceV482Test(unittest.TestCase):
+    def fund_admission(self):
+        return {
+            'artifact':'GP12_FUND_FLOW_SNAPSHOT_ADMISSION_V482',
+            'version':'V4.82','strategy_id':'GP_V11',
+            'status':'PASS_LOCKED_FUND_FLOW_SNAPSHOT_PAYLOAD_VERIFIED_PARTIAL_WINDOW',
+            'formal_window':['2020-06-01','2026-04-17'],
+            'source':{
+                'repo_id':'ellendan/a-share-21',
+                'source_commit':'227be520b89ed737dd65bea4785a41ae39a9b7a4',
+                'filename':'all-prices-with-values-250423.csv',
+                'expected_size_bytes':2134704074,
+                'expected_sha256':'034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea',
+                'actual_size_bytes':2134704074,
+                'actual_sha256':'034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea',
+                'rows':4934625,'symbols':5148,'first_date':'2021-01-04','last_date':'2025-04-23',
+                'flow_columns':['dde_l','l_net_value','net_flow_rate','act_buy_xl','pas_buy_xl','act_sell_xl','pas_sell_xl','act_buy_l','pas_buy_l','act_sell_l','pas_sell_l','act_buy_m','pas_buy_m','act_sell_m','pas_sell_m','buy_l','sell_l'],
+            },
+            'remote_pointer_identity_verified':True,
+            'actual_snapshot_bytes_verified_in_current_recovery':True,
+            'single_original_snapshot_policy_verified':True,
+            'auto_converted_hf_parquet_allowed':False,
+            'formal_window_coverage_complete':False,
+            'pit_known_at_semantics_recovered':False,
+            'factor_formula_recovered':False,
+            'remaining_data_gaps':['FUND_FLOW_FORMAL_WINDOW_COVERAGE_INCOMPLETE','FUND_FLOW_PIT_KNOWN_AT_UNBOUND'],
+            'remaining_contract_gaps':['PRICE_FUND_EFFICIENCY_FORMULA_PULSE_FILTER_AND_NORMALIZATION_MISSING'],
+            'blocker':'PIT_SECTOR_AND_FUND_FLOW_INPUT_PROVENANCE_INCOMPLETE','blocker_closed':False,
+            'model_freeze_allowed':False,'oos_metrics_allowed':False,
+        }
+
     def test_known_historical_source_clues_are_bound_without_false_closure(self):
         x = build_sector_fund_source_provenance()
         self.assertEqual(x["status"], "PARTIAL_SOURCE_PROVENANCE_BOUND")
@@ -23,6 +53,18 @@ class SectorFundSourceProvenanceV482Test(unittest.TestCase):
         self.assertFalse(x["blocker_closed"])
         self.assertFalse(x["model_freeze_allowed"])
         self.assertFalse(x["oos_metrics_allowed"])
+
+    def test_verified_payload_is_bound_without_false_closure(self):
+        x=build_sector_fund_source_provenance(self.fund_admission())
+        self.assertTrue(x['fund_flow']['actual_snapshot_bytes_verified_in_current_recovery'])
+        self.assertEqual(x['fund_flow']['verified_rows'],4934625)
+        self.assertEqual(x['fund_flow']['verified_symbols'],5148)
+        self.assertEqual(x['fund_flow']['verified_coverage'],['2021-01-04','2025-04-23'])
+        self.assertNotIn('FUND_FLOW_SOURCE_BYTES_NOT_VERIFIED_IN_CURRENT_RECOVERY',x['remaining_data_gaps'])
+        self.assertIn('FUND_FLOW_FORMAL_WINDOW_COVERAGE_INCOMPLETE',x['remaining_data_gaps'])
+        self.assertFalse(x['blocker_closed'])
+        self.assertFalse(x['model_freeze_allowed'])
+        self.assertFalse(x['oos_metrics_allowed'])
 
     def test_candidate_fund_snapshot_cannot_cover_full_formal_window(self):
         x = build_sector_fund_source_provenance()
