@@ -1,0 +1,27 @@
+name: GP12 Fund Flow Snapshot Admission V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths:
+      - 'scripts/test_gp12_fund_flow_snapshot_admission_v482.py'
+      - 'scripts/gp12_fund_flow_snapshot_admission_v482.py'
+      - '.github/workflows/gp12-fund-flow-snapshot-admission-v482.yml'
+      - '.github/fund-flow-integration-trigger-v482.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run fund-flow snapshot admission tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_fund_flow_snapshot_admission_v482.py
