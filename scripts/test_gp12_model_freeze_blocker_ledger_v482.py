@@ -71,11 +71,19 @@ def intraday():
         'status':'PASS_FORMAL847_15M_60M_COVERAGE_PARTIAL_INTRADAY_PROVENANCE',
         'blocker':'FORMAL847_INTRADAY_BYTE_COVERAGE_AND_HISTORICAL_RESAMPLING_MISSING','blocker_closed':False,
         'exact_gap':{'symbol':'000638.SZ','date':'2026-04-13'},
-        'primary_snapshot':{'symbol_n':847,'required_trade_dates':1011607,'valid_trade_dates':1011606,'missing_trade_dates':1,'invalid_grid_dates':0,'bars_15m_rows':16185696,'bars_60m_rows':4046424,'shard_evidence_semantic_sha256':'355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b'},
+        'primary_snapshot':{
+            'symbol_n':847,'required_trade_dates':1011607,'valid_trade_dates':1011606,'missing_trade_dates':1,'invalid_grid_dates':0,
+            'bars_15m_rows':16185696,'bars_60m_rows':4046424,
+            'shard_evidence_semantic_sha256':'355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b',
+            'source_files_hash_bound':844,'source_bytes_hash_bound':8048396274,
+            'source_file_binding_semantic_sha256':'1'*64,
+        },
+        'formal_847_source_files_bytes_hash_bound':True,
+        'formal_847_required_minute_date_coverage_complete':False,
         'formal_847_15m_coverage_verified':True,'formal_847_60m_coverage_verified':True,
         'formal_847_minute_byte_coverage_verified':False,
         'historical_gp_intraday_resampling_contract_recovered':False,'factor_formula_recovered':False,
-        'remaining_subgaps':['FORMAL847_MINUTE_BYTE_COVERAGE_SINGLE_DAY_GAP_000638_SZ_2026_04_13','HISTORICAL_GP_INTRADAY_RESAMPLING_CONTRACT_MISSING','EXACT_INTRADAY_CONFIRMATION_FACTOR_FORMULA_MISSING'],
+        'remaining_subgaps':['FORMAL847_REQUIRED_MINUTE_DATE_COVERAGE_SINGLE_DAY_GAP_000638_SZ_2026_04_13','HISTORICAL_GP_INTRADAY_RESAMPLING_CONTRACT_MISSING','EXACT_INTRADAY_CONFIRMATION_FACTOR_FORMULA_MISSING'],
         'model_freeze_allowed':False,'oos_metrics_allowed':False,
     }
 
@@ -97,13 +105,24 @@ class ModelFreezeBlockerLedgerV482Test(unittest.TestCase):
         self.assertEqual(sf['fund_flow_verified_coverage'],['2021-01-04','2025-04-23'])
         self.assertEqual(sf['fund_flow_verified_payload_sha256'],'034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea')
         self.assertNotIn('FUND_FLOW_SOURCE_BYTES_NOT_VERIFIED_IN_CURRENT_RECOVERY',sf['remaining_data_gaps'])
-        self.assertTrue(by[MIXED[1]]['evidence']['formal_847_15m_coverage_verified'])
-        self.assertTrue(by[MIXED[1]]['evidence']['formal_847_60m_coverage_verified'])
-        self.assertFalse(by[MIXED[1]]['evidence']['formal_847_minute_byte_coverage_verified'])
-        self.assertEqual(by[MIXED[1]]['evidence']['exact_gap'],{'symbol':'000638.SZ','date':'2026-04-13'})
+        intra=by[MIXED[1]]['evidence']
+        self.assertTrue(intra['formal_847_source_files_bytes_hash_bound'])
+        self.assertEqual(intra['source_files_hash_bound'],844)
+        self.assertEqual(intra['source_bytes_hash_bound'],8048396274)
+        self.assertEqual(len(intra['source_file_binding_semantic_sha256']),64)
+        self.assertFalse(intra['formal_847_required_minute_date_coverage_complete'])
+        self.assertTrue(intra['formal_847_15m_coverage_verified'])
+        self.assertTrue(intra['formal_847_60m_coverage_verified'])
+        self.assertFalse(intra['formal_847_minute_byte_coverage_verified'])
+        self.assertEqual(intra['exact_gap'],{'symbol':'000638.SZ','date':'2026-04-13'})
         self.assertFalse(x['candidate_substitution_allowed'])
         self.assertFalse(x['model_freeze_allowed'])
         self.assertFalse(x['oos_metrics_allowed'])
+
+    def test_intraday_source_binding_is_required_for_current_ledger_state(self):
+        i=intraday(); i['formal_847_source_files_bytes_hash_bound']=False
+        with self.assertRaisesRegex(ValueError,'intraday'):
+            build_model_freeze_blocker_ledger(checkpoint(),triage(),sector_fund(),i)
 
     def test_intraday_partial_evidence_cannot_claim_closed_or_minute_complete(self):
         for key in ('blocker_closed','formal_847_minute_byte_coverage_verified','historical_gp_intraday_resampling_contract_recovered','factor_formula_recovered'):
