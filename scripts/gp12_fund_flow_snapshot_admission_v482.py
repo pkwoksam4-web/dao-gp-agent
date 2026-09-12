@@ -51,6 +51,50 @@ def validate_remote_pointer(text: str) -> dict:
     return {'sha256': digest, 'size_bytes': size}
 
 
+def validate_hf_file_metadata(record: dict) -> dict:
+    _require(record.get('rfilename') == FILENAME, 'remote metadata filename mismatch')
+    lfs=record.get('lfs') or {}
+    size=int(lfs.get('size', record.get('size', -1)))
+    digest=str(lfs.get('sha256') or '').lower()
+    _require(size == EXPECTED_SIZE_BYTES, 'remote metadata size mismatch')
+    _require(digest == EXPECTED_SHA256, 'remote metadata SHA256 mismatch')
+    return {'sha256': digest, 'size_bytes': size}
+
+
+def fetch_remote_file_metadata() -> dict:
+    try:
+        from huggingface_hub import HfApi
+    except Exception as e:
+        raise RuntimeError('huggingface_hub is required for remote metadata verification') from e
+    info=HfApi().dataset_info(REPO_ID, revision=SOURCE_COMMIT, files_metadata=True)
+    hits=[]
+    for s in info.siblings or []:
+        if getattr(s,'rfilename',None) == FILENAME:
+            lfs=getattr(s,'lfs',None)
+            if lfs is not None and not isinstance(lfs,dict):
+                lfs={k:getattr(lfs,k,None) for k in ['size','sha256','pointer_size']}
+            hits.append({'rfilename':getattr(s,'rfilename',None),'size':getattr(s,'size',None),'lfs':lfs or {}})
+    _require(len(hits) == 1, f'exact remote file metadata cardinality mismatch: {len(hits)}')
+    return validate_hf_file_metadata(hits[0])
+
+
+def download_locked_snapshot(local_dir: str | Path) -> Path:
+    fetch_remote_file_metadata()
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as e:
+        raise RuntimeError('huggingface_hub is required for locked snapshot download') from e
+    od=Path(local_dir); od.mkdir(parents=True,exist_ok=True)
+    local=hf_hub_download(
+        repo_id=REPO_ID,
+        filename=FILENAME,
+        repo_type='dataset',
+        revision=SOURCE_COMMIT,
+        local_dir=str(od),
+    )
+    return Path(local)
+
+
 def build_fund_flow_snapshot_admission(scan: dict, remote_pointer_verified: bool) -> dict:
     _require(remote_pointer_verified is True, 'remote pointer identity not verified')
     identity=(
@@ -160,13 +204,23 @@ def scan_snapshot(path: str | Path) -> dict:
 
 def main() -> None:
     ap=argparse.ArgumentParser()
-    ap.add_argument('--snapshot',required=True)
-    ap.add_argument('--pointer',required=True)
+    src=ap.add_mutually_exclusive_group(required=True)
+    src.add_argument('--snapshot')
+    src.add_argument('--download-dir')
+    ap.add_argument('--pointer')
     ap.add_argument('--out',required=True)
     a=ap.parse_args()
-    pointer=validate_remote_pointer(Path(a.pointer).read_text(encoding='utf-8'))
-    scan=scan_snapshot(a.snapshot)
-    out=build_fund_flow_snapshot_admission(scan,remote_pointer_verified=bool(pointer))
+    if a.download_dir:
+        remote=fetch_remote_file_metadata()
+        snapshot=download_locked_snapshot(a.download_dir)
+        remote_verified=bool(remote)
+    else:
+        _require(bool(a.pointer), '--pointer is required with --snapshot')
+        remote=validate_remote_pointer(Path(a.pointer).read_text(encoding='utf-8'))
+        snapshot=Path(a.snapshot)
+        remote_verified=bool(remote)
+    scan=scan_snapshot(snapshot)
+    out=build_fund_flow_snapshot_admission(scan,remote_pointer_verified=remote_verified)
     dst=Path(a.out); dst.parent.mkdir(parents=True,exist_ok=True)
     dst.write_text(json.dumps(out,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(out,ensure_ascii=False,indent=2))
