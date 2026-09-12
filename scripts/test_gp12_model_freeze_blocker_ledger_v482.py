@@ -46,8 +46,19 @@ def sector_fund():
         'status':'PARTIAL_SOURCE_PROVENANCE_BOUND',
         'blocker':'PIT_SECTOR_AND_FUND_FLOW_INPUT_PROVENANCE_INCOMPLETE','blocker_closed':False,
         'sector':{'adapter_path_recovered':True,'source_snapshot_identity_locked':False,'pit_membership_verified':False},
-        'fund_flow':{'candidate_snapshot_identity_locked':True,'formal_window_coverage_complete':False,'pit_provenance_complete':False},
-        'remaining_data_gaps':['SECTOR_SOURCE_SNAPSHOT_IDENTITY_UNBOUND','FUND_FLOW_FORMAL_WINDOW_COVERAGE_INCOMPLETE'],
+        'fund_flow':{
+            'candidate_snapshot_identity_locked':True,
+            'remote_pointer_identity_verified':True,
+            'actual_snapshot_bytes_verified_in_current_recovery':True,
+            'verified_rows':4934625,
+            'verified_symbols':5148,
+            'verified_coverage':['2021-01-04','2025-04-23'],
+            'verified_payload_size_bytes':2134704074,
+            'verified_payload_sha256':'034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea',
+            'formal_window_coverage_complete':False,
+            'pit_provenance_complete':False,
+        },
+        'remaining_data_gaps':['SECTOR_SOURCE_SNAPSHOT_IDENTITY_UNBOUND','SECTOR_SOURCE_BYTES_NOT_HASH_BOUND','SECTOR_PIT_MEMBERSHIP_UNVERIFIED','FUND_FLOW_FORMAL_WINDOW_COVERAGE_INCOMPLETE','FUND_FLOW_PIT_KNOWN_AT_UNBOUND'],
         'remaining_contract_gaps':['SECTOR_RS_BREADTH_SLOPE_NORMALIZATION_AND_AGGREGATION_MISSING','PRICE_FUND_EFFICIENCY_FORMULA_PULSE_FILTER_AND_NORMALIZATION_MISSING'],
         'data_completion_would_close_blocker_by_itself':False,
         'model_freeze_allowed':False,'oos_metrics_allowed':False,
@@ -79,6 +90,13 @@ class ModelFreezeBlockerLedgerV482Test(unittest.TestCase):
             self.assertEqual(by[b]['recovery_state'],'HISTORICAL_CONTRACT_MISSING')
         self.assertEqual(by[MIXED[0]]['recovery_state'],'PARTIAL_ENGINEERING_RECOVERY')
         self.assertEqual(by[MIXED[1]]['recovery_state'],'PARTIAL_ENGINEERING_RECOVERY')
+        sf=by[MIXED[0]]['evidence']
+        self.assertTrue(sf['fund_flow_source_bytes_verified'])
+        self.assertEqual(sf['fund_flow_verified_rows'],4934625)
+        self.assertEqual(sf['fund_flow_verified_symbols'],5148)
+        self.assertEqual(sf['fund_flow_verified_coverage'],['2021-01-04','2025-04-23'])
+        self.assertEqual(sf['fund_flow_verified_payload_sha256'],'034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea')
+        self.assertNotIn('FUND_FLOW_SOURCE_BYTES_NOT_VERIFIED_IN_CURRENT_RECOVERY',sf['remaining_data_gaps'])
         self.assertTrue(by[MIXED[1]]['evidence']['formal_847_15m_coverage_verified'])
         self.assertTrue(by[MIXED[1]]['evidence']['formal_847_60m_coverage_verified'])
         self.assertFalse(by[MIXED[1]]['evidence']['formal_847_minute_byte_coverage_verified'])
@@ -95,6 +113,11 @@ class ModelFreezeBlockerLedgerV482Test(unittest.TestCase):
 
     def test_sector_fund_partial_evidence_cannot_claim_closed(self):
         s=sector_fund(); s['blocker_closed']=True
+        with self.assertRaisesRegex(ValueError,'sector/fund'):
+            build_model_freeze_blocker_ledger(checkpoint(),triage(),s,intraday())
+
+    def test_verified_fund_flow_bytes_are_required_for_current_ledger_state(self):
+        s=sector_fund(); s['fund_flow']['actual_snapshot_bytes_verified_in_current_recovery']=False
         with self.assertRaisesRegex(ValueError,'sector/fund'):
             build_model_freeze_blocker_ledger(checkpoint(),triage(),s,intraday())
 
