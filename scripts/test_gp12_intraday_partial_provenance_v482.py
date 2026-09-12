@@ -4,50 +4,74 @@ from gp12_intraday_partial_provenance_v482 import build_intraday_partial_provena
 
 
 class IntradayPartialProvenanceV482Test(unittest.TestCase):
+    def _pass_record(self, seq):
+        symbol=f'X{seq:06d}.SZ'
+        return {
+            'symbol':symbol,
+            'status':'PASS_REQUIRED_TRADE_DATES_EXACT',
+            'required_trade_dates':1,
+            'missing_trade_dates':[],
+            'invalid_grid_dates':[],
+            'canonical_path':f'data/{symbol}.parquet',
+            'source_downloaded':True,
+            'source_sha256':f'{seq+1000:064x}',
+            'source_bytes':1000+seq,
+            'source_rows_total':240,
+        }
+
     def shard_reports(self):
         reports=[]
+        seq=1
         for i in range(17):
+            selected=50 if i < 14 else 49
+            pass_n=46 if i == 0 else selected
+            records=[]
+            for _ in range(pass_n):
+                records.append(self._pass_record(seq)); seq += 1
+            if i == 0:
+                records.extend([
+                    {
+                        'symbol':'000638.SZ','status':'REVIEW_REQUIRED_TRADE_DATES',
+                        'required_trade_dates':1419,
+                        'missing_trade_dates':['2026-04-13'],'invalid_grid_dates':[],
+                        'canonical_path':'data/000638.SZ.parquet','source_downloaded':True,
+                        'source_sha256':'c'*64,'source_bytes':123456,'source_rows_total':300000,
+                    },
+                    {
+                        'symbol':'600074.SH','status':'EXPECTED_ZERO_TRADE_NA','required_trade_dates':0,
+                        'missing_trade_dates':[],'invalid_grid_dates':[],'canonical_path':'data/600074.SH.parquet',
+                        'source_downloaded':False,'source_sha256':None,'source_bytes':0,
+                    },
+                    {
+                        'symbol':'600485.SH','status':'EXPECTED_ZERO_TRADE_NA','required_trade_dates':0,
+                        'missing_trade_dates':[],'invalid_grid_dates':[],'canonical_path':'data/600485.SH.parquet',
+                        'source_downloaded':False,'source_sha256':None,'source_bytes':0,
+                    },
+                    {
+                        'symbol':'600677.SH','status':'EXPECTED_ZERO_TRADE_NA','required_trade_dates':0,
+                        'missing_trade_dates':[],'invalid_grid_dates':[],'canonical_path':'data/600677.SH.parquet',
+                        'source_downloaded':False,'source_sha256':None,'source_bytes':0,
+                    },
+                ])
             reports.append({
                 'artifact':'INTRADAY_FORMAL847_MATERIALIZATION_SHARD_V482',
                 'version':'V4.82',
                 'dataset':'neigezhu/china-a-share-1min-ohlcv',
                 'snapshot_commit':'f311a5f11569e9d541386982d15f2214d9970b8a',
                 'shard_index':i,'shard_count':17,
-                'symbols_selected':50 if i < 14 else 49,
-                'pass_symbols':50 if i < 14 else 49,
-                'expected_zero_trade_symbols':0,
-                'review_symbols':0,
-                'required_trade_dates':0,'valid_trade_dates':0,
-                'missing_trade_dates':0,'invalid_grid_dates':0,
-                'bars_15m':{'rows':0,'sha256':f'{i+1:064x}'},
-                'bars_60m':{'rows':0,'sha256':f'{i+18:064x}'},
-                'records':[],
+                'symbols_selected':selected,
+                'pass_symbols':pass_n,
+                'expected_zero_trade_symbols':3 if i == 0 else 0,
+                'review_symbols':1 if i == 0 else 0,
+                'required_trade_dates':1011607 if i == 0 else 0,
+                'valid_trade_dates':1011606 if i == 0 else 0,
+                'missing_trade_dates':1 if i == 0 else 0,
+                'invalid_grid_dates':0,
+                'bars_15m':{'rows':16185696 if i == 0 else 0,'sha256':'a'*64 if i == 0 else f'{i+1:064x}'},
+                'bars_60m':{'rows':4046424 if i == 0 else 0,'sha256':'b'*64 if i == 0 else f'{i+18:064x}'},
+                'records':records,
+                'source_bytes_downloaded':sum(int(r.get('source_bytes',0)) for r in records),
             })
-        # Replace summary counts with exact frozen global cardinalities while preserving 17 unique shards.
-        r=reports[0]
-        r.update({
-            'symbols_selected':50,'pass_symbols':46,'expected_zero_trade_symbols':3,'review_symbols':1,
-            'required_trade_dates':1011607,'valid_trade_dates':1011606,
-            'missing_trade_dates':1,'invalid_grid_dates':0,
-            'bars_15m':{'rows':16185696,'sha256':'a'*64},
-            'bars_60m':{'rows':4046424,'sha256':'b'*64},
-            'records':[
-                {'symbol':'000638.SZ','status':'REVIEW_REQUIRED_TRADE_DATES','missing_trade_dates':['2026-04-13'],'invalid_grid_dates':[]},
-                {'symbol':'600074.SH','status':'EXPECTED_ZERO_TRADE_NA','missing_trade_dates':[],'invalid_grid_dates':[]},
-                {'symbol':'600485.SH','status':'EXPECTED_ZERO_TRADE_NA','missing_trade_dates':[],'invalid_grid_dates':[]},
-                {'symbol':'600677.SH','status':'EXPECTED_ZERO_TRADE_NA','missing_trade_dates':[],'invalid_grid_dates':[]},
-            ],
-        })
-        # Zero out other shard contributions to global summaries.
-        for rr in reports[1:]:
-            rr.update({'required_trade_dates':0,'valid_trade_dates':0,'bars_15m':{'rows':0,'sha256':rr['bars_15m']['sha256']},'bars_60m':{'rows':0,'sha256':rr['bars_60m']['sha256']}})
-        # Keep exact global symbol totals 847 and pass total 843.
-        reports[0]['symbols_selected']=50
-        for i in range(1,14): reports[i]['symbols_selected']=50
-        for i in range(14,17): reports[i]['symbols_selected']=49
-        reports[0]['pass_symbols']=46
-        for i in range(1,14): reports[i]['pass_symbols']=50
-        for i in range(14,17): reports[i]['pass_symbols']=49
         return reports
 
     def baostock(self):
@@ -90,15 +114,31 @@ class IntradayPartialProvenanceV482Test(unittest.TestCase):
         self.assertFalse(x['model_freeze_allowed'])
         self.assertFalse(x['oos_metrics_allowed'])
 
+    def test_all_row_bearing_source_files_are_hash_bound_separately_from_date_coverage(self):
+        x=build_intraday_partial_provenance(self.shard_reports(),self.baostock(),self.sina())
+        self.assertTrue(x['formal_847_source_files_bytes_hash_bound'])
+        self.assertEqual(x['primary_snapshot']['source_files_hash_bound'],844)
+        self.assertGreater(x['primary_snapshot']['source_bytes_hash_bound'],0)
+        self.assertEqual(len(x['primary_snapshot']['source_file_binding_semantic_sha256']),64)
+        self.assertFalse(x['formal_847_required_minute_date_coverage_complete'])
+        self.assertEqual(x['exact_gap'],{'symbol':'000638.SZ','date':'2026-04-13'})
+
+    def test_missing_source_sha_fails_source_byte_binding(self):
+        r=self.shard_reports()
+        r[1]['records'][0]['source_sha256']=None
+        with self.assertRaisesRegex(ValueError,'source byte'):
+            build_intraday_partial_provenance(r,self.baostock(),self.sina())
+
     def test_only_three_known_zero_trade_symbols_are_allowed(self):
         r=self.shard_reports()
-        r[0]['records'][1]['symbol']='600000.SH'
+        r[0]['records'][-3]['symbol']='600000.SH'
         with self.assertRaisesRegex(ValueError,'zero-trade'):
             build_intraday_partial_provenance(r,self.baostock(),self.sina())
 
     def test_second_missing_day_fails_closed(self):
         r=self.shard_reports(); r[1]['missing_trade_dates']=1; r[1]['review_symbols']=1
-        r[1]['records']=[{'symbol':'000001.SZ','status':'REVIEW_REQUIRED_TRADE_DATES','missing_trade_dates':['2026-04-14'],'invalid_grid_dates':[]}]
+        r[1]['records'][0]['status']='REVIEW_REQUIRED_TRADE_DATES'
+        r[1]['records'][0]['missing_trade_dates']=['2026-04-14']
         with self.assertRaises(ValueError):
             build_intraday_partial_provenance(r,self.baostock(),self.sina())
 
