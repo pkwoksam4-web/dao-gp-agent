@@ -18,6 +18,8 @@ MIXED_BLOCKERS = [SECTOR_FUND_BLOCKER, INTRADAY_BLOCKER]
 CANONICAL_BLOCKERS = HISTORICAL_CONTRACT_BLOCKERS + MIXED_BLOCKERS
 
 EXPECTED_INTRADAY_SEMANTIC_SHA256 = '355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b'
+EXPECTED_INTRADAY_SOURCE_FILES_HASH_BOUND = 844
+EXPECTED_INTRADAY_SOURCE_BYTES_HASH_BOUND = 8048396274
 EXPECTED_FUND_FLOW_SHA256 = '034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea'
 EXPECTED_FUND_FLOW_SIZE_BYTES = 2134704074
 EXPECTED_FUND_FLOW_ROWS = 4934625
@@ -28,6 +30,16 @@ EXPECTED_FUND_FLOW_COVERAGE = ['2021-01-04','2025-04-23']
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def _is_sha256(value: object) -> bool:
+    if not isinstance(value, str) or len(value) != 64:
+        return False
+    try:
+        int(value, 16)
+        return True
+    except ValueError:
+        return False
 
 
 def _require_fail_closed(name: str, evidence: dict) -> None:
@@ -105,6 +117,8 @@ def _validate_intraday(evidence: dict) -> None:
         and evidence.get('status') == 'PASS_FORMAL847_15M_60M_COVERAGE_PARTIAL_INTRADAY_PROVENANCE'
         and evidence.get('blocker') == INTRADAY_BLOCKER
         and evidence.get('blocker_closed') is False
+        and evidence.get('formal_847_source_files_bytes_hash_bound') is True
+        and evidence.get('formal_847_required_minute_date_coverage_complete') is False
         and evidence.get('formal_847_15m_coverage_verified') is True
         and evidence.get('formal_847_60m_coverage_verified') is True
         and evidence.get('formal_847_minute_byte_coverage_verified') is False
@@ -123,8 +137,11 @@ def _validate_intraday(evidence: dict) -> None:
         'bars_15m_rows':16185696,
         'bars_60m_rows':4046424,
         'shard_evidence_semantic_sha256':EXPECTED_INTRADAY_SEMANTIC_SHA256,
+        'source_files_hash_bound':EXPECTED_INTRADAY_SOURCE_FILES_HASH_BOUND,
+        'source_bytes_hash_bound':EXPECTED_INTRADAY_SOURCE_BYTES_HASH_BOUND,
     }
     _require(all(primary.get(k) == v for k, v in expected.items()), 'intraday frozen cardinality/hash mismatch')
+    _require(_is_sha256(primary.get('source_file_binding_semantic_sha256')), 'intraday source-file binding hash missing')
     _require(len(evidence.get('remaining_subgaps') or []) == 3, 'intraday remaining subgap mismatch')
     _require_fail_closed('intraday', evidence)
 
@@ -184,6 +201,11 @@ def build_model_freeze_blocker_ledger(
         'recovery_state': 'PARTIAL_ENGINEERING_RECOVERY',
         'blocker_closed': False,
         'evidence': {
+            'formal_847_source_files_bytes_hash_bound': True,
+            'source_files_hash_bound': primary['source_files_hash_bound'],
+            'source_bytes_hash_bound': primary['source_bytes_hash_bound'],
+            'source_file_binding_semantic_sha256': primary['source_file_binding_semantic_sha256'],
+            'formal_847_required_minute_date_coverage_complete': False,
             'formal_847_15m_coverage_verified': True,
             'formal_847_60m_coverage_verified': True,
             'formal_847_minute_byte_coverage_verified': False,
