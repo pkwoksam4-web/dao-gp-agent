@@ -8,6 +8,8 @@ on:
       - 'scripts/gp12_model_freeze_provenance_admission_v482.py'
       - 'scripts/test_gp12_model_freeze_recovery_triage_v482.py'
       - 'scripts/gp12_model_freeze_recovery_triage_v482.py'
+      - 'scripts/test_gp12_sector_fund_source_provenance_v482.py'
+      - 'scripts/gp12_sector_fund_source_provenance_v482.py'
       - 'data/GP12_HISTORICAL_ARCHIVE_EXHAUSTION_V482.json'
       - '.github/workflows/gp12-model-freeze-provenance-admission-v482.yml'
       - '.github/model-freeze-integration-trigger-v482.txt'
@@ -30,7 +32,8 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_gp12_model_freeze_provenance_admission_v482.py \
-            test_gp12_model_freeze_recovery_triage_v482.py
+            test_gp12_model_freeze_recovery_triage_v482.py \
+            test_gp12_sector_fund_source_provenance_v482.py
 
   integrate-current-provenance:
     if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[model-freeze-integration]') }}
@@ -120,6 +123,18 @@ jobs:
           PY
           fi
 
+      - name: Build sector/fund source provenance partial checkpoint
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import json
+          from pathlib import Path
+          from gp12_sector_fund_source_provenance_v482 import build_sector_fund_source_provenance
+          x=build_sector_fund_source_provenance()
+          Path('out/model_freeze/GP12_SECTOR_FUND_SOURCE_PROVENANCE_V482.json').write_text(
+              json.dumps(x,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+
       - name: Verify fail-closed semantics
         run: |
           python - <<'PY'
@@ -141,6 +156,10 @@ jobs:
               assert y['model_freeze_allowed'] is False
               assert y['oos_metrics_allowed'] is False
               assert y['candidate_substitution_allowed'] is False
+          s=json.loads(Path('out/model_freeze/GP12_SECTOR_FUND_SOURCE_PROVENANCE_V482.json').read_text())
+          assert s['blocker_closed'] is False
+          assert s['model_freeze_allowed'] is False
+          assert s['oos_metrics_allowed'] is False
           print('Model Freeze remains correctly fail-closed with canonical provenance blockers')
           PY
 
