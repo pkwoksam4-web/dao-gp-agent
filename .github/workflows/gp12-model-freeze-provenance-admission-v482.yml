@@ -10,6 +10,8 @@ on:
       - 'scripts/gp12_model_freeze_recovery_triage_v482.py'
       - 'scripts/test_gp12_sector_fund_source_provenance_v482.py'
       - 'scripts/gp12_sector_fund_source_provenance_v482.py'
+      - 'scripts/test_gp12_fund_flow_snapshot_admission_v482.py'
+      - 'scripts/gp12_fund_flow_snapshot_admission_v482.py'
       - 'scripts/test_gp12_model_freeze_blocker_ledger_v482.py'
       - 'scripts/gp12_model_freeze_blocker_ledger_v482.py'
       - 'data/GP12_HISTORICAL_ARCHIVE_EXHAUSTION_V482.json'
@@ -78,6 +80,15 @@ jobs:
           github-token: ${{ github.token }}
           repository: pkwoksam4-web/dao-gp-agent
 
+      - name: Download frozen fund-flow snapshot admission
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-fund-flow-snapshot-admission-v482
+          path: upstream/fund_flow
+          run-id: 34693368048
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
       - name: Materialize exact strategy recovery evidence commit
         run: |
           mkdir -p upstream/strategy
@@ -112,6 +123,7 @@ jobs:
           result['frozen_inputs']={
             'label_provenance':{'workflow_run_id':34609078336,'artifact_id':10267217161,'artifact_zip_sha256':'1e4d3142823bce2163e4394dad2b7380e821081cc4b3c6249c41e92b9fac5f62'},
             'oos_calendar':{'workflow_run_id':34209105455,'artifact_id':10049029128,'artifact_zip_sha256':'20c982ad7709195e7235e412275e29d3c946f027d991675e4d0dc7cd6ba8e94e'},
+            'fund_flow_snapshot':{'workflow_run_id':34693368048,'artifact_id':10298291856,'artifact_zip_sha256':'5caed1d9b51e028a68984b4d83ca9aec140361a8f13dbd9b70a39ef9a0fa9d89'},
             'strategy_recovery_commit':'189ee5cde4fa77d8881dd651080dd19a15852561',
           }
           p=Path('out/model_freeze/GP12_MODEL_FREEZE_PROVENANCE_CHECKPOINT_V482.json')
@@ -141,7 +153,11 @@ jobs:
           import json
           from pathlib import Path
           from gp12_sector_fund_source_provenance_v482 import build_sector_fund_source_provenance
-          x=build_sector_fund_source_provenance()
+
+          hits=list(Path('upstream/fund_flow').rglob('GP12_FUND_FLOW_SNAPSHOT_ADMISSION_V482.json'))
+          assert len(hits)==1,hits
+          fund=json.loads(hits[0].read_text(encoding='utf-8'))
+          x=build_sector_fund_source_provenance(fund)
           Path('out/model_freeze/GP12_SECTOR_FUND_SOURCE_PROVENANCE_V482.json').write_text(
               json.dumps(x,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print(json.dumps(x,ensure_ascii=False,indent=2))
@@ -167,6 +183,12 @@ jobs:
                   'artifact_id':10294308672,
                   'artifact_zip_sha256':'422616e9ffc3313eaed7125040757ee493b96374706b0906038d79acd328f81e',
                   'shard_evidence_semantic_sha256':'355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b',
+              },
+              'fund_flow_snapshot':{
+                  'workflow_run_id':34693368048,
+                  'artifact_id':10298291856,
+                  'artifact_zip_sha256':'5caed1d9b51e028a68984b4d83ca9aec140361a8f13dbd9b70a39ef9a0fa9d89',
+                  'payload_sha256':'034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea',
               },
               'sector_fund_partial':{'generated_in_same_integration':True},
               'historical_archive_exhaustion':{'repo_path':'data/GP12_HISTORICAL_ARCHIVE_EXHAUSTION_V482.json'},
@@ -198,14 +220,23 @@ jobs:
               assert y['oos_metrics_allowed'] is False
               assert y['candidate_substitution_allowed'] is False
           s=json.loads(Path('out/model_freeze/GP12_SECTOR_FUND_SOURCE_PROVENANCE_V482.json').read_text())
+          assert s['fund_flow']['actual_snapshot_bytes_verified_in_current_recovery'] is True
+          assert s['fund_flow']['verified_rows']==4934625
+          assert s['fund_flow']['verified_symbols']==5148
+          assert s['fund_flow']['verified_coverage']==['2021-01-04','2025-04-23']
+          assert 'FUND_FLOW_SOURCE_BYTES_NOT_VERIFIED_IN_CURRENT_RECOVERY' not in s['remaining_data_gaps']
           assert s['blocker_closed'] is False
           assert s['model_freeze_allowed'] is False
           assert s['oos_metrics_allowed'] is False
           l=json.loads(Path('out/model_freeze/GP12_MODEL_FREEZE_BLOCKER_LEDGER_V482.json').read_text())
           assert l['summary']=={'blocker_n':10,'closed_n':0,'partial_recovery_n':2,'historical_contract_missing_n':8}
+          by={r['blocker']:r for r in l['blockers']}
+          sf=by['PIT_SECTOR_AND_FUND_FLOW_INPUT_PROVENANCE_INCOMPLETE']['evidence']
+          assert sf['fund_flow_source_bytes_verified'] is True
+          assert sf['fund_flow_verified_payload_sha256']=='034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea'
           assert l['model_freeze_allowed'] is False
           assert l['oos_metrics_allowed'] is False
-          print('Model Freeze remains correctly fail-closed with 8 historical-contract and 2 partial-recovery blockers')
+          print('Model Freeze remains fail-closed; fund-flow source bytes are now frozen and verified')
           PY
 
       - name: Upload Model Freeze provenance checkpoint
