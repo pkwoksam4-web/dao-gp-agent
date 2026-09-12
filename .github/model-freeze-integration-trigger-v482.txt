@@ -3,3 +3,4 @@ Recovery triage integration after 13-archive exhaustion evidence.
 Sector/fund partial provenance checkpoint integration.
 Intraday partial provenance and blocker-ledger integration.
 Verified exact fund-flow source bytes integrated from frozen run 34693368048.
+Verified 844/844 row-bearing intraday source-file bytes integrated from frozen run 34696954174.
