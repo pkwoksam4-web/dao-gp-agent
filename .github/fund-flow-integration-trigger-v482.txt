@@ -1,0 +1,2 @@
+GP12 V4.82 exact fund-flow historical snapshot verification trigger.
+Source is locked to ellendan/a-share-21 commit 227be520b89ed737dd65bea4785a41ae39a9b7a4.
