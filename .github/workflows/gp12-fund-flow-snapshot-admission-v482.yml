@@ -25,3 +25,49 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_gp12_fund_flow_snapshot_admission_v482.py
+
+  verify-exact-snapshot:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[fund-flow-integration]') }}
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact snapshot tooling
+        run: python -m pip install --disable-pip-version-check --quiet pandas huggingface_hub hf_xet
+      - name: Download, hash-verify and stream-scan exact historical snapshot
+        env:
+          HF_HUB_DISABLE_PROGRESS_BARS: '1'
+        run: |
+          mkdir -p work out
+          python scripts/gp12_fund_flow_snapshot_admission_v482.py \
+            --download-dir work \
+            --out out/GP12_FUND_FLOW_SNAPSHOT_ADMISSION_V482.json
+      - name: Verify fail-closed boundary
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('out/GP12_FUND_FLOW_SNAPSHOT_ADMISSION_V482.json'))
+          assert x['status']=='PASS_LOCKED_FUND_FLOW_SNAPSHOT_PAYLOAD_VERIFIED_PARTIAL_WINDOW'
+          assert x['remote_pointer_identity_verified'] is True
+          assert x['actual_snapshot_bytes_verified_in_current_recovery'] is True
+          assert x['formal_window_coverage_complete'] is False
+          assert x['pit_known_at_semantics_recovered'] is False
+          assert x['factor_formula_recovered'] is False
+          assert x['blocker_closed'] is False
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          print('Fund-flow source bytes verified; Model Freeze stays fail-closed')
+          PY
+      - name: Remove source payload before artifact upload
+        run: rm -f work/all-prices-with-values-250423.csv
+      - name: Upload fund-flow snapshot admission
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-fund-flow-snapshot-admission-v482
+          path: out/GP12_FUND_FLOW_SNAPSHOT_ADMISSION_V482.json
+          if-no-files-found: error
+          retention-days: 30
