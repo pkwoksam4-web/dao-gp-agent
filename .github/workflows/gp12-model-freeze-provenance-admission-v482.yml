@@ -10,6 +10,8 @@ on:
       - 'scripts/gp12_model_freeze_recovery_triage_v482.py'
       - 'scripts/test_gp12_sector_fund_source_provenance_v482.py'
       - 'scripts/gp12_sector_fund_source_provenance_v482.py'
+      - 'scripts/test_gp12_model_freeze_blocker_ledger_v482.py'
+      - 'scripts/gp12_model_freeze_blocker_ledger_v482.py'
       - 'data/GP12_HISTORICAL_ARCHIVE_EXHAUSTION_V482.json'
       - '.github/workflows/gp12-model-freeze-provenance-admission-v482.yml'
       - '.github/model-freeze-integration-trigger-v482.txt'
@@ -33,7 +35,8 @@ jobs:
           python -m unittest -v \
             test_gp12_model_freeze_provenance_admission_v482.py \
             test_gp12_model_freeze_recovery_triage_v482.py \
-            test_gp12_sector_fund_source_provenance_v482.py
+            test_gp12_sector_fund_source_provenance_v482.py \
+            test_gp12_model_freeze_blocker_ledger_v482.py
 
   integrate-current-provenance:
     if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[model-freeze-integration]') }}
@@ -63,6 +66,15 @@ jobs:
           name: gp-oos-calendar-v482
           path: upstream/calendar
           run-id: 34209105455
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download frozen intraday partial provenance
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-intraday-partial-provenance-v482
+          path: upstream/intraday_partial
+          run-id: 34683796361
           github-token: ${{ github.token }}
           repository: pkwoksam4-web/dao-gp-agent
 
@@ -135,6 +147,35 @@ jobs:
           print(json.dumps(x,ensure_ascii=False,indent=2))
           PY
 
+      - name: Build canonical Model Freeze blocker ledger
+        run: |
+          PYTHONPATH=scripts python - <<'PY'
+          import json
+          from pathlib import Path
+          from gp12_model_freeze_blocker_ledger_v482 import build_model_freeze_blocker_ledger
+
+          def load(path): return json.loads(Path(path).read_text(encoding='utf-8'))
+          ledger=build_model_freeze_blocker_ledger(
+              load('out/model_freeze/GP12_MODEL_FREEZE_PROVENANCE_CHECKPOINT_V482.json'),
+              load('out/model_freeze/GP12_MODEL_FREEZE_RECOVERY_TRIAGE_V482.json'),
+              load('out/model_freeze/GP12_SECTOR_FUND_SOURCE_PROVENANCE_V482.json'),
+              load('upstream/intraday_partial/GP12_INTRADAY_PARTIAL_PROVENANCE_V482.json'),
+          )
+          ledger['evidence_refs']={
+              'intraday_partial':{
+                  'workflow_run_id':34683796361,
+                  'artifact_id':10294308672,
+                  'artifact_zip_sha256':'422616e9ffc3313eaed7125040757ee493b96374706b0906038d79acd328f81e',
+                  'shard_evidence_semantic_sha256':'355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b',
+              },
+              'sector_fund_partial':{'generated_in_same_integration':True},
+              'historical_archive_exhaustion':{'repo_path':'data/GP12_HISTORICAL_ARCHIVE_EXHAUSTION_V482.json'},
+          }
+          Path('out/model_freeze/GP12_MODEL_FREEZE_BLOCKER_LEDGER_V482.json').write_text(
+              json.dumps(ledger,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(ledger,ensure_ascii=False,indent=2))
+          PY
+
       - name: Verify fail-closed semantics
         run: |
           python - <<'PY'
@@ -160,7 +201,11 @@ jobs:
           assert s['blocker_closed'] is False
           assert s['model_freeze_allowed'] is False
           assert s['oos_metrics_allowed'] is False
-          print('Model Freeze remains correctly fail-closed with canonical provenance blockers')
+          l=json.loads(Path('out/model_freeze/GP12_MODEL_FREEZE_BLOCKER_LEDGER_V482.json').read_text())
+          assert l['summary']=={'blocker_n':10,'closed_n':0,'partial_recovery_n':2,'historical_contract_missing_n':8}
+          assert l['model_freeze_allowed'] is False
+          assert l['oos_metrics_allowed'] is False
+          print('Model Freeze remains correctly fail-closed with 8 historical-contract and 2 partial-recovery blockers')
           PY
 
       - name: Upload Model Freeze provenance checkpoint
