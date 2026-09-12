@@ -1,2 +1,3 @@
 GP12 V4.82 Model Freeze provenance integration trigger.
 Recovery triage integration after 13-archive exhaustion evidence.
+Sector/fund partial provenance checkpoint integration.
