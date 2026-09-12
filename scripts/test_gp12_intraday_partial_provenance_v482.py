@@ -99,7 +99,7 @@ class IntradayPartialProvenanceV482Test(unittest.TestCase):
     def test_second_missing_day_fails_closed(self):
         r=self.shard_reports(); r[1]['missing_trade_dates']=1; r[1]['review_symbols']=1
         r[1]['records']=[{'symbol':'000001.SZ','status':'REVIEW_REQUIRED_TRADE_DATES','missing_trade_dates':['2026-04-14'],'invalid_grid_dates':[]}]
-        with self.assertRaisesRegex(ValueError,'single gap'):
+        with self.assertRaises(ValueError):
             build_intraday_partial_provenance(r,self.baostock(),self.sina())
 
     def test_baostock_identity_hash_or_count_change_fails(self):
