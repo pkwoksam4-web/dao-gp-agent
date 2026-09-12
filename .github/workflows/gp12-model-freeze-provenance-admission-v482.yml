@@ -76,7 +76,7 @@ jobs:
         with:
           name: gp12-intraday-partial-provenance-v482
           path: upstream/intraday_partial
-          run-id: 34683796361
+          run-id: 34696954174
           github-token: ${{ github.token }}
           repository: pkwoksam4-web/dao-gp-agent
 
@@ -123,6 +123,7 @@ jobs:
           result['frozen_inputs']={
             'label_provenance':{'workflow_run_id':34609078336,'artifact_id':10267217161,'artifact_zip_sha256':'1e4d3142823bce2163e4394dad2b7380e821081cc4b3c6249c41e92b9fac5f62'},
             'oos_calendar':{'workflow_run_id':34209105455,'artifact_id':10049029128,'artifact_zip_sha256':'20c982ad7709195e7235e412275e29d3c946f027d991675e4d0dc7cd6ba8e94e'},
+            'intraday_partial':{'workflow_run_id':34696954174,'artifact_id':10299136986,'artifact_zip_sha256':'89bd58a8980e9babe3ddf0b1e02919b70eba82bab223809bd13ebbdf669ff94f'},
             'fund_flow_snapshot':{'workflow_run_id':34693368048,'artifact_id':10298291856,'artifact_zip_sha256':'5caed1d9b51e028a68984b4d83ca9aec140361a8f13dbd9b70a39ef9a0fa9d89'},
             'strategy_recovery_commit':'189ee5cde4fa77d8881dd651080dd19a15852561',
           }
@@ -179,9 +180,9 @@ jobs:
           )
           ledger['evidence_refs']={
               'intraday_partial':{
-                  'workflow_run_id':34683796361,
-                  'artifact_id':10294308672,
-                  'artifact_zip_sha256':'422616e9ffc3313eaed7125040757ee493b96374706b0906038d79acd328f81e',
+                  'workflow_run_id':34696954174,
+                  'artifact_id':10299136986,
+                  'artifact_zip_sha256':'89bd58a8980e9babe3ddf0b1e02919b70eba82bab223809bd13ebbdf669ff94f',
                   'shard_evidence_semantic_sha256':'355502946ab0f769dc43313f7757984e2bac9297cb241df378b875c9de20e39b',
               },
               'fund_flow_snapshot':{
@@ -234,9 +235,15 @@ jobs:
           sf=by['PIT_SECTOR_AND_FUND_FLOW_INPUT_PROVENANCE_INCOMPLETE']['evidence']
           assert sf['fund_flow_source_bytes_verified'] is True
           assert sf['fund_flow_verified_payload_sha256']=='034f6578d1475856c8a74285167e6f167bbb7052d25a1c691d804a9c2bbe6eea'
+          intr=by['FORMAL847_INTRADAY_BYTE_COVERAGE_AND_HISTORICAL_RESAMPLING_MISSING']['evidence']
+          assert intr['formal_847_source_files_bytes_hash_bound'] is True
+          assert intr['source_files_hash_bound']==844
+          assert intr['source_bytes_hash_bound']==8048396274
+          assert intr['formal_847_required_minute_date_coverage_complete'] is False
+          assert intr['exact_gap']=={'symbol':'000638.SZ','date':'2026-04-13'}
           assert l['model_freeze_allowed'] is False
           assert l['oos_metrics_allowed'] is False
-          print('Model Freeze remains fail-closed; fund-flow source bytes are now frozen and verified')
+          print('Model Freeze remains fail-closed; fund-flow bytes and 844 intraday source files are frozen and verified')
           PY
 
       - name: Upload Model Freeze provenance checkpoint
