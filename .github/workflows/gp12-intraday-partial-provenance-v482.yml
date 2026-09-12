@@ -1,0 +1,100 @@
+name: GP12 Intraday Partial Provenance V482
+
+on:
+  push:
+    branches: [gp/baostock-fullraw-crosscheck-v482]
+    paths:
+      - 'scripts/test_gp12_intraday_partial_provenance_v482.py'
+      - 'scripts/gp12_intraday_partial_provenance_v482.py'
+      - '.github/workflows/gp12-intraday-partial-provenance-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run intraday partial provenance tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_intraday_partial_provenance_v482.py
+
+  integrate-frozen-evidence:
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download all 17 frozen Formal847 shard audits
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp-intraday-formal847-audit-*-v482
+          path: input/shards
+          merge-multiple: true
+          run-id: 34446872502
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download exact BaoStock aggregate probe
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-intraday-000638-baostock-probe-v482
+          path: input/baostock
+          run-id: 34452654219
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Download Sina minute corroboration probe
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-intraday-000638-sina-1m-probe-v482
+          path: input/sina
+          run-id: 34444014051
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+
+      - name: Recompute frozen partial intraday provenance
+        run: |
+          mkdir -p out
+          python scripts/gp12_intraday_partial_provenance_v482.py \
+            --shard-dir input/shards \
+            --baostock input/baostock/INTRADAY_000638_BAOSTOCK_PROBE_V482.json \
+            --sina input/sina/SINA_000638_1M_PROBE_AUDIT_V482.json \
+            --out out/GP12_INTRADAY_PARTIAL_PROVENANCE_V482.json
+
+      - name: Verify fail-closed promotion boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('out/GP12_INTRADAY_PARTIAL_PROVENANCE_V482.json').read_text())
+          assert x['status']=='PASS_FORMAL847_15M_60M_COVERAGE_PARTIAL_INTRADAY_PROVENANCE'
+          assert x['formal_847_15m_coverage_verified'] is True
+          assert x['formal_847_60m_coverage_verified'] is True
+          assert x['formal_847_minute_byte_coverage_verified'] is False
+          assert x['historical_gp_intraday_resampling_contract_recovered'] is False
+          assert x['factor_formula_recovered'] is False
+          assert x['blocker_closed'] is False
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          print('Partial intraday provenance verified; Model Freeze/OOS remain fail-closed')
+          PY
+
+      - name: Upload partial intraday provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-intraday-partial-provenance-v482
+          path: out/GP12_INTRADAY_PARTIAL_PROVENANCE_V482.json
+          if-no-files-found: error
+          retention-days: 30
