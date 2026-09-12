@@ -1,0 +1,179 @@
+{
+  "artifact": "GP12_HISTORICAL_ARCHIVE_EXHAUSTION_V482",
+  "version": "V4.82",
+  "strategy_id": "GP_V11",
+  "scope": "ALL_ACCESSIBLE_GP_V11_OFFLINE_BACKTEST_LINEAGE_PLUS_FORMAL_EVIDENCE_PACKS",
+  "accessible_archive_lineage_complete": true,
+  "archive_count": 13,
+  "missing_expected_archive_names": [
+    "v11_offline_backtest_v3_8.zip"
+  ],
+  "missing_expected_archive_interpretation": "No v3_8 archive is present in the accessible Library lineage. Exhaustion means all currently accessible historical assets were inspected; it does not claim a never-recovered external v3_8 or other original asset cannot exist elsewhere.",
+  "authoritative_hit_semantics": "keyword_presence below means a contextual authoritative historical contract hit, not a raw lexical occurrence. Incidental terms in diagnostics, labels, TODOs, README exclusions, or execution-risk diagnostics do not count as recovery of the missing GP_V11 policy/formula.",
+  "archives": [
+    {
+      "name": "v11_offline_backtest_starter.zip",
+      "library_file_id": "file_0000000062e48209926c2ad1c0b72f7f",
+      "size_bytes": 6075,
+      "sha256": "6e69e8193be2991236b08b5c3c63450db56bc5a32fdd2ed9849842a8afbff3a9",
+      "zip_entry_n": 10,
+      "python_source_n": 1,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": false,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_starter_v2.zip",
+      "library_file_id": "file_00000000785c8207939912213976ffbd",
+      "size_bytes": 21032,
+      "sha256": "42e969c5b6a1369b34d5532ce2c9bd4ec4e14b67eede37b5ea12d9f733ec2777",
+      "zip_entry_n": 12,
+      "python_source_n": 1,
+      "python_bytecode_n": 1,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_1.zip",
+      "library_file_id": "file_00000000694481fab82a93874b669c1e",
+      "size_bytes": 76309,
+      "sha256": "27c32c9dfea6ca8945caa185db9288008422a3da171ac39f86f743644861888d",
+      "zip_entry_n": 21,
+      "python_source_n": 5,
+      "python_bytecode_n": 5,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_2.zip",
+      "library_file_id": "file_00000000ff8082069c4475e60357f25c",
+      "size_bytes": 45293,
+      "sha256": "71c242fc19822e32a994f53a677735518d855a446765b0b0bd6c3171fa2adbea",
+      "zip_entry_n": 26,
+      "python_source_n": 15,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_3.zip",
+      "library_file_id": "file_00000000cf0481f580a92ab3e82a90d1",
+      "size_bytes": 65818,
+      "sha256": "330bca45bdf6358a55148d37a96fe89a50290f9b6789e6780e11edc5edcc4e12",
+      "zip_entry_n": 37,
+      "python_source_n": 26,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_4.zip",
+      "library_file_id": "file_00000000f69082099cdf865ab006aaad",
+      "library_version_id": "3",
+      "size_bytes": 84632,
+      "sha256": "d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba",
+      "zip_entry_n": 44,
+      "python_source_n": 36,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_5.zip",
+      "library_file_id": "file_00000000e03481fd9e90e2527d29a6bf",
+      "library_version_id": "2",
+      "size_bytes": 265652,
+      "sha256": "3b82e3f004f0991c4c2d841e1d6905eee102c5274f7c6b8b5a430f845492cda8",
+      "zip_entry_n": 93,
+      "python_source_n": 40,
+      "python_bytecode_n": 40,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_6.zip",
+      "library_file_id": "file_0000000094e881f590f924bc6cf43a08",
+      "size_bytes": 286525,
+      "sha256": "d3b521126329a504c85ca5d4ccbbe59dd5fec8a0a73089ab462eb355f5156d9a",
+      "zip_entry_n": 104,
+      "python_source_n": 45,
+      "python_bytecode_n": 45,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_7.zip",
+      "library_file_id": "file_0000000084bc81f583012dd8131cc047",
+      "library_version_id": "1",
+      "size_bytes": 141777,
+      "sha256": "1e48012b9330288d4be23c0f1bab4b2851d932624eafa895dba632ba55b1998f",
+      "zip_entry_n": 79,
+      "python_source_n": 65,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_9.zip",
+      "library_file_id": "file_000000002a908206b618c35c22cefa6f",
+      "size_bytes": 266220,
+      "sha256": "f5e60507102b6846a1ab2edaaa5bbe79b55ec9a44d6763ea3b6d0c61d3296b22",
+      "zip_entry_n": 121,
+      "python_source_n": 89,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "v11_offline_backtest_v3_10.zip",
+      "library_file_id": "file_0000000027d4820683c9a38a9886d045",
+      "size_bytes": 1301865,
+      "sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "zip_entry_n": 135,
+      "python_source_n": 99,
+      "python_bytecode_n": 0,
+      "explicit_daily_base_scope": true,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "GP_V11_FORMAL_EVIDENCE_PACK_v39.zip",
+      "library_file_id": "file_00000000670081f5992132c21f9f9b94",
+      "size_bytes": 93463,
+      "sha256": "ed25152c2fff718d67fd11f9b648e34ce24ed3f275a53f98ea7e02e8a7002f3f",
+      "zip_entry_n": 12,
+      "python_source_n": 4,
+      "python_bytecode_n": 4,
+      "explicit_daily_base_scope": false,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    },
+    {
+      "name": "GP_V11_FORMAL_EVIDENCE_PACK_v310.zip",
+      "library_file_id": "file_00000000331081f8a8e43636c5d11035",
+      "size_bytes": 99427,
+      "sha256": "e8903e70d41a65e4258f8bbd4beecbce06b2f1a0ea805de31a94aacf64a61f53",
+      "zip_entry_n": 14,
+      "python_source_n": 5,
+      "python_bytecode_n": 5,
+      "explicit_daily_base_scope": false,
+      "keyword_presence": {"full_three_way_prob": false, "topn_policy": false, "entry_exit_policy": false, "holding_rebalance": false, "position_sizing": false, "intraday_formula": false}
+    }
+  ],
+  "explicit_daily_base_scope_archive_n": 10,
+  "scope_finding": "starter_v2 and the v3.1-v3.10 accessible lineage repeatedly state that the package is the Daily structure/Daily Base layer; Market Regime, Sector RS/Breadth, historical fund direction, Event Shock and 15m/60m execution are not merged as the complete GP_V11 strategy.",
+  "authoritative_contract_hits": {
+    "full_gp12_three_way_probability_mapping": 0,
+    "ranking_topn_semantics": 0,
+    "entry_exit_thresholds": 0,
+    "holding_and_rebalance_policy": 0,
+    "position_sizing_and_risk_rules": 0,
+    "actual_fill_price_and_intraday_execution_rules": 0,
+    "exact_intraday_confirmation_factor_formula": 0
+  },
+  "historical_conversation_contract_search_complete": true,
+  "historical_conversation_found_missing_policy_contract": false,
+  "historical_conversation_finding": "Recovered historical conversation evidence confirms the 12-factor identities/weights and selected framework constraints, but does not establish the missing final probability, ranking, entry/exit, holding/rebalance, sizing, fill or non-Daily executable contracts.",
+  "candidate_substitution_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "conclusion": "Accessible historical assets are exhausted for the missing authoritative GP_V11 strategy contract. This does not prove no external original asset exists; it proves the currently accessible archive lineage cannot by itself close the historical-contract blockers."
+}
