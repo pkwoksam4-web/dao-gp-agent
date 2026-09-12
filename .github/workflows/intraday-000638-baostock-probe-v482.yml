@@ -1,0 +1,108 @@
+name: GP V4.82 Intraday 000638 BaoStock Probe
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-000638-baostock-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install BaoStock
+        run: python -m pip install --disable-pip-version-check --quiet baostock pandas
+      - name: Probe raw 5m/15m/60m bars
+        run: |
+          mkdir -p out/baostock-probe
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import baostock as bs
+
+          symbol = 'sz.000638'
+          date = '2026-04-13'
+          fields = 'date,time,code,open,high,low,close,volume,amount,adjustflag'
+
+          out = {
+              'artifact': 'INTRADAY_000638_BAOSTOCK_PROBE_V482',
+              'version': 'V4.82',
+              'symbol': '000638.SZ',
+              'date': date,
+              'provider': 'BaoStock',
+              'query_code': symbol,
+              'fields': fields.split(','),
+              'adjustflag': '3',
+              'scope': 'READ_ONLY_AGGREGATE_FALLBACK_PROBE_NOT_FORMAL_FILL',
+              'login_error_code': None,
+              'login_error_msg': None,
+              'frequencies': {},
+              'formal_fill_allowed': False,
+              'minute_byte_coverage_verified': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+
+          lg = bs.login()
+          out['login_error_code'] = lg.error_code
+          out['login_error_msg'] = lg.error_msg
+          if lg.error_code != '0':
+              raise RuntimeError(f'BaoStock login failed: {lg.error_code} {lg.error_msg}')
+
+          try:
+              for freq in ('5', '15', '60'):
+                  rs = bs.query_history_k_data_plus(
+                      symbol,
+                      fields,
+                      start_date=date,
+                      end_date=date,
+                      frequency=freq,
+                      adjustflag='3',
+                  )
+                  rows = []
+                  while rs.error_code == '0' and rs.next():
+                      vals = rs.get_row_data()
+                      rows.append(dict(zip(rs.fields, vals)))
+                  payload = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+                  out['frequencies'][freq] = {
+                      'error_code': rs.error_code,
+                      'error_msg': rs.error_msg,
+                      'count': len(rows),
+                      'rows': rows,
+                      'response_canonical_sha256': hashlib.sha256(payload).hexdigest(),
+                  }
+          finally:
+              bs.logout()
+
+          for freq, item in out['frequencies'].items():
+              if item['error_code'] != '0':
+                  raise RuntimeError(f'BaoStock {freq}m query failed: {item}')
+
+          path = Path('out/baostock-probe/INTRADAY_000638_BAOSTOCK_PROBE_V482.json')
+          path.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps({
+              f'{freq}m_count': out['frequencies'][freq]['count']
+              for freq in ('5','15','60')
+          }, ensure_ascii=False, indent=2))
+          print('last_5m=', out['frequencies']['5']['rows'][-3:] if out['frequencies']['5']['rows'] else [])
+          print('last_15m=', out['frequencies']['15']['rows'][-2:] if out['frequencies']['15']['rows'] else [])
+          print('last_60m=', out['frequencies']['60']['rows'][-2:] if out['frequencies']['60']['rows'] else [])
+          PY
+      - name: Upload BaoStock probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-000638-baostock-probe-v482
+          path: out/baostock-probe/INTRADAY_000638_BAOSTOCK_PROBE_V482.json
+          if-no-files-found: error
+          retention-days: 30

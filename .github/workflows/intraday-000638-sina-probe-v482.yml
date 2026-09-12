@@ -1,0 +1,111 @@
+name: GP V4.82 Intraday 000638 Sina 1m Probe
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-000638-sina-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch raw Sina 1m JSONP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/sina-000638
+          URL='https://quotes.sina.cn/cn/api/jsonp_v2.php/=/CN_MarketDataService.getKLineData?symbol=sz000638&scale=1&ma=no&datalen=1970'
+          curl --fail --location --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 180 \
+            --user-agent 'Mozilla/5.0' \
+            --dump-header out/sina-000638/http_headers.txt \
+            --output out/sina-000638/raw_response.txt \
+            "$URL"
+          test -s out/sina-000638/raw_response.txt
+          sha256sum out/sina-000638/raw_response.txt | tee out/sina-000638/raw_response.sha256
+          wc -c out/sina-000638/raw_response.txt
+      - name: Parse and audit 2026-04-13 rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+
+          root = Path('out/sina-000638')
+          raw_path = root / 'raw_response.txt'
+          raw_bytes = raw_path.read_bytes()
+          text = raw_bytes.decode('utf-8', errors='replace').strip()
+          sha = hashlib.sha256(raw_bytes).hexdigest()
+
+          # Accept plain JSON or JSONP/wrapper; extract the outermost JSON array.
+          left = text.find('[')
+          right = text.rfind(']')
+          if left < 0 or right <= left:
+              raise SystemExit('No JSON array found in Sina response')
+          payload = json.loads(text[left:right + 1])
+          if not isinstance(payload, list):
+              raise SystemExit('Sina payload is not a list')
+
+          def ts(row):
+              for key in ('day', 'date', 'time', 'datetime'):
+                  if key in row and row[key] is not None:
+                      return str(row[key])
+              return ''
+
+          target = [row for row in payload if ts(row).startswith('2026-04-13')]
+          dates = sorted({ts(row)[:10] for row in payload if ts(row)})
+          first_ts = ts(payload[0]) if payload else None
+          last_ts = ts(payload[-1]) if payload else None
+          keys = sorted({k for row in payload[:20] if isinstance(row, dict) for k in row})
+
+          target_path = root / 'SINA_000638_20260413_1M_ROWS_V482.json'
+          target_path.write_text(json.dumps(target, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          target_sha = hashlib.sha256(target_path.read_bytes()).hexdigest()
+
+          audit = {
+              'artifact': 'SINA_000638_1M_PROBE_V482',
+              'version': 'V4.82',
+              'symbol': '000638.SZ',
+              'sina_symbol': 'sz000638',
+              'requested_scale_minutes': 1,
+              'requested_datalen': 1970,
+              'raw_response_sha256': sha,
+              'raw_response_bytes': len(raw_bytes),
+              'parsed_rows': len(payload),
+              'payload_keys': keys,
+              'first_timestamp': first_ts,
+              'last_timestamp': last_ts,
+              'date_min': dates[0] if dates else None,
+              'date_max': dates[-1] if dates else None,
+              'target_date': '2026-04-13',
+              'target_rows': len(target),
+              'target_rows_sha256': target_sha,
+              'target_first_timestamp': ts(target[0]) if target else None,
+              'target_last_timestamp': ts(target[-1]) if target else None,
+              'target_present': bool(target),
+              'eligible_as_fallback_source': False,
+              'reason': 'Probe only. Eligibility requires timestamp/session/value validation and provenance binding.',
+              'formal_847_coverage_promoted': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          (root / 'SINA_000638_1M_PROBE_AUDIT_V482.json').write_text(
+              json.dumps(audit, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(audit, ensure_ascii=False, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-000638-sina-1m-probe-v482
+          path: out/sina-000638/
+          if-no-files-found: error
+          retention-days: 30

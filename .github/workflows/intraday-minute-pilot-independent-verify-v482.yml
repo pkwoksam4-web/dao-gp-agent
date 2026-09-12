@@ -1,0 +1,179 @@
+name: GP V4.82 Intraday Minute Pilot Independent Verify
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-minute-pilot-independent-verify-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  independent-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent verifier dependencies
+        run: python -m pip install --disable-pip-version-check --quiet pandas pyarrow numpy
+      - name: Download exact pilot artifact from run 34431397499
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-intraday-minute-materialization-pilot-v482
+          path: input/pilot
+          run-id: 34431397499
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Independently reconstruct and compare all bars
+        run: |
+          mkdir -p out/independent-verify
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          import numpy as np
+          import pandas as pd
+
+          root = Path('input/pilot')
+          source_path = root / '002002_1MIN_F311A5F.parquet'
+          out15_path = root / '002002_15M_F311A5F.parquet'
+          out60_path = root / '002002_60M_F311A5F.parquet'
+          evidence_path = root / 'INTRADAY_MINUTE_MATERIALIZATION_PILOT_V482.json'
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with path.open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          evidence = json.loads(evidence_path.read_text(encoding='utf-8'))
+          assert sha256(source_path) == '209907efad308af285f937f913a8c8017ab75eede908a87ce5c109989eb43d92'
+          assert sha256(out15_path) == evidence['output_15m']['sha256']
+          assert sha256(out60_path) == evidence['output_60m']['sha256']
+
+          src = pd.read_parquet(source_path).sort_values('timestamp').reset_index(drop=True)
+          src['timestamp'] = pd.to_datetime(src['timestamp'])
+          b15 = pd.read_parquet(out15_path).sort_values(['trade_date','session','bar_end']).reset_index(drop=True)
+          b60 = pd.read_parquet(out60_path).sort_values(['trade_date','session','bar_end']).reset_index(drop=True)
+          for b in (b15, b60):
+              for c in ['trade_date','source_start','bar_end']:
+                  b[c] = pd.to_datetime(b[c])
+
+          assert len(src) == 820123
+          assert src['timestamp'].duplicated().sum() == 0
+          src['trade_date'] = src['timestamp'].dt.normalize()
+          src['hhmm'] = src['timestamp'].dt.strftime('%H:%M')
+          day_counts = src.groupby('trade_date').size()
+          assert len(day_counts) == 3403
+          assert set(day_counts.unique()) == {241}
+
+          marker = src[src['hhmm'] == '09:30']
+          assert len(marker) == 3403
+          assert marker.groupby('trade_date').size().eq(1).all()
+          assert (src['hhmm'] == '13:00').sum() == 0
+
+          cont = src[src['hhmm'] != '09:30'].copy()
+          cont['session'] = np.where(cont['hhmm'] <= '11:30', 'AM', 'PM')
+          session_counts = cont.groupby(['trade_date','session']).size()
+          assert set(session_counts.unique()) == {120}
+          assert len(cont) == 3403 * 240
+          cont['pos'] = cont.groupby(['trade_date','session']).cumcount()
+
+          def reconstruct(interval):
+              x = cont.copy()
+              x['bucket'] = x['pos'] // interval
+              g = x.groupby(['trade_date','session','bucket'], sort=True, observed=True)
+              exp = g.agg(
+                  symbol=('symbol','first'),
+                  source_start=('timestamp','first'),
+                  bar_end=('timestamp','last'),
+                  source_rows=('timestamp','size'),
+                  open=('open','first'),
+                  high=('high','max'),
+                  low=('low','min'),
+                  close=('close','last'),
+                  volume=('volume','sum'),
+                  turnover=('turnover','sum'),
+              ).reset_index()
+              exp['interval_minutes'] = interval
+              cols = ['symbol','trade_date','session','interval_minutes','source_start','bar_end','source_rows','open','high','low','close','volume','turnover']
+              return exp[cols].sort_values(['trade_date','session','bar_end']).reset_index(drop=True)
+
+          def compare(expected, observed, interval, bars_per_day):
+              assert len(observed) == 3403 * bars_per_day
+              assert len(expected) == len(observed)
+              assert set(observed['source_rows'].unique()) == {interval}
+              for c in ['symbol','session']:
+                  assert expected[c].astype(str).tolist() == observed[c].astype(str).tolist(), c
+              for c in ['trade_date','source_start','bar_end']:
+                  assert expected[c].tolist() == observed[c].tolist(), c
+              for c in ['interval_minutes','source_rows','volume']:
+                  assert np.array_equal(expected[c].to_numpy(), observed[c].to_numpy()), c
+              for c in ['open','high','low','close','turnover']:
+                  assert np.allclose(expected[c].to_numpy(dtype=float), observed[c].to_numpy(dtype=float), rtol=1e-12, atol=1e-6, equal_nan=True), c
+              per_day = observed.groupby(observed['trade_date'].dt.normalize()).size()
+              assert set(per_day.unique()) == {bars_per_day}
+              assert not (((observed['session'] == 'AM') & (observed['bar_end'].dt.strftime('%H:%M') > '11:30')).any())
+              assert not (((observed['session'] == 'PM') & (observed['source_start'].dt.strftime('%H:%M') < '13:01')).any())
+
+          exp15 = reconstruct(15)
+          exp60 = reconstruct(60)
+          compare(exp15, b15, 15, 16)
+          compare(exp60, b60, 60, 4)
+
+          assert evidence['status'] == 'PASS_SINGLE_SYMBOL_SESSION_AWARE_RESAMPLE_PILOT_NOT_FORMAL'
+          assert evidence['single_symbol_minute_bytes_materialized'] is True
+          assert evidence['single_symbol_15m_resampling_validated'] is True
+          assert evidence['single_symbol_60m_resampling_validated'] is True
+          assert evidence['formal_847_15m_coverage_verified'] is False
+          assert evidence['formal_847_60m_coverage_verified'] is False
+          assert evidence['historical_gp_intraday_resampling_contract_recovered'] is False
+          assert evidence['factor_formula_recovered'] is False
+          assert evidence['model_freeze_allowed'] is False
+          assert evidence['oos_metrics_allowed'] is False
+
+          report = {
+              'artifact': 'INTRADAY_MINUTE_PILOT_INDEPENDENT_VERIFY_V482',
+              'status': 'PASS_INDEPENDENT_FULL_RECONSTRUCTION_SINGLE_SYMBOL_PILOT_NOT_FORMAL',
+              'verification_head_sha': os.environ.get('GITHUB_SHA'),
+              'source_pilot_run_id': 34431397499,
+              'source_pilot_artifact_id': 10134644253,
+              'source_pilot_artifact_digest': 'sha256:a974fbf4d1974cfa16bc97da2fd28d5c12debaf2ae2ca0ccf06d11e034d55e69',
+              'source_sha256': sha256(source_path),
+              'source_rows': len(src),
+              'trading_dates': int(day_counts.size),
+              'opening_marker_rows': int(len(marker)),
+              'continuous_rows': int(len(cont)),
+              'bars_15m_rows': len(b15),
+              'bars_15m_sha256': sha256(out15_path),
+              'bars_60m_rows': len(b60),
+              'bars_60m_sha256': sha256(out60_path),
+              'full_row_by_row_reconstruction_match_15m': True,
+              'full_row_by_row_reconstruction_match_60m': True,
+              'lunch_crossing_count_15m': 0,
+              'lunch_crossing_count_60m': 0,
+              'formal_847_coverage_verified': False,
+              'historical_gp_formula_recovered': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          Path('out/independent-verify/INTRADAY_MINUTE_PILOT_INDEPENDENT_VERIFY_V482.json').write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload independent verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-minute-pilot-independent-verify-v482
+          path: out/independent-verify/INTRADAY_MINUTE_PILOT_INDEPENDENT_VERIFY_V482.json
+          if-no-files-found: error
+          retention-days: 30

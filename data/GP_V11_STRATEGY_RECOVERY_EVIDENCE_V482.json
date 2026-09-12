@@ -1,0 +1,155 @@
+{
+  "artifact": "GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482",
+  "version": "V4.82",
+  "strategy_id": "GP_V11",
+  "searched_surfaces": [
+    {
+      "surface": "github_repository_history",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "dao-gp-agent repository history begins after the original August GP V1.1 package work, so it is not the carrier of the original offline-backtest archives"
+    },
+    {
+      "surface": "file_library_direct_zip_enumeration_2026_09_10",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "direct Library ZIP enumeration recovered the historical GP V1.1 package lineage including starter_v2, v3_1, v3_2, v3_3, v3_4, v3_5, v3_6, v3_7, v3_9, v3_10 and Formal evidence packs; prior index-search ABSENT conclusions are superseded"
+    },
+    {
+      "surface": "file_library_v3_4_exact_bytes",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "v11_offline_backtest_v3_4.zip was materialized from Library and SHA256 d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba exactly matches the previously recorded historical candidate SHA"
+    },
+    {
+      "surface": "file_library_v3_10_exact_bytes",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "v11_offline_backtest_v3_10.zip was materialized from Library; archive SHA256 is d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d and contains executable Daily Base, panel and Formal pipeline source plus tests and a package manifest"
+    },
+    {
+      "surface": "historical_conversation_acceptance_2026_08_25",
+      "confidence": "USER_CONFIRMED",
+      "finding": "the assistant enumerated the fixed V1.0 12-factor library and weights, and the user immediately accepted the proposal and freezing of that fixed 12-factor framework; this is confirmation-by-adjacent-acceptance rather than an independently retyped factor list"
+    },
+    {
+      "surface": "gmail_attachment_search",
+      "confidence": "ABSENT",
+      "finding": "read-only Gmail search found no separate GP V1.1 source attachment; Library is the recovered authoritative package carrier"
+    },
+    {
+      "surface": "v3_4_to_v3_10_source_diff",
+      "confidence": "AUTHORITATIVE_FILE",
+      "finding": "run_backtest.py source comparison shows the Daily Base scoring formula is stable across the inspected historical packages; later change primarily vectorizes the three-market-day first-touch label path"
+    }
+  ],
+  "confirmed_rules": [
+    {
+      "key": "framework_cardinality_and_version",
+      "confidence": "USER_CONFIRMED",
+      "value": {
+        "framework_version": "V1.0",
+        "factor_count": 12,
+        "frozen_framework_accepted": true,
+        "confirmation_mode": "adjacent acceptance of the enumerated fixed-factor proposal"
+      }
+    },
+    {
+      "key": "factor_library_v10",
+      "confidence": "USER_CONFIRMED",
+      "value": [
+        {"name": "Market Regime", "weight_pct": 8},
+        {"name": "Market Breadth/Diffusion", "weight_pct": 4},
+        {"name": "Sector RS", "weight_pct": 10},
+        {"name": "Sector Slope x R2", "weight_pct": 7},
+        {"name": "Sector Breadth", "weight_pct": 8},
+        {"name": "Position", "weight_pct": 12},
+        {"name": "Multi-Momentum", "weight_pct": 10},
+        {"name": "Trend Quality", "weight_pct": 8},
+        {"name": "Efficiency Ratio", "weight_pct": 7},
+        {"name": "Drawdown Recovery", "weight_pct": 8},
+        {"name": "Price/Fund Efficiency", "weight_pct": 10},
+        {"name": "Intraday Confirmation", "weight_pct": 8}
+      ]
+    },
+    {
+      "key": "output_framework",
+      "confidence": "USER_CONFIRMED",
+      "value": "fixed output framework includes Structure, Inertia and Execution scores plus P-up/P-range/P-down and key validation levels; exact probability mapping is not recovered"
+    },
+    {
+      "key": "label_clock",
+      "confidence": "USER_CONFIRMED",
+      "value": "T+1/T+2/T+3 advance by market trading days, not next available stock K-line after suspension"
+    },
+    {
+      "key": "lookback_windows",
+      "confidence": "USER_CONFIRMED",
+      "value": [5, 10, 20, 60, 120]
+    },
+    {
+      "key": "forecast_horizons",
+      "confidence": "USER_CONFIRMED",
+      "value": ["T+1", "T+2", "T+3"]
+    },
+    {
+      "key": "execution_timeframe_separation",
+      "confidence": "USER_CONFIRMED",
+      "value": "daily close snapshot is separated from 15-minute and 60-minute execution confirmation"
+    },
+    {
+      "key": "outcome_leakage_rule",
+      "confidence": "USER_CONFIRMED",
+      "value": "future labels and post-Formal observations are validation outcomes only and cannot be used to tune or construct pre-exposure strategy decisions"
+    },
+    {
+      "key": "daily_base_remaining_inertia_formula",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": "remaining_inertia = 0.40*raw_strength + 0.25*life_score + 0.25*trend_quality + 0.10*(100-trend_consumption), clipped to [0,100]; exact executable source is recovered from v11_offline_backtest_v3_10.zip"
+    },
+    {
+      "key": "daily_base_subscore_rules",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": {
+        "raw_strength": "20 points for each positive r5/r10/r20/r60/r120",
+        "life_score": "starts 50; pos120<0.35 +15; 0.35<=pos120<=0.75 +10; pos120>0.90 -20; pos120>0.80 and r20<0 -10; clipped [0,100]",
+        "trend_quality": "starts 50; slope20>0 +15 else -10; r2_20>0.55 +10; er20>0.35 +10; close_loc>0.65 +10; close_loc<0.30 -10; clipped [0,100]",
+        "trend_consumption": "starts 0; pos120>0.85 +25; r5>0.12 +20; r10>0.20 +15; vol_ratio20>1.8 +15; close_loc<0.45 +15; r5<0 and r20>0.15 +10; clipped [0,100]"
+      }
+    },
+    {
+      "key": "daily_base_feature_and_label_scope",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": "recovered source includes r5/r10/r20/r60/r120, ER10/20, 20/60/120 position, 20-day slope and R2, ATR14, close location, volume ratio, optional turnover ratio and 20/60-day drawdown; labels include T+1/T+2/T+3, MFE/MAE, fixed-hit thresholds and ATR-adaptive three-day first-touch UP/DOWN/FLAT/AMBIG"
+    },
+    {
+      "key": "daily_base_scope_limitation",
+      "confidence": "AUTHORITATIVE_FILE",
+      "value": "historical V3.10 README explicitly says this is still the Daily structure layer; Market Regime, Sector RS/Breadth, historical fund direction, 15/60-minute execution and Event Shock scores are not merged"
+    }
+  ],
+  "candidate_clues": [],
+  "recovered_assets": [
+    {
+      "key": "daily_base_strategy_code",
+      "confidence": "AUTHORITATIVE_FILE",
+      "scope": "DAILY_BASE_ONLY",
+      "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip",
+      "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "files": [
+        {"path": "src/run_backtest.py", "sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1"},
+        {"path": "src/run_panel_backtest.py", "sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2"},
+        {"path": "src/run_formal_pipeline.py", "sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"}
+      ],
+      "complete_12_factor_strategy": false
+    }
+  ],
+  "missing_required_fields": [
+    "complete_12_factor_strategy_code_bytes",
+    "non_daily_layer_factor_formulas",
+    "exact_normalization_and_clipping",
+    "score_layer_aggregation",
+    "probability_mapping",
+    "ranking_topn_semantics",
+    "entry_exit_thresholds",
+    "holding_and_rebalance_policy",
+    "position_sizing_and_risk_rules",
+    "non_daily_layer_source_bytes"
+  ]
+}

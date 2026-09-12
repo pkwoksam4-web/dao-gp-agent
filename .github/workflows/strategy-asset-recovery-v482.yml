@@ -1,0 +1,452 @@
+name: GP V4.82 Strategy Asset Recovery
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - 'scripts/strategy_asset_recovery_v482.py'
+      - 'scripts/test_strategy_asset_recovery_v482.py'
+      - 'scripts/test_strategy_factor_recovery_matrix_v482.py'
+      - 'scripts/test_gp12_candidate_historical_crosswalk_v482.py'
+      - 'scripts/test_strategy_policy_recovery_matrix_v482.py'
+      - 'scripts/test_strategy_intraday_source_recovery_v482.py'
+      - 'scripts/test_strategy_intraday_inventory_binding_v482.py'
+      - 'data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json'
+      - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
+      - 'data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json'
+      - 'data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json'
+      - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
+      - 'data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json'
+      - 'data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json'
+      - 'data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv'
+      - 'data/FORMAL847_SYMBOLS_V482.txt'
+      - '.github/workflows/strategy-asset-recovery-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Strategy recovery contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_strategy_asset_recovery_v482.py \
+            test_strategy_factor_recovery_matrix_v482.py \
+            test_gp12_candidate_historical_crosswalk_v482.py \
+            test_strategy_policy_recovery_matrix_v482.py \
+            test_strategy_intraday_source_recovery_v482.py \
+            test_strategy_intraday_inventory_binding_v482.py
+      - name: Upstream recovery, calendar, admission and Formal regressions
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_model_freeze_recovery_v482.py \
+            test_oos_calendar_v482.py \
+            test_oos_admission_v482.py \
+            test_formal_readiness_v482.py \
+            test_formal_readiness_finalize_v482.py
+
+  production-recovery:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download OOS-calendar-bound recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-oos-calendar-v482
+          path: input/oos-calendar
+          run-id: 34209105455
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Evaluate production strategy recovery evidence
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/strategy-recovery
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import strategy_asset_recovery_v482 as mod
+
+          checkpoint_path = Path('input/oos-calendar/MODEL_ASSET_RECOVERY_CHECKPOINT_V482_OOS_CALENDAR.json')
+          evidence_path = Path('data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json')
+          matrix_path = Path('data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json')
+          crosswalk_path = Path('data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json')
+          policy_path = Path('data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json')
+          intraday_path = Path('data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json')
+          intraday_verify_path = Path('data/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json')
+          intraday_inventory_audit_path = Path('data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json')
+          intraday_inventory_map_path = Path('data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv')
+          intraday_formal_symbols_path = Path('data/FORMAL847_SYMBOLS_V482.txt')
+
+          checkpoint = json.loads(checkpoint_path.read_text(encoding='utf-8'))
+          evidence = json.loads(evidence_path.read_text(encoding='utf-8'))
+
+          matrix_bytes = matrix_path.read_bytes()
+          matrix = json.loads(matrix_bytes.decode('utf-8'))
+          matrix_sha256 = hashlib.sha256(matrix_bytes).hexdigest()
+
+          crosswalk_bytes = crosswalk_path.read_bytes()
+          crosswalk = json.loads(crosswalk_bytes.decode('utf-8'))
+          crosswalk_sha256 = hashlib.sha256(crosswalk_bytes).hexdigest()
+
+          policy_bytes = policy_path.read_bytes()
+          policy = json.loads(policy_bytes.decode('utf-8'))
+          policy_sha256 = hashlib.sha256(policy_bytes).hexdigest()
+
+          intraday_bytes = intraday_path.read_bytes()
+          intraday = json.loads(intraday_bytes.decode('utf-8'))
+          intraday_sha256 = hashlib.sha256(intraday_bytes).hexdigest()
+
+          intraday_verify_bytes = intraday_verify_path.read_bytes()
+          intraday_verify = json.loads(intraday_verify_bytes.decode('utf-8'))
+          intraday_verify_sha256 = hashlib.sha256(intraday_verify_bytes).hexdigest()
+          assert intraday_verify_sha256 == '1eb392c8224d13c0b883ea71ec27cd84f73f599c0526107608e0996725c6068a'
+
+          intraday_inventory_audit_bytes = intraday_inventory_audit_path.read_bytes()
+          intraday_inventory_audit = json.loads(intraday_inventory_audit_bytes.decode('utf-8'))
+          intraday_inventory_audit_sha256 = hashlib.sha256(intraday_inventory_audit_bytes).hexdigest()
+          assert intraday_inventory_audit_sha256 == '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'
+          intraday_inventory_map_bytes = intraday_inventory_map_path.read_bytes()
+          intraday_inventory_map_sha256 = hashlib.sha256(intraday_inventory_map_bytes).hexdigest()
+          assert intraday_inventory_map_sha256 == 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'
+          intraday_formal_symbols_bytes = intraday_formal_symbols_path.read_bytes()
+          intraday_formal_symbols_sha256 = hashlib.sha256(intraday_formal_symbols_bytes).hexdigest()
+          assert intraday_formal_symbols_sha256 == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'
+          assert intraday_inventory_audit['formal847_inventory_intersection']['matched_symbols'] == 847
+          assert intraday_inventory_audit['formal847_inventory_intersection']['missing_symbols'] == 0
+          assert intraday_inventory_audit['formal_847_minute_inventory_membership_verified'] is True
+          assert intraday_inventory_audit['formal_847_minute_byte_coverage_verified'] is False
+          assert intraday_inventory_audit['formal_847_15m_coverage_verified'] is False
+          assert intraday_inventory_audit['formal_847_60m_coverage_verified'] is False
+
+          expected_factors = [
+              ('Market Regime', 8),
+              ('Market Breadth/Diffusion', 4),
+              ('Sector RS', 10),
+              ('Sector Slope x R2', 7),
+              ('Sector Breadth', 8),
+              ('Position', 12),
+              ('Multi-Momentum', 10),
+              ('Trend Quality', 8),
+              ('Efficiency Ratio', 7),
+              ('Drawdown Recovery', 8),
+              ('Price/Fund Efficiency', 10),
+              ('Intraday Confirmation', 8),
+          ]
+          assert matrix['artifact'] == 'GP_V11_FACTOR_RECOVERY_MATRIX_V482'
+          assert matrix['version'] == 'V4.82'
+          assert matrix['factor_library_version'] == 'V1.0'
+          assert [(x['name'], x['weight_pct']) for x in matrix['factors']] == expected_factors
+          assert sum(x['weight_pct'] for x in matrix['factors']) == 100
+          assert all(x['recovery_status'] == 'PARTIAL_FILE_BACKED' for x in matrix['factors'])
+          assert matrix['authoritative_weight_vector_recovered'] is True
+          assert matrix['complete_factor_definitions_recovered'] is False
+          assert matrix['full_strategy_source_recovered'] is False
+          assert matrix['model_freeze_allowed'] is False
+          assert matrix['oos_metrics_allowed'] is False
+
+          isrc = matrix['intraday_source_partial']
+          assert isrc['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
+          assert isrc['frequency'] == '1min'
+          assert isrc['actual_minute_bytes_materialized'] is True
+          assert isrc['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert isrc['formal_847_inventory_membership_verified'] is True
+          assert isrc['formal_847_inventory_audit_sha256'] == intraday_inventory_audit_sha256
+          assert isrc['formal_847_inventory_map_sha256'] == intraday_inventory_map_sha256
+          assert isrc['formal_847_inventory_symbols'] == 847
+          assert isrc['formal_847_minute_byte_coverage_verified'] is False
+          assert isrc['formal_15m_coverage_verified'] is False
+          assert isrc['formal_60m_coverage_verified'] is False
+          assert isrc['resampling_contract_recovered'] is False
+          assert isrc['factor_formula_recovered'] is False
+
+          ipilot = matrix['intraday_pilot_partial_source']
+          assert ipilot['scope'] == '002002.SZ_ONLY'
+          assert ipilot['source_pilot_run_id'] == 34431397499
+          assert ipilot['source_pilot_artifact_id'] == 10134644253
+          assert ipilot['source_pilot_artifact_digest'] == 'sha256:a974fbf4d1974cfa16bc97da2fd28d5c12debaf2ae2ca0ccf06d11e034d55e69'
+          assert ipilot['source_sha256'] == '209907efad308af285f937f913a8c8017ab75eede908a87ce5c109989eb43d92'
+          assert ipilot['bars_15m_rows'] == 54448
+          assert ipilot['bars_15m_sha256'] == 'cfd34f09d29bcaac1c0f9d47197fb640d1a9721a6e929e2458e3d6144d3596a8'
+          assert ipilot['bars_60m_rows'] == 13612
+          assert ipilot['bars_60m_sha256'] == '6ac057ed46d99d12864ce301ffa4cbc2939c94c69e7d647242b1a17da9bcef99'
+          assert ipilot['independent_verify_report_sha256'] == intraday_verify_sha256
+          assert ipilot['full_reconstruction_match_15m'] is True
+          assert ipilot['full_reconstruction_match_60m'] is True
+          assert ipilot['historical_gp_resampling_contract_recovered'] is False
+          assert ipilot['formal_847_coverage_verified'] is False
+          assert ipilot['factor_formula_recovered'] is False
+
+          expected_crosswalk_status = {
+              'F1': 'UNVERIFIED_NEW_PROPOSAL',
+              'F2': 'PARTIAL_OVERLAP',
+              'F3': 'CONFIRMED_IDENTITY_ONLY',
+              'F4': 'CONFIRMED_IDENTITY_ONLY',
+              'F5': 'CONFIRMED_IDENTITY_ONLY',
+              'F6': 'PARTIAL_OVERLAP',
+              'F7': 'CONFLICT_WITH_RECOVERED_SOURCE',
+              'F8': 'CONFLICT_WITH_RECOVERED_SOURCE',
+              'F9': 'PARTIAL_OVERLAP',
+              'F10': 'PARTIAL_OVERLAP',
+              'F11': 'UNVERIFIED_NEW_PROPOSAL',
+              'F12': 'UNVERIFIED_NEW_PROPOSAL',
+          }
+          assert crosswalk['artifact'] == 'GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482'
+          assert crosswalk['version'] == 'V4.82'
+          assert crosswalk['candidate']['strategy_id'] == 'GP12_REBUILD_CANDIDATE_V1'
+          assert crosswalk['candidate']['head_sha'] == 'fbba9345fec544b05da6a14f4c2aff43c81d2c95'
+          assert crosswalk['candidate']['adoption_status'] == 'UNAPPROVED'
+          assert crosswalk['promoted_from_candidate_package'] == ['factor_names_and_weights_v1_0']
+          assert crosswalk['authoritative_weight_vector'] == [8, 4, 10, 7, 8, 12, 10, 8, 7, 8, 10, 8]
+          assert {x['factor_id']: x['historical_status'] for x in crosswalk['factors']} == expected_crosswalk_status
+          assert crosswalk['historical_strategy_recovered'] is False
+          assert crosswalk['candidate_formula_adoption_allowed'] is False
+          assert crosswalk['model_freeze_allowed'] is False
+          assert crosswalk['oos_metrics_allowed'] is False
+          assert crosswalk['candidate_policy_disposition']['historical_status'] == 'REJECT_AS_HISTORICAL_PARAMETERS'
+          assert crosswalk['candidate_policy_disposition']['freeze_eligible'] is False
+
+          assert policy['artifact'] == 'GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482'
+          assert policy['version'] == 'V4.82'
+          psrc = policy['daily_base_probability_source']
+          assert psrc['archive_sha256'] == 'd526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d'
+          assert psrc['run_panel_backtest_sha256'] == '62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2'
+          assert psrc['calibrate_fold_sha256'] == 'fc989c4de8b792bcb97644342f17ca770f3edef737a0f969b9709186bac5f1ef'
+          assert psrc['minimum_train_market_days'] == 720
+          assert psrc['step_market_days'] == 63
+          assert psrc['default_quantile_bins'] == 10
+          assert psrc['shrinkage_equivalent_rows'] == 20
+          assert psrc['target_specific_purge'] is True
+          assert psrc['full_gp12_probability_mapping_recovered'] is False
+          assert policy['full_parameter_set_recovered'] is False
+          assert policy['full_strategy_probability_mapping_recovered'] is False
+          assert policy['model_freeze_allowed'] is False
+          assert policy['oos_metrics_allowed'] is False
+
+          assert intraday['artifact'] == 'GP_V11_INTRADAY_SOURCE_RECOVERY_V482'
+          assert intraday['version'] == 'V4.82'
+          assert intraday['status'] == 'PARTIAL_FILE_BACKED_FORMAL847_INVENTORY_PLUS_SINGLE_SYMBOL_RESAMPLING_PILOT'
+          assert intraday['primary_source']['dataset'] == 'neigezhu/china-a-share-1min-ohlcv'
+          assert intraday['primary_source']['snapshot_commit_full'] == 'f311a5f11569e9d541386982d15f2214d9970b8a'
+          hist = intraday['historical_delisted_inventory']
+          assert hist['evidence_sha256'] == 'e4ef39e67de755c41605e869338a55b722cc0fc146a64c662bae4b82c260d839'
+          assert hist['symbols'] == 163
+          assert hist['found_in_inventory'] == 163
+          assert hist['complete'] == 129
+          assert hist['partial'] == 34
+          assert hist['audited_missing_trading_days'] == 3935
+          assert hist['unique_canonical_files'] == 163
+          assert intraday['actual_minute_bytes_materialized_in_strategy_recovery'] is True
+          assert intraday['actual_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert intraday['single_symbol_session_aware_resampling_pilot_validated'] is True
+          inv_binding = intraday['formal847_inventory_audit']
+          assert inv_binding['audit_sha256'] == intraday_inventory_audit_sha256
+          assert inv_binding['inventory_map_sha256'] == intraday_inventory_map_sha256
+          assert inv_binding['formal_symbols_sha256'] == intraday_formal_symbols_sha256
+          assert inv_binding['formal_universe_symbols'] == 847
+          assert inv_binding['matched_inventory_symbols'] == 847
+          assert inv_binding['missing_inventory_symbols'] == 0
+          assert inv_binding['formal_847_minute_inventory_membership_verified'] is True
+          assert inv_binding['formal_847_minute_byte_coverage_verified'] is False
+          assert intraday['formal_847_minute_inventory_membership_verified'] is True
+          assert intraday['formal_847_minute_byte_coverage_verified'] is False
+          assert intraday['formal_847_15m_coverage_verified'] is False
+          assert intraday['formal_847_60m_coverage_verified'] is False
+          assert intraday['resampling_contract_recovered'] is False
+          assert intraday['factor_formula_recovered'] is False
+          assert intraday['model_freeze_allowed'] is False
+          assert intraday['oos_metrics_allowed'] is False
+
+          pilot = intraday['single_symbol_resampling_pilot']
+          assert pilot['source_pilot_run_id'] == 34431397499
+          assert pilot['source_pilot_head_sha'] == 'f3d94fb3c6e668f3de550b4872e2935095609d44'
+          assert pilot['source_pilot_artifact_id'] == 10134644253
+          assert pilot['source_pilot_artifact_digest'] == 'sha256:a974fbf4d1974cfa16bc97da2fd28d5c12debaf2ae2ca0ccf06d11e034d55e69'
+          assert pilot['source_sha256'] == intraday_verify['source_sha256']
+          assert pilot['source_rows'] == intraday_verify['source_rows']
+          assert pilot['trading_dates'] == intraday_verify['trading_dates']
+          assert pilot['continuous_rows'] == intraday_verify['continuous_rows']
+          assert pilot['bars_15m_rows'] == intraday_verify['bars_15m_rows']
+          assert pilot['bars_15m_sha256'] == intraday_verify['bars_15m_sha256']
+          assert pilot['bars_60m_rows'] == intraday_verify['bars_60m_rows']
+          assert pilot['bars_60m_sha256'] == intraday_verify['bars_60m_sha256']
+          assert pilot['independent_verify_run_id'] == 34431659116
+          assert pilot['independent_verify_head_sha'] == 'b3436aaa31e93ebb0c9fdd9771067419fc7f9ee3'
+          assert pilot['independent_verify_artifact_id'] == 10134703581
+          assert pilot['independent_verify_artifact_digest'] == 'sha256:a22eaf171b4daec9c2c7d3cadf82de01135e5c1ab0684b17bbdd584bef830cf9'
+          assert pilot['independent_verify_report_sha256'] == intraday_verify_sha256
+          assert pilot['full_reconstruction_match_15m'] is True
+          assert pilot['full_reconstruction_match_60m'] is True
+          assert pilot['lunch_crossing_count_15m'] == 0
+          assert pilot['lunch_crossing_count_60m'] == 0
+          assert pilot['historical_authority'] is False
+
+          assert intraday_verify['artifact'] == 'INTRADAY_MINUTE_PILOT_INDEPENDENT_VERIFY_V482'
+          assert intraday_verify['status'] == 'PASS_INDEPENDENT_FULL_RECONSTRUCTION_SINGLE_SYMBOL_PILOT_NOT_FORMAL'
+          assert intraday_verify['verification_head_sha'] == 'b3436aaa31e93ebb0c9fdd9771067419fc7f9ee3'
+          assert intraday_verify['source_pilot_run_id'] == 34431397499
+          assert intraday_verify['source_pilot_artifact_id'] == 10134644253
+          assert intraday_verify['full_row_by_row_reconstruction_match_15m'] is True
+          assert intraday_verify['full_row_by_row_reconstruction_match_60m'] is True
+          assert intraday_verify['lunch_crossing_count_15m'] == 0
+          assert intraday_verify['lunch_crossing_count_60m'] == 0
+          assert intraday_verify['formal_847_coverage_verified'] is False
+          assert intraday_verify['historical_gp_formula_recovered'] is False
+          assert intraday_verify['model_freeze_allowed'] is False
+          assert intraday_verify['oos_metrics_allowed'] is False
+
+          out = mod.evaluate_strategy_recovery(checkpoint, evidence)
+          expected = [
+              'FACTOR_DEFINITION_MISSING',
+              'PARAMETER_SET_MISSING',
+              'STRATEGY_CODE_MISSING',
+          ]
+          assert out['status'] == 'STRATEGY_ASSETS_INCOMPLETE_V482', out
+          assert out['blockers'] == expected, out['blockers']
+          assert out['daily_base_code_recovered'] is True
+          assert len(out['recovered_assets']) == 1
+          assert out['recovered_assets'][0]['scope'] == 'DAILY_BASE_ONLY'
+          assert out['recovered_assets'][0]['complete_12_factor_strategy'] is False
+          assert out['strategy_code_recovered'] is False
+          assert out['parameter_set_recovered'] is False
+          assert out['factor_definition_recovered'] is False
+          assert out['model_freeze_allowed'] is False
+          assert out['oos_metrics_allowed'] is False
+          assert all(x['freeze_eligible'] is False for x in out['candidate_clues'])
+          assert len(out['missing_required_fields']) == 10
+
+          out['factor_recovery_matrix_sha256'] = matrix_sha256
+          out['factor_library_version'] = matrix['factor_library_version']
+          out['authoritative_weight_vector_recovered'] = matrix['authoritative_weight_vector_recovered']
+          out['all_12_factors_have_partial_file_backed_evidence'] = True
+          out['complete_factor_definitions_recovered'] = matrix['complete_factor_definitions_recovered']
+          out['full_strategy_source_recovered'] = matrix['full_strategy_source_recovered']
+          out['candidate_historical_crosswalk_sha256'] = crosswalk_sha256
+          out['candidate_strategy_id'] = crosswalk['candidate']['strategy_id']
+          out['candidate_head_sha'] = crosswalk['candidate']['head_sha']
+          out['candidate_adoption_status'] = crosswalk['candidate']['adoption_status']
+          out['candidate_formula_adoption_allowed'] = crosswalk['candidate_formula_adoption_allowed']
+          out['decision_policy_recovery_matrix_sha256'] = policy_sha256
+          out['daily_base_probability_calibration_recovered'] = True
+          out['full_strategy_probability_mapping_recovered'] = policy['full_strategy_probability_mapping_recovered']
+          out['full_parameter_set_recovered'] = policy['full_parameter_set_recovered']
+          out['intraday_source_recovery_sha256'] = intraday_sha256
+          out['intraday_pilot_independent_verify_sha256'] = intraday_verify_sha256
+          out['intraday_source_inventory_recovered'] = True
+          out['intraday_minute_bytes_materialized'] = intraday['actual_minute_bytes_materialized_in_strategy_recovery']
+          out['intraday_minute_bytes_materialized_scope'] = intraday['actual_minute_bytes_materialized_scope']
+          out['intraday_single_symbol_resampling_pilot_validated'] = intraday['single_symbol_session_aware_resampling_pilot_validated']
+          out['formal_847_minute_inventory_membership_verified'] = intraday['formal_847_minute_inventory_membership_verified']
+          out['formal_847_minute_inventory_audit_sha256'] = intraday_inventory_audit_sha256
+          out['formal_847_minute_inventory_map_sha256'] = intraday_inventory_map_sha256
+          out['formal_847_symbols_sha256'] = intraday_formal_symbols_sha256
+          out['formal_847_minute_byte_coverage_verified'] = intraday['formal_847_minute_byte_coverage_verified']
+          out['intraday_pilot_source_sha256'] = pilot['source_sha256']
+          out['intraday_pilot_15m_sha256'] = pilot['bars_15m_sha256']
+          out['intraday_pilot_60m_sha256'] = pilot['bars_60m_sha256']
+          out['formal_15m_coverage_verified'] = intraday['formal_847_15m_coverage_verified']
+          out['formal_60m_coverage_verified'] = intraday['formal_847_60m_coverage_verified']
+          out['intraday_resampling_contract_recovered'] = intraday['resampling_contract_recovered']
+          out['intraday_factor_formula_recovered'] = intraday['factor_formula_recovered']
+
+          assert out['intraday_minute_bytes_materialized'] is True
+          assert out['intraday_minute_bytes_materialized_scope'] == 'SINGLE_SYMBOL_002002_ONLY'
+          assert out['intraday_single_symbol_resampling_pilot_validated'] is True
+          assert out['formal_847_minute_inventory_membership_verified'] is True
+          assert out['formal_847_minute_inventory_audit_sha256'] == '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83'
+          assert out['formal_847_minute_inventory_map_sha256'] == 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed'
+          assert out['formal_847_symbols_sha256'] == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'
+          assert out['formal_847_minute_byte_coverage_verified'] is False
+          assert out['formal_15m_coverage_verified'] is False
+          assert out['formal_60m_coverage_verified'] is False
+          assert out['intraday_resampling_contract_recovered'] is False
+          assert out['intraday_factor_formula_recovered'] is False
+          assert out['model_freeze_allowed'] is False
+          assert out['oos_metrics_allowed'] is False
+
+          target = Path('out/strategy-recovery/STRATEGY_ASSET_RECOVERY_CHECKPOINT_V482.json')
+          target.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          Path('out/strategy-recovery/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json').write_text(
+              json.dumps(evidence, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          Path('out/strategy-recovery/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json').write_bytes(matrix_bytes)
+          Path('out/strategy-recovery/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json').write_bytes(crosswalk_bytes)
+          Path('out/strategy-recovery/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json').write_bytes(policy_bytes)
+          Path('out/strategy-recovery/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json').write_bytes(intraday_bytes)
+          Path('out/strategy-recovery/GP_V11_INTRADAY_MINUTE_PILOT_VERIFY_V482.json').write_bytes(intraday_verify_bytes)
+          Path('out/strategy-recovery/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json').write_bytes(intraday_inventory_audit_bytes)
+          Path('out/strategy-recovery/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv').write_bytes(intraday_inventory_map_bytes)
+          Path('out/strategy-recovery/FORMAL847_SYMBOLS_V482.txt').write_bytes(intraday_formal_symbols_bytes)
+
+          print(json.dumps({
+              'status': out['status'],
+              'daily_base_code_recovered': out['daily_base_code_recovered'],
+              'all_12_factors_have_partial_file_backed_evidence': out['all_12_factors_have_partial_file_backed_evidence'],
+              'daily_base_probability_calibration_recovered': out['daily_base_probability_calibration_recovered'],
+              'intraday_source_inventory_recovered': out['intraday_source_inventory_recovered'],
+              'intraday_minute_bytes_materialized': out['intraday_minute_bytes_materialized'],
+              'intraday_minute_bytes_materialized_scope': out['intraday_minute_bytes_materialized_scope'],
+              'intraday_single_symbol_resampling_pilot_validated': out['intraday_single_symbol_resampling_pilot_validated'],
+              'formal_847_minute_inventory_membership_verified': out['formal_847_minute_inventory_membership_verified'],
+              'formal_847_minute_inventory_audit_sha256': out['formal_847_minute_inventory_audit_sha256'],
+              'formal_847_minute_inventory_map_sha256': out['formal_847_minute_inventory_map_sha256'],
+              'formal_847_symbols_sha256': out['formal_847_symbols_sha256'],
+              'formal_847_minute_byte_coverage_verified': out['formal_847_minute_byte_coverage_verified'],
+              'intraday_pilot_source_sha256': out['intraday_pilot_source_sha256'],
+              'intraday_pilot_15m_sha256': out['intraday_pilot_15m_sha256'],
+              'intraday_pilot_60m_sha256': out['intraday_pilot_60m_sha256'],
+              'intraday_pilot_independent_verify_sha256': out['intraday_pilot_independent_verify_sha256'],
+              'formal_15m_coverage_verified': out['formal_15m_coverage_verified'],
+              'formal_60m_coverage_verified': out['formal_60m_coverage_verified'],
+              'intraday_resampling_contract_recovered': out['intraday_resampling_contract_recovered'],
+              'intraday_factor_formula_recovered': out['intraday_factor_formula_recovered'],
+              'full_strategy_probability_mapping_recovered': out['full_strategy_probability_mapping_recovered'],
+              'full_parameter_set_recovered': out['full_parameter_set_recovered'],
+              'authoritative_weight_vector_recovered': out['authoritative_weight_vector_recovered'],
+              'complete_factor_definitions_recovered': out['complete_factor_definitions_recovered'],
+              'full_strategy_source_recovered': out['full_strategy_source_recovered'],
+              'factor_recovery_matrix_sha256': out['factor_recovery_matrix_sha256'],
+              'candidate_historical_crosswalk_sha256': out['candidate_historical_crosswalk_sha256'],
+              'decision_policy_recovery_matrix_sha256': out['decision_policy_recovery_matrix_sha256'],
+              'intraday_source_recovery_sha256': out['intraday_source_recovery_sha256'],
+              'candidate_strategy_id': out['candidate_strategy_id'],
+              'candidate_head_sha': out['candidate_head_sha'],
+              'candidate_adoption_status': out['candidate_adoption_status'],
+              'candidate_formula_adoption_allowed': out['candidate_formula_adoption_allowed'],
+              'strategy_code_recovered': out['strategy_code_recovered'],
+              'parameter_set_recovered': out['parameter_set_recovered'],
+              'factor_definition_recovered': out['factor_definition_recovered'],
+              'evidence_sha256': out['evidence_sha256'],
+              'remaining_blockers': out['blockers'],
+              'missing_required_fields': out['missing_required_fields'],
+              'model_freeze_allowed': out['model_freeze_allowed'],
+              'oos_metrics_allowed': out['oos_metrics_allowed'],
+          }, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload strategy recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-strategy-asset-recovery-v482
+          path: out/strategy-recovery/
+          if-no-files-found: error
+          retention-days: 30

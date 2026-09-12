@@ -1,0 +1,49 @@
+name: Persist GP V4.82 Intraday Formal847 Inventory Evidence
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/persist-intraday-formal847-inventory-evidence-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  persist-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download exact verified inventory artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-intraday-formal847-inventory-audit-v482
+          path: input/inventory
+          run-id: 34433067936
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify and persist exact evidence bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '25593756ef0b625c9995e1816f1e5e8d64eaa184256313acc35425b1e7c8ae83  input/inventory/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json' | sha256sum -c -
+          echo 'bb637ac1db53c3546fba072227832799b84487187840e6421f5ba29319b68aed  input/inventory/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv' | sha256sum -c -
+          echo '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8  input/inventory/FORMAL847_SYMBOLS_V482.txt' | sha256sum -c -
+          cp input/inventory/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json data/
+          cp input/inventory/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv data/
+          cp input/inventory/FORMAL847_SYMBOLS_V482.txt data/
+          sha256sum data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv data/FORMAL847_SYMBOLS_V482.txt
+      - name: Commit exact inventory evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv data/FORMAL847_SYMBOLS_V482.txt
+          git diff --cached --quiet && exit 0
+          git commit -m 'evidence(intraday): persist Formal847 fixed inventory audit'
+          git push origin HEAD:gp/strategy-asset-recovery-v482

@@ -1,0 +1,37 @@
+# Checkpoint after Formal847 inventory binding commit ec7739eac9c846247ee4f8398a898bf7294b7edc
+name: GP V4.82 Intraday Source Recovery Contract
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - 'scripts/test_strategy_intraday_source_recovery_v482.py'
+      - 'scripts/test_strategy_intraday_inventory_binding_v482.py'
+      - 'data/GP_V11_INTRADAY_SOURCE_RECOVERY_V482.json'
+      - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
+      - 'data/INTRADAY_FORMAL847_INVENTORY_AUDIT_V482.json'
+      - 'data/FORMAL847_NEIGEZHU_INVENTORY_ROWS_V482.csv'
+      - 'data/FORMAL847_SYMBOLS_V482.txt'
+      - '.github/workflows/strategy-intraday-source-recovery-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  intraday-source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Intraday source recovery contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_strategy_intraday_source_recovery_v482.py \
+            test_strategy_intraday_inventory_binding_v482.py

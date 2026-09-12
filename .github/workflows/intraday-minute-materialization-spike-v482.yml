@@ -1,0 +1,75 @@
+name: GP V4.82 Intraday Minute Materialization Spike
+
+on:
+  push:
+    branches:
+      - gp/strategy-asset-recovery-v482
+    paths:
+      - '.github/workflows/intraday-minute-materialization-spike-v482.yml'
+      - 'scripts/test_intraday_minute_materialization_pilot_v482.py'
+      - 'scripts/intraday_minute_materialization_pilot_v482.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check --quiet pandas pyarrow
+      - name: Intraday minute resampling pilot contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_intraday_minute_materialization_pilot_v482.py
+
+  materialize-fixed-snapshot:
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet dependencies
+        run: python -m pip install --disable-pip-version-check --quiet pandas pyarrow
+      - name: Download exact fixed-snapshot minute parquet
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/intraday-pilot
+          URL='https://huggingface.co/datasets/neigezhu/china-a-share-1min-ohlcv/resolve/f311a5f11569e9d541386982d15f2214d9970b8a/data/stock_1m/SZ/002002.parquet?download=true'
+          curl --fail --location --retry 3 --retry-all-errors --connect-timeout 30 --max-time 900 \
+            --dump-header out/intraday-pilot/http_headers.txt \
+            --output out/intraday-pilot/002002_1MIN_F311A5F.parquet "$URL"
+          test -s out/intraday-pilot/002002_1MIN_F311A5F.parquet
+      - name: Materialize session-aware 15m and 60m pilot bars
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/intraday_minute_materialization_pilot_v482.py \
+            --input out/intraday-pilot/002002_1MIN_F311A5F.parquet \
+            --out-dir out/intraday-pilot \
+            --symbol 002002.SZ \
+            --snapshot-commit f311a5f11569e9d541386982d15f2214d9970b8a \
+            --canonical-path data/stock_1m/SZ/002002.parquet \
+            --expected-sha256 209907efad308af285f937f913a8c8017ab75eede908a87ce5c109989eb43d92
+      - name: Upload byte-bound pilot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp-intraday-minute-materialization-pilot-v482
+          path: |
+            out/intraday-pilot/002002_1MIN_F311A5F.parquet
+            out/intraday-pilot/002002_15M_F311A5F.parquet
+            out/intraday-pilot/002002_60M_F311A5F.parquet
+            out/intraday-pilot/INTRADAY_MINUTE_MATERIALIZATION_PILOT_V482.json
+            out/intraday-pilot/http_headers.txt
+          if-no-files-found: error
+          retention-days: 30

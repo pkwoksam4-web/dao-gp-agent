@@ -1,0 +1,87 @@
+{
+  "artifact": "INTRADAY_FORMAL847_INVENTORY_AUDIT_V482",
+  "factor_formula_recovered": false,
+  "formal847_inventory_intersection": {
+    "expected_zero_trade_symbols_found_in_inventory": [
+      "600074.SH",
+      "600485.SH",
+      "600677.SH"
+    ],
+    "expected_zero_trade_symbols_missing_from_inventory": [],
+    "matched_pct": 1.0,
+    "matched_symbols": 847,
+    "missing_symbol_list": [],
+    "missing_symbols": 0,
+    "row_level_missing_symbol_list": []
+  },
+  "formal_847_15m_coverage_verified": false,
+  "formal_847_60m_coverage_verified": false,
+  "formal_847_minute_byte_coverage_verified": false,
+  "formal_847_minute_inventory_membership_verified": true,
+  "formal_raw": {
+    "artifact_digest": "sha256:cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+    "artifact_id": 10042614517,
+    "artifact_name": "gp-sohu-full-raw-v482-reaudit",
+    "expected_zero_trade_symbol_count": 3,
+    "expected_zero_trade_symbols": [
+      "600074.SH",
+      "600485.SH",
+      "600677.SH"
+    ],
+    "formal_universe_symbols": 847,
+    "raw_row_level_symbols": 844,
+    "run_id": 34192233633,
+    "sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+    "symbol_column": "symbol",
+    "universe_reconstruction": "844 row-level symbols UNION exact 3 expected zero-trade symbols from authoritative Full RAW audit = 847"
+  },
+  "historical_gp_resampling_contract_recovered": false,
+  "minute_inventory": {
+    "bytes": 1052388,
+    "candidate_symbol_columns": [
+      {
+        "column": "symbol",
+        "formal847_matches": 847,
+        "unique": 5795
+      }
+    ],
+    "columns": [
+      "symbol",
+      "exchange",
+      "file",
+      "input_files",
+      "records",
+      "duplicate_records_removed",
+      "first_timestamp",
+      "last_timestamp",
+      "reused",
+      "listing_date",
+      "delisting_date",
+      "universe_status",
+      "expected_start_date",
+      "expected_end_date",
+      "expected_trading_days",
+      "observed_trading_days",
+      "missing_trading_days",
+      "coverage_status",
+      "verified_missing_trading_days",
+      "confirmed_suspension_days",
+      "zero_daily_no_trade_days",
+      "unresolved_no_bar_days",
+      "audited_expected_trading_days",
+      "audited_missing_trading_days",
+      "audited_coverage_status"
+    ],
+    "dataset": "neigezhu/china-a-share-1min-ohlcv",
+    "metadata_path": "metadata/coverage_by_instrument.csv",
+    "rows": 5795,
+    "selected_symbol_column": "symbol",
+    "sha256": "31a058c1019e1b097d99e862db68a028ec9d191adb09839c35365f4cb390dc32",
+    "snapshot_commit": "f311a5f11569e9d541386982d15f2214d9970b8a",
+    "symbol_dtype_preserved_as_string": true
+  },
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "status": "INVENTORY_ONLY_NOT_BYTE_COVERAGE",
+  "version": "V4.82"
+}

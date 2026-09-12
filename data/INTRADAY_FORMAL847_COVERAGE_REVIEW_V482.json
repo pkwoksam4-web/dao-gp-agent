@@ -1,0 +1,81 @@
+{
+  "artifact": "INTRADAY_FORMAL847_COVERAGE_REVIEW_V482",
+  "version": "V4.82",
+  "status": "REVIEW_FORMAL847_INTRADAY_COVERAGE",
+  "scope": "FORMAL_WINDOW_REQUIRED_TRADE_DATES_FIXED_SNAPSHOT_REVIEW_NOT_PASS",
+  "formal_start": "2020-06-01",
+  "formal_end": "2026-04-17",
+  "dataset": "neigezhu/china-a-share-1min-ohlcv",
+  "snapshot_commit": "f311a5f11569e9d541386982d15f2214d9970b8a",
+  "source_scaleout": {
+    "run_id": 34446872502,
+    "head_sha": "babff6bc76976d4ce3595b00f689f5f816bb4b70",
+    "workflow": "GP V4.82 Intraday Formal847 Scaleout",
+    "run_conclusion": "failure_expected_from_fail_closed_aggregate",
+    "shard_jobs_success": 17,
+    "aggregate_job_id": 102782745126,
+    "aggregate_conclusion": "failure",
+    "aggregate_failure_reason": "shard 0 is not PASS"
+  },
+  "totals": {
+    "shards": 17,
+    "symbols": 847,
+    "pass_symbols": 843,
+    "expected_zero_trade_symbols": 3,
+    "review_symbols": 1,
+    "required_trade_dates": 1011607,
+    "valid_trade_dates": 1011606,
+    "missing_trade_dates": 1,
+    "invalid_grid_dates": 0,
+    "source_bytes_downloaded": 8048396274,
+    "bars_15m_rows": 16185696,
+    "bars_60m_rows": 4046424
+  },
+  "gaps": [
+    {
+      "shard_index": 0,
+      "symbol": "000638.SZ",
+      "date": "2026-04-13",
+      "kind": "MISSING_REQUIRED_TRADE_DATE_IN_PRIMARY_MINUTE_SNAPSHOT",
+      "canonical_path": "data/stock_1m/SZ/000638.parquet",
+      "primary_source_sha256": "7dd45b88b285499f249b951155447bc6a0f9408ead4c473e3c2977f16a8742e3",
+      "primary_source_bytes": 9889166,
+      "primary_source_rows_total": 949058,
+      "required_trade_dates_for_symbol": 1419,
+      "valid_trade_dates_for_symbol": 1418,
+      "invalid_grid_dates": [],
+      "independent_trade_day_existence_evidence": "Sina returned 238 regular-session minute records for the date; 14:58 and 14:59 were absent, so it is partial evidence only and is not used to fill bars."
+    }
+  ],
+  "audit_artifact_zip_sha256": {
+    "0": "0d689dfbef90a12131795d798140ad143e8d5e08327708c7529eb4ed38fe6e36",
+    "1": "d319bd9d85f83a1f506b4d37e34c89de50a73866e0c8b21b3290ff97ddf62a27",
+    "2": "68a3c9976fae5883c7e4540b6334b7681b1e44eec90656c9130e6c4e297345e6",
+    "3": "02b746a54e375bf2922741907baf597a17a88d222be7a7d84167c629df2f9a54",
+    "4": "b11b67afe10c5b916d289ef9d576b60c6a8081586a82f438d9aae9f645e7d970",
+    "5": "4cfdf54c8dd2769c41a378987fc0006c75229ccb36be465349a0c585e60f3ad8",
+    "6": "b25e14abc0528fc54c9e6ce0f4f7a216ef8b6e8735a336419282c8c9e251c72c",
+    "7": "169efde21f9efb8971e5ddf857a0e27d24c34719da94605e8578aeb16493d55a",
+    "8": "71a7bf886fc81f56dfd077b7a181c96ce6dd2759ea2b85838f9b8601dffcfccc",
+    "9": "3a93e07161b0a3d53bc89145ec9a27f3f4459ac35d9c4a3e865fc272ba5ee725",
+    "10": "842e07dbe2a8d05e0bfe14df1e2809f9c093d5fa05a250235873a9980d4cebc6",
+    "11": "216261497758536d31351b5be4bfd4f5a0ffd60620a70b30d1cd6629c2a20a2d",
+    "12": "522b3e65a2a07e9526839d0854e10034c4be97a5d501acf069368fed4172588f",
+    "13": "c031bbce3fe1a16a4217cceff663f2b099b64f3ebc9ed1e4e6d67b4f6b1be463",
+    "14": "cb9ee215a66bd38f8ecd1be37812aca3e9d74f037eed98b6e3fa4d8f42dbc01f",
+    "15": "d3ef7c5dada9bb82cfa16c5dd743c79957d3f9b43cd91542e0c2861b70d58e28",
+    "16": "52ceadc396371b267a0e485ef6e5bca6f9a94530cd42e92dbf6ac7144dff1506"
+  },
+  "independent_local_verification": {
+    "all_17_audit_zip_digests_match_github": true,
+    "unique_gap_count": 1,
+    "unique_gap_identity": "000638.SZ/2026-04-13"
+  },
+  "formal_847_minute_byte_coverage_verified": false,
+  "formal_847_15m_coverage_verified": false,
+  "formal_847_60m_coverage_verified": false,
+  "historical_gp_intraday_resampling_contract_recovered": false,
+  "factor_formula_recovered": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
