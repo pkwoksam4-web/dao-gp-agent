@@ -1,0 +1,166 @@
+name: Software Heritage recovery probe
+
+on:
+  push:
+    branches:
+      - gp-swh-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Query revisions and recover text source when archived
+        shell: bash
+        run: |
+          set +e
+          mkdir -p swh_probe/raw swh_probe/revisions swh_probe/directories
+          cat > swh_probe/targets.txt <<'EOF'
+          d659e6a5d849d8557e4cb2b25f9014f94ef3dec4
+          eb1345a857c7fd577f3102cd18812bc0924bf4c2
+          993c24cf8aea3e63619e35ee4f9f2639810431a2
+          f46f72eda893fa2abb5abe020e1cb67b233d9a59
+          39ae5ede04027f3d41de03fac658bb0728b45361
+          25812984ac52635af50c6522b964c5ed9f1fa658
+          b813095f2fb17d0e890e0a80cc86ad222700b9ef
+          166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8
+          EOF
+          python - <<'PY'
+          import json, os, time, urllib.request, urllib.error, urllib.parse, re, hashlib
+          from pathlib import Path
+
+          root=Path('swh_probe')
+          base='https://archive.softwareheritage.org/api/1'
+          ua='dao-gp-agent-provenance-probe/2.1'
+          shas=[x.strip() for x in (root/'targets.txt').read_text().splitlines() if x.strip()]
+          fingerprints=[
+            'legacy_codes','0_5_1','rolling_rank_quantile_weighted_stats_fast',
+            'liquidity_cut','growth_moti','factors_raw.pkl','factors_z.pkl','df_z_e',
+            'GP_V11','remaining_inertia','weekly_picks','factor-pipeline-memory','WHC'
+          ]
+          exts={'.py','.md','.txt','.json','.toml','.yaml','.yml','.ini','.cfg','.csv','.sh','.sql','.ipynb'}
+          summary={'revisions':{},'origin_queries':{},'matches':[],'errors':[]}
+
+          def get(url, binary=False, timeout=35):
+            req=urllib.request.Request(url, headers={'User-Agent':ua,'Accept':'application/json'})
+            try:
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                data=r.read()
+                return r.status, data if binary else data.decode('utf-8','replace'), dict(r.headers)
+            except urllib.error.HTTPError as e:
+              body=e.read()
+              return e.code, body if binary else body.decode('utf-8','replace'), dict(e.headers)
+            except Exception as e:
+              return 0, repr(e), {}
+
+          # Exact origin queries using both search and origin-get URL forms.
+          origins=['https://github.com/leo-quant-research/data_lake','https://github.com/leo-quant-research/AlphaAgent']
+          for origin in origins:
+            enc=urllib.parse.quote(origin, safe='')
+            urls={
+              'search': f'{base}/origin/search/{enc}/',
+              'get': f'{base}/origin/{enc}/get/',
+              'visits': f'{base}/origin/{enc}/visits/',
+            }
+            summary['origin_queries'][origin]={}
+            for kind,url in urls.items():
+              st,body,h=get(url)
+              summary['origin_queries'][origin][kind]={'status':st,'head':body[:4000] if isinstance(body,str) else ''}
+              (root/f'origin_{kind}_{origin.rsplit("/",1)[-1]}.txt').write_text(str(body),'utf-8')
+
+          seen_dirs={}
+          seen_contents=set()
+
+          def list_dir(dirsha):
+            if dirsha in seen_dirs: return seen_dirs[dirsha]
+            st,body,h=get(f'{base}/directory/{dirsha}/?limit=1000')
+            if st!=200:
+              summary['errors'].append({'kind':'directory','sha':dirsha,'status':st,'head':str(body)[:1000]})
+              seen_dirs[dirsha]=[]; return []
+            try: obj=json.loads(body)
+            except Exception:
+              summary['errors'].append({'kind':'directory-json','sha':dirsha,'status':st,'head':str(body)[:1000]}); obj=[]
+            # API can return list or object wrapper.
+            if isinstance(obj,dict):
+              entries=obj.get('content') or obj.get('entries') or obj.get('results') or []
+              if not isinstance(entries,list): entries=[]
+            elif isinstance(obj,list): entries=obj
+            else: entries=[]
+            seen_dirs[dirsha]=entries
+            return entries
+
+          def safe_name(x):
+            if isinstance(x,bytes): return x.decode('utf-8','replace')
+            return str(x or '')
+
+          def fetch_text_content(target, path, revsha):
+            if target in seen_contents: return
+            seen_contents.add(target)
+            st,data,h=get(f'{base}/content/sha1_git:{target}/raw/', binary=True, timeout=45)
+            if st!=200 or not isinstance(data,(bytes,bytearray)):
+              return
+            if len(data)>2_000_000: return
+            text=bytes(data).decode('utf-8','replace')
+            low=text.lower()
+            hits=[fp for fp in fingerprints if fp.lower() in low]
+            if hits:
+              out=root/'raw'/f'{revsha[:12]}_{hashlib.sha1(path.encode()).hexdigest()[:10]}_{Path(path).name}'
+              out.write_bytes(bytes(data))
+              summary['matches'].append({'revision':revsha,'path':path,'content_sha1_git':target,'bytes':len(data),'fingerprints':hits,'saved_as':str(out)})
+
+          def walk(dirsha, prefix, revsha, depth=0):
+            if depth>12: return
+            for e in list_dir(dirsha):
+              if not isinstance(e,dict): continue
+              name=safe_name(e.get('name'))
+              typ=e.get('type')
+              target=e.get('target') or e.get('id')
+              if not target: continue
+              path=f'{prefix}/{name}' if prefix else name
+              if typ in ('dir','directory'):
+                walk(str(target),path,revsha,depth+1)
+              elif typ in ('file','content'):
+                p=Path(name)
+                # Fetch likely source/config/doc files, plus filenames carrying fingerprints.
+                interesting=p.suffix.lower() in exts or any(fp.lower() in path.lower() for fp in fingerprints)
+                if interesting:
+                  fetch_text_content(str(target),path,revsha)
+
+          for sha in shas:
+            st,body,h=get(f'{base}/revision/{sha}/')
+            entry={'status':st,'head':str(body)[:4000]}
+            summary['revisions'][sha]=entry
+            (root/'revisions'/f'{sha}.txt').write_text(str(body),'utf-8')
+            if st!=200: continue
+            try: obj=json.loads(body)
+            except Exception: continue
+            directory=obj.get('directory') or obj.get('directory_id')
+            if isinstance(directory,dict): directory=directory.get('id')
+            entry['directory']=directory
+            entry['message']=obj.get('message')
+            entry['date']=obj.get('date')
+            entry['committer_date']=obj.get('committer_date')
+            entry['parents']=obj.get('parents')
+            if directory:
+              walk(str(directory),'',sha)
+
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({
+            'revision_200':[k for k,v in summary['revisions'].items() if v.get('status')==200],
+            'match_count':len(summary['matches']),
+            'origin_statuses':{o:{k:v['status'] for k,v in q.items()} for o,q in summary['origin_queries'].items()},
+            'errors':len(summary['errors'])
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: software-heritage-recovery-20260913
+          path: swh_probe/
+          retention-days: 30
