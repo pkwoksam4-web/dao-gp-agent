@@ -19,7 +19,7 @@ jobs:
         run: |
           set +e
           mkdir -p probe5
-          ua='dao-gp-agent-provenance-probe/1.4'
+          ua='dao-gp-agent-provenance-probe/1.5'
           fetch() {
             name="$1"; url="$2"
             curl -L --retry 2 --connect-timeout 10 --max-time 60 -sS -A "$ua" "$url" -o "probe5/${name}.json" 2>"probe5/${name}.err"
@@ -41,16 +41,18 @@ jobs:
           fetch hf_hc_models 'https://huggingface.co/api/models?author=haochenw-TITI&limit=100'
           fetch hf_hc_spaces 'https://huggingface.co/api/spaces?author=haochenw-TITI&limit=100'
 
-      - name: Scan selected GH Archive days by actor
+      - name: Fill GH Archive early-hour gap with exact identities
         shell: bash
         run: |
           set +e
           mkdir -p probe5/gharchive
           cat > probe5/dates.txt <<'EOF'
           2026-07-06
+          2026-07-13
           2026-07-28
           2026-07-31
           2026-08-01
+          2026-08-11
           EOF
 
           scan_one() {
@@ -59,13 +61,13 @@ jobs:
             base="probe5/gharchive/${date}-${hour}"
             curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "$url" 2>"${base}.err" \
               | gzip -dc 2>>"${base}.err" \
-              | grep -E 'leo-quant-research|data_lake|AlphaAgent|zjzesheng|haochenw-TITI' \
+              | grep -E '"login":"leo-quant-research"|"name":"leo-quant-research/|"login":"zjzesheng"|"login":"haochenw-TITI"|"name":"haochenw-TITI/' \
               > "${base}.hits"
             test -s "${base}.hits" || rm -f "${base}.hits"
           }
           export -f scan_one
           while read -r d; do
-            for h in $(seq -w 0 23); do printf '%s\t%s\n' "$d" "$h"; done
+            for h in $(seq 0 9); do printf '%s\t%s\n' "$d" "$h"; done
           done < probe5/dates.txt | xargs -P 12 -n 2 bash -c 'scan_one "$0" "$1"'
 
       - name: Build evidence summary
@@ -90,7 +92,7 @@ jobs:
           hits=[]
           for p in sorted((root/'gharchive').glob('*.hits')):
               lines=p.read_text('utf-8',errors='replace').splitlines()
-              hits.append({'file':p.name,'line_count':len(lines),'sample':lines[:5]})
+              hits.append({'file':p.name,'line_count':len(lines),'sample':lines[:10]})
           summary['gharchive_hits']=hits
           (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
           print(json.dumps({'json_files':len(list(root.glob('*.json'))),'hit_files':len(hits),'hit_lines':sum(x['line_count'] for x in hits)},ensure_ascii=False))
