@@ -1,0 +1,65 @@
+name: Repository lineage scan
+
+on:
+  push:
+    branches:
+      - gp-lineage-20260913-b
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - name: Scan GH Archive selected dates
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe10/gharchive
+          scan_one() {
+            date="$1"; hour="$2"
+            base="probe10/gharchive/${date}-${hour}"
+            curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "https://data.gharchive.org/${date}-${hour}.json.gz" 2>"${base}.err" \
+              | gzip -dc 2>>"${base}.err" \
+              | grep -E '300349603|1296046921' > "${base}.hits"
+            test -s "${base}.hits" || rm -f "${base}.hits"
+          }
+          export -f scan_one
+          for d in 2026-07-17 2026-07-18 2026-07-19 2026-07-20 2026-07-28 2026-07-29 2026-07-30 2026-07-31 2026-08-01 2026-08-02 2026-08-03 2026-08-04 2026-08-05; do
+            for h in $(seq 0 23); do printf '%s\t%s\n' "$d" "$h"; done
+          done | xargs -P 24 -n 2 bash -c 'scan_one "$0" "$1"'
+
+      - name: Parse events
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('probe10')
+          events=[]
+          for p in sorted((root/'gharchive').glob('*.hits')):
+              for line in p.read_text('utf-8',errors='replace').splitlines():
+                  try: x=json.loads(line)
+                  except Exception: continue
+                  actor=x.get('actor') or {}; repo=x.get('repo') or {}; pay=x.get('payload') or {}
+                  if actor.get('id') != 300349603 and repo.get('id') != 1296046921: continue
+                  e={'file':p.name,'event_id':x.get('id'),'type':x.get('type'),'created_at':x.get('created_at'),'public':x.get('public'),'actor_id':actor.get('id'),'actor':actor.get('login'),'repo_id':repo.get('id'),'repo_name':repo.get('name')}
+                  for k in ['ref','ref_type','before','head','action','size','distinct_size','repository_id','push_id']:
+                      if k in pay: e[k]=pay.get(k)
+                  events.append(e)
+          events.sort(key=lambda x:(x.get('created_at') or '',x.get('event_id') or ''))
+          out={'events':events,'hit_count':len(events),'distinct_repos':sorted({str(e.get('repo_id'))+' '+str(e.get('repo_name')) for e in events})}
+          (root/'events.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps(out,ensure_ascii=False)[:6000])
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-lineage-more
+          path: probe10/
+          retention-days: 30
