@@ -1,0 +1,93 @@
+name: External asset data_download probe
+
+on:
+  push:
+    branches:
+      - gp/external-asset-probe-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Query archive indexes for predecessor repo name
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe6
+          ua='dao-gp-agent-provenance-probe/1.6'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 2 --connect-timeout 10 --max-time 90 -sS -A "$ua" "$url" -D "probe6/${name}.headers" -o "probe6/${name}.txt" 2>"probe6/${name}.err"
+          }
+
+          fetch github_repo 'https://api.github.com/repos/leo-quant-research/data_download'
+          fetch github_commits_search 'https://api.github.com/search/commits?q=data_download+leo-quant-research&per_page=100'
+          fetch wayback_repo 'https://web.archive.org/cdx/search/cdx?url=github.com%2Fleo-quant-research%2Fdata_download%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+          fetch wayback_raw 'https://web.archive.org/cdx/search/cdx?url=raw.githubusercontent.com%2Fleo-quant-research%2Fdata_download%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+
+          # Search a few recent Common Crawl indexes directly for the old repo name.
+          fetch cc_2026_30 'https://index.commoncrawl.org/CC-MAIN-2026-30-index?url=github.com%2Fleo-quant-research%2Fdata_download%2F*&output=json'
+          fetch cc_2026_26 'https://index.commoncrawl.org/CC-MAIN-2026-26-index?url=github.com%2Fleo-quant-research%2Fdata_download%2F*&output=json'
+          fetch cc_2026_21 'https://index.commoncrawl.org/CC-MAIN-2026-21-index?url=github.com%2Fleo-quant-research%2Fdata_download%2F*&output=json'
+
+      - name: Scan GH Archive around account creation through July 13
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe6/gharchive
+          scan_one() {
+            date="$1"; hour="$2"
+            url="https://data.gharchive.org/${date}-${hour}.json.gz"
+            base="probe6/gharchive/${date}-${hour}"
+            curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "$url" 2>"${base}.err" \
+              | gzip -dc 2>>"${base}.err" \
+              | grep -E '"login":"leo-quant-research"|"name":"leo-quant-research/data_download"|"name":"leo-quant-research/data_lake"' \
+              > "${base}.hits"
+            test -s "${base}.hits" || rm -f "${base}.hits"
+          }
+          export -f scan_one
+          for d in 2026-07-06 2026-07-07 2026-07-08 2026-07-09 2026-07-10 2026-07-11 2026-07-12 2026-07-13; do
+            for h in $(seq 0 23); do printf '%s\t%s\n' "$d" "$h"; done
+          done | xargs -P 16 -n 2 bash -c 'scan_one "$0" "$1"'
+
+      - name: Build compact summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, re
+          root=Path('probe6')
+          files={}
+          needles=['data_download','data_lake','leo-quant-research','sha','commit','blob','tree']
+          for p in sorted(root.glob('*.txt')):
+              text=p.read_text('utf-8',errors='replace')
+              files[p.name]={
+                  'bytes':p.stat().st_size,
+                  'head':re.sub(r'\s+',' ',text[:2000]),
+                  'needles':{n:(n.lower() in text.lower()) for n in needles},
+              }
+          hits=[]
+          for p in sorted((root/'gharchive').glob('*.hits')):
+              lines=p.read_text('utf-8',errors='replace').splitlines()
+              hits.append({'file':p.name,'line_count':len(lines),'sample':lines[:20]})
+          errors=[]
+          for p in sorted((root/'gharchive').glob('*.err')):
+              if p.stat().st_size:
+                  errors.append({'file':p.name,'head':p.read_text('utf-8',errors='replace')[:500]})
+          summary={'files':files,'gharchive_hits':hits,'gharchive_nonempty_errors':errors}
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'hit_files':len(hits),'hit_lines':sum(x['line_count'] for x in hits),'nonempty_errors':len(errors)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-asset-datadownload-probe-20260913
+          path: probe6/
+          retention-days: 30
