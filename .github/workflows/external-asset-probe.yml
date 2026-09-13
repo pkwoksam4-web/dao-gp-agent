@@ -1,0 +1,105 @@
+name: External asset provenance probe
+
+on:
+  push:
+    branches:
+      - gp/external-asset-probe-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Query public archival and code indexes
+        run: |
+          set -u
+          mkdir -p probe_out
+
+          fetch() {
+            name="$1"
+            url="$2"
+            echo "### $name" | tee -a probe_out/run.log
+            echo "$url" | tee -a probe_out/run.log
+            curl -L --fail-with-body --max-time 40 \
+              -A 'dao-gp-agent-provenance-probe/1.0' \
+              -D "probe_out/${name}.headers" \
+              "$url" -o "probe_out/${name}.txt" \
+              >>probe_out/run.log 2>&1 || true
+          }
+
+          fetch wayback_data_lake 'https://web.archive.org/cdx/search/cdx?url=github.com%2Fleo-quant-research%2Fdata_lake%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+          fetch wayback_alphaagent 'https://web.archive.org/cdx/search/cdx?url=github.com%2Fleo-quant-research%2FAlphaAgent%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+          fetch wayback_raw_data_lake 'https://web.archive.org/cdx/search/cdx?url=raw.githubusercontent.com%2Fleo-quant-research%2Fdata_lake%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+          fetch wayback_raw_alphaagent 'https://web.archive.org/cdx/search/cdx?url=raw.githubusercontent.com%2Fleo-quant-research%2FAlphaAgent%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+          fetch wayback_owner 'https://web.archive.org/cdx/search/cdx?url=github.com%2Fleo-quant-research%2F*&output=json&filter=statuscode%3A200&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&collapse=urlkey&limit=10000'
+
+          fetch github_owner 'https://api.github.com/users/leo-quant-research'
+          fetch github_data_lake 'https://api.github.com/repos/leo-quant-research/data_lake'
+          fetch github_alphaagent 'https://api.github.com/repos/leo-quant-research/AlphaAgent'
+          fetch github_owner_events 'https://api.github.com/users/leo-quant-research/events/public?per_page=100'
+
+          fetch grep_rank 'https://grep.app/api/search?q=rolling_rank_quantile_weighted_stats_fast'
+          fetch grep_growth 'https://grep.app/api/search?q=growth_moti'
+          fetch grep_liquidity 'https://grep.app/api/search?q=liquidity_cut'
+          fetch grep_factors_raw 'https://grep.app/api/search?q=factors_raw.pkl'
+          fetch grep_factors_z 'https://grep.app/api/search?q=factors_z.pkl'
+
+          fetch hf_models 'https://huggingface.co/api/models?author=leo-quant-research&limit=100'
+          fetch hf_datasets 'https://huggingface.co/api/datasets?author=leo-quant-research&limit=100'
+          fetch hf_spaces 'https://huggingface.co/api/spaces?author=leo-quant-research&limit=100'
+
+          fetch gitlab_alphaagent 'https://gitlab.com/api/v4/projects?search=AlphaAgent&simple=true&per_page=100'
+          fetch gitlab_data_lake 'https://gitlab.com/api/v4/projects?search=data_lake&simple=true&per_page=100'
+          fetch gitlab_growth_moti 'https://gitlab.com/api/v4/projects?search=growth_moti&simple=true&per_page=100'
+
+          fetch commoncrawl_indexes 'https://index.commoncrawl.org/collinfo.json'
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          out = Path('probe_out')
+          needles = [
+              'leo-quant-research', 'AlphaAgent', 'data_lake', 'legacy_codes', '0_5_1',
+              'rolling_rank_quantile_weighted_stats_fast', 'growth_moti', 'liquidity_cut',
+              'factors_raw.pkl', 'factors_z.pkl', '/blob/', '/tree/', 'raw.githubusercontent.com'
+          ]
+          hits = []
+          for p in out.glob('*.txt'):
+              text = p.read_text('utf-8', errors='replace')
+              low = text.lower()
+              for needle in needles:
+                  pos = low.find(needle.lower())
+                  if pos >= 0:
+                      a = max(0, pos - 300)
+                      b = min(len(text), pos + len(needle) + 700)
+                      hits.append({
+                          'file': p.name,
+                          'needle': needle,
+                          'snippet': re.sub(r'\s+', ' ', text[a:b])[:1200],
+                      })
+          (out / 'high_value_hits.json').write_text(json.dumps(hits, ensure_ascii=False, indent=2), 'utf-8')
+          summary = {
+              'text_files': len(list(out.glob('*.txt'))),
+              'header_files': len(list(out.glob('*.headers'))),
+              'hit_groups': len(hits),
+          }
+          (out / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2), 'utf-8')
+          print(json.dumps(summary, ensure_ascii=False))
+          PY
+
+      - name: Upload raw probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-asset-probe-20260913
+          path: probe_out/
+          if-no-files-found: warn
+          retention-days: 30
