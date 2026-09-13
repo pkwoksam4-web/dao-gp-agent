@@ -1,0 +1,146 @@
+name: Common Crawl origin recovery
+
+on:
+  push:
+    branches:
+      - gp-commoncrawl-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Query archive indexes and recover bounded WARC records
+        shell: bash
+        run: |
+          set -u
+          mkdir -p probe12/index probe12/warc probe12/wayback
+          python - <<'PY'
+          import gzip, io, json, re, time
+          from pathlib import Path
+          from urllib.parse import quote
+          import requests
+
+          root=Path('probe12')
+          session=requests.Session()
+          session.headers.update({'User-Agent':'dao-gp-agent-provenance-probe/1.12'})
+
+          targets=[
+              'github.com/leo-quant-research/data_lake/*',
+              'raw.githubusercontent.com/leo-quant-research/data_lake/*',
+              'api.github.com/repos/leo-quant-research/data_lake*',
+              'github.com/leo-quant-research/AlphaAgent/*',
+              'raw.githubusercontent.com/leo-quant-research/AlphaAgent/*',
+              'api.github.com/repos/leo-quant-research/AlphaAgent*',
+          ]
+          indexes=['CC-MAIN-2026-30','CC-MAIN-2026-34']
+          all_records=[]
+
+          def get(url, **kwargs):
+              last=None
+              for i in range(4):
+                  try:
+                      r=session.get(url, timeout=45, **kwargs)
+                      if r.status_code in (429,500,502,503,504):
+                          last=r; time.sleep(2*(i+1)); continue
+                      return r
+                  except Exception as e:
+                      last=e; time.sleep(2*(i+1))
+              if hasattr(last,'status_code'): return last
+              raise last
+
+          for idx in indexes:
+              for n,target in enumerate(targets):
+                  url=f'https://index.commoncrawl.org/{idx}-index?url={quote(target,safe="")}&output=json&filter=status:200'
+                  try:
+                      r=get(url)
+                      text=r.text
+                      (root/'index'/f'{idx}_{n}.txt').write_text(text,'utf-8',errors='replace')
+                      meta={'index':idx,'target':target,'url':url,'status':r.status_code,'bytes':len(r.content)}
+                      recs=[]
+                      if r.status_code==200:
+                          for line in text.splitlines():
+                              line=line.strip()
+                              if not line.startswith('{'): continue
+                              try: obj=json.loads(line)
+                              except Exception: continue
+                              obj['_index']=idx; obj['_target']=target
+                              recs.append(obj); all_records.append(obj)
+                      meta['records']=len(recs)
+                      (root/'index'/f'{idx}_{n}.meta.json').write_text(json.dumps(meta,indent=2),'utf-8')
+                  except Exception as e:
+                      (root/'index'/f'{idx}_{n}.error.txt').write_text(repr(e),'utf-8')
+
+          # Deduplicate captures and recover at most 40 small/medium WARC records.
+          uniq=[]; seen=set()
+          for x in all_records:
+              key=(x.get('filename'),x.get('offset'),x.get('length'))
+              if key in seen: continue
+              seen.add(key); uniq.append(x)
+          (root/'records.json').write_text(json.dumps(uniq,ensure_ascii=False,indent=2),'utf-8')
+
+          recovered=[]
+          for i,x in enumerate(uniq[:40]):
+              try:
+                  fn=x['filename']; off=int(x['offset']); length=int(x['length'])
+                  if length > 8_000_000:
+                      recovered.append({'i':i,'url':x.get('url'),'skipped':'length_limit','length':length}); continue
+                  headers={'Range':f'bytes={off}-{off+length-1}'}
+                  r=get('https://data.commoncrawl.org/'+fn, headers=headers)
+                  raw=r.content
+                  out=root/'warc'/f'{i:03d}.warc.gz'
+                  out.write_bytes(raw)
+                  decoded=''
+                  try:
+                      decoded=gzip.decompress(raw).decode('utf-8','replace')
+                  except Exception:
+                      try:
+                          decoded=gzip.GzipFile(fileobj=io.BytesIO(raw)).read().decode('utf-8','replace')
+                      except Exception as e:
+                          decoded=f'[decode failed: {e!r}]'
+                  (root/'warc'/f'{i:03d}.txt').write_text(decoded,'utf-8')
+                  recovered.append({'i':i,'url':x.get('url'),'timestamp':x.get('timestamp'),'status':r.status_code,'bytes':len(raw),'decoded_chars':len(decoded),'index':x.get('_index')})
+              except Exception as e:
+                  recovered.append({'i':i,'url':x.get('url'),'error':repr(e)})
+          (root/'recovered.json').write_text(json.dumps(recovered,ensure_ascii=False,indent=2),'utf-8')
+
+          # Wayback CDX, exact same targets, bounded metadata only.
+          wb=[]
+          for n,target in enumerate(targets):
+              url='https://web.archive.org/cdx/search/cdx?url='+quote(target,safe='')+'&output=json&filter=statuscode:200&fl=timestamp,original,statuscode,digest,mimetype,length&collapse=digest&limit=200'
+              try:
+                  r=get(url)
+                  (root/'wayback'/f'{n}.txt').write_text(r.text,'utf-8',errors='replace')
+                  wb.append({'target':target,'status':r.status_code,'bytes':len(r.content),'head':r.text[:500]})
+              except Exception as e:
+                  wb.append({'target':target,'error':repr(e)})
+          (root/'wayback_summary.json').write_text(json.dumps(wb,ensure_ascii=False,indent=2),'utf-8')
+
+          # Compact keyword evidence from recovered text.
+          needles=['legacy_codes','0_5_1','rolling_rank_quantile_weighted_stats_fast','liquidity_cut','growth_moti','factors_raw.pkl','factors_z.pkl','df_z_e','Multi Agent Factor Research System','AlphaAgent','data_lake']
+          hits=[]
+          for p in sorted((root/'warc').glob('*.txt')):
+              text=p.read_text('utf-8',errors='replace')
+              found={k:text.lower().count(k.lower()) for k in needles if k.lower() in text.lower()}
+              if found:
+                  snippets={}
+                  low=text.lower()
+                  for k in found:
+                      pos=low.find(k.lower())
+                      snippets[k]=re.sub(r'\s+',' ',text[max(0,pos-300):pos+700])
+                  hits.append({'file':p.name,'found':found,'snippets':snippets})
+          (root/'keyword_hits.json').write_text(json.dumps(hits,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'index_records':len(all_records),'unique_records':len(uniq),'recovered':len(recovered),'keyword_hit_files':len(hits)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commoncrawl-origin-recovery
+          path: probe12/
+          retention-days: 30
