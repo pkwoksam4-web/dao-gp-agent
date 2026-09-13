@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 28
     steps:
-      - name: Scan GH Archive for Leo and recovered repository lineage
+      - name: Scan GH Archive for deleted repository IDs and account lineage
         shell: bash
         run: |
           set +e
@@ -24,13 +24,13 @@ jobs:
             base="probe11/gharchive/${date}-${hour}"
             curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "https://data.gharchive.org/${date}-${hour}.json.gz" 2>"${base}.err" \
               | gzip -dc 2>>"${base}.err" \
-              | grep -E '"id":300349603|"login":"leo-quant-research"|"name":"leo-quant-research/|1296046921|leo-quant-research/AlphaAgent' > "${base}.hits"
+              | grep -E '1296046921|1317931511|"id":300349603|"login":"leo-quant-research"|"name":"leo-quant-research/|315634734|"login":"zjzesheng"|"name":"zjzesheng/' > "${base}.hits"
             test -s "${base}.hits" || rm -f "${base}.hits"
           }
           export -f scan_one
           python - <<'PY' > probe11/dates.txt
           import datetime as dt
-          d=dt.date(2026,7,1); end=dt.date(2026,8,15)
+          d=dt.date(2026,8,16); end=dt.date(2026,9,13)
           while d<=end:
               print(d.isoformat()); d+=dt.timedelta(days=1)
           PY
@@ -46,28 +46,25 @@ jobs:
           from pathlib import Path
           root=Path('probe11')
           events=[]
+          target_repo_ids={1296046921,1317931511}
+          target_actor_ids={300349603,315634734}
           for p in sorted((root/'gharchive').glob('*.hits')):
               for line in p.read_text('utf-8',errors='replace').splitlines():
                   try: x=json.loads(line)
                   except Exception: continue
                   repo=x.get('repo') or {}; actor=x.get('actor') or {}; pay=x.get('payload') or {}
-                  if not (actor.get('id')==300349603 or actor.get('login')=='leo-quant-research' or repo.get('id')==1296046921 or str(repo.get('name','')).startswith('leo-quant-research/')):
+                  name=str(repo.get('name',''))
+                  if not (repo.get('id') in target_repo_ids or actor.get('id') in target_actor_ids or actor.get('login') in {'leo-quant-research','zjzesheng'} or name.startswith('leo-quant-research/') or name.startswith('zjzesheng/')):
                       continue
                   e={'file':p.name,'event_id':x.get('id'),'type':x.get('type'),'created_at':x.get('created_at'),'public':x.get('public'),'actor_id':actor.get('id'),'actor':actor.get('login'),'repo_id':repo.get('id'),'repo_name':repo.get('name')}
                   for k in ['ref','ref_type','before','head','action','size','distinct_size','repository_id','push_id','master_branch','description','pusher_type']:
                       if k in pay: e[k]=pay.get(k)
                   if isinstance(pay.get('forkee'),dict):
-                      e['forkee_id']=pay['forkee'].get('id'); e['forkee_full_name']=pay['forkee'].get('full_name'); e['forkee_owner']=(pay['forkee'].get('owner') or {}).get('login')
+                      f=pay['forkee']; e['forkee_id']=f.get('id'); e['forkee_full_name']=f.get('full_name'); e['forkee_owner']=(f.get('owner') or {}).get('login')
                   if isinstance(pay.get('release'),dict): e['release_tag']=pay['release'].get('tag_name')
                   events.append(e)
           events.sort(key=lambda x:(x.get('created_at') or '',x.get('event_id') or ''))
-          out={
-            'events':events,
-            'hit_count':len(events),
-            'repo_ids':sorted({e.get('repo_id') for e in events if e.get('repo_id') is not None}),
-            'repo_names':sorted({e.get('repo_name') for e in events if e.get('repo_name')}),
-            'event_types':{},
-          }
+          out={'events':events,'hit_count':len(events),'repo_ids':sorted({e.get('repo_id') for e in events if e.get('repo_id') is not None}),'repo_names':sorted({e.get('repo_name') for e in events if e.get('repo_name')}),'event_types':{}}
           for e in events: out['event_types'][e['type']]=out['event_types'].get(e['type'],0)+1
           (root/'events.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
           print(json.dumps({'hit_count':out['hit_count'],'repo_ids':out['repo_ids'],'repo_names':out['repo_names'],'event_types':out['event_types']},ensure_ascii=False))
@@ -77,6 +74,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: leo-full-lineage-20260701-20260815
+          name: leo-repo-lineage-20260816-20260913
           path: probe11/
           retention-days: 30
