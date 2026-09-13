@@ -1,0 +1,114 @@
+name: External object recovery probe
+
+on:
+  push:
+    branches:
+      - gp/external-object-recovery-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Probe recovered repo id and commit objects
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe8
+          ua='dao-gp-agent-provenance-probe/1.8'
+          repo='leo-quant-research/data_lake'
+          rid='1296046921'
+          head='eb1345a857c7fd577f3102cd18812bc0924bf4c2'
+          before='d659e6a5d849d8557e4cb2b25f9014f94ef3dec4'
+
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 1 --connect-timeout 10 --max-time 50 -sS -A "$ua" \
+              -D "probe8/${name}.headers" -w '\nHTTP_FINAL=%{http_code}\nURL_FINAL=%{url_effective}\n' \
+              "$url" -o "probe8/${name}.body" 2>"probe8/${name}.err"
+            printf 'HTTP_FINAL=' >> "probe8/${name}.meta"
+            awk 'BEGIN{IGNORECASE=1}/^HTTP\//{code=$2}END{print code}' "probe8/${name}.headers" >> "probe8/${name}.meta"
+            printf 'LOCATION_CHAIN:\n' >> "probe8/${name}.meta"
+            grep -i '^location:' "probe8/${name}.headers" >> "probe8/${name}.meta" || true
+          }
+
+          fetch api_repo "https://api.github.com/repos/${repo}"
+          fetch api_repo_id "https://api.github.com/repositories/${rid}"
+          fetch api_commit_head "https://api.github.com/repos/${repo}/commits/${head}"
+          fetch api_commit_before "https://api.github.com/repos/${repo}/commits/${before}"
+          fetch api_gitcommit_head "https://api.github.com/repos/${repo}/git/commits/${head}"
+          fetch api_gitcommit_before "https://api.github.com/repos/${repo}/git/commits/${before}"
+          fetch api_repoid_commit_head "https://api.github.com/repositories/${rid}/commits/${head}"
+          fetch api_repoid_gitcommit_head "https://api.github.com/repositories/${rid}/git/commits/${head}"
+          fetch search_commit_head "https://api.github.com/search/commits?q=hash%3A${head}&per_page=100"
+          fetch search_commit_before "https://api.github.com/search/commits?q=hash%3A${before}&per_page=100"
+
+          fetch html_commit_head "https://github.com/${repo}/commit/${head}"
+          fetch html_commit_before "https://github.com/${repo}/commit/${before}"
+          fetch patch_head "https://github.com/${repo}/commit/${head}.patch"
+          fetch tree_head "https://github.com/${repo}/tree/${head}"
+
+          for path in docs/architecture.md docs/qa_p0_p3_20260713.md docs/phase_mapping.md docs/roadmap.md docs/pipeline.md .cursor/skills/factor-pipeline-memory/SKILL.md; do
+            slug=$(echo "$path" | tr '/.' '__')
+            fetch "raw_head_${slug}" "https://raw.githubusercontent.com/${repo}/${head}/${path}"
+            fetch "raw_before_${slug}" "https://raw.githubusercontent.com/${repo}/${before}/${path}"
+          done
+
+          # Git smart-HTTP probes. Preserve stdout/stderr separately.
+          git ls-remote "https://github.com/${repo}.git" > probe8/git_ls_remote.out 2> probe8/git_ls_remote.err || true
+          mkdir -p probe8/gitfetch && cd probe8/gitfetch
+          git init -q
+          git fetch --depth=1 "https://github.com/${repo}.git" "$head" > fetch_head.out 2> fetch_head.err || true
+          git rev-parse FETCH_HEAD > fetched_head_sha.txt 2>/dev/null || true
+          if test -s fetched_head_sha.txt; then
+            git cat-file -p FETCH_HEAD > fetched_head_commit.txt 2>/dev/null || true
+            git ls-tree -r FETCH_HEAD > fetched_head_tree.txt 2>/dev/null || true
+            git archive --format=zip -o ../recovered_head.zip FETCH_HEAD 2>/dev/null || true
+          fi
+          cd ../..
+
+      - name: Build compact summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,re
+          from pathlib import Path
+          root=Path('probe8')
+          out={}
+          for p in sorted(root.glob('*.body')):
+              name=p.stem
+              body=p.read_text('utf-8',errors='replace')
+              headers=(root/(name+'.headers')).read_text('utf-8',errors='replace') if (root/(name+'.headers')).exists() else ''
+              codes=re.findall(r'^HTTP/\S+\s+(\d+)',headers,re.M)
+              locs=re.findall(r'^location:\s*(.+)$',headers,re.I|re.M)
+              out[name]={
+                  'bytes':p.stat().st_size,
+                  'codes':codes,
+                  'locations':locs,
+                  'body_head':re.sub(r'\s+',' ',body[:1500])
+              }
+          gf=root/'gitfetch'
+          out['git']={
+              'ls_remote_out':(root/'git_ls_remote.out').read_text('utf-8',errors='replace')[:3000] if (root/'git_ls_remote.out').exists() else '',
+              'ls_remote_err':(root/'git_ls_remote.err').read_text('utf-8',errors='replace')[:3000] if (root/'git_ls_remote.err').exists() else '',
+              'fetch_head_out':(gf/'fetch_head.out').read_text('utf-8',errors='replace')[:3000] if (gf/'fetch_head.out').exists() else '',
+              'fetch_head_err':(gf/'fetch_head.err').read_text('utf-8',errors='replace')[:3000] if (gf/'fetch_head.err').exists() else '',
+              'fetched_head_sha':(gf/'fetched_head_sha.txt').read_text('utf-8',errors='replace').strip() if (gf/'fetched_head_sha.txt').exists() else '',
+              'recovered_zip':(root/'recovered_head.zip').exists(),
+              'recovered_zip_bytes':(root/'recovered_head.zip').stat().st_size if (root/'recovered_head.zip').exists() else 0,
+          }
+          (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'endpoints':len([k for k in out if k!='git']),'git_recovered':out['git']['recovered_zip'],'git_sha':out['git']['fetched_head_sha']},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-object-recovery-20260913
+          path: probe8/
+          retention-days: 30
