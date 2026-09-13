@@ -1,0 +1,141 @@
+name: External object recovery 2
+
+on:
+  push:
+    branches:
+      - gp-object2-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Probe deleted repository objects and archive caches
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe12/http probe12/git probe12/archive
+          ua='dao-gp-agent-provenance-probe/2.0'
+
+          cat > probe12/targets.tsv <<'EOF'
+          data_lake	1296046921	d659e6a5d849d8557e4cb2b25f9014f94ef3dec4
+          data_lake	1296046921	eb1345a857c7fd577f3102cd18812bc0924bf4c2
+          data_lake	1296046921	993c24cf8aea3e63619e35ee4f9f2639810431a2
+          data_lake	1296046921	f46f72eda893fa2abb5abe020e1cb67b233d9a59
+          data_lake	1296046921	39ae5ede04027f3d41de03fac658bb0728b45361
+          AlphaAgent	1317931511	25812984ac52635af50c6522b964c5ed9f1fa658
+          AlphaAgent	1317931511	b813095f2fb17d0e890e0a80cc86ad222700b9ef
+          AlphaAgent	1317931511	166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8
+          EOF
+
+          fetch_text() {
+            name="$1"; url="$2"
+            curl -L --retry 1 --connect-timeout 10 --max-time 60 -sS -A "$ua" \
+              -D "probe12/http/${name}.headers" -o "probe12/http/${name}.body" "$url" 2>"probe12/http/${name}.err" || true
+          }
+          fetch_bin() {
+            name="$1"; url="$2"
+            curl -L --retry 1 --connect-timeout 10 --max-time 90 -sS -A "$ua" \
+              -D "probe12/archive/${name}.headers" -o "probe12/archive/${name}.bin" "$url" 2>"probe12/archive/${name}.err" || true
+          }
+
+          while IFS=$'\t' read -r repo rid sha; do
+            full="leo-quant-research/${repo}"
+            short="${repo}_${sha:0:12}"
+            fetch_text "${short}_api_commit" "https://api.github.com/repos/${full}/commits/${sha}"
+            fetch_text "${short}_api_gitcommit" "https://api.github.com/repos/${full}/git/commits/${sha}"
+            fetch_text "${short}_api_byid_commit" "https://api.github.com/repositories/${rid}/commits/${sha}"
+            fetch_text "${short}_html_commit" "https://github.com/${full}/commit/${sha}"
+            fetch_text "${short}_patch" "https://github.com/${full}/commit/${sha}.patch"
+            fetch_bin  "${short}_codeload" "https://codeload.github.com/${full}/zip/${sha}"
+
+            for path in README.md pyproject.toml requirements.txt docs/architecture.md docs/qa_p0_p3_20260713.md .cursor/skills/factor-pipeline-memory/SKILL.md; do
+              slug=$(printf '%s' "$path" | tr '/.' '__')
+              fetch_text "${short}_raw_${slug}" "https://raw.githubusercontent.com/${full}/${sha}/${path}"
+            done
+
+            fetch_text "${short}_wayback_commit" "https://web.archive.org/cdx/search/cdx?url=github.com%2Fleo-quant-research%2F${repo}%2Fcommit%2F${sha}&output=json&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&filter=statuscode%3A200"
+            fetch_text "${short}_wayback_raw" "https://web.archive.org/cdx/search/cdx?url=raw.githubusercontent.com%2Fleo-quant-research%2F${repo}%2F${sha}%2F*&output=json&fl=timestamp%2Coriginal%2Cstatuscode%2Cdigest%2Cmimetype%2Clength&filter=statuscode%3A200&limit=10000"
+            fetch_text "${short}_grepapp" "https://grep.app/api/search?q=${sha}"
+
+            mkdir -p "probe12/git/${short}" && cd "probe12/git/${short}"
+            git init -q
+            git fetch --depth=1 "https://github.com/${full}.git" "$sha" > fetch.out 2> fetch.err || true
+            git rev-parse FETCH_HEAD > fetched.sha 2>/dev/null || true
+            if test -s fetched.sha; then
+              git cat-file -p FETCH_HEAD > commit.txt 2>/dev/null || true
+              git ls-tree -r FETCH_HEAD > tree.txt 2>/dev/null || true
+              git archive --format=zip -o "../../../archive/${short}_gitarchive.zip" FETCH_HEAD 2>/dev/null || true
+            fi
+            cd ../../../
+          done < probe12/targets.tsv
+
+      - name: Probe AlphaAgent relation against surviving upstream network
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe12/network
+          for sha in 25812984ac52635af50c6522b964c5ed9f1fa658 b813095f2fb17d0e890e0a80cc86ad222700b9ef 166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8; do
+            for repo in RndmVariableQ/AlphaAgent Wangchanghao12/AlphaAgent xuechun2026/AlphaAgent oldtimerocknroad/AlphaAgent sumb-10/AlphaAgent_jin; do
+              slug=$(echo "$repo" | tr '/' '_')
+              curl -L --connect-timeout 10 --max-time 45 -sS \
+                -D "probe12/network/${slug}_${sha:0:12}.headers" \
+                -o "probe12/network/${slug}_${sha:0:12}.json" \
+                "https://api.github.com/repos/${repo}/commits/${sha}" 2>"probe12/network/${slug}_${sha:0:12}.err" || true
+            done
+          done
+
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,re,hashlib,zipfile
+          root=Path('probe12')
+          def status(headers):
+              if not headers.exists(): return []
+              txt=headers.read_text('utf-8',errors='replace')
+              return re.findall(r'^HTTP/\S+\s+(\d+)',txt,re.M)
+          hits=[]
+          for p in sorted((root/'http').glob('*.body')):
+              codes=status(p.with_suffix('.headers'))
+              body=p.read_bytes()
+              if codes and codes[-1] not in {'404','422'}:
+                  hits.append({'name':p.stem,'codes':codes,'bytes':len(body),'sha256':hashlib.sha256(body).hexdigest(),'head':body[:1200].decode('utf-8',errors='replace')})
+          archives=[]
+          for p in sorted((root/'archive').glob('*')):
+              if not p.is_file() or p.suffix in {'.headers','.err'}: continue
+              codes=status(p.with_suffix('.headers')) if p.suffix=='.bin' else []
+              b=p.read_bytes()
+              valid_zip=False
+              try:
+                  with zipfile.ZipFile(p) as z: valid_zip=len(z.namelist())>0
+              except Exception: pass
+              archives.append({'name':p.name,'codes':codes,'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'valid_zip':valid_zip})
+          git=[]
+          for d in sorted((root/'git').glob('*')):
+              if not d.is_dir(): continue
+              fetched=(d/'fetched.sha').read_text('utf-8',errors='replace').strip() if (d/'fetched.sha').exists() else ''
+              err=(d/'fetch.err').read_text('utf-8',errors='replace')[:1200] if (d/'fetch.err').exists() else ''
+              git.append({'target':d.name,'fetched_sha':fetched,'fetch_err':err,'tree_exists':(d/'tree.txt').exists()})
+          network=[]
+          for p in sorted((root/'network').glob('*.json')):
+              codes=status(p.with_suffix('.headers'))
+              if codes and codes[-1] not in {'404','422'}:
+                  network.append({'name':p.stem,'codes':codes,'bytes':p.stat().st_size,'head':p.read_text('utf-8',errors='replace')[:1200]})
+          out={'non_404_http_hits':hits,'archives':archives,'git':git,'network_non_404':network}
+          (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'http_hits':len(hits),'valid_archives':sum(x['valid_zip'] for x in archives),'git_fetches':sum(bool(x['fetched_sha']) for x in git),'network_hits':len(network)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-object2-recovery-20260913
+          path: probe12/
+          retention-days: 30
