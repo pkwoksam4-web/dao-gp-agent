@@ -12,9 +12,9 @@ permissions:
 jobs:
   query:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
-      - name: Inspect public GitHub dataset schemas
+      - name: Query deleted repository history and events
         shell: bash
         run: |
           set +e
@@ -23,17 +23,23 @@ jobs:
           q() {
             name="$1"; sql="$2"
             printf '%s\n' "$sql" > "probe13/${name}.sql"
-            curl -L --retry 2 --connect-timeout 12 --max-time 80 -sS "$endpoint" \
+            curl -L --retry 2 --connect-timeout 12 --max-time 120 -sS "$endpoint" \
               --data-binary "$sql" -o "probe13/${name}.json" 2>"probe13/${name}.err"
           }
-          q github_events_schema "DESCRIBE TABLE default.github_events FORMAT JSON"
-          q repos_schema "DESCRIBE TABLE default.repos FORMAT JSON"
-          q repos_history_schema "DESCRIBE TABLE default.repos_history FORMAT JSON"
-          q repos_raw_schema "DESCRIBE TABLE default.repos_raw FORMAT JSON"
-          q actors_schema "DESCRIBE TABLE default.actors FORMAT JSON"
-          q github_events_sample "SELECT * FROM default.github_events LIMIT 1 FORMAT JSON"
-          q repos_sample "SELECT * FROM default.repos LIMIT 1 FORMAT JSON"
-          q repos_history_sample "SELECT * FROM default.repos_history LIMIT 1 FORMAT JSON"
+
+          cols="time,id,name,owner.login AS owner_login,owner.id AS owner_id,full_name,description,fork,created_at,updated_at,pushed_at,size,stargazers_count,language,forks_count,archived,disabled,visibility,default_branch,network_count"
+          q data_lake_by_id "SELECT $cols FROM default.repos_history WHERE id=1296046921 ORDER BY time FORMAT JSON"
+          q data_lake_by_name "SELECT $cols FROM default.repos_history WHERE full_name='leo-quant-research/data_lake' ORDER BY time FORMAT JSON"
+          q data_download_history "SELECT $cols FROM default.repos_history WHERE full_name='leo-quant-research/data_download' ORDER BY time FORMAT JSON"
+          q alphaagent_history "SELECT $cols FROM default.repos_history WHERE full_name='leo-quant-research/AlphaAgent' ORDER BY time FORMAT JSON"
+          q leo_owner_history "SELECT $cols FROM default.repos_history WHERE owner.login='leo-quant-research' ORDER BY time,full_name FORMAT JSON"
+          q leo_actor "SELECT * FROM default.actors WHERE login='leo-quant-research' FORMAT JSON"
+
+          evcols="file_time,event_type,actor_login,repo_name,created_at,updated_at,action,ref,ref_type,creator_user_login,title,path,head_ref,head_sha,base_ref,base_sha,merge_commit_sha,commit_id,original_commit_id,push_size,push_distinct_size,release_tag_name,release_name"
+          q data_lake_events "SELECT $evcols FROM default.github_events WHERE repo_name='leo-quant-research/data_lake' AND created_at>=toDateTime('2026-06-01 00:00:00') AND created_at<toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
+          q data_download_events "SELECT $evcols FROM default.github_events WHERE repo_name='leo-quant-research/data_download' AND created_at>=toDateTime('2026-06-01 00:00:00') AND created_at<toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
+          q alphaagent_events "SELECT $evcols FROM default.github_events WHERE repo_name='leo-quant-research/AlphaAgent' AND created_at>=toDateTime('2026-06-01 00:00:00') AND created_at<toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
+          q leo_events "SELECT $evcols FROM default.github_events WHERE actor_login='leo-quant-research' AND created_at>=toDateTime('2026-06-01 00:00:00') AND created_at<toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
 
       - name: Build compact summary
         shell: bash
@@ -46,13 +52,13 @@ jobs:
               text=p.read_text('utf-8',errors='replace')
               try: obj=json.loads(text)
               except Exception: obj=None
-              e={'bytes':p.stat().st_size,'head':text[:2500]}
+              e={'bytes':p.stat().st_size,'head':text[:1500]}
               if isinstance(obj,dict):
                   e['rows']=obj.get('rows')
-                  if isinstance(obj.get('data'),list): e['data']=obj['data'][:500]
+                  if isinstance(obj.get('data'),list): e['data']=obj['data'][:1000]
               out[p.name]=e
           (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
-          print(json.dumps(out,ensure_ascii=False)[:20000])
+          print(json.dumps({k:{'rows':v.get('rows'),'bytes':v['bytes']} for k,v in out.items()},ensure_ascii=False))
           PY
 
       - name: Upload evidence
