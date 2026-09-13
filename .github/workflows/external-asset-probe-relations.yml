@@ -1,0 +1,136 @@
+name: External asset relation probe
+
+on:
+  push:
+    branches:
+      - gp/external-asset-probe2-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - name: Query public profiles, org membership and repository events
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe7
+          ua='dao-gp-agent-provenance-probe/1.7'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 2 --connect-timeout 10 --max-time 60 -sS -A "$ua" "$url" \
+              -D "probe7/${name}.headers" -o "probe7/${name}.json" 2>"probe7/${name}.err"
+          }
+
+          fetch haochen_profile 'https://api.github.com/users/haochenw-TITI'
+          fetch haochen_repos 'https://api.github.com/users/haochenw-TITI/repos?type=all&per_page=100'
+          fetch haochen_events 'https://api.github.com/users/haochenw-TITI/events/public?per_page=100'
+          fetch haochen_starred 'https://api.github.com/users/haochenw-TITI/starred?per_page=100'
+
+          fetch zj_profile 'https://api.github.com/users/zjzesheng'
+          fetch zj_members 'https://api.github.com/orgs/zjzesheng/members?per_page=100'
+          fetch zj_public_members 'https://api.github.com/orgs/zjzesheng/public_members?per_page=100'
+          fetch zj_repos 'https://api.github.com/orgs/zjzesheng/repos?type=all&per_page=100'
+
+          fetch alpha_events_1 'https://api.github.com/repos/RndmVariableQ/AlphaAgent/events?per_page=100&page=1'
+          fetch alpha_events_2 'https://api.github.com/repos/RndmVariableQ/AlphaAgent/events?per_page=100&page=2'
+          fetch alpha_events_3 'https://api.github.com/repos/RndmVariableQ/AlphaAgent/events?per_page=100&page=3'
+          fetch alpha_forks 'https://api.github.com/repos/RndmVariableQ/AlphaAgent/forks?per_page=100&sort=oldest'
+
+      - name: Scan missing July GH Archive window for Leo public events
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe7/gharchive
+          scan_one() {
+            date="$1"; hour="$2"
+            url="https://data.gharchive.org/${date}-${hour}.json.gz"
+            base="probe7/gharchive/${date}-${hour}"
+            curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "$url" 2>"${base}.err" \
+              | gzip -dc 2>>"${base}.err" \
+              | grep -E '"login":"leo-quant-research"|"name":"leo-quant-research/' \
+              > "${base}.hits"
+            test -s "${base}.hits" || rm -f "${base}.hits"
+          }
+          export -f scan_one
+          for d in $(seq -f '2026-07-%02g' 14 30); do
+            for h in $(seq 0 23); do printf '%s\t%s\n' "$d" "$h"; done
+          done | xargs -P 24 -n 2 bash -c 'scan_one "$0" "$1"'
+
+      - name: Build compact evidence summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          root=Path('probe7')
+          summary={}
+          needles=['leo-quant-research','haochenw-TITI','zjzesheng','AlphaAgent','data_lake','data_download','WHC','legacy_codes']
+          for p in sorted(root.glob('*.json')):
+              raw=p.read_text('utf-8',errors='replace')
+              try: obj=json.loads(raw)
+              except Exception: obj=None
+              entry={'bytes':p.stat().st_size,'type':type(obj).__name__ if obj is not None else None}
+              if isinstance(obj,list):
+                  entry['count']=len(obj)
+                  # retain only compact identity/event metadata
+                  compact=[]
+                  for x in obj[:100]:
+                      if not isinstance(x,dict): continue
+                      c={}
+                      for k in ['id','type','created_at','name','full_name','login','fork','description','html_url','pushed_at','updated_at']:
+                          if k in x: c[k]=x[k]
+                      if isinstance(x.get('actor'),dict): c['actor']=x['actor'].get('login')
+                      if isinstance(x.get('repo'),dict): c['repo']=x['repo'].get('name')
+                      if isinstance(x.get('payload'),dict):
+                          pay=x['payload']
+                          for k in ['ref','ref_type','before','head','action','size','distinct_size']:
+                              if k in pay: c['payload_'+k]=pay[k]
+                          if isinstance(pay.get('forkee'),dict):
+                              c['forkee_full_name']=pay['forkee'].get('full_name')
+                              c['forkee_id']=pay['forkee'].get('id')
+                      compact.append(c)
+                  entry['compact']=compact
+              elif isinstance(obj,dict):
+                  for k in ['login','id','name','company','location','bio','public_repos','followers','following','created_at','updated_at','message','total_count']:
+                      if k in obj: entry[k]=obj[k]
+              entry['needle_counts']={n:raw.lower().count(n.lower()) for n in needles}
+              summary[p.name]=entry
+
+          gh=[]
+          for p in sorted((root/'gharchive').glob('*.hits')):
+              lines=p.read_text('utf-8',errors='replace').splitlines()
+              parsed=[]
+              for line in lines[:50]:
+                  try:
+                      x=json.loads(line)
+                      parsed.append({
+                          'id':x.get('id'),'type':x.get('type'),'created_at':x.get('created_at'),
+                          'actor':(x.get('actor') or {}).get('login'),
+                          'repo':(x.get('repo') or {}).get('name'),
+                          'payload':{k:(x.get('payload') or {}).get(k) for k in ['ref','ref_type','before','head','action','size','distinct_size'] if k in (x.get('payload') or {})}
+                      })
+                  except Exception:
+                      parsed.append({'raw':line[:1200]})
+              gh.append({'file':p.name,'line_count':len(lines),'events':parsed})
+          nonempty_errors=[]
+          for p in sorted((root/'gharchive').glob('*.err')):
+              if p.stat().st_size:
+                  nonempty_errors.append({'file':p.name,'head':p.read_text('utf-8',errors='replace')[:500]})
+          summary['gharchive_hits']=gh
+          summary['gharchive_nonempty_errors']=nonempty_errors
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'hit_files':len(gh),'hit_lines':sum(x['line_count'] for x in gh),'gh_errors':len(nonempty_errors)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-asset-relation-probe-20260913
+          path: probe7/
+          retention-days: 30
