@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Discover public GitHub dataset schema
+      - name: Inspect public GitHub dataset schemas
         shell: bash
         run: |
           set +e
@@ -26,9 +26,14 @@ jobs:
             curl -L --retry 2 --connect-timeout 12 --max-time 80 -sS "$endpoint" \
               --data-binary "$sql" -o "probe13/${name}.json" 2>"probe13/${name}.err"
           }
-          q databases "SHOW DATABASES FORMAT JSON"
-          q tables "SELECT database,name,total_rows,total_bytes FROM system.tables WHERE positionCaseInsensitive(database,'git')>0 OR positionCaseInsensitive(name,'git')>0 OR positionCaseInsensitive(name,'event')>0 ORDER BY database,name FORMAT JSON"
-          q all_play_tables "SELECT database,name FROM system.tables WHERE database NOT IN ('system','INFORMATION_SCHEMA','information_schema') ORDER BY database,name LIMIT 500 FORMAT JSON"
+          q github_events_schema "DESCRIBE TABLE default.github_events FORMAT JSON"
+          q repos_schema "DESCRIBE TABLE default.repos FORMAT JSON"
+          q repos_history_schema "DESCRIBE TABLE default.repos_history FORMAT JSON"
+          q repos_raw_schema "DESCRIBE TABLE default.repos_raw FORMAT JSON"
+          q actors_schema "DESCRIBE TABLE default.actors FORMAT JSON"
+          q github_events_sample "SELECT * FROM default.github_events LIMIT 1 FORMAT JSON"
+          q repos_sample "SELECT * FROM default.repos LIMIT 1 FORMAT JSON"
+          q repos_history_sample "SELECT * FROM default.repos_history LIMIT 1 FORMAT JSON"
 
       - name: Build compact summary
         shell: bash
@@ -41,13 +46,13 @@ jobs:
               text=p.read_text('utf-8',errors='replace')
               try: obj=json.loads(text)
               except Exception: obj=None
-              e={'bytes':p.stat().st_size,'head':text[:1500]}
+              e={'bytes':p.stat().st_size,'head':text[:2500]}
               if isinstance(obj,dict):
                   e['rows']=obj.get('rows')
                   if isinstance(obj.get('data'),list): e['data']=obj['data'][:500]
               out[p.name]=e
           (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
-          print(json.dumps(out,ensure_ascii=False)[:12000])
+          print(json.dumps(out,ensure_ascii=False)[:20000])
           PY
 
       - name: Upload evidence
