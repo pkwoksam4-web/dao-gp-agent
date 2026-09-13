@@ -1,0 +1,56 @@
+name: External asset account probe
+
+on:
+  push:
+    branches:
+      - gp/external-asset-probe-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Query surviving public account traces
+        run: |
+          mkdir -p probe2
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/users/leo-quant-research/following?per_page=100' -o probe2/github_following.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/users/leo-quant-research/starred?per_page=100' -o probe2/github_starred.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/users/leo-quant-research/subscriptions?per_page=100' -o probe2/github_subscriptions.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/users/leo-quant-research/gists?per_page=100' -o probe2/github_gists.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/search/repositories?q=%22Multi+Agent+Factor+Research+System%22&per_page=100' -o probe2/github_repo_phrase.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/search/commits?q=rolling_rank_quantile_weighted_stats_fast&per_page=100' -o probe2/github_commit_rank.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/search/commits?q=growth_moti&per_page=100' -o probe2/github_commit_growth.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.1' 'https://api.github.com/search/commits?q=liquidity_cut&per_page=100' -o probe2/github_commit_liquidity.json
+
+      - name: Query recent Common Crawl indexes
+        run: |
+          curl -G -L --max-time 40 -A 'dao-gp-agent-provenance-probe/1.1' --data-urlencode 'url=github.com/leo-quant-research/data_lake/*' --data-urlencode 'output=json' --data-urlencode 'filter=status:200' --data-urlencode 'collapse=urlkey' 'https://index.commoncrawl.org/CC-MAIN-2026-34-index' -o probe2/cc34_data_lake.jsonl
+          curl -G -L --max-time 40 -A 'dao-gp-agent-provenance-probe/1.1' --data-urlencode 'url=github.com/leo-quant-research/AlphaAgent/*' --data-urlencode 'output=json' --data-urlencode 'filter=status:200' --data-urlencode 'collapse=urlkey' 'https://index.commoncrawl.org/CC-MAIN-2026-34-index' -o probe2/cc34_alphaagent.jsonl
+          curl -G -L --max-time 40 -A 'dao-gp-agent-provenance-probe/1.1' --data-urlencode 'url=github.com/leo-quant-research/data_lake/*' --data-urlencode 'output=json' --data-urlencode 'filter=status:200' --data-urlencode 'collapse=urlkey' 'https://index.commoncrawl.org/CC-MAIN-2026-30-index' -o probe2/cc30_data_lake.jsonl
+          curl -G -L --max-time 40 -A 'dao-gp-agent-provenance-probe/1.1' --data-urlencode 'url=github.com/leo-quant-research/AlphaAgent/*' --data-urlencode 'output=json' --data-urlencode 'filter=status:200' --data-urlencode 'collapse=urlkey' 'https://index.commoncrawl.org/CC-MAIN-2026-30-index' -o probe2/cc30_alphaagent.jsonl
+          curl -G -L --max-time 40 -A 'dao-gp-agent-provenance-probe/1.1' --data-urlencode 'url=github.com/leo-quant-research/data_lake/*' --data-urlencode 'output=json' --data-urlencode 'filter=status:200' --data-urlencode 'collapse=urlkey' 'https://index.commoncrawl.org/CC-MAIN-2026-25-index' -o probe2/cc25_data_lake.jsonl
+          curl -G -L --max-time 40 -A 'dao-gp-agent-provenance-probe/1.1' --data-urlencode 'url=github.com/leo-quant-research/AlphaAgent/*' --data-urlencode 'output=json' --data-urlencode 'filter=status:200' --data-urlencode 'collapse=urlkey' 'https://index.commoncrawl.org/CC-MAIN-2026-25-index' -o probe2/cc25_alphaagent.jsonl
+
+      - name: Build compact summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          out = Path('probe2')
+          summary = {}
+          for p in sorted(out.iterdir()):
+              summary[p.name] = {'bytes': p.stat().st_size, 'head': p.read_text('utf-8', errors='replace')[:500]}
+          (out / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2), 'utf-8')
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-asset-account-probe-20260913
+          path: probe2/
+          retention-days: 30
