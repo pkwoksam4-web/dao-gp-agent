@@ -1,0 +1,105 @@
+name: External asset origin probe
+
+on:
+  push:
+    branches:
+      - gp/external-asset-probe-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Query public account and mirror traces
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe5
+          ua='dao-gp-agent-provenance-probe/1.4'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 2 --connect-timeout 10 --max-time 60 -sS -A "$ua" "$url" -o "probe5/${name}.json" 2>"probe5/${name}.err"
+          }
+
+          fetch leo_profile 'https://api.github.com/users/leo-quant-research'
+          fetch leo_repos 'https://api.github.com/users/leo-quant-research/repos?type=all&per_page=100'
+          fetch leo_following 'https://api.github.com/users/leo-quant-research/following?per_page=100'
+          fetch haochen_following 'https://api.github.com/users/haochenw-TITI/following?per_page=100'
+          fetch zjzesheng_profile 'https://api.github.com/users/zjzesheng'
+          fetch zjzesheng_repos 'https://api.github.com/orgs/zjzesheng/repos?type=all&per_page=100'
+          fetch alpha_forks 'https://api.github.com/repos/RndmVariableQ/AlphaAgent/forks?per_page=100&sort=oldest'
+          fetch repo_search_phrase 'https://api.github.com/search/repositories?q=%22Multi+Agent+Factor+Research+System%22&per_page=100'
+
+          fetch hf_zj_datasets 'https://huggingface.co/api/datasets?author=zjzesheng&limit=100'
+          fetch hf_zj_models 'https://huggingface.co/api/models?author=zjzesheng&limit=100'
+          fetch hf_zj_spaces 'https://huggingface.co/api/spaces?author=zjzesheng&limit=100'
+          fetch hf_hc_datasets 'https://huggingface.co/api/datasets?author=haochenw-TITI&limit=100'
+          fetch hf_hc_models 'https://huggingface.co/api/models?author=haochenw-TITI&limit=100'
+          fetch hf_hc_spaces 'https://huggingface.co/api/spaces?author=haochenw-TITI&limit=100'
+
+      - name: Scan selected GH Archive days by actor
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe5/gharchive
+          cat > probe5/dates.txt <<'EOF'
+          2026-07-06
+          2026-07-28
+          2026-07-31
+          2026-08-01
+          EOF
+
+          scan_one() {
+            date="$1"; hour="$2"
+            url="https://data.gharchive.org/${date}-${hour}.json.gz"
+            base="probe5/gharchive/${date}-${hour}"
+            curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "$url" 2>"${base}.err" \
+              | gzip -dc 2>>"${base}.err" \
+              | grep -E 'leo-quant-research|data_lake|AlphaAgent|zjzesheng|haochenw-TITI' \
+              > "${base}.hits"
+            test -s "${base}.hits" || rm -f "${base}.hits"
+          }
+          export -f scan_one
+          while read -r d; do
+            for h in $(seq -w 0 23); do printf '%s\t%s\n' "$d" "$h"; done
+          done < probe5/dates.txt | xargs -P 12 -n 2 bash -c 'scan_one "$0" "$1"'
+
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('probe5')
+          summary={}
+          for p in sorted(root.glob('*.json')):
+              raw=p.read_text('utf-8',errors='replace')
+              try: obj=json.loads(raw)
+              except Exception: obj=None
+              entry={'bytes':p.stat().st_size,'type':type(obj).__name__ if obj is not None else None,'head':raw[:1200]}
+              if isinstance(obj,list): entry['count']=len(obj)
+              elif isinstance(obj,dict):
+                  for k in ['login','id','name','type','public_repos','created_at','updated_at','total_count']:
+                      if k in obj: entry[k]=obj[k]
+                  if isinstance(obj.get('items'),list): entry['items_count']=len(obj['items'])
+              summary[p.name]=entry
+          hits=[]
+          for p in sorted((root/'gharchive').glob('*.hits')):
+              lines=p.read_text('utf-8',errors='replace').splitlines()
+              hits.append({'file':p.name,'line_count':len(lines),'sample':lines[:5]})
+          summary['gharchive_hits']=hits
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'json_files':len(list(root.glob('*.json'))),'hit_files':len(hits),'hit_lines':sum(x['line_count'] for x in hits)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-asset-origin-probe-20260913
+          path: probe5/
+          retention-days: 30
