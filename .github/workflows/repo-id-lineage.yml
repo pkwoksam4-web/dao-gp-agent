@@ -1,0 +1,79 @@
+name: Recovered repo id lineage probe
+
+on:
+  push:
+    branches:
+      - gp/repo-id-lineage-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Scan GH Archive for recovered repository id
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe9/gharchive
+          rid='1296046921'
+          scan_one() {
+            date="$1"; hour="$2"
+            base="probe9/gharchive/${date}-${hour}"
+            curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "https://data.gharchive.org/${date}-${hour}.json.gz" 2>"${base}.err" \
+              | gzip -dc 2>>"${base}.err" \
+              | grep -F '1296046921' > "${base}.hits"
+            test -s "${base}.hits" || rm -f "${base}.hits"
+          }
+          export -f scan_one
+          for d in 2026-07-08 2026-07-09 2026-07-10 2026-07-11 2026-07-12 2026-07-13 2026-07-14 2026-07-15 2026-07-16 2026-07-17 2026-07-18; do
+            for h in $(seq 0 23); do printf '%s\t%s\n' "$d" "$h"; done
+          done | xargs -P 24 -n 2 bash -c 'scan_one "$0" "$1"'
+
+      - name: Parse event lineage
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('probe9')
+          events=[]
+          for p in sorted((root/'gharchive').glob('*.hits')):
+              for line in p.read_text('utf-8',errors='replace').splitlines():
+                  try: x=json.loads(line)
+                  except Exception: continue
+                  pay=x.get('payload') or {}
+                  repo=x.get('repo') or {}
+                  actor=x.get('actor') or {}
+                  e={
+                    'file':p.name,'event_id':x.get('id'),'type':x.get('type'),'created_at':x.get('created_at'),
+                    'actor_id':actor.get('id'),'actor':actor.get('login'),
+                    'repo_id':repo.get('id'),'repo_name':repo.get('name'),'public':x.get('public'),
+                  }
+                  for k in ['ref','ref_type','before','head','action','size','distinct_size','repository_id','push_id']:
+                      if k in pay: e[k]=pay.get(k)
+                  if isinstance(pay.get('forkee'),dict):
+                      e['forkee_id']=pay['forkee'].get('id'); e['forkee_full_name']=pay['forkee'].get('full_name')
+                  if isinstance(pay.get('release'),dict):
+                      e['release_tag']=pay['release'].get('tag_name')
+                  events.append(e)
+          events.sort(key=lambda x:(x.get('created_at') or '',x.get('event_id') or ''))
+          errors=[]
+          for p in sorted((root/'gharchive').glob('*.err')):
+              if p.stat().st_size:
+                  errors.append({'file':p.name,'head':p.read_text('utf-8',errors='replace')[:500]})
+          out={'repo_id':1296046921,'events':events,'hit_count':len(events),'nonempty_errors':errors}
+          (root/'lineage.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'hit_count':len(events),'error_files':len(errors),'names':sorted(set(e.get('repo_name') for e in events if e.get('repo_name')))},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-id-lineage-1296046921
+          path: probe9/
+          retention-days: 30
