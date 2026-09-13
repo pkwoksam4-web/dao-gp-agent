@@ -1,0 +1,91 @@
+name: External repository index probe
+
+on:
+  push:
+    branches:
+      - gp-index-probe-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Query external public repository indexes
+        shell: bash
+        run: |
+          set +e
+          mkdir -p index_probe
+          ua='dao-gp-agent-provenance-probe/2.2'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 1 --connect-timeout 10 --max-time 75 -sS -A "$ua" \
+              -D "index_probe/${name}.headers" -o "index_probe/${name}.body" "$url" 2>"index_probe/${name}.err" || true
+          }
+
+          # ecosyste.ms repository metadata may retain historical/deleted repository records.
+          fetch eco_data_lake 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake'
+          fetch eco_alphaagent 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent'
+          fetch eco_owner 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/owners/leo-quant-research'
+
+          # Sourcegraph public search can sometimes retain code from recently removed repositories.
+          python - <<'PY'
+          import urllib.parse
+          queries={
+            'sg_repo_data_lake':'context:global repo:^github.com/leo-quant-research/data_lake$ count:100',
+            'sg_repo_alphaagent':'context:global repo:^github.com/leo-quant-research/AlphaAgent$ count:100',
+            'sg_rolling':'context:global "rolling_rank_quantile_weighted_stats_fast" count:100',
+            'sg_legacy_codes':'context:global "legacy_codes" "liquidity_cut" count:100',
+            'sg_growth':'context:global "growth_moti" count:100',
+            'sg_sha_data':'context:global "39ae5ede04027f3d41de03fac658bb0728b45361" count:100',
+            'sg_sha_alpha':'context:global "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8" count:100',
+          }
+          for name,q in queries.items():
+              url='https://sourcegraph.com/.api/search/stream?'+urllib.parse.urlencode({'q':q,'v':'V3'})
+              print(name+'\t'+url)
+          PY > index_probe/sourcegraph_urls.tsv
+          while IFS=$'\t' read -r name url; do
+            fetch "$name" "$url"
+          done < index_probe/sourcegraph_urls.tsv
+
+          # Other public metadata mirrors/caches.
+          fetch libraries_data_lake 'https://libraries.io/github/leo-quant-research/data_lake'
+          fetch libraries_alphaagent 'https://libraries.io/github/leo-quant-research/AlphaAgent'
+          fetch opengraph_data_lake 'https://github.com/leo-quant-research/data_lake'
+          fetch opengraph_alphaagent 'https://github.com/leo-quant-research/AlphaAgent'
+
+      - name: Summarize useful responses
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,re
+          from pathlib import Path
+          root=Path('index_probe')
+          out={}
+          needles=['leo-quant-research','data_lake','AlphaAgent','legacy_codes','0_5_1','rolling_rank_quantile_weighted_stats_fast','liquidity_cut','growth_moti','fork','parent','source','created_at','pushed_at','39ae5ede','166bc13f']
+          for p in sorted(root.glob('*.body')):
+              raw=p.read_text('utf-8',errors='replace')
+              hp=p.with_suffix('.headers')
+              headers=hp.read_text('utf-8',errors='replace') if hp.exists() else ''
+              codes=re.findall(r'^HTTP/\S+\s+(\d+)',headers,re.M)
+              out[p.stem]={
+                'codes':codes,
+                'bytes':p.stat().st_size,
+                'needle_counts':{n:raw.lower().count(n.lower()) for n in needles if n.lower() in raw.lower()},
+                'head':re.sub(r'\s+',' ',raw[:6000])
+              }
+          (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
+          useful={k:v for k,v in out.items() if v['needle_counts'] or (v['codes'] and v['codes'][-1]=='200' and v['bytes']>10)}
+          print(json.dumps({'responses':len(out),'useful':list(useful),'details':useful},ensure_ascii=False)[:12000])
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-index-probe-20260913
+          path: index_probe/
+          retention-days: 30
