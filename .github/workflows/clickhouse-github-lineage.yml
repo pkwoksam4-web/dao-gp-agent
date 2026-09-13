@@ -12,9 +12,9 @@ permissions:
 jobs:
   query:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
-      - name: Query public GitHub events index
+      - name: Discover public GitHub dataset schema
         shell: bash
         run: |
           set +e
@@ -26,15 +26,9 @@ jobs:
             curl -L --retry 2 --connect-timeout 12 --max-time 80 -sS "$endpoint" \
               --data-binary "$sql" -o "probe13/${name}.json" 2>"probe13/${name}.err"
           }
-
-          q schema "DESCRIBE TABLE github.events FORMAT JSON"
-          q by_repo_id "SELECT * FROM github.events WHERE repo_id='1296046921' AND created_at >= toDateTime('2026-07-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
-          q by_repo_name "SELECT * FROM github.events WHERE repo_name='leo-quant-research/data_lake' AND created_at >= toDateTime('2026-07-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
-          q alpha_name "SELECT * FROM github.events WHERE repo_name='leo-quant-research/AlphaAgent' AND created_at >= toDateTime('2026-06-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
-          q actor "SELECT * FROM github.events WHERE actor_login='leo-quant-research' AND created_at >= toDateTime('2026-06-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
-          q old_name "SELECT * FROM github.events WHERE repo_name='leo-quant-research/data_download' AND created_at >= toDateTime('2026-06-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') ORDER BY created_at FORMAT JSON"
-          q sha_head "SELECT * FROM github.events WHERE created_at >= toDateTime('2026-07-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') AND positionCaseInsensitive(toString(tuple(*)), 'eb1345a857c7fd577f3102cd18812bc0924bf4c2') > 0 LIMIT 100 FORMAT JSON"
-          q sha_before "SELECT * FROM github.events WHERE created_at >= toDateTime('2026-07-01 00:00:00') AND created_at < toDateTime('2026-09-01 00:00:00') AND positionCaseInsensitive(toString(tuple(*)), 'd659e6a5d849d8557e4cb2b25f9014f94ef3dec4') > 0 LIMIT 100 FORMAT JSON"
+          q databases "SHOW DATABASES FORMAT JSON"
+          q tables "SELECT database,name,total_rows,total_bytes FROM system.tables WHERE positionCaseInsensitive(database,'git')>0 OR positionCaseInsensitive(name,'git')>0 OR positionCaseInsensitive(name,'event')>0 ORDER BY database,name FORMAT JSON"
+          q all_play_tables "SELECT database,name FROM system.tables WHERE database NOT IN ('system','INFORMATION_SCHEMA','information_schema') ORDER BY database,name LIMIT 500 FORMAT JSON"
 
       - name: Build compact summary
         shell: bash
@@ -42,21 +36,18 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path('probe13')
-          out={}
+          root=Path('probe13'); out={}
           for p in sorted(root.glob('*.json')):
               text=p.read_text('utf-8',errors='replace')
               try: obj=json.loads(text)
               except Exception: obj=None
-              e={'bytes':p.stat().st_size,'head':text[:1000]}
+              e={'bytes':p.stat().st_size,'head':text[:1500]}
               if isinstance(obj,dict):
                   e['rows']=obj.get('rows')
-                  if isinstance(obj.get('data'),list):
-                      e['data_count']=len(obj['data'])
-                      e['data']=obj['data'][:100]
+                  if isinstance(obj.get('data'),list): e['data']=obj['data'][:500]
               out[p.name]=e
           (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
-          print(json.dumps({k:{'rows':v.get('rows'),'count':v.get('data_count'),'bytes':v.get('bytes')} for k,v in out.items()},ensure_ascii=False))
+          print(json.dumps(out,ensure_ascii=False)[:12000])
           PY
 
       - name: Upload evidence
