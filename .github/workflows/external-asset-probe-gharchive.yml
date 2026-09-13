@@ -1,0 +1,92 @@
+name: External asset GH Archive probe
+
+on:
+  push:
+    branches:
+      - gp/external-asset-probe-20260913
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Query public relationship traces
+        run: |
+          mkdir -p probe4
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.3' 'https://api.github.com/users/zjzesheng/followers?per_page=100' -o probe4/zjzesheng_followers.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.3' 'https://api.github.com/users/leo-quant-research/followers?per_page=100' -o probe4/leo_followers.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.3' 'https://api.github.com/users/leo-quant-research/orgs?per_page=100' -o probe4/leo_orgs.json
+          curl -L --max-time 30 -A 'dao-gp-agent-provenance-probe/1.3' 'https://api.github.com/repos/zjzesheng/legacy_codes' -o probe4/zjzesheng_legacy_codes.json
+
+      - name: Scan selected GH Archive dates for deleted repo events
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe4/gharchive
+          cat > probe4/targets.tsv <<'EOF'
+          2026-07-13	leo-quant-research/data_lake
+          2026-07-31	leo-quant-research/AlphaAgent
+          2026-08-01	leo-quant-research/AlphaAgent
+          2026-08-11	zjzesheng
+          EOF
+
+          scan_one() {
+            date="$1"
+            hour="$2"
+            needle="$3"
+            slug=$(echo "$needle" | tr '/' '_')
+            url="https://data.gharchive.org/${date}-${hour}.json.gz"
+            out="probe4/gharchive/${date}-${hour}-${slug}.hits"
+            err="probe4/gharchive/${date}-${hour}-${slug}.err"
+            curl -L --retry 2 --connect-timeout 12 --max-time 150 -sS "$url" 2>>"$err" | gzip -dc 2>>"$err" | grep -F "$needle" > "$out"
+            test -s "$out" || rm -f "$out"
+          }
+          export -f scan_one
+
+          while IFS=$'\t' read -r date needle; do
+            for h in $(seq -w 0 23); do
+              printf '%s\t%s\t%s\n' "$date" "$h" "$needle"
+            done
+          done < probe4/targets.tsv | xargs -P 12 -n 3 bash -c 'scan_one "$0" "$1" "$2"'
+
+          find probe4/gharchive -name '*.hits' -type f -print -exec wc -l {} \; > probe4/gharchive_hit_files.txt
+
+      - name: Build compact evidence summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          out = Path('probe4')
+          summary = {}
+          for p in sorted(out.glob('*.json')):
+              text = p.read_text('utf-8', errors='replace')
+              try:
+                  parsed = json.loads(text)
+              except Exception:
+                  parsed = None
+              summary[p.name] = {
+                  'bytes': p.stat().st_size,
+                  'json_type': type(parsed).__name__ if parsed is not None else None,
+                  'count': len(parsed) if isinstance(parsed, list) else None,
+                  'head': text[:1000],
+              }
+          hits = []
+          for p in sorted((out / 'gharchive').glob('*.hits')):
+              lines = p.read_text('utf-8', errors='replace').splitlines()
+              hits.append({'file': p.name, 'line_count': len(lines), 'sample': lines[:3]})
+          summary['gharchive_hits'] = hits
+          (out / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2), 'utf-8')
+          print(json.dumps({'hit_files': len(hits), 'hit_lines': sum(x['line_count'] for x in hits)}, ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: external-asset-gharchive-probe-20260913
+          path: probe4/
+          retention-days: 30
