@@ -14,12 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Search Sourcegraph and grep.app
+      - name: Search Sourcegraph including archived and forked repositories
         shell: bash
         run: |
           set +e
-          mkdir -p probe/sourcegraph probe/grepapp
-          ua='dao-gp-agent-provenance-probe/3.2'
+          mkdir -p probe/sourcegraph
+          ua='dao-gp-agent-provenance-probe/3.3'
           run_sg() {
             name="$1"; query="$2"
             curl -G -L --retry 2 --connect-timeout 12 --max-time 120 -sS -A "$ua" \
@@ -29,35 +29,15 @@ jobs:
               -w '%{http_code}\n' 'https://sourcegraph.com/.api/search/stream' \
               > "probe/sourcegraph/${name}.status" 2> "probe/sourcegraph/${name}.err" || true
           }
-          run_ga() {
-            name="$1"; query="$2"
-            curl -G -L --retry 2 --connect-timeout 12 --max-time 120 -sS -A "$ua" \
-              --data-urlencode "q=$query" \
-              -D "probe/grepapp/${name}.headers" \
-              -o "probe/grepapp/${name}.body" \
-              -w '%{http_code}\n' 'https://grep.app/api/search' \
-              > "probe/grepapp/${name}.status" 2> "probe/grepapp/${name}.err" || true
-          }
-
-          run_sg repo_data_lake 'context:global repo:^github\.com/leo-quant-research/data_lake$ count:1000'
-          run_sg repo_alphaagent 'context:global repo:^github\.com/leo-quant-research/AlphaAgent$ count:1000'
-          run_sg rolling 'context:global "rolling_rank_quantile_weighted_stats_fast" count:1000'
-          run_sg liquidity 'context:global "liquidity_cut" count:1000'
-          run_sg growth_moti 'context:global "growth_moti" count:1000'
-          run_sg factor_memory 'context:global "factor-pipeline-memory" count:1000'
-          run_sg legacy_codes 'context:global "legacy_codes" "0_5_1" count:1000'
-          run_sg sha_dl 'context:global "39ae5ede04027f3d41de03fac658bb0728b45361" count:1000'
-          run_sg sha_aa 'context:global "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8" count:1000'
-          run_sg agent_desc 'context:global "Multi Agent Factor Research System" count:1000'
-
-          run_ga rolling 'rolling_rank_quantile_weighted_stats_fast'
-          run_ga liquidity 'liquidity_cut'
-          run_ga growth_moti 'growth_moti'
-          run_ga factor_memory 'factor-pipeline-memory'
-          run_ga legacy_codes 'legacy_codes 0_5_1'
-          run_ga sha_dl '39ae5ede04027f3d41de03fac658bb0728b45361'
-          run_ga sha_aa '166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8'
-          run_ga agent_desc 'Multi Agent Factor Research System'
+          suffix='archived:yes fork:yes count:1000'
+          run_sg rolling "context:global \"rolling_rank_quantile_weighted_stats_fast\" $suffix"
+          run_sg liquidity "context:global \"liquidity_cut\" $suffix"
+          run_sg growth_moti "context:global \"growth_moti\" $suffix"
+          run_sg factor_memory "context:global \"factor-pipeline-memory\" $suffix"
+          run_sg legacy_codes "context:global \"legacy_codes\" \"0_5_1\" $suffix"
+          run_sg sha_dl "context:global \"39ae5ede04027f3d41de03fac658bb0728b45361\" $suffix"
+          run_sg sha_aa "context:global \"166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8\" $suffix"
+          run_sg agent_desc "context:global \"Multi Agent Factor Research System\" $suffix"
 
       - name: Summarize useful hits
         shell: bash
@@ -65,25 +45,14 @@ jobs:
           python - <<'PY'
           import json,re,hashlib
           from pathlib import Path
-          root=Path('probe'); out={'sourcegraph':{},'grepapp':{}}
-          for kind in ('sourcegraph','grepapp'):
-              for body in sorted((root/kind).glob('*.body')):
-                  name=body.stem; raw=body.read_bytes(); text=raw.decode('utf-8','replace')
-                  status=(root/kind/(name+'.status')).read_text(errors='replace').strip() if (root/kind/(name+'.status')).exists() else None
-                  rec={'http_status':status,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest() if raw else None}
-                  if kind=='grepapp':
-                      try:
-                          obj=json.loads(text); hits=obj.get('hits') or {}; rec['total']=hits.get('total')
-                          rec['repos']=sorted({h.get('repo') for h in (hits.get('hits') or []) if isinstance(h,dict) and h.get('repo')})[:100]
-                      except Exception: rec['preview']=text[:1000]
-                  else:
-                      rec['match_events']=len(re.findall(r'^event: matches$',text,flags=re.M))
-                      rec['progress_done']=('"done":true' in text.replace(' ',''))
-                      repos=sorted(set(re.findall(r'"repository":"([^"]+)"',text)))
-                      rec['repos']=repos[:100]
-                      rec['preview']=text[:1500] if not repos else None
-                  out[kind][name]=rec
-          (root/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
+          root=Path('probe/sourcegraph'); out={}
+          for body in sorted(root.glob('*.body')):
+              name=body.stem; raw=body.read_bytes(); text=raw.decode('utf-8','replace')
+              status=(root/(name+'.status')).read_text(errors='replace').strip() if (root/(name+'.status')).exists() else None
+              repos=sorted(set(re.findall(r'"repository":"([^"]+)"',text)))
+              match_counts=[int(x) for x in re.findall(r'"matchCount":(\d+)',text)]
+              out[name]={'http_status':status,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest() if raw else None,'repos':repos[:200],'final_match_count':max(match_counts) if match_counts else 0,'done':'"done":true' in text.replace(' ','')}
+          (Path('probe')/'summary.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),'utf-8')
           print(json.dumps(out,ensure_ascii=False,indent=2))
           PY
 
@@ -91,6 +60,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: public-code-index-probe-20260914
+          name: sourcegraph-all-repos-probe-20260914
           path: probe/
           retention-days: 30
