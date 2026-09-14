@@ -1,4 +1,4 @@
-name: data_lake pre-Jul17 lineage GH Archive scan
+name: data_lake creation-hour neighbor GH Archive scan
 
 on:
   push:
@@ -11,65 +11,46 @@ permissions:
 
 jobs:
   scan:
-    strategy:
-      fail-fast: false
-      matrix:
-        chunk:
-          - {name: jun01-10, start: '2026-06-01', end: '2026-06-10'}
-          - {name: jun11-20, start: '2026-06-11', end: '2026-06-20'}
-          - {name: jun21-30, start: '2026-06-21', end: '2026-06-30'}
-          - {name: jul01-08, start: '2026-07-01', end: '2026-07-08'}
-          - {name: jul09-16, start: '2026-07-09', end: '2026-07-16'}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
-      - name: Scan ${{ matrix.chunk.name }} for stable data_lake identity
+      - name: Scan 2026-07-10 04Z target and neighboring repo ids
         shell: bash
-        env:
-          START_DATE: ${{ matrix.chunk.start }}
-          END_DATE: ${{ matrix.chunk.end }}
         run: |
           set -u
           mkdir -p out
+          u="https://data.gharchive.org/2026-07-10-4.json.gz"
+          tmp="/tmp/gha-2026-07-10-4.gz"
+          code=$(curl -L --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 -sS -o "$tmp" -w '%{http_code}' "$u" || true)
+          bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
+          printf '2026-07-10\t4\t%s\t%s\n' "$code" "$bytes" > out/status.tsv
           : > out/matches.jsonl
-          : > out/status.tsv
-          d="$START_DATE"
-          while :; do
-            for hour in $(seq 0 23); do
-              u="https://data.gharchive.org/${d}-${hour}.json.gz"
-              tmp="/tmp/gha-${d}-${hour}.gz"
-              code=$(curl -L --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 -sS -o "$tmp" -w '%{http_code}' "$u" || true)
-              bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
-              printf '%s\t%s\t%s\t%s\n' "$d" "$hour" "$code" "$bytes" >> out/status.tsv
-              if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
-                gzip -dc "$tmp" 2>/dev/null | grep -F -e '1296046921' -e '300349603' -e 'leo-quant-research/data_lake' -e 'leo-quant-research/data_download' >> out/matches.jsonl || true
-              fi
-              rm -f "$tmp"
-            done
-            [ "$d" = "$END_DATE" ] && break
-            d=$(date -I -d "$d + 1 day")
-          done
+          if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
+            gzip -dc "$tmp" 2>/dev/null | grep -F -e '1296046915' -e '1296046921' -e '1296046930' -e '300349603' >> out/matches.jsonl || true
+          fi
           python - <<'PY'
           import json, pathlib
           p=pathlib.Path('out/matches.jsonl')
-          seen=set(); rows=[]
+          ids={1296046915,1296046921,1296046930}
+          rows=[]; seen=set()
           for line in p.read_text(errors='replace').splitlines():
               try: o=json.loads(line)
               except Exception: continue
-              actor=o.get('actor') or {}; repo=o.get('repo') or {}; payload=o.get('payload') or {}
-              if not (repo.get('id')==1296046921 or actor.get('id')==300349603 or repo.get('name') in ('leo-quant-research/data_lake','leo-quant-research/data_download')):
+              repo=o.get('repo') or {}; actor=o.get('actor') or {}; payload=o.get('payload') or {}
+              if repo.get('id') not in ids and actor.get('id') != 300349603:
                   continue
               eid=str(o.get('id'))
               if eid in seen: continue
               seen.add(eid)
-              rows.append({'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),'actor':actor,'repo':repo,'org':o.get('org'),'payload':payload})
-          rows.sort(key=lambda x: x.get('created_at') or '')
+              rows.append({'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),'actor':actor,'repo':repo,'org':o.get('org'),'payload':payload,'public':o.get('public')})
+          rows.sort(key=lambda x:x.get('created_at') or '')
           pathlib.Path('out/matches_pretty.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
-          pathlib.Path('out/first_match.json').write_text(json.dumps(rows[0] if rows else None,indent=2,ensure_ascii=False))
-          print(json.dumps(rows,indent=2,ensure_ascii=False))
+          by_repo={str(i):[r for r in rows if (r.get('repo') or {}).get('id')==i] for i in sorted(ids)}
+          pathlib.Path('out/by_repo.json').write_text(json.dumps(by_repo,indent=2,ensure_ascii=False))
+          print(json.dumps(by_repo,indent=2,ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: datalake-pre-jul17-${{ matrix.chunk.name }}
+          name: datalake-creation-hour-neighbor-check
           path: out
           retention-days: 30
