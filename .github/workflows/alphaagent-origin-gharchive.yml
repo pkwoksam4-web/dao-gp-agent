@@ -1,4 +1,4 @@
-name: zjzesheng legacy migration GH Archive scan
+name: data_lake pre-Jul17 lineage GH Archive scan
 
 on:
   push:
@@ -15,15 +15,15 @@ jobs:
       fail-fast: false
       matrix:
         chunk:
-          - {name: aug11-18, start: '2026-08-11', end: '2026-08-18'}
-          - {name: aug19-26, start: '2026-08-19', end: '2026-08-26'}
-          - {name: aug27-sep03, start: '2026-08-27', end: '2026-09-03'}
-          - {name: sep04-08, start: '2026-09-04', end: '2026-09-08'}
-          - {name: sep09-13, start: '2026-09-09', end: '2026-09-13'}
+          - {name: jun01-10, start: '2026-06-01', end: '2026-06-10'}
+          - {name: jun11-20, start: '2026-06-11', end: '2026-06-20'}
+          - {name: jun21-30, start: '2026-06-21', end: '2026-06-30'}
+          - {name: jul01-08, start: '2026-07-01', end: '2026-07-08'}
+          - {name: jul09-16, start: '2026-07-09', end: '2026-07-16'}
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
-      - name: Scan ${{ matrix.chunk.name }} for organization and migration identities
+      - name: Scan ${{ matrix.chunk.name }} for stable data_lake identity
         shell: bash
         env:
           START_DATE: ${{ matrix.chunk.start }}
@@ -42,7 +42,7 @@ jobs:
               bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
               printf '%s\t%s\t%s\t%s\n' "$d" "$hour" "$code" "$bytes" >> out/status.tsv
               if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
-                gzip -dc "$tmp" 2>/dev/null | grep -F -e 'zjzesheng/' -e 'legacy_codes' -e '315634734' -e '300349603' -e '216113541' >> out/matches.jsonl || true
+                gzip -dc "$tmp" 2>/dev/null | grep -F -e '1296046921' -e '300349603' -e 'leo-quant-research/data_lake' -e 'leo-quant-research/data_download' >> out/matches.jsonl || true
               fi
               rm -f "$tmp"
             done
@@ -56,13 +56,13 @@ jobs:
           for line in p.read_text(errors='replace').splitlines():
               try: o=json.loads(line)
               except Exception: continue
+              actor=o.get('actor') or {}; repo=o.get('repo') or {}; payload=o.get('payload') or {}
+              if not (repo.get('id')==1296046921 or actor.get('id')==300349603 or repo.get('name') in ('leo-quant-research/data_lake','leo-quant-research/data_download')):
+                  continue
               eid=str(o.get('id'))
               if eid in seen: continue
               seen.add(eid)
-              rows.append({
-                  'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),
-                  'actor':o.get('actor'),'repo':o.get('repo'),'org':o.get('org'),'payload':o.get('payload')
-              })
+              rows.append({'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),'actor':actor,'repo':repo,'org':o.get('org'),'payload':payload})
           rows.sort(key=lambda x: x.get('created_at') or '')
           pathlib.Path('out/matches_pretty.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
           pathlib.Path('out/first_match.json').write_text(json.dumps(rows[0] if rows else None,indent=2,ensure_ascii=False))
@@ -70,6 +70,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: zjzesheng-legacy-migration-${{ matrix.chunk.name }}
+          name: datalake-pre-jul17-${{ matrix.chunk.name }}
           path: out
           retention-days: 30
