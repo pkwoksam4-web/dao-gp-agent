@@ -1,0 +1,144 @@
+name: Common Crawl URL Index fallback
+
+on:
+  push:
+    branches:
+      - gp-cc-url-index-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Query parquet URL index directly
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe
+          python -m pip install -q duckdb==1.4.0
+          python - <<'PY'
+          import json, urllib.request, urllib.parse, xml.etree.ElementTree as ET, hashlib, time
+          from pathlib import Path
+          import duckdb
+
+          root=Path('probe')
+          ua='dao-gp-agent-provenance-probe/5.0'
+          crawls=['CC-MAIN-2026-34','CC-MAIN-2026-30']
+
+          def list_keys(crawl):
+              prefix=f'cc-index/table/cc-main/warc/crawl={crawl}/subset=warc/'
+              base='https://commoncrawl.s3.amazonaws.com/'
+              params={'list-type':'2','prefix':prefix,'max-keys':'1000'}
+              all_keys=[]; token=None; pages=[]
+              for page in range(10):
+                  q=params.copy()
+                  if token:q['continuation-token']=token
+                  url=base+'?'+urllib.parse.urlencode(q)
+                  req=urllib.request.Request(url,headers={'User-Agent':ua})
+                  try:
+                      with urllib.request.urlopen(req,timeout=60) as r:
+                          data=r.read(); status=getattr(r,'status',200)
+                  except Exception as e:
+                      pages.append({'url':url,'error':repr(e)}); break
+                  pages.append({'url':url,'status':status,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+                  try: x=ET.fromstring(data)
+                  except Exception as e:
+                      pages[-1]['parse_error']=repr(e); break
+                  ns={'s3':'http://s3.amazonaws.com/doc/2006-03-01/'}
+                  keys=[n.text for n in x.findall('.//s3:Contents/s3:Key',ns) if n.text]
+                  if not keys: keys=[n.text for n in x.findall('.//Contents/Key') if n.text]
+                  all_keys.extend(k for k in keys if k.endswith('.parquet'))
+                  t=x.findtext('.//s3:NextContinuationToken',namespaces=ns) or x.findtext('.//NextContinuationToken')
+                  trunc=(x.findtext('.//s3:IsTruncated',namespaces=ns) or x.findtext('.//IsTruncated') or '').lower()=='true'
+                  if not trunc or not t: break
+                  token=t
+              return all_keys,pages
+
+          con=duckdb.connect()
+          try:
+              con.execute('INSTALL httpfs')
+          except Exception: pass
+          try:
+              con.execute('LOAD httpfs')
+          except Exception: pass
+          for stmt in ["SET threads=4","SET http_retries=8","SET http_retry_wait_ms=1500","SET enable_progress_bar=false"]:
+              try:con.execute(stmt)
+              except Exception:pass
+
+          result={'crawls':{},'matches':[],'errors':[]}
+          for crawl in crawls:
+              keys,pages=list_keys(crawl)
+              urls=['https://data.commoncrawl.org/'+k for k in keys]
+              result['crawls'][crawl]={'parquet_files':len(urls),'list_pages':pages,'sample_keys':keys[:5]}
+              (root/f'{crawl}_keys.json').write_text(json.dumps(keys,indent=2),'utf-8')
+              if not urls: continue
+              try:
+                  rel=con.from_parquet(urls)
+                  rel.create_view('ccidx_tmp',replace=True)
+                  rows=con.execute("""
+                    SELECT url, url_host_name, fetch_time, fetch_status, content_mime_type,
+                           warc_filename, warc_record_offset, warc_record_length
+                    FROM ccidx_tmp
+                    WHERE lower(url_host_name) IN ('github.com','raw.githubusercontent.com','codeload.github.com')
+                      AND lower(url) LIKE '%leo-quant-research%'
+                    ORDER BY fetch_time
+                    LIMIT 1000
+                  """).fetchall()
+                  cols=['url','url_host_name','fetch_time','fetch_status','content_mime_type','warc_filename','warc_record_offset','warc_record_length']
+                  for row in rows:
+                      rec={k:(v.isoformat() if hasattr(v,'isoformat') else v) for k,v in zip(cols,row)}
+                      rec['crawl']=crawl; result['matches'].append(rec)
+              except Exception as e:
+                  result['errors'].append({'crawl':crawl,'stage':'duckdb_query','error':repr(e)})
+              try:con.execute('DROP VIEW IF EXISTS ccidx_tmp')
+              except Exception:pass
+
+          (root/'summary.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'crawls':{k:v['parquet_files'] for k,v in result['crawls'].items()},'match_count':len(result['matches']),'errors':result['errors']},ensure_ascii=False)[:15000])
+          PY
+
+      - name: Recover matched WARC payloads
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY'
+          import json,urllib.request,gzip,io,hashlib
+          from pathlib import Path
+          root=Path('probe'); out=root/'payloads';out.mkdir(exist_ok=True)
+          try:d=json.loads((root/'summary.json').read_text('utf-8'))
+          except Exception:d={'matches':[]}
+          recovered=[]
+          for i,r in enumerate(d.get('matches') or []):
+              fn=r.get('warc_filename'); off=r.get('warc_record_offset'); length=r.get('warc_record_length')
+              if not fn or off is None or length is None:continue
+              try:off=int(off);length=int(length)
+              except:continue
+              req=urllib.request.Request('https://data.commoncrawl.org/'+fn,headers={'Range':f'bytes={off}-{off+length-1}','User-Agent':'dao-gp-agent-provenance-probe/5.0'})
+              try:
+                  with urllib.request.urlopen(req,timeout=60) as resp:b=resp.read();st=getattr(resp,'status',200)
+              except Exception as e:
+                  recovered.append({'match':r,'error':repr(e)});continue
+              try:raw=gzip.decompress(b)
+              except:
+                  try:raw=gzip.GzipFile(fileobj=io.BytesIO(b)).read()
+                  except:raw=b
+              first=raw.find(b'\r\n\r\n');rest=raw[first+4:] if first>=0 else raw
+              second=rest.find(b'\r\n\r\n');payload=rest[second+4:] if second>=0 else rest
+              name=f'{i:03d}_{hashlib.sha256(payload).hexdigest()[:16]}'
+              (out/f'{name}.payload').write_bytes(payload)
+              recovered.append({'match':r,'status':st,'range_bytes':len(b),'payload_bytes':len(payload),'payload_sha256':hashlib.sha256(payload).hexdigest(),'file':f'payloads/{name}.payload'})
+          (root/'recovered.json').write_text(json.dumps(recovered,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'recovered':len([x for x in recovered if x.get('file')]),'attempts':len(recovered)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-url-index-recovery-20260914
+          path: probe/
+          retention-days: 30
