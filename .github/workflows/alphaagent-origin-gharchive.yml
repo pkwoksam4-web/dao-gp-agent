@@ -42,20 +42,7 @@ jobs:
               bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
               printf '%s\t%s\t%s\t%s\n' "$d" "$hour" "$code" "$bytes" >> out/status.tsv
               if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
-                gzip -dc "$tmp" 2>/dev/null | python -c '
-import sys,json
-for line in sys.stdin:
-    try: o=json.loads(line)
-    except Exception: continue
-    actor=o.get("actor") or {}; repo=o.get("repo") or {}; org=o.get("org") or {}; payload=o.get("payload") or {}
-    repo_name=str(repo.get("name") or "")
-    actor_id=actor.get("id")
-    org_id=org.get("id")
-    org_login=str(org.get("login") or "")
-    payload_text=json.dumps(payload,ensure_ascii=False)
-    hit=(repo_name.startswith("zjzesheng/") or "legacy_codes" in repo_name.lower() or org_id==315634734 or org_login=="zjzesheng" or actor_id in (300349603,216113541) or "zjzesheng" in payload_text or "legacy_codes" in payload_text.lower())
-    if hit: print(json.dumps(o,ensure_ascii=False,separators=(",",":")))
-' >> out/matches.jsonl || true
+                gzip -dc "$tmp" 2>/dev/null | grep -F -e 'zjzesheng/' -e 'legacy_codes' -e '315634734' -e '300349603' -e '216113541' >> out/matches.jsonl || true
               fi
               rm -f "$tmp"
             done
