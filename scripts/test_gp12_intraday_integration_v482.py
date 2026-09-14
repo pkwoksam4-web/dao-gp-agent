@@ -12,6 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 PARAMETERS_PATH = ROOT / 'data' / 'GP12_CANDIDATE_PARAMETERS_V1.json'
 FACTORS_PATH = ROOT / 'data' / 'GP12_CANDIDATE_FACTORS_V1.json'
 EVIDENCE_PATH = ROOT / 'data' / 'GP12_FORMAL_INPUT_EVIDENCE_V1.json'
+INTRADAY_EVIDENCE_PATH = ROOT / 'data' / 'GP12_INTRADAY_FORMAL847_BINDING_V1.json'
 INTRADAY_BINDING_SHA256 = 'd65a7dac16525f360a4fc93b104c49e8ba279f7eae7c7ac0ba9fba834fc99573'
 
 EXPECTED_REMAINING_BLOCKERS = sorted([
@@ -48,6 +49,19 @@ def with_intraday_binding(evidence: dict, sha256: str = INTRADAY_BINDING_SHA256)
 
 
 class GP12IntradayReadinessIntegrationTests(unittest.TestCase):
+    def test_intraday_binding_evidence_file_is_canonical_and_fail_closed(self):
+        self.assertTrue(INTRADAY_EVIDENCE_PATH.exists())
+        binding = load_json(INTRADAY_EVIDENCE_PATH)
+        self.assertEqual(mod.canonical_json_sha256(binding), INTRADAY_BINDING_SHA256)
+        self.assertTrue(binding['coverage']['formal_847_15m_coverage_verified'])
+        self.assertTrue(binding['coverage']['formal_847_60m_coverage_verified'])
+        self.assertFalse(binding['coverage']['formal_847_minute_byte_coverage_verified'])
+        self.assertFalse(binding['coverage']['historical_gp_intraday_resampling_contract_recovered'])
+        self.assertFalse(binding['coverage']['factor_formula_recovered'])
+        self.assertEqual(binding['safety']['candidate_adoption_status'], 'UNAPPROVED')
+        self.assertFalse(binding['safety']['model_freeze_allowed'])
+        self.assertFalse(binding['safety']['oos_metrics_allowed'])
+
     def test_repository_manifest_binds_formal847_intraday_without_opening_freeze(self):
         evidence = load_json(EVIDENCE_PATH)
         report = mod.build_readiness_report(
