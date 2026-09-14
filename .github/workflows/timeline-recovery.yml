@@ -1,0 +1,69 @@
+name: Ecosyste.ms timeline recovery probe
+
+on:
+  push:
+    branches:
+      - gp-timeline-probe-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch retained repository timeline events
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe
+          ua='dao-gp-agent-provenance-probe/3.4'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 2 --connect-timeout 12 --max-time 120 -sS -A "$ua" \
+              -D "probe/${name}.headers" -o "probe/${name}.body" \
+              -w '%{http_code}\n' "$url" > "probe/${name}.status" 2> "probe/${name}.err" || true
+          }
+          fetch data_lake 'https://timeline.ecosyste.ms/api/v1/events/leo-quant-research/data_lake?per_page=100'
+          fetch alphaagent 'https://timeline.ecosyste.ms/api/v1/events/leo-quant-research/AlphaAgent?per_page=100'
+          fetch data_lake_summary 'https://timeline.ecosyste.ms/api/v1/events/leo-quant-research/data_lake/summary?year=2026'
+          fetch alphaagent_summary 'https://timeline.ecosyste.ms/api/v1/events/leo-quant-research/AlphaAgent/summary?year=2026'
+          fetch leo_user 'https://timeline.ecosyste.ms/api/v1/users/leo-quant-research?per_page=100'
+          fetch leo_summary 'https://timeline.ecosyste.ms/api/v1/users/leo-quant-research/summary?year=2026'
+
+      - name: Extract high-value payloads
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('probe'); summary=[]; events=[]
+          for st in sorted(root.glob('*.status')):
+              name=st.stem; body=root/(name+'.body'); raw=body.read_bytes() if body.exists() else b''
+              rec={'name':name,'status':st.read_text(errors='replace').strip(),'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest() if raw else None}
+              if raw:
+                  text=raw.decode('utf-8','replace')
+                  try:
+                      obj=json.loads(text); rec['json_type']=type(obj).__name__
+                      if isinstance(obj,list):
+                          rec['count']=len(obj)
+                          for x in obj:
+                              if isinstance(x,dict) and x.get('repository') in {'leo-quant-research/data_lake','leo-quant-research/AlphaAgent','leo-quant-research/alphaagent'}:
+                                  events.append(x)
+                      elif isinstance(obj,dict): rec['keys']=sorted(obj.keys())[:100]
+                  except Exception: rec['preview']=text[:1000]
+              summary.append(rec)
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          (root/'target_events.json').write_text(json.dumps(events,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'summary':summary,'target_event_count':len(events),'target_events':events},ensure_ascii=False,indent=2)[:30000])
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosyste-timeline-recovery-20260914
+          path: probe/
+          retention-days: 30
