@@ -1,0 +1,121 @@
+name: Public code index recovery probe
+
+on:
+  push:
+    branches:
+      - gp-code-index-recovery-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Query public code indexes and mirrors
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, re, hashlib, urllib.parse, urllib.request, urllib.error
+          from pathlib import Path
+
+          root=Path('probe')
+          root.mkdir(exist_ok=True)
+          ua='dao-gp-agent-provenance-probe/3.2'
+
+          def fetch(name, url, timeout=90):
+              p=root/name
+              p.parent.mkdir(parents=True, exist_ok=True)
+              req=urllib.request.Request(url, headers={'User-Agent':ua, 'Accept':'*/*'})
+              status=None; headers={}; data=b''; err=''
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as r:
+                      status=getattr(r,'status',200)
+                      headers=dict(r.headers.items())
+                      data=r.read()
+              except urllib.error.HTTPError as e:
+                  status=e.code; headers=dict(e.headers.items()) if e.headers else {}
+                  try: data=e.read()
+                  except Exception: data=b''
+                  err=repr(e)
+              except Exception as e:
+                  err=repr(e)
+              (Path(str(p)+'.status')).write_text(str(status or 'ERR'))
+              (Path(str(p)+'.headers')).write_text(json.dumps(headers,ensure_ascii=False,indent=2))
+              (Path(str(p)+'.body')).write_bytes(data)
+              (Path(str(p)+'.err')).write_text(err)
+              return status,data
+
+          sg_queries={
+            'repo_data_lake':'context:global repo:^github\\.com/leo-quant-research/data_lake$ archived:yes fork:yes count:200',
+            'repo_alphaagent':'context:global repo:^github\\.com/leo-quant-research/AlphaAgent$ archived:yes fork:yes count:200',
+            'rolling_rank':'context:global archived:yes fork:yes "rolling_rank_quantile_weighted_stats_fast" count:200',
+            'legacy_whc':'context:global archived:yes fork:yes "WHC" "legacy_codes" count:200',
+            'factor_pair':'context:global archived:yes fork:yes "liquidity_cut" "growth_moti" count:200',
+            'pkl_chain':'context:global archived:yes fork:yes "factors_raw.pkl" "df_z_e" count:200',
+            'legacy_051':'context:global archived:yes fork:yes "0_5_1" "df_raw" count:200',
+            'sha_data_head':'context:global archived:yes fork:yes "39ae5ede04027f3d41de03fac658bb0728b45361" count:50',
+            'sha_alpha_head':'context:global archived:yes fork:yes "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8" count:50',
+          }
+          for name,q in sg_queries.items():
+              url='https://sourcegraph.com/.api/search/stream?'+urllib.parse.urlencode({'q':q,'v':'V3'})
+              fetch(Path('sourcegraph')/name, url)
+
+          grep_queries={
+            'rolling_rank':'rolling_rank_quantile_weighted_stats_fast',
+            'legacy_whc':'WHC legacy_codes',
+            'factor_pair':'liquidity_cut growth_moti',
+            'pkl_chain':'factors_raw.pkl df_z_e',
+            'legacy_051':'0_5_1 df_raw',
+            'sha_data_head':'39ae5ede04027f3d41de03fac658bb0728b45361',
+            'sha_alpha_head':'166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8',
+            'repo_data_lake':'leo-quant-research/data_lake',
+            'repo_alphaagent':'leo-quant-research/AlphaAgent',
+          }
+          for name,q in grep_queries.items():
+              url='https://grep.app/api/search?'+urllib.parse.urlencode({'q':q,'regexp':'false','case':'true'})
+              fetch(Path('grepapp')/name, url)
+
+          # Public project searches on GitLab can expose mirrors even when GitHub origin is gone.
+          for name,q in {'data_lake':'leo-quant-research data_lake','alphaagent':'leo-quant-research AlphaAgent','rolling_rank':'rolling_rank_quantile_weighted_stats_fast'}.items():
+              url='https://gitlab.com/api/v4/projects?'+urllib.parse.urlencode({'search':q,'simple':'true','per_page':100})
+              fetch(Path('gitlab')/name, url)
+
+          # Page-level historical mirrors/metadata.
+          pages={
+            'libraries_data_lake':'https://libraries.io/github/leo-quant-research/data_lake',
+            'libraries_alphaagent':'https://libraries.io/github/leo-quant-research/AlphaAgent',
+            'repos_data_lake':'https://repos.ecosyste.ms/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake',
+            'repos_alphaagent':'https://repos.ecosyste.ms/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent',
+          }
+          for name,url in pages.items(): fetch(Path('pages')/name,url)
+
+          # Summarize without interpreting a 200 as a hit.
+          summary=[]
+          needles=['leo-quant-research','rolling_rank_quantile_weighted_stats_fast','legacy_codes','liquidity_cut','growth_moti','39ae5ede04027f3d41de03fac658bb0728b45361','166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8']
+          for st in sorted(root.rglob('*.status')):
+              base=Path(str(st)[:-7]); body=Path(str(base)+'.body')
+              data=body.read_bytes() if body.exists() else b''
+              text=data.decode('utf-8','replace')
+              rec={'name':str(base.relative_to(root)),'status':st.read_text().strip(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest() if data else None,'needle_counts':{n:text.lower().count(n.lower()) for n in needles}}
+              try:
+                  obj=json.loads(text)
+                  rec['json_type']=type(obj).__name__
+                  if isinstance(obj,list): rec['json_count']=len(obj)
+                  elif isinstance(obj,dict): rec['keys']=sorted(obj.keys())[:30]
+              except Exception:
+                  pass
+              summary.append(rec)
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2))
+          print(json.dumps(summary,ensure_ascii=False)[:12000])
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-index-recovery-20260914
+          path: probe/
+          retention-days: 30
