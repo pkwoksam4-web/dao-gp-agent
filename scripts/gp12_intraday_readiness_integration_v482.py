@@ -9,6 +9,7 @@ import gp12_formal_input_readiness_v1 as base
 
 ARTIFACT = 'GP12_FORMAL_INPUT_READINESS_INTRADAY_V482'
 VERSION = 'V4.82'
+UPSTREAM_ARTIFACT = 'GP12_FORMAL_INPUT_READINESS_V1'
 BINDING_ARTIFACT = 'GP12_INTRADAY_FORMAL847_BINDING_V1'
 BINDING_SHA256 = 'd65a7dac16525f360a4fc93b104c49e8ba279f7eae7c7ac0ba9fba834fc99573'
 FORMAL_START = '2020-06-01'
@@ -89,7 +90,8 @@ def build_intraday_checkpoint(parameters: dict, factors: dict, upstream_evidence
         **report,
         'artifact': ARTIFACT,
         'version': VERSION,
-        'upstream_artifact': upstream_evidence['artifact'],
+        'upstream_artifact': UPSTREAM_ARTIFACT,
+        'upstream_evidence_artifact': upstream_evidence['artifact'],
         'intraday_binding_artifact': BINDING_ARTIFACT,
         'intraday_binding_sha256': binding_sha,
         'formal_847_minute_byte_coverage_verified': coverage['formal_847_minute_byte_coverage_verified'],
