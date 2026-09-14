@@ -1,0 +1,136 @@
+name: Ecosystems cached repository recovery
+
+on:
+  push:
+    branches:
+      - gp-ecosystems-recovery-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Query ecosyste.ms cached services
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe/repos probe/commits probe/timeline probe/archives
+          ua='dao-gp-agent-provenance-probe/3.0'
+
+          fetch() {
+            name="$1"
+            url="$2"
+            mkdir -p "$(dirname "probe/$name")"
+            curl -L --retry 2 --connect-timeout 12 --max-time 120 -sS -A "$ua" \
+              -w '%{http_code}\n' -D "probe/${name}.headers" -o "probe/${name}.body" "$url" \
+              > "probe/${name}.status" 2> "probe/${name}.err" || true
+          }
+
+          fetch repos/data_lake 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake'
+          fetch repos/data_lake_manifests 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/manifests'
+          fetch repos/data_lake_tags 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/tags'
+          fetch repos/data_lake_releases 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/releases'
+          fetch repos/data_lake_sbom 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/sbom'
+
+          fetch repos/alphaagent 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent'
+          fetch repos/alphaagent_manifests 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/manifests'
+          fetch repos/alphaagent_tags 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/tags'
+          fetch repos/alphaagent_releases 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/releases'
+          fetch repos/alphaagent_sbom 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/sbom'
+
+          fetch commits/data_lake_lookup 'https://commits.ecosyste.ms/api/v1/repositories/lookup?url=https%3A%2F%2Fgithub.com%2Fleo-quant-research%2Fdata_lake'
+          fetch commits/data_lake_repo 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake'
+          fetch commits/data_lake_commits_p1 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/commits?per_page=100&page=1&order=asc'
+          fetch commits/data_lake_commits_p2 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/commits?per_page=100&page=2&order=asc'
+
+          fetch commits/alphaagent_lookup 'https://commits.ecosyste.ms/api/v1/repositories/lookup?url=https%3A%2F%2Fgithub.com%2Fleo-quant-research%2FAlphaAgent'
+          fetch commits/alphaagent_repo 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent'
+          fetch commits/alphaagent_commits_p1 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/commits?per_page=100&page=1&order=asc'
+          fetch commits/alphaagent_commits_p2 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/commits?per_page=100&page=2&order=asc'
+
+          fetch timeline/data_lake 'https://timeline.ecosyste.ms/api/v1/events/leo-quant-research%2Fdata_lake?per_page=100&page=1'
+          fetch timeline/alphaagent 'https://timeline.ecosyste.ms/api/v1/events/leo-quant-research%2FAlphaAgent?per_page=100&page=1'
+
+          qdl=$(python -c 'import urllib.parse; print(urllib.parse.quote("https://codeload.github.com/leo-quant-research/data_lake/tar.gz/refs/heads/main", safe=""))')
+          qaa=$(python -c 'import urllib.parse; print(urllib.parse.quote("https://codeload.github.com/leo-quant-research/AlphaAgent/tar.gz/refs/heads/main", safe=""))')
+          fetch archives/data_lake_list "https://archives.ecosyste.ms/api/v1/archives/list?url=$qdl"
+          fetch archives/alphaagent_list "https://archives.ecosyste.ms/api/v1/archives/list?url=$qaa"
+
+          for path in README.md docs/architecture.md docs/roadmap.md docs/qa_p0_p3_20260713.md .cursor/rules/lake-factor-lab-coordination.mdc .cursor/skills/factor-pipeline-memory/SKILL.md; do
+            qp=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$path")
+            safe=$(echo "$path" | tr '/.' '__')
+            fetch "archives/data_lake_${safe}" "https://archives.ecosyste.ms/api/v1/archives/contents?url=$qdl&path=$qp"
+          done
+          for path in README.md .cursor/rules/agent-json-outputs.mdc; do
+            qp=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$path")
+            safe=$(echo "$path" | tr '/.' '__')
+            fetch "archives/alphaagent_${safe}" "https://archives.ecosyste.ms/api/v1/archives/contents?url=$qaa&path=$qp"
+          done
+
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, hashlib
+          from pathlib import Path
+          root=Path('probe')
+          rows=[]
+          for status in sorted(root.rglob('*.status')):
+              base=Path(str(status)[:-7])
+              body=Path(str(base)+'.body')
+              code=status.read_text(errors='replace').strip()
+              data=body.read_bytes() if body.exists() else b''
+              entry={'name':str(base.relative_to(root)),'http_status':code,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest() if data else None}
+              if data:
+                  text=data.decode('utf-8','replace')
+                  try:
+                      obj=json.loads(text)
+                      entry['json_type']=type(obj).__name__
+                      if isinstance(obj,list):
+                          entry['json_count']=len(obj)
+                          if obj and isinstance(obj[0],dict): entry['first_keys']=sorted(obj[0].keys())[:30]
+                      elif isinstance(obj,dict):
+                          entry['keys']=sorted(obj.keys())[:50]
+                          for k in ['id','uuid','full_name','default_branch','total_commits','total_committers','last_synced_at','last_synced_commit']:
+                              if k in obj: entry[k]=obj[k]
+                  except Exception:
+                      entry['preview']=text[:500]
+              rows.append(entry)
+          (root/'summary.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2),'utf-8')
+
+          commits=[]; manifests=[]; timelines=[]
+          for p in sorted((root/'commits').glob('*commits_p*.body')):
+              try: obj=json.loads(p.read_text('utf-8'))
+              except Exception: continue
+              if isinstance(obj,list):
+                  for x in obj:
+                      if isinstance(x,dict): commits.append({'source':p.name, **{k:x.get(k) for k in ['sha','message','author','committer','timestamp','merge','html_url']}})
+          for p in sorted((root/'repos').glob('*_manifests.body')):
+              try: obj=json.loads(p.read_text('utf-8'))
+              except Exception: continue
+              if isinstance(obj,list):
+                  for x in obj:
+                      if isinstance(x,dict): manifests.append({'source':p.name, **x})
+          for p in sorted((root/'timeline').glob('*.body')):
+              try: obj=json.loads(p.read_text('utf-8'))
+              except Exception: continue
+              seq=obj if isinstance(obj,list) else [obj]
+              for x in seq:
+                  if isinstance(x,dict): timelines.append({'source':p.name, **x})
+          (root/'recovered_commits.json').write_text(json.dumps(commits,ensure_ascii=False,indent=2),'utf-8')
+          (root/'recovered_manifests.json').write_text(json.dumps(manifests,ensure_ascii=False,indent=2),'utf-8')
+          (root/'recovered_timeline.json').write_text(json.dumps(timelines,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'commit_count':len(commits),'manifest_count':len(manifests),'timeline_count':len(timelines)},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecosystems-cached-recovery-20260914
+          path: probe/
+          retention-days: 30
