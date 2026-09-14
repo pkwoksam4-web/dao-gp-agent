@@ -12,16 +12,16 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - name: Scan Aug 1-3 for repo id and name
+      - name: Scan Aug 4-7 for repo id and name
         shell: bash
         run: |
           set -u
           mkdir -p out
           : > out/matches.jsonl
           : > out/status.tsv
-          for day in 01 02 03; do
+          for day in 04 05 06 07; do
             for hour in $(seq 0 23); do
               u="https://data.gharchive.org/2026-08-${day}-${hour}.json.gz"
               tmp="/tmp/gha-${day}-${hour}.gz"
@@ -41,15 +41,12 @@ jobs:
           for line in p.read_text(errors='replace').splitlines():
               try: o=json.loads(line)
               except: continue
-              rows.append({
-                  'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),
-                  'actor':o.get('actor'),'repo':o.get('repo'),'payload':o.get('payload')
-              })
+              rows.append({'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),'actor':o.get('actor'),'repo':o.get('repo'),'payload':o.get('payload')})
           pathlib.Path('out/matches_pretty.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
           print(json.dumps(rows,indent=2,ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: alphaagent-origin-gharchive-20260914-aug01-03
+          name: alphaagent-origin-gharchive-20260914-aug04-07
           path: out
           retention-days: 30
