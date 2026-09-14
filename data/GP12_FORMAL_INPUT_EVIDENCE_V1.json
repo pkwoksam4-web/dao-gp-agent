@@ -131,22 +131,22 @@
       "blockers": ["STATUS_SEMANTICS_INCOMPLETE"]
     },
     "intraday_15m": {
-      "binding_state": "BOUND_VERIFIED_ARTIFACT",
-      "pit_state": "PIT_VERIFIED",
-      "source_artifact": "GP12_INTRADAY_FORMAL847_BINDING_V1",
-      "source_sha256": "d65a7dac16525f360a4fc93b104c49e8ba279f7eae7c7ac0ba9fba834fc99573",
-      "coverage_start": "2020-06-01",
-      "coverage_end": "2026-04-17",
-      "blockers": []
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["INTRADAY_15M_UNBOUND"]
     },
     "intraday_60m": {
-      "binding_state": "BOUND_VERIFIED_ARTIFACT",
-      "pit_state": "PIT_VERIFIED",
-      "source_artifact": "GP12_INTRADAY_FORMAL847_BINDING_V1",
-      "source_sha256": "d65a7dac16525f360a4fc93b104c49e8ba279f7eae7c7ac0ba9fba834fc99573",
-      "coverage_start": "2020-06-01",
-      "coverage_end": "2026-04-17",
-      "blockers": []
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["INTRADAY_60M_UNBOUND"]
     }
   }
 }
