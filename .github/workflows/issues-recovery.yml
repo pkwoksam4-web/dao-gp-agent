@@ -1,0 +1,114 @@
+name: Retained issue and commit cache probe
+
+on:
+  push:
+    branches:
+      - gp-issues-recovery-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Query issues and commits services
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe/issues probe/commits
+          ua='dao-gp-agent-provenance-probe/3.1'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 2 --connect-timeout 12 --max-time 90 -sS -A "$ua" \
+              -w '%{http_code}\n' -D "probe/${name}.headers" -o "probe/${name}.body" "$url" \
+              > "probe/${name}.status" 2> "probe/${name}.err" || true
+          }
+
+          for repo in data_lake AlphaAgent; do
+            qrepo=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote("leo-quant-research/"+sys.argv[1], safe=""))' "$repo")
+            qurl=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote("https://github.com/leo-quant-research/"+sys.argv[1], safe=""))' "$repo")
+            low=$(echo "$repo" | tr '[:upper:]' '[:lower:]')
+            fetch "issues/${low}_lookup" "https://issues.ecosyste.ms/api/v1/repositories/lookup?url=$qurl"
+            fetch "issues/${low}_repo" "https://issues.ecosyste.ms/api/v1/hosts/GitHub/repositories/$qrepo"
+            fetch "issues/${low}_list" "https://issues.ecosyste.ms/api/v1/hosts/GitHub/repositories/$qrepo/issues?per_page=100&page=1&sort=created_at&order=asc"
+            fetch "issues/${low}_labels" "https://issues.ecosyste.ms/api/v1/hosts/GitHub/repositories/$qrepo/labels"
+            fetch "commits/${low}_repo_poll" "https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/$qrepo"
+            fetch "commits/${low}_list_poll" "https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/$qrepo/commits?per_page=100&page=1&sort=timestamp&order=asc"
+          done
+
+      - name: Fetch any discovered issues individually
+        shell: bash
+        run: |
+          set +e
+          ua='dao-gp-agent-provenance-probe/3.1'
+          python - <<'PY' > /tmp/issues.tsv
+          import json
+          from pathlib import Path
+          for p in sorted(Path('probe/issues').glob('*_list.body')):
+              try: obj=json.loads(p.read_text('utf-8'))
+              except Exception: continue
+              if not isinstance(obj,list): continue
+              repo='AlphaAgent' if p.name.startswith('alphaagent') else 'data_lake'
+              for x in obj:
+                  if isinstance(x,dict) and x.get('number') is not None:
+                      print(repo, x['number'], sep='\t')
+          PY
+          while IFS=$'\t' read -r repo num; do
+            [ -n "$repo" ] || continue
+            qrepo=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote("leo-quant-research/"+sys.argv[1], safe=""))' "$repo")
+            low=$(echo "$repo" | tr '[:upper:]' '[:lower:]')
+            curl -L --retry 2 --connect-timeout 12 --max-time 90 -sS -A "$ua" \
+              -w '%{http_code}\n' -D "probe/issues/${low}_issue_${num}.headers" \
+              -o "probe/issues/${low}_issue_${num}.body" \
+              "https://issues.ecosyste.ms/api/v1/hosts/GitHub/repositories/$qrepo/issues/$num" \
+              > "probe/issues/${low}_issue_${num}.status" 2> "probe/issues/${low}_issue_${num}.err" || true
+          done < /tmp/issues.tsv
+
+      - name: Summarize evidence
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('probe')
+          summary=[]; issues=[]; commits=[]
+          for st in sorted(root.rglob('*.status')):
+              base=Path(str(st)[:-7]); body=Path(str(base)+'.body')
+              data=body.read_bytes() if body.exists() else b''
+              rec={'name':str(base.relative_to(root)),'status':st.read_text(errors='replace').strip(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest() if data else None}
+              if data:
+                  try:
+                      obj=json.loads(data.decode('utf-8','replace'))
+                      rec['json_type']=type(obj).__name__
+                      if isinstance(obj,list): rec['count']=len(obj)
+                      elif isinstance(obj,dict): rec['keys']=sorted(obj.keys())[:50]
+                  except Exception: rec['preview']=data.decode('utf-8','replace')[:500]
+              summary.append(rec)
+          for p in sorted((root/'issues').glob('*_list.body')):
+              try: obj=json.loads(p.read_text('utf-8'))
+              except Exception: continue
+              if isinstance(obj,list):
+                  for x in obj:
+                      if isinstance(x,dict): issues.append({'source':p.name,**x})
+          for p in sorted((root/'commits').glob('*_list_poll.body')):
+              try: obj=json.loads(p.read_text('utf-8'))
+              except Exception: continue
+              if isinstance(obj,list):
+                  for x in obj:
+                      if isinstance(x,dict): commits.append({'source':p.name,**x})
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          (root/'recovered_issues.json').write_text(json.dumps(issues,ensure_ascii=False,indent=2),'utf-8')
+          (root/'recovered_commits_poll.json').write_text(json.dumps(commits,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'issues':len(issues),'commits':len(commits),'issue_titles':[x.get('title') for x in issues]},ensure_ascii=False))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issues-commit-cache-probe-20260914
+          path: probe/
+          retention-days: 30
