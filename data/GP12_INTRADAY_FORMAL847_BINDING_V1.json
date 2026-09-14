@@ -1,0 +1,45 @@
+{
+  "artifact": "GP12_INTRADAY_FORMAL847_BINDING_V1",
+  "version": "1.0",
+  "formal_start": "2020-06-01",
+  "formal_end": "2026-04-17",
+  "primary_source": {
+    "dataset": "neigezhu/china-a-share-1min-ohlcv",
+    "snapshot_commit": "f311a5f11569e9d541386982d15f2214d9970b8a",
+    "coverage_review_artifact": "INTRADAY_FORMAL847_COVERAGE_REVIEW_V482",
+    "scaleout_run_id": 34446872502,
+    "formal_symbols": 847,
+    "required_trade_dates": 1011607,
+    "primary_valid_trade_dates": 1011606,
+    "primary_missing_trade_dates": 1,
+    "unique_gap": "000638.SZ/2026-04-13"
+  },
+  "exact_fallback": {
+    "provider": "BaoStock",
+    "symbol": "000638.SZ",
+    "date": "2026-04-13",
+    "query_code": "sz.000638",
+    "adjustflag": "3",
+    "run_id": 34452654219,
+    "artifact_id": 10142164418,
+    "artifact_zip_sha256": "eaf42fa65436c874e252fc7426612f40b46597f6be2c1738fb2bfc3fbb823e60",
+    "bars_5m_count": 48,
+    "bars_15m_count": 16,
+    "bars_60m_count": 4,
+    "bars_5m_canonical_sha256": "6cb7243bf6b535a6dd3ef9991025a1394a2c1913f5ae963c06c63f139e6347db",
+    "bars_15m_canonical_sha256": "f4aaa1728793a02b3e8804789ec0cee1ca1c1e15d7bdda1a22247ac295e6420c",
+    "bars_60m_canonical_sha256": "f6ef9280856e0946d1970ea13f680fff14139a258a6aaf9b811fb2da0a4cc6d7"
+  },
+  "coverage": {
+    "formal_847_15m_coverage_verified": true,
+    "formal_847_60m_coverage_verified": true,
+    "formal_847_minute_byte_coverage_verified": false,
+    "historical_gp_intraday_resampling_contract_recovered": false,
+    "factor_formula_recovered": false
+  },
+  "safety": {
+    "candidate_adoption_status": "UNAPPROVED",
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
