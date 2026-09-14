@@ -1,4 +1,4 @@
-name: data_lake hidden interval GH Archive scan
+name: Software Heritage revision object probe
 
 on:
   push:
@@ -10,70 +10,48 @@ permissions:
   contents: read
 
 jobs:
-  scan:
-    strategy:
-      fail-fast: false
-      matrix:
-        chunk:
-          - {name: jul18-24, start: '2026-07-18', end: '2026-07-24'}
-          - {name: jul25-31, start: '2026-07-25', end: '2026-07-31'}
-          - {name: aug01-07, start: '2026-08-01', end: '2026-08-07'}
+  probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
-      - name: Scan ${{ matrix.chunk.name }} for hidden data_lake activity
+      - name: Probe commit SHAs directly in Software Heritage
         shell: bash
-        env:
-          START_DATE: ${{ matrix.chunk.start }}
-          END_DATE: ${{ matrix.chunk.end }}
         run: |
           set -u
-          mkdir -p out
-          : > out/matches.jsonl
+          mkdir -p out/bodies
           : > out/status.tsv
-          d="$START_DATE"
-          while :; do
-            for hour in $(seq 0 23); do
-              u="https://data.gharchive.org/${d}-${hour}.json.gz"
-              tmp="/tmp/gha-${d}-${hour}.gz"
-              code=$(curl -L --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 -sS -o "$tmp" -w '%{http_code}' "$u" || true)
-              bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
-              printf '%s\t%s\t%s\t%s\n' "$d" "$hour" "$code" "$bytes" >> out/status.tsv
-              if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
-                gzip -dc "$tmp" 2>/dev/null | grep -F -e '1296046921' -e 'leo-quant-research/data_lake' -e '300349603' >> out/matches.jsonl || true
-              fi
-              rm -f "$tmp"
-            done
-            [ "$d" = "$END_DATE" ] && break
-            d=$(date -I -d "$d + 1 day")
-          done
+          cat > out/targets.tsv <<'EOF'
+          data_lake d659e6a5d849d8557e4cb2b25f9014f94ef3dec4
+          data_lake eb1345a857c7fd577f3102cd18812bc0924bf4c2
+          data_lake 993c24cf8aea3e63619e35ee4f9f2639810431a2
+          data_lake f46f72eda893fa2abb5abe020e1cb67b233d9a59
+          data_lake 39ae5ede04027f3d41de03fac658bb0728b45361
+          AlphaAgent 25812984ac52635af50c6522b964c5ed9f1fa658
+          AlphaAgent b813095f2fb17d0e890e0a80cc86ad222700b9ef
+          AlphaAgent 166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8
+          EOF
+          while read -r repo sha; do
+            url="https://archive.softwareheritage.org/api/1/revision/${sha}/"
+            body="out/bodies/${sha}.json"
+            code=$(curl -L --retry 2 --retry-delay 2 --connect-timeout 15 --max-time 60 -sS -A 'dao-gp-recovery/1.0' -o "$body" -w '%{http_code}' "$url" || true)
+            bytes=$(stat -c%s "$body" 2>/dev/null || echo 0)
+            printf '%s\t%s\t%s\t%s\n' "$repo" "$sha" "$code" "$bytes" >> out/status.tsv
+          done < out/targets.tsv
           python - <<'PY'
           import json, pathlib
-          p=pathlib.Path('out/matches.jsonl')
-          rows=[]; seen=set()
-          for line in p.read_text(errors='replace').splitlines():
-              try: o=json.loads(line)
-              except Exception: continue
-              repo=o.get('repo') or {}; actor=o.get('actor') or {}
-              if repo.get('id') != 1296046921 and repo.get('name') != 'leo-quant-research/data_lake' and actor.get('id') != 300349603:
-                  continue
-              eid=str(o.get('id'))
-              if eid in seen: continue
-              seen.add(eid)
-              rows.append({'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),'public':o.get('public'),'actor':actor,'repo':repo,'org':o.get('org'),'payload':o.get('payload')})
-          rows.sort(key=lambda x:x.get('created_at') or '')
-          pathlib.Path('out/matches_pretty.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
-          status=[]
+          rows=[]
           for line in pathlib.Path('out/status.tsv').read_text().splitlines():
-              date,hour,code,bytes_=line.split('\t')
-              status.append((date,int(hour),code,int(bytes_)))
-          summary={'hours':len(status),'http_200':sum(c=='200' for _,_,c,_ in status),'bad_hours':[(d,h,c,b) for d,h,c,b in status if c!='200' or b<=1000],'match_count':len(rows)}
-          pathlib.Path('out/summary.json').write_text(json.dumps(summary,indent=2,ensure_ascii=False))
-          print(json.dumps(summary,indent=2,ensure_ascii=False))
+              repo,sha,code,bytes_=line.split('\t')
+              body=pathlib.Path('out/bodies',sha+'.json').read_text(errors='replace')
+              parsed=None
+              try: parsed=json.loads(body)
+              except Exception: pass
+              rows.append({'repo':repo,'sha':sha,'http_code':int(code or 0),'bytes':int(bytes_),'body':parsed if parsed is not None else body[:1000]})
+          pathlib.Path('out/results.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
           print(json.dumps(rows,indent=2,ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: datalake-hidden-interval-${{ matrix.chunk.name }}
+          name: swh-revision-object-probe-20260914
           path: out
           retention-days: 30
