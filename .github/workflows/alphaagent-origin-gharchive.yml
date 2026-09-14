@@ -1,4 +1,4 @@
-name: Software Heritage revision object probe
+name: Wayback wildcard inventory for deleted repos
 
 on:
   push:
@@ -10,48 +10,51 @@ permissions:
   contents: read
 
 jobs:
-  probe:
+  inventory:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Probe commit SHAs directly in Software Heritage
+      - name: Enumerate archived URLs for deleted repositories
         shell: bash
         run: |
           set -u
-          mkdir -p out/bodies
+          mkdir -p out
           : > out/status.tsv
-          cat > out/targets.tsv <<'EOF'
-          data_lake d659e6a5d849d8557e4cb2b25f9014f94ef3dec4
-          data_lake eb1345a857c7fd577f3102cd18812bc0924bf4c2
-          data_lake 993c24cf8aea3e63619e35ee4f9f2639810431a2
-          data_lake f46f72eda893fa2abb5abe020e1cb67b233d9a59
-          data_lake 39ae5ede04027f3d41de03fac658bb0728b45361
-          AlphaAgent 25812984ac52635af50c6522b964c5ed9f1fa658
-          AlphaAgent b813095f2fb17d0e890e0a80cc86ad222700b9ef
-          AlphaAgent 166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8
-          EOF
-          while read -r repo sha; do
-            url="https://archive.softwareheritage.org/api/1/revision/${sha}/"
-            body="out/bodies/${sha}.json"
-            code=$(curl -L --retry 2 --retry-delay 2 --connect-timeout 15 --max-time 60 -sS -A 'dao-gp-recovery/1.0' -o "$body" -w '%{http_code}' "$url" || true)
+          python - <<'PY' > out/queries.tsv
+          import urllib.parse
+          qs=[
+            ('data_lake_github','github.com/leo-quant-research/data_lake/*'),
+            ('data_lake_raw','raw.githubusercontent.com/leo-quant-research/data_lake/*'),
+            ('data_lake_api','api.github.com/repos/leo-quant-research/data_lake/*'),
+            ('alphaagent_github','github.com/leo-quant-research/AlphaAgent/*'),
+            ('alphaagent_raw','raw.githubusercontent.com/leo-quant-research/AlphaAgent/*'),
+          ]
+          for name,target in qs:
+              params={'url':target,'from':'2026','to':'2026','output':'json','fl':'timestamp,original,statuscode,mimetype,digest','filter':'statuscode:200','collapse':'urlkey','limit':'5000'}
+              print(name+'\t'+'https://web.archive.org/cdx/search/cdx?'+urllib.parse.urlencode(params))
+          PY
+          while IFS=$'\t' read -r name url; do
+            body="out/${name}.json"
+            code=$(curl -L --retry 2 --retry-delay 2 --connect-timeout 15 --max-time 90 -sS -A 'Mozilla/5.0' -o "$body" -w '%{http_code}' "$url" || true)
             bytes=$(stat -c%s "$body" 2>/dev/null || echo 0)
-            printf '%s\t%s\t%s\t%s\n' "$repo" "$sha" "$code" "$bytes" >> out/status.tsv
-          done < out/targets.tsv
+            printf '%s\t%s\t%s\n' "$name" "$code" "$bytes" >> out/status.tsv
+          done < out/queries.tsv
           python - <<'PY'
-          import json, pathlib
-          rows=[]
+          import json,pathlib
+          summary={}
           for line in pathlib.Path('out/status.tsv').read_text().splitlines():
-              repo,sha,code,bytes_=line.split('\t')
-              body=pathlib.Path('out/bodies',sha+'.json').read_text(errors='replace')
-              parsed=None
-              try: parsed=json.loads(body)
+              name,code,bytes_=line.split('\t')
+              p=pathlib.Path('out',name+'.json')
+              txt=p.read_text(errors='replace') if p.exists() else ''
+              rows=None
+              try: rows=json.loads(txt)
               except Exception: pass
-              rows.append({'repo':repo,'sha':sha,'http_code':int(code or 0),'bytes':int(bytes_),'body':parsed if parsed is not None else body[:1000]})
-          pathlib.Path('out/results.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
-          print(json.dumps(rows,indent=2,ensure_ascii=False))
+              summary[name]={'http_code':int(code or 0),'bytes':int(bytes_),'rows':(len(rows)-1 if isinstance(rows,list) and rows else None),'sample':rows[:20] if isinstance(rows,list) else txt[:1500]}
+          pathlib.Path('out/summary.json').write_text(json.dumps(summary,indent=2,ensure_ascii=False))
+          print(json.dumps(summary,indent=2,ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: swh-revision-object-probe-20260914
+          name: wayback-wildcard-inventory-20260914
           path: out
           retention-days: 30
