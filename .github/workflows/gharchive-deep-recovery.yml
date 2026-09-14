@@ -1,0 +1,125 @@
+name: GH Archive deep recovery
+
+on:
+  push:
+    branches:
+      - gp-gharchive-deep-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download targeted GH Archive hours and extract events
+        shell: bash
+        run: |
+          set +e
+          mkdir -p ghdeep/raw ghdeep/hits
+
+          cat > ghdeep/targets.tsv <<'EOF'
+          2026-08-08	4
+          2026-08-09	4
+          2026-08-11	3
+          2026-08-11	4
+          2026-08-11	5
+          2026-08-11	6
+          EOF
+
+          while IFS=$'\t' read -r date hour; do
+            url="https://data.gharchive.org/${date}-${hour}.json.gz"
+            out="ghdeep/raw/${date}-${hour}.json.gz"
+            echo "fetch $url"
+            curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 240 -A 'dao-gp-agent-gharchive-deep/1.0' "$url" -o "$out"
+            if [ ! -s "$out" ]; then
+              echo "missing $url" >> ghdeep/errors.txt
+              rm -f "$out"
+            fi
+          done < ghdeep/targets.tsv
+
+          python - <<'PY'
+          import gzip, json
+          from pathlib import Path
+
+          root=Path('ghdeep')
+          repo_id=1296046921
+          repo_name='leo-quant-research/data_lake'
+          target_push_ids={39420002630,39481233901,37444180219}
+          terms=['zjzesheng','legacy_codes','0_5_1','WHC','haochenw-TITI','leo-quant-research/data_lake']
+          matched=[]
+          stats=[]
+
+          for p in sorted((root/'raw').glob('*.json.gz')):
+            total=0; hits=0
+            try:
+              with gzip.open(p,'rt',encoding='utf-8',errors='replace') as f:
+                for line in f:
+                  total += 1
+                  try: ev=json.loads(line)
+                  except Exception: continue
+                  repo=ev.get('repo') or {}
+                  actor=ev.get('actor') or {}
+                  payload=ev.get('payload') or {}
+                  raw=line
+                  is_target=(repo.get('id')==repo_id or repo.get('name')==repo_name or payload.get('push_id') in target_push_ids)
+                  text_hit=any(t.lower() in raw.lower() for t in terms)
+                  if not (is_target or text_hit):
+                    continue
+                  hits += 1
+                  rec={
+                    'source_file':p.name,
+                    'id':ev.get('id'),
+                    'type':ev.get('type'),
+                    'created_at':ev.get('created_at'),
+                    'actor':actor,
+                    'repo':repo,
+                    'payload':payload,
+                    'public':ev.get('public'),
+                    'org':ev.get('org'),
+                  }
+                  matched.append(rec)
+            except Exception as e:
+              (root/'errors.txt').open('a',encoding='utf-8').write(f'{p.name}: {e!r}\n')
+            stats.append({'file':p.name,'total_events':total,'matched_events':hits})
+
+          (root/'matched_events.json').write_text(json.dumps(matched,ensure_ascii=False,indent=2),'utf-8')
+          (root/'stats.json').write_text(json.dumps(stats,ensure_ascii=False,indent=2),'utf-8')
+
+          pushes=[]
+          for ev in matched:
+            if ev.get('type')!='PushEvent':
+              continue
+            pl=ev.get('payload') or {}
+            pushes.append({
+              'created_at':ev.get('created_at'),
+              'repo':(ev.get('repo') or {}).get('name'),
+              'repo_id':(ev.get('repo') or {}).get('id'),
+              'actor':(ev.get('actor') or {}).get('login'),
+              'push_id':pl.get('push_id'),
+              'ref':pl.get('ref'),
+              'before':pl.get('before'),
+              'head':pl.get('head'),
+              'size':pl.get('size'),
+              'distinct_size':pl.get('distinct_size'),
+              'commits':pl.get('commits'),
+            })
+          (root/'pushes_compact.json').write_text(json.dumps(pushes,ensure_ascii=False,indent=2),'utf-8')
+
+          print(json.dumps({
+            'files':stats,
+            'matched_count':len(matched),
+            'push_count':len(pushes),
+            'pushes':pushes,
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload deep recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gharchive-deep-recovery-20260914
+          path: ghdeep/
+          retention-days: 30
