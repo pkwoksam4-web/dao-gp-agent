@@ -11,36 +11,37 @@ permissions:
 
 jobs:
   scan:
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk:
+          - {name: jul01-08, start: 1, end: 8}
+          - {name: jul09-16, start: 9, end: 16}
+          - {name: jul17-24, start: 17, end: 24}
+          - {name: jul25-31, start: 25, end: 31}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Scan forward from Aug 8 for first repo event
+      - name: Scan ${{ matrix.chunk.name }} for repo id and name
         shell: bash
         run: |
           set -u
           mkdir -p out
           : > out/matches.jsonl
           : > out/status.tsv
-          found=0
-          for day in $(seq -w 8 31); do
+          for daynum in $(seq ${{ matrix.chunk.start }} ${{ matrix.chunk.end }}); do
+            day=$(printf '%02d' "$daynum")
             for hour in $(seq 0 23); do
-              u="https://data.gharchive.org/2026-08-${day}-${hour}.json.gz"
+              u="https://data.gharchive.org/2026-07-${day}-${hour}.json.gz"
               tmp="/tmp/gha-${day}-${hour}.gz"
-              hit="/tmp/hit-${day}-${hour}.jsonl"
               code=$(curl -L --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 -sS -o "$tmp" -w '%{http_code}' "$u" || true)
               bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
-              printf '2026-08-%s\t%s\t%s\t%s\n' "$day" "$hour" "$code" "$bytes" >> out/status.tsv
+              printf '2026-07-%s\t%s\t%s\t%s\n' "$day" "$hour" "$code" "$bytes" >> out/status.tsv
               if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
-                gzip -dc "$tmp" 2>/dev/null | grep -F -e '1317931511' -e 'leo-quant-research/AlphaAgent' > "$hit" || true
-                if [ -s "$hit" ]; then
-                  cat "$hit" >> out/matches.jsonl
-                  found=1
-                fi
+                gzip -dc "$tmp" 2>/dev/null | grep -F -e '1317931511' -e 'leo-quant-research/AlphaAgent' >> out/matches.jsonl || true
               fi
-              rm -f "$tmp" "$hit"
-              if [ "$found" -eq 1 ]; then break; fi
+              rm -f "$tmp"
             done
-            if [ "$found" -eq 1 ]; then break; fi
           done
           python - <<'PY'
           import json, pathlib
@@ -57,6 +58,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: alphaagent-origin-gharchive-20260914-first-event
+          name: alphaagent-origin-gharchive-20260914-${{ matrix.chunk.name }}
           path: out
           retention-days: 30
