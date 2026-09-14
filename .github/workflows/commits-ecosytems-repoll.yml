@@ -1,0 +1,67 @@
+name: Re-poll deleted repository commit cache
+
+on:
+  push:
+    branches:
+      - gp-commits-repoll-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Query commits.ecosyste.ms
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe
+          ua='dao-gp-agent-provenance-probe/3.1'
+          fetch() {
+            name="$1"; url="$2"
+            curl -L --retry 2 --connect-timeout 12 --max-time 120 -sS -A "$ua" \
+              -w '%{http_code}\n' -D "probe/${name}.headers" -o "probe/${name}.body" "$url" \
+              > "probe/${name}.status" 2> "probe/${name}.err" || true
+          }
+          fetch data_lake_repo 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake'
+          fetch data_lake_commits 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake/commits?per_page=100&page=1'
+          fetch alphaagent_repo 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent'
+          fetch alphaagent_commits 'https://commits.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent/commits?per_page=100&page=1'
+
+      - name: Summarize
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, pathlib, hashlib
+          root=pathlib.Path('probe'); rows=[]
+          for s in sorted(root.glob('*.status')):
+              stem=s.stem; body=root/(stem+'.body')
+              raw=body.read_bytes() if body.exists() else b''
+              row={'name':stem,'http_status':s.read_text(errors='replace').strip(),'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest() if raw else None}
+              if raw:
+                  text=raw.decode('utf-8','replace')
+                  try:
+                      obj=json.loads(text); row['json_type']=type(obj).__name__
+                      if isinstance(obj,dict):
+                          for k in ['status','id','full_name','default_branch','total_commits','total_committers','last_synced_at','last_synced_commit','commits_url','repository_url']:
+                              if k in obj: row[k]=obj[k]
+                      elif isinstance(obj,list):
+                          row['count']=len(obj)
+                          row['items']=[{k:x.get(k) for k in ['sha','message','author','committer','timestamp','merge','html_url']} for x in obj[:100] if isinstance(x,dict)]
+                  except Exception:
+                      row['preview']=text[:1000]
+              rows.append(row)
+          (root/'summary.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps(rows,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commits-ecosystems-repoll-20260914
+          path: probe/
+          retention-days: 30
