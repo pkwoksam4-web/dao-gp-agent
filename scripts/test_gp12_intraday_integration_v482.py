@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import pathlib
 import unittest
@@ -11,6 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 PARAMETERS_PATH = ROOT / 'data' / 'GP12_CANDIDATE_PARAMETERS_V1.json'
 FACTORS_PATH = ROOT / 'data' / 'GP12_CANDIDATE_FACTORS_V1.json'
 EVIDENCE_PATH = ROOT / 'data' / 'GP12_FORMAL_INPUT_EVIDENCE_V1.json'
+INTRADAY_BINDING_SHA256 = 'd65a7dac16525f360a4fc93b104c49e8ba279f7eae7c7ac0ba9fba834fc99573'
 
 EXPECTED_REMAINING_BLOCKERS = sorted([
     'ADJUSTED_CLOSE_PIT_UNVERIFIED',
@@ -28,6 +30,21 @@ EXPECTED_REMAINING_BLOCKERS = sorted([
 
 def load_json(path: pathlib.Path) -> dict:
     return json.loads(path.read_text(encoding='utf-8'))
+
+
+def with_intraday_binding(evidence: dict, sha256: str = INTRADAY_BINDING_SHA256) -> dict:
+    result = copy.deepcopy(evidence)
+    for family in ('intraday_15m', 'intraday_60m'):
+        result['feature_families'][family] = {
+            'binding_state': 'BOUND_VERIFIED_ARTIFACT',
+            'pit_state': 'PIT_VERIFIED',
+            'source_artifact': 'GP12_INTRADAY_FORMAL847_BINDING_V1',
+            'source_sha256': sha256,
+            'coverage_start': '2020-06-01',
+            'coverage_end': '2026-04-17',
+            'blockers': [],
+        }
+    return result
 
 
 class GP12IntradayReadinessIntegrationTests(unittest.TestCase):
@@ -56,6 +73,11 @@ class GP12IntradayReadinessIntegrationTests(unittest.TestCase):
         self.assertFalse(report['candidate_freeze_ready'])
         self.assertFalse(report['model_freeze_allowed'])
         self.assertFalse(report['oos_metrics_allowed'])
+
+    def test_intraday_binding_identity_tamper_is_rejected(self):
+        evidence = with_intraday_binding(load_json(EVIDENCE_PATH), '9' * 64)
+        validation = mod.validate_production_evidence_manifest(evidence)
+        self.assertIn('INTRADAY_EVIDENCE_INVALID', validation['blockers'])
 
 
 if __name__ == '__main__':
