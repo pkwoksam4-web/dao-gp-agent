@@ -1,0 +1,210 @@
+name: Web archive source recovery
+
+on:
+  push:
+    branches:
+      - gp-webarchive-recovery-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Query Common Crawl indexes and recover captures
+        shell: bash
+        run: |
+          set +e
+          mkdir -p probe/commoncrawl/index probe/commoncrawl/payloads probe/arquivo
+          python - <<'PY'
+          import json, urllib.request, urllib.parse, urllib.error, gzip, io, re, hashlib
+          from pathlib import Path
+
+          root=Path('probe/commoncrawl')
+          ua='dao-gp-agent-provenance-probe/4.0'
+          def get(url, timeout=60, headers=None):
+              h={'User-Agent':ua}; h.update(headers or {})
+              req=urllib.request.Request(url,headers=h)
+              try:
+                  with urllib.request.urlopen(req,timeout=timeout) as r:
+                      return getattr(r,'status',200),dict(r.headers.items()),r.read(),''
+              except urllib.error.HTTPError as e:
+                  try: data=e.read()
+                  except: data=b''
+                  return e.code,dict(e.headers.items()) if e.headers else {},data,repr(e)
+              except Exception as e:
+                  return None,{},b'',repr(e)
+
+          st,h,data,err=get('https://index.commoncrawl.org/collinfo.json')
+          (root/'collinfo.json').write_bytes(data)
+          try: cols=json.loads(data)
+          except: cols=[]
+          indexes=[]
+          for c in cols:
+              cid=c.get('id','')
+              if cid.startswith('CC-MAIN-2026-'):
+                  indexes.append((cid,c.get('cdx-api') or f'https://index.commoncrawl.org/{cid}-index'))
+          indexes.sort(reverse=True)
+
+          targets=[
+            ('github_data_lake','github.com/leo-quant-research/data_lake', 'prefix'),
+            ('github_alphaagent','github.com/leo-quant-research/AlphaAgent', 'prefix'),
+            ('github_alphaagent_lower','github.com/leo-quant-research/alphaagent', 'prefix'),
+            ('raw_data_lake','raw.githubusercontent.com/leo-quant-research/data_lake', 'prefix'),
+            ('raw_alphaagent','raw.githubusercontent.com/leo-quant-research/AlphaAgent', 'prefix'),
+            ('codeload_data_lake','codeload.github.com/leo-quant-research/data_lake', 'prefix'),
+            ('codeload_alphaagent','codeload.github.com/leo-quant-research/AlphaAgent', 'prefix'),
+          ]
+          records=[]
+          for cid,api in indexes:
+              for label,target,mt in targets:
+                  q=api+'?'+urllib.parse.urlencode({'url':target,'output':'json','matchType':mt,'filter':'status:200','limit':'100'})
+                  st,h,body,err=get(q,timeout=75)
+                  p=root/'index'/f'{cid}_{label}'
+                  p.with_suffix('.status').write_text(str(st or 'ERR'))
+                  p.with_suffix('.err').write_text(err)
+                  p.with_suffix('.body').write_bytes(body)
+                  if st!=200: continue
+                  for line in body.decode('utf-8','replace').splitlines():
+                      try: rec=json.loads(line)
+                      except: continue
+                      rec['_index']=cid; rec['_label']=label
+                      records.append(rec)
+
+          # De-duplicate by WARC segment coordinates and recover manageable text/html/json captures.
+          uniq={}
+          for r in records:
+              key=(r.get('filename'),r.get('offset'),r.get('length'))
+              if all(key): uniq[key]=r
+          recovered=[]
+          for i,(key,r) in enumerate(sorted(uniq.items(), key=lambda kv:(kv[1].get('timestamp',''),kv[1].get('url','')))):
+              if i>=150: break
+              fn,off,length=key
+              try: offi=int(off); leni=int(length)
+              except: continue
+              if leni>8_000_000: continue
+              url='https://data.commoncrawl.org/'+fn
+              st,h,seg,err=get(url,timeout=90,headers={'Range':f'bytes={offi}-{offi+leni-1}'})
+              entry={'record':r,'range_status':st,'range_bytes':len(seg),'error':err}
+              if st in (200,206) and seg:
+                  try:
+                      raw=gzip.decompress(seg)
+                  except Exception:
+                      try: raw=gzip.GzipFile(fileobj=io.BytesIO(seg)).read()
+                      except Exception: raw=seg
+                  # WARC record contains WARC headers + HTTP response headers + payload.
+                  # Save full decompressed record for provenance and a best-effort payload split.
+                  rid=hashlib.sha256((str(fn)+str(off)+str(length)).encode()).hexdigest()[:16]
+                  fullp=root/'payloads'/f'{rid}.warc_record'
+                  fullp.write_bytes(raw)
+                  marker=b'\r\n\r\n'
+                  parts=raw.split(marker,2)
+                  payload=parts[2] if len(parts)>=3 else raw
+                  pp=root/'payloads'/f'{rid}.payload'
+                  pp.write_bytes(payload)
+                  entry.update({'id':rid,'warc_bytes':len(raw),'payload_bytes':len(payload),'payload_sha256':hashlib.sha256(payload).hexdigest(),'warc_file':str(fullp.relative_to(Path('probe'))),'payload_file':str(pp.relative_to(Path('probe')))})
+              recovered.append(entry)
+
+          (root/'records.json').write_text(json.dumps(records,ensure_ascii=False,indent=2),'utf-8')
+          (root/'recovered.json').write_text(json.dumps(recovered,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'indexes':len(indexes),'raw_records':len(records),'unique_records':len(uniq),'recovery_attempts':len(recovered),'recovered_payloads':sum(1 for x in recovered if x.get('payload_file'))},ensure_ascii=False))
+          PY
+
+      - name: Query Arquivo.pt URL history and full text
+        shell: bash
+        run: |
+          set +e
+          python - <<'PY'
+          import json, urllib.request, urllib.parse, urllib.error, hashlib
+          from pathlib import Path
+          root=Path('probe/arquivo'); root.mkdir(parents=True,exist_ok=True)
+          ua='dao-gp-agent-provenance-probe/4.0'
+          def fetch(name,url):
+              req=urllib.request.Request(url,headers={'User-Agent':ua})
+              status=None; data=b''; err=''; headers={}
+              try:
+                  with urllib.request.urlopen(req,timeout=90) as r:
+                      status=getattr(r,'status',200); headers=dict(r.headers.items()); data=r.read()
+              except urllib.error.HTTPError as e:
+                  status=e.code; headers=dict(e.headers.items()) if e.headers else {}
+                  try:data=e.read()
+                  except:data=b''
+                  err=repr(e)
+              except Exception as e: err=repr(e)
+              (root/f'{name}.status').write_text(str(status or 'ERR'))
+              (root/f'{name}.headers').write_text(json.dumps(headers,ensure_ascii=False,indent=2))
+              (root/f'{name}.body').write_bytes(data)
+              (root/f'{name}.err').write_text(err)
+              return status,data
+
+          urls={
+            'data_lake_root':'https://github.com/leo-quant-research/data_lake',
+            'data_lake_arch':'https://github.com/leo-quant-research/data_lake/blob/main/docs/architecture.md',
+            'data_lake_qa':'https://github.com/leo-quant-research/data_lake/blob/main/docs/qa_p0_p3_20260713.md',
+            'data_lake_raw_arch':'https://raw.githubusercontent.com/leo-quant-research/data_lake/main/docs/architecture.md',
+            'alphaagent_root':'https://github.com/leo-quant-research/AlphaAgent',
+            'alphaagent_readme':'https://github.com/leo-quant-research/AlphaAgent/blob/main/README.md',
+            'alphaagent_raw_readme':'https://raw.githubusercontent.com/leo-quant-research/AlphaAgent/main/README.md',
+          }
+          found=[]
+          for name,u in urls.items():
+              q='https://arquivo.pt/textsearch?'+urllib.parse.urlencode({'versionHistory':u,'from':'20260701','to':'20260914','maxItems':'100','prettyPrint':'false'})
+              st,data=fetch(name+'_history',q)
+              if st==200:
+                  try: obj=json.loads(data)
+                  except: obj={}
+                  items=obj.get('response_items') or []
+                  for j,it in enumerate(items[:30]):
+                      it2={'query':name,**it}; found.append(it2)
+                      noframe=it.get('linkToNoFrame') or it.get('linkToOriginalFile') or it.get('linkToArchive')
+                      if noframe:
+                          fetch(f'{name}_capture_{j}',noframe)
+          # full-text unique fingerprints, because a URL-specific capture can be absent while text index remains.
+          terms={
+            'rolling_rank':'"rolling_rank_quantile_weighted_stats_fast"',
+            'legacy_codes':'"legacy_codes" "WHC"',
+            'factor_pair':'"liquidity_cut" "growth_moti"',
+            'pkl_chain':'"factors_raw.pkl" "df_z_e"',
+          }
+          for name,qterm in terms.items():
+              q='https://arquivo.pt/textsearch?'+urllib.parse.urlencode({'q':qterm,'from':'20260701','to':'20260914','maxItems':'100','prettyPrint':'false'})
+              st,data=fetch('text_'+name,q)
+              if st==200:
+                  try: obj=json.loads(data)
+                  except: obj={}
+                  for it in obj.get('response_items') or []: found.append({'query':'text_'+name,**it})
+          (root/'found.json').write_text(json.dumps(found,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps({'arquivo_items':len(found),'urls':sorted({x.get('originalURL') for x in found if x.get('originalURL')})},ensure_ascii=False)[:12000])
+          PY
+
+      - name: Build evidence summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('probe')
+          cc=json.loads((root/'commoncrawl/recovered.json').read_text('utf-8')) if (root/'commoncrawl/recovered.json').exists() else []
+          recs=json.loads((root/'commoncrawl/records.json').read_text('utf-8')) if (root/'commoncrawl/records.json').exists() else []
+          ar=json.loads((root/'arquivo/found.json').read_text('utf-8')) if (root/'arquivo/found.json').exists() else []
+          keyterms=['legacy_codes','rolling_rank_quantile_weighted_stats_fast','liquidity_cut','growth_moti','0_5_1','factors_raw.pkl','AlphaAgent','data_lake']
+          payload_hits=[]
+          for p in sorted((root/'commoncrawl/payloads').glob('*.payload')):
+              text=p.read_text('utf-8',errors='replace')
+              counts={k:text.lower().count(k.lower()) for k in keyterms}
+              if any(counts.values()): payload_hits.append({'file':str(p.relative_to(root)),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'counts':counts,'preview':text[:1000]})
+          summary={'commoncrawl_records':len(recs),'commoncrawl_recovered':sum(1 for x in cc if x.get('payload_file')),'commoncrawl_payload_hits':payload_hits,'arquivo_items':len(ar),'arquivo_urls':sorted({x.get('originalURL') for x in ar if x.get('originalURL')})}
+          (root/'summary.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2),'utf-8')
+          print(json.dumps(summary,ensure_ascii=False)[:15000])
+          PY
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webarchive-recovery-20260914
+          path: probe/
+          retention-days: 30
