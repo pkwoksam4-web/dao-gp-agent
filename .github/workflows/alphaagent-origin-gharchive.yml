@@ -1,4 +1,4 @@
-name: AlphaAgent origin GH Archive scan
+name: zjzesheng legacy migration GH Archive scan
 
 on:
   push:
@@ -15,42 +15,67 @@ jobs:
       fail-fast: false
       matrix:
         chunk:
-          - {name: jul01-08, start: 1, end: 8}
-          - {name: jul09-16, start: 9, end: 16}
-          - {name: jul17-24, start: 17, end: 24}
-          - {name: jul25-31, start: 25, end: 31}
+          - {name: aug11-18, start: '2026-08-11', end: '2026-08-18'}
+          - {name: aug19-26, start: '2026-08-19', end: '2026-08-26'}
+          - {name: aug27-sep03, start: '2026-08-27', end: '2026-09-03'}
+          - {name: sep04-08, start: '2026-09-04', end: '2026-09-08'}
+          - {name: sep09-13, start: '2026-09-09', end: '2026-09-13'}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
-      - name: Scan ${{ matrix.chunk.name }} for repo id and name
+      - name: Scan ${{ matrix.chunk.name }} for organization and migration identities
         shell: bash
+        env:
+          START_DATE: ${{ matrix.chunk.start }}
+          END_DATE: ${{ matrix.chunk.end }}
         run: |
           set -u
           mkdir -p out
           : > out/matches.jsonl
           : > out/status.tsv
-          for daynum in $(seq ${{ matrix.chunk.start }} ${{ matrix.chunk.end }}); do
-            day=$(printf '%02d' "$daynum")
+          d="$START_DATE"
+          while :; do
             for hour in $(seq 0 23); do
-              u="https://data.gharchive.org/2026-07-${day}-${hour}.json.gz"
-              tmp="/tmp/gha-${day}-${hour}.gz"
+              u="https://data.gharchive.org/${d}-${hour}.json.gz"
+              tmp="/tmp/gha-${d}-${hour}.gz"
               code=$(curl -L --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 120 -sS -o "$tmp" -w '%{http_code}' "$u" || true)
               bytes=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
-              printf '2026-07-%s\t%s\t%s\t%s\n' "$day" "$hour" "$code" "$bytes" >> out/status.tsv
+              printf '%s\t%s\t%s\t%s\n' "$d" "$hour" "$code" "$bytes" >> out/status.tsv
               if [ "$code" = "200" ] && [ "$bytes" -gt 1000 ]; then
-                gzip -dc "$tmp" 2>/dev/null | grep -F -e '1317931511' -e 'leo-quant-research/AlphaAgent' >> out/matches.jsonl || true
+                gzip -dc "$tmp" 2>/dev/null | python -c '
+import sys,json
+for line in sys.stdin:
+    try: o=json.loads(line)
+    except Exception: continue
+    actor=o.get("actor") or {}; repo=o.get("repo") or {}; org=o.get("org") or {}; payload=o.get("payload") or {}
+    repo_name=str(repo.get("name") or "")
+    actor_id=actor.get("id")
+    org_id=org.get("id")
+    org_login=str(org.get("login") or "")
+    payload_text=json.dumps(payload,ensure_ascii=False)
+    hit=(repo_name.startswith("zjzesheng/") or "legacy_codes" in repo_name.lower() or org_id==315634734 or org_login=="zjzesheng" or actor_id in (300349603,216113541) or "zjzesheng" in payload_text or "legacy_codes" in payload_text.lower())
+    if hit: print(json.dumps(o,ensure_ascii=False,separators=(",",":")))
+' >> out/matches.jsonl || true
               fi
               rm -f "$tmp"
             done
+            [ "$d" = "$END_DATE" ] && break
+            d=$(date -I -d "$d + 1 day")
           done
           python - <<'PY'
           import json, pathlib
           p=pathlib.Path('out/matches.jsonl')
-          rows=[]
+          seen=set(); rows=[]
           for line in p.read_text(errors='replace').splitlines():
               try: o=json.loads(line)
               except Exception: continue
-              rows.append({'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),'actor':o.get('actor'),'repo':o.get('repo'),'payload':o.get('payload')})
+              eid=str(o.get('id'))
+              if eid in seen: continue
+              seen.add(eid)
+              rows.append({
+                  'id':o.get('id'),'type':o.get('type'),'created_at':o.get('created_at'),
+                  'actor':o.get('actor'),'repo':o.get('repo'),'org':o.get('org'),'payload':o.get('payload')
+              })
           rows.sort(key=lambda x: x.get('created_at') or '')
           pathlib.Path('out/matches_pretty.json').write_text(json.dumps(rows,indent=2,ensure_ascii=False))
           pathlib.Path('out/first_match.json').write_text(json.dumps(rows[0] if rows else None,indent=2,ensure_ascii=False))
@@ -58,6 +83,6 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: alphaagent-origin-gharchive-20260914-${{ matrix.chunk.name }}
+          name: zjzesheng-legacy-migration-${{ matrix.chunk.name }}
           path: out
           retention-days: 30
