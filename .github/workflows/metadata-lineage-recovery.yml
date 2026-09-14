@@ -1,0 +1,64 @@
+name: Metadata lineage recovery
+
+on:
+  push:
+    branches:
+      - gp-metadata-lineage-recovery-20260914
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Probe cached lineage and archives
+        shell: bash
+        run: |
+          set -u
+          mkdir -p probe
+          probe_url() {
+            name="$1"; url="$2"
+            echo "$url" > "probe/${name}.url"
+            curl -L --retry 2 --retry-delay 2 --connect-timeout 15 --max-time 90 \
+              -D "probe/${name}.headers" -o "probe/${name}.body" -w '%{http_code}\n%{url_effective}\n%{size_download}\n' \
+              "$url" > "probe/${name}.meta" 2> "probe/${name}.err" || true
+          }
+
+          probe_url ecosys_leo_alphaagent 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2FAlphaAgent'
+          probe_url ecosys_leo_datalake 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/leo-quant-research%2Fdata_lake'
+          probe_url ecosys_upstream_alphaagent 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/RndmVariableQ%2FAlphaAgent'
+          probe_url ecosys_wang_alphaagent 'https://repos.ecosyste.ms/api/v1/hosts/GitHub/repositories/Wangchanghao12%2FAlphaAgent'
+
+          probe_url swh_legacy_origin 'https://archive.softwareheritage.org/api/1/origin/https://github.com/zjzesheng/legacy_codes/get/'
+          probe_url swh_legacy_visits 'https://archive.softwareheritage.org/api/1/origin/https://github.com/zjzesheng/legacy_codes/visits/'
+          probe_url swh_leo_alpha_origin 'https://archive.softwareheritage.org/api/1/origin/https://github.com/leo-quant-research/AlphaAgent/get/'
+          probe_url swh_leo_alpha_visits 'https://archive.softwareheritage.org/api/1/origin/https://github.com/leo-quant-research/AlphaAgent/visits/'
+
+          probe_url gh_upstream 'https://api.github.com/repos/RndmVariableQ/AlphaAgent'
+          probe_url gh_wang 'https://api.github.com/repos/Wangchanghao12/AlphaAgent'
+          probe_url gh_upstream_forks 'https://api.github.com/repos/RndmVariableQ/AlphaAgent/forks?per_page=100&sort=newest'
+
+          python - <<'PY'
+          import json, pathlib, re
+          root=pathlib.Path('probe')
+          summary=[]
+          needles=['leo-quant-research','AlphaAgent','data_lake','data_download','legacy_codes','0_5_1','zjzesheng','RndmVariableQ','Wangchanghao12','fork','parent','source','previous_names','repository_id','repo_id','created_at','pushed_at','last_synced','default_branch','uuid','size']
+          for meta in sorted(root.glob('*.meta')):
+              name=meta.stem
+              vals=meta.read_text(errors='replace').splitlines()
+              body=(root/f'{name}.body').read_text(errors='replace') if (root/f'{name}.body').exists() else ''
+              found={n:(n.lower() in body.lower()) for n in needles}
+              summary.append({'name':name,'http':vals[0] if vals else None,'effective':vals[1] if len(vals)>1 else None,'bytes':vals[2] if len(vals)>2 else None,'needles':found,'head':re.sub(r'\s+',' ',body[:1000])})
+          (root/'summary.json').write_text(json.dumps(summary,indent=2,ensure_ascii=False))
+          PY
+
+          cat probe/summary.json
+      - name: Upload probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: metadata-lineage-recovery-20260914
+          path: probe
+          retention-days: 30
