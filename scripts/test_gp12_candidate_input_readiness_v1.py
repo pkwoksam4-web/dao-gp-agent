@@ -9,6 +9,8 @@ import gp12_candidate_input_readiness_v1 as mod
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+FACTOR_SHA256 = "b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e"
+PARAMETER_SHA256 = "22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204"
 
 
 def load(name: str) -> dict:
@@ -33,8 +35,8 @@ def valid_benchmark_evidence() -> dict:
         },
         "formal_window": ["2020-06-01", "2026-04-17"],
         "binding_sha256": "73e9f84bd5a7a01ae43a6d780c66279a48c63743636e4fb3611996bead544c1a",
-        "factors_sha256": "b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e",
-        "parameters_sha256": "22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204",
+        "factors_sha256": FACTOR_SHA256,
+        "parameters_sha256": PARAMETER_SHA256,
         "factors_parameters_hashes_unchanged": True,
         "calendar": {
             "expected_n": 1426,
@@ -94,6 +96,8 @@ class CandidateInputReadinessTests(unittest.TestCase):
         )
         self.assertEqual(out["ready_factor_ids"], ["F6", "F7", "F8", "F9", "F10", "F12"])
         self.assertEqual(out["blocked_factor_ids"], ["F1", "F2", "F3", "F4", "F5", "F11"])
+        self.assertEqual(out["asset_hashes"]["factor_definition_sha256"], FACTOR_SHA256)
+        self.assertEqual(out["asset_hashes"]["parameter_sha256"], PARAMETER_SHA256)
         self.assertTrue(out["candidate_benchmark_reference_validated"])
         self.assertEqual(out["candidate_benchmark_reference"]["code"], "000985")
         self.assertEqual(out["candidate_benchmark_reference"]["scope"], "BENCHMARK_REFERENCE_ONLY")
@@ -122,6 +126,8 @@ class CandidateInputReadinessTests(unittest.TestCase):
         evidence = copy.deepcopy(valid_benchmark_evidence())
         evidence["benchmark"]["code"] = "000300"
         out = build(evidence)
+        self.assertEqual(out["asset_hashes"]["factor_definition_sha256"], FACTOR_SHA256)
+        self.assertEqual(out["asset_hashes"]["parameter_sha256"], PARAMETER_SHA256)
         self.assertFalse(out["candidate_benchmark_reference_validated"])
         self.assertIn("CANDIDATE_BENCHMARK_EVIDENCE_INVALID", out["blockers"])
         self.assertFalse(out["feature_families"]["market_adjusted_close"]["formal_feature_ready"])
