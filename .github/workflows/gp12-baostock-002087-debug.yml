@@ -1,4 +1,4 @@
-name: GP12 BaoStock Turnover Boundary Debug
+name: GP12 Turnover Residual Source Debug
 
 on:
   push:
@@ -8,57 +8,72 @@ on:
       - '.github/workflows/gp12-baostock-002087-debug.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -q baostock
-      - name: Print raw BaoStock boundary anomalies
+      - name: Install Sina probe runtime
+        run: pip install -q akshare pandas pyarrow
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Probe 300216 and 002604 through Sina/AkShare
         run: |
           python - <<'PY'
           import json, math
-          import baostock as bs
+          import akshare as ak
+          import pandas as pd
 
-          symbols = {
-              '300216.SZ': 'sz.300216',
-              '600647.SH': 'sh.600647',
-              '002087.SZ': 'sz.002087',
-              '002604.SZ': 'sz.002604',
-              '300356.SZ': 'sz.300356',
-              '603133.SH': 'sh.603133',
-              '600766.SH': 'sh.600766',
-          }
-
-          lg = bs.login()
-          print('LOGIN', lg.error_code, lg.error_msg)
-          try:
-              for symbol, code in symbols.items():
-                  rs = bs.query_history_k_data_plus(
-                      code,
-                      'date,code,open,high,low,close,volume,amount,turn,tradestatus,isST',
-                      start_date='2020-06-01',
-                      end_date='2026-04-17',
-                      frequency='d',
-                      adjustflag='3',
-                  )
-                  anomalies = []
-                  n = 0
-                  while rs.next():
-                      n += 1
-                      row = dict(zip(rs.fields, rs.get_row_data()))
-                      turn_raw = row.get('turn', '')
-                      try:
-                          turn = float(turn_raw)
-                          bad_turn = (not math.isfinite(turn)) or turn <= 0
-                      except (TypeError, ValueError):
-                          bad_turn = True
-                      if row.get('tradestatus') != '1' or bad_turn:
-                          anomalies.append(row)
-                  print('SYMBOL', symbol, 'QUERY', rs.error_code, rs.error_msg, 'ROWS', n)
-                  print(json.dumps(anomalies, ensure_ascii=False, indent=2))
-          finally:
-              bs.logout()
+          raw = pd.read_parquet(
+              'upstream/raw/SOHU_RAW_FULL_V482.parquet',
+              columns=['symbol','date','amount'],
+          )
+          targets = {'300216.SZ':'sz300216','002604.SZ':'sz002604'}
+          for symbol, sina_symbol in targets.items():
+              exp = raw[raw['symbol'].eq(symbol)].copy()
+              expected_dates = [str(x)[:10] for x in exp['date'].tolist()]
+              print('TARGET', symbol, 'EXPECTED', len(expected_dates), expected_dates[0], expected_dates[-1])
+              try:
+                  df = ak.stock_zh_a_daily(
+                      symbol=sina_symbol,
+                      start_date='20200601',
+                      end_date='20260417',
+                      adjust='',
+                  ).reset_index(drop=False)
+                  print('COLUMNS', list(df.columns), 'RETURNED', len(df))
+                  df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+                  got = df[df['date'].isin(expected_dates)].copy()
+                  print('MATCHED', len(got), 'MISSING', sorted(set(expected_dates)-set(got['date'])))
+                  rows=[]
+                  for _, r in got.iterrows():
+                      vol=float(r['volume'])
+                      shares=float(r['outstanding_share'])
+                      turn=float(r['turnover'])
+                      derived=vol/shares if shares > 0 else float('nan')
+                      rows.append({
+                          'date':r['date'],
+                          'volume':vol,
+                          'outstanding_share':shares,
+                          'turnover':turn,
+                          'derived_turnover':derived,
+                          'positive':bool(math.isfinite(turn) and turn>0),
+                          'derived_positive':bool(math.isfinite(derived) and derived>0),
+                          'abs_diff':abs(turn-derived) if math.isfinite(turn) and math.isfinite(derived) else None,
+                      })
+                  print(json.dumps(rows, ensure_ascii=False, indent=2))
+              except Exception as exc:
+                  print('ERROR', symbol, type(exc).__name__, str(exc))
           PY
