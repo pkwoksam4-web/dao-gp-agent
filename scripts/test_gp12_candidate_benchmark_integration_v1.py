@@ -6,7 +6,7 @@ import pathlib
 import tempfile
 import unittest
 
-import gp12_candidate_v1 as candidate
+import gp12_candidate_package_review_v1 as candidate
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
