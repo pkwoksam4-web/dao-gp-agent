@@ -13,7 +13,7 @@ permissions:
   actions: read
 
 jobs:
-  probe:
+  parameter-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -21,67 +21,103 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install probe dependencies
-        run: pip install -q pandas
-      - name: Download authoritative PIT-ST V4.80 panel
-        uses: actions/download-artifact@v4
-        with:
-          name: gp-pit-st-v480-merged
-          path: pitst
-          run-id: 33971534669
-          github-token: ${{ github.token }}
-      - name: Probe Eastmoney long-history main net flow
-        env:
-          PYTHONPATH: scripts
+      - name: Probe Eastmoney fund-flow parameter behavior
         run: |
           mkdir -p artifact
           python - <<'PY'
           import json
+          import urllib.parse
+          import urllib.request
           from pathlib import Path
-          import pandas as pd
-          from gp12_eastmoney_adapter_v1 import fetch_flow
-          from baostock_turnover_full_v482 import expected_trade_dates
 
-          pit_path=next(Path('pitst').rglob('PIT_ST_DAILY_MERGED_V480.csv'))
-          pit=pd.read_csv(pit_path,usecols=['symbol','date','tradestatus'])
-          symbols=['000001.SZ','002359.SZ','600000.SH','600634.SH']
-          formal_start='2020-06-01'; formal_end='2026-04-17'
-          out={'artifact':'GP12_MAIN_NET_FLOW_PROBE_V482','formal_window':[formal_start,formal_end],'limit':5000,'symbols':[],'formal_admission':False,'oos_metrics_allowed':False}
+          HOSTS = [
+              'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get',
+              'https://push2.eastmoney.com/api/qt/stock/fflow/daykline/get',
+          ]
+          UT = 'b2884a393a59ad64002292a3e90d46a5'
+          FIELDS1 = 'f1,f2,f3,f7'
+          FIELDS2 = 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61'
+
+          def secid(symbol):
+              code, exch = symbol.split('.')
+              return f'{"0" if exch == "SZ" else "1"}.{code}'
+
+          variants = [
+              ('baseline_lmt5000_klt101', {'lmt':'5000','klt':'101'}),
+              ('lmt0_klt101', {'lmt':'0','klt':'101'}),
+              ('lmt1000_klt101', {'lmt':'1000','klt':'101'}),
+              ('lmt5000_klt101_ut', {'lmt':'5000','klt':'101','ut':UT}),
+              ('lmt0_klt101_ut', {'lmt':'0','klt':'101','ut':UT}),
+              ('lmt0_klt1_ut', {'lmt':'0','klt':'1','ut':UT}),
+              ('lmt5000_klt101_ut_begend', {
+                  'lmt':'5000','klt':'101','ut':UT,'beg':'20200601','end':'20260417'}),
+              ('lmt0_klt101_ut_begend', {
+                  'lmt':'0','klt':'101','ut':UT,'beg':'20200601','end':'20260417'}),
+          ]
+          symbols = ['000001.SZ','600634.SH']
+          out = {
+              'artifact':'GP12_MAIN_NET_FLOW_PARAMETER_PROBE_V482',
+              'hypothesis':'The 120-row response is controlled by request parameters or host selection rather than parser logic.',
+              'symbols':symbols,
+              'variants':[],
+              'formal_admission':False,
+              'oos_metrics_allowed':False,
+          }
+
           for symbol in symbols:
-              rec={'symbol':symbol}
-              try:
-                  rows=fetch_flow(symbol,limit=5000,timeout=30)
-                  raw_dates=[r['date'] for r in rows]
-                  formal=[r for r in rows if formal_start <= r['date'] <= formal_end]
-                  actual_dates=[r['date'] for r in formal]
-                  expected=expected_trade_dates(pit,symbol)
-                  aset=set(actual_dates); eset=set(expected)
-                  rec.update({
-                      'status':'RESPONDED',
-                      'raw_rows':len(rows),
-                      'raw_first_date':min(raw_dates) if raw_dates else None,
-                      'raw_last_date':max(raw_dates) if raw_dates else None,
-                      'formal_rows':len(formal),
-                      'formal_first_date':min(actual_dates) if actual_dates else None,
-                      'formal_last_date':max(actual_dates) if actual_dates else None,
-                      'expected_trade_rows':len(expected),
-                      'missing_n':len(eset-aset),
-                      'extra_n':len(aset-eset),
-                      'duplicate_n':len(actual_dates)-len(aset),
-                      'missing_examples':sorted(eset-aset)[:20],
-                      'extra_examples':sorted(aset-eset)[:20],
-                      'exact_formal_dates':len(eset-aset)==0 and len(aset-eset)==0 and len(actual_dates)==len(aset),
-                  })
-              except Exception as exc:
-                  rec.update({'status':'FAILED_SOURCE','error_type':type(exc).__name__,'error':str(exc)})
-              out['symbols'].append(rec)
-          Path('artifact/GP12_MAIN_NET_FLOW_PROBE_V482.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8')
+              for host in HOSTS:
+                  for name, delta in variants:
+                      params = {
+                          'secid':secid(symbol),
+                          'fields1':FIELDS1,
+                          'fields2':FIELDS2,
+                          **delta,
+                      }
+                      url = host + '?' + urllib.parse.urlencode(params)
+                      rec = {
+                          'symbol':symbol,
+                          'host':host.split('/')[2],
+                          'variant':name,
+                          'params':delta,
+                      }
+                      try:
+                          req = urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0 GP12-V482-PROBE'})
+                          with urllib.request.urlopen(req, timeout=30) as response:
+                              body = response.read()
+                              rec['http_status'] = int(response.status)
+                              rec['content_type'] = response.headers.get('content-type')
+                          payload = json.loads(body.decode('utf-8'))
+                          data = payload.get('data') if isinstance(payload, dict) else None
+                          klines = data.get('klines') if isinstance(data, dict) else None
+                          dates = []
+                          if isinstance(klines, list):
+                              for row in klines:
+                                  if isinstance(row, str) and row:
+                                      dates.append(row.split(',',1)[0][:10])
+                          rec.update({
+                              'status':'RESPONDED',
+                              'rc':payload.get('rc') if isinstance(payload,dict) else None,
+                              'rt':payload.get('rt') if isinstance(payload,dict) else None,
+                              'data_is_null':data is None,
+                              'data_keys':sorted(data.keys()) if isinstance(data,dict) else [],
+                              'row_count':len(klines) if isinstance(klines,list) else None,
+                              'first_date':min(dates) if dates else None,
+                              'last_date':max(dates) if dates else None,
+                              'payload_total':data.get('total') if isinstance(data,dict) else None,
+                              'payload_name':data.get('name') if isinstance(data,dict) else None,
+                          })
+                      except Exception as exc:
+                          rec.update({'status':'FAILED','error_type':type(exc).__name__,'error':str(exc)})
+                      out['variants'].append(rec)
+
+          Path('artifact/GP12_MAIN_NET_FLOW_PARAMETER_PROBE_V482.json').write_text(
+              json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8')
           print(json.dumps(out,ensure_ascii=False,indent=2))
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gp12-main-net-flow-probe-v482
+          name: gp12-main-net-flow-parameter-probe-v482
           path: artifact/
           if-no-files-found: warn
           retention-days: 30
