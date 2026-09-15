@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from decimal import Decimal, InvalidOperation
 
 EXPECTED_SYMBOL_LIST_N = 847
 EXPECTED_TURNOVER_SYMBOL_N = 844
@@ -78,6 +79,16 @@ def parse_hishq_turnover_bytes(symbol: str, raw: bytes) -> list[dict]:
     return rows
 
 
+def _finite_decimal(value: object, label: str) -> Decimal:
+    try:
+        out = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f'invalid {label}: {value!r}') from exc
+    if not out.is_finite():
+        raise ValueError(f'invalid {label}: {value!r}')
+    return out
+
+
 def crosscheck_eastmoney_turnover(
     sohu_rows: list[dict],
     eastmoney_rows: list[dict],
@@ -90,20 +101,22 @@ def crosscheck_eastmoney_turnover(
     }
     diffs = []
     failures = []
+    tolerance = _finite_decimal(tolerance_bp, 'tolerance_bp')
     for row in sohu_rows or []:
         key = (normalize_symbol(row.get('symbol')), str(row.get('date') or '')[:10])
         other = eastmoney.get(key)
         if other is None:
             failures.append({'symbol': key[0], 'date': key[1], 'reason': 'MISSING_EASTMONEY'})
             continue
-        sohu_ratio = float(row.get('turnover_ratio'))
-        eastmoney_ratio = float(other.get('turnover_pct')) / 100.0
-        if not (math.isfinite(sohu_ratio) and math.isfinite(eastmoney_ratio)):
-            failures.append({'symbol': key[0], 'date': key[1], 'reason': 'NONFINITE_TURNOVER'})
+        sohu_ratio = _finite_decimal(row.get('turnover_ratio'), 'Sohu turnover_ratio')
+        eastmoney_ratio = _finite_decimal(other.get('turnover_pct'), 'Eastmoney turnover_pct') / Decimal('100')
+        if sohu_ratio < 0 or eastmoney_ratio < 0:
+            failures.append({'symbol': key[0], 'date': key[1], 'reason': 'NEGATIVE_TURNOVER'})
             continue
-        diff_bp = abs(sohu_ratio - eastmoney_ratio) * 10_000.0
+        diff_bp_decimal = abs(sohu_ratio - eastmoney_ratio) * Decimal('10000')
+        diff_bp = float(diff_bp_decimal)
         diffs.append(diff_bp)
-        if diff_bp > float(tolerance_bp):
+        if diff_bp_decimal > tolerance:
             failures.append({'symbol': key[0], 'date': key[1], 'reason': 'TURNOVER_DIFF', 'diff_bp': diff_bp})
     return {
         'matched_n': len(diffs),
