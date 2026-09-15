@@ -27,3 +27,71 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_baostock_turnover_v482.py
+
+  live-pilot:
+    needs: baostock-turnover-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install BaoStock
+        run: pip install -q baostock
+      - name: Probe known turnover anchor dates
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p artifact_baostock_turnover_pilot
+          python - <<'PY'
+          import json, pathlib
+          import baostock as bs
+          from baostock_turnover_v482 import audit_and_extract
+          from pit_st_collector_v480 import to_baostock_code
+
+          anchors={
+              '002359.SZ': {'2020-06-12': 3.82},
+              '600634.SH': {'2020-07-22': 0.71},
+          }
+          login=bs.login()
+          assert str(login.error_code)=='0',(login.error_code,login.error_msg)
+          report={'artifact':'BAOSTOCK_TURNOVER_LIVE_PILOT_V482','anchors':[],'formal_admission':False,'oos_metrics_allowed':False}
+          try:
+              for symbol, expected in anchors.items():
+                  code=to_baostock_code(symbol)
+                  start=min(expected); end=max(expected)
+                  rs=bs.query_history_k_data_plus(
+                      code,'date,code,turn,tradestatus,isST',
+                      start_date=start,end_date=end,frequency='d',adjustflag='3')
+                  rows=[]
+                  assert str(rs.error_code)=='0',(symbol,rs.error_code,rs.error_msg)
+                  while rs.next():
+                      rows.append(dict(zip(rs.fields,rs.get_row_data())))
+                  audit=audit_and_extract(symbol,rows)
+                  assert audit['status']=='PASS_TURNOVER_ROWS'],audit
+                  by_date={r['date']:r for r in rows}
+                  for d,sohu_pct in expected.items():
+                      assert d in by_date,(symbol,d,rows)
+                      turn_text=by_date[d]['turn']
+                      turn_pct=float(turn_text)
+                      report['anchors'].append({
+                          'symbol':symbol,'date':d,
+                          'baostock_turn_text':turn_text,
+                          'baostock_turn_pct':turn_pct,
+                          'archived_sohu_turn_pct':sohu_pct,
+                          'abs_diff_percentage_points':abs(turn_pct-sohu_pct),
+                          'abs_diff_bp':abs(turn_pct-sohu_pct)*100.0,
+                      })
+          finally:
+              bs.logout()
+          p=pathlib.Path('artifact_baostock_turnover_pilot/BAOSTOCK_TURNOVER_LIVE_PILOT_V482.json')
+          p.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-baostock-turnover-live-pilot-v482
+          path: artifact_baostock_turnover_pilot/
+          if-no-files-found: warn
+          retention-days: 30
