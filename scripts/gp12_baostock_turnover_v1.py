@@ -20,6 +20,7 @@ FORMAL_SYMBOL_N = 844
 EXPECTED_TRADE_ROWS = 1_011_607
 NA_SYMBOLS = ["600074.SH", "600485.SH", "600677.SH"]
 SOURCE_ID = "BAOSTOCK_TURN_DAILY_UNADJUSTED"
+BAOSTOCK_QUERY_FIELDS = "date,code,volume,amount,turn,tradestatus"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
@@ -58,10 +59,21 @@ def _positive_finite(value: object, label: str) -> float:
     return out
 
 
+def _positive_finite_or_none(value: object) -> float | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(out) or out <= 0:
+        return None
+    return out
+
+
 def provider_metadata() -> dict:
     return {
         "provider": "BaoStock",
         "field": "turn",
+        "query_fields": BAOSTOCK_QUERY_FIELDS,
         "source_unit": "percent",
         "candidate_unit": "decimal_ratio",
         "frequency": "d",
@@ -69,6 +81,10 @@ def provider_metadata() -> dict:
         "series": "historical_daily_turnover_ratio",
         "origin": "NEW_RECONSTRUCTION_CANDIDATE",
         "status": "CANDIDATE_ONLY_UNAPPROVED",
+        "status_override_rule": (
+            "tradestatus=0 may be retained only when volume, amount, and turn "
+            "are all strictly positive finite values"
+        ),
         "historical_gp_v11_source_recovered": False,
         "historical_provider_publication_timestamp_proven": False,
     }
@@ -78,16 +94,30 @@ def parse_baostock_row(symbol: str, row: dict) -> dict | None:
     symbol = normalize_symbol(symbol)
     if not isinstance(row, dict):
         raise ValueError("BaoStock row must be an object")
-    if str(row.get("tradestatus", "")) != "1":
-        return None
+
     expected_code = symbol_to_baostock_code(symbol)
     actual_code = str(row.get("code", "")).strip().lower()
     if actual_code != expected_code:
         raise ValueError(f"BaoStock code mismatch for {symbol}: {actual_code!r}")
     date_value = str(row.get("date", "")).strip()[:10]
     dt.date.fromisoformat(date_value)
-    turn_percent = _positive_finite(row.get("turn"), "BaoStock turn")
-    return {"date": date_value, "turnover_ratio": turn_percent / 100.0}
+
+    status = str(row.get("tradestatus", ""))
+    if status == "1":
+        turn_percent = _positive_finite(row.get("turn"), "BaoStock turn")
+        return {"date": date_value, "turnover_ratio": turn_percent / 100.0}
+
+    if status == "0":
+        volume = _positive_finite_or_none(row.get("volume"))
+        amount = _positive_finite_or_none(row.get("amount"))
+        turn_percent = _positive_finite_or_none(row.get("turn"))
+        if volume is not None and amount is not None and turn_percent is not None:
+            return {
+                "date": date_value,
+                "turnover_ratio": turn_percent / 100.0,
+                "provider_status_override": True,
+            }
+    return None
 
 
 def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) -> dict:
@@ -96,6 +126,7 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
     observed_dates: list[str] = []
     invalid_value = False
     invalid_date = False
+    provider_status_override_dates: list[str] = []
     for row in rows:
         date_value = str(row.get("date", "")).strip()
         try:
@@ -103,6 +134,8 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
         except ValueError:
             invalid_date = True
         observed_dates.append(date_value)
+        if row.get("provider_status_override") is True:
+            provider_status_override_dates.append(date_value)
         try:
             turnover = float(row.get("turnover_ratio"))
             if not math.isfinite(turnover) or turnover <= 0:
@@ -140,6 +173,8 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
         "extra_date_n": len(extra),
         "missing_dates_sample": missing[:20],
         "extra_dates_sample": extra[:20],
+        "provider_status_override_n": len(provider_status_override_dates),
+        "provider_status_override_dates": provider_status_override_dates,
         "coverage_exact": not any(
             b in blockers
             for b in (
@@ -198,6 +233,14 @@ def summarize_full_audit(
     panel_complete = materialized_rows == expected_trade_rows == observed_rows
     if not panel_complete:
         _append_once(blockers, "TURNOVER_PANEL_ROW_COVERAGE_MISMATCH")
+    override_records = [
+        {
+            "symbol": str(record.get("symbol")),
+            "dates": list(record.get("provider_status_override_dates") or []),
+        }
+        for record in records
+        if int(record.get("provider_status_override_n") or 0) > 0
+    ]
     return {
         "artifact": ARTIFACT_AUDIT,
         "version": VERSION,
@@ -210,6 +253,11 @@ def summarize_full_audit(
         "expected_trade_rows": expected_trade_rows,
         "observed_turnover_rows": observed_rows,
         "materialized_rows": materialized_rows,
+        "provider_status_override_n": sum(
+            int(record.get("provider_status_override_n") or 0) for record in records
+        ),
+        "provider_status_override_symbol_n": len(override_records),
+        "provider_status_overrides": override_records,
         "panel_complete": panel_complete,
         "turnover_ratio_candidate_pit_verified": not blockers,
         "provider": provider_metadata(),
@@ -254,7 +302,7 @@ def _query_symbol(bs, symbol: str) -> tuple[list[dict], dict]:
     code = symbol_to_baostock_code(symbol)
     rs = bs.query_history_k_data_plus(
         code,
-        "date,code,turn,tradestatus",
+        BAOSTOCK_QUERY_FIELDS,
         start_date=FORMAL_START,
         end_date=FORMAL_END,
         frequency="d",
@@ -314,6 +362,8 @@ def run_shard(
                     "extra_date_n": 0,
                     "missing_dates_sample": expected_dates[:20],
                     "extra_dates_sample": [],
+                    "provider_status_override_n": 0,
+                    "provider_status_override_dates": [],
                     "coverage_exact": False,
                     "pit_policy_valid": False,
                     "pit_scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
@@ -342,6 +392,9 @@ def run_shard(
         "expected_trade_rows": sum(int(record["expected_row_n"]) for record in records),
         "observed_turnover_rows": sum(int(record["row_n"]) for record in records),
         "materialized_rows": len(materialized),
+        "provider_status_override_n": sum(
+            int(record.get("provider_status_override_n") or 0) for record in records
+        ),
         "provider": provider_metadata(),
         "records": records,
         "model_freeze_allowed": False,
@@ -477,6 +530,7 @@ def main() -> int:
             "expected_trade_rows",
             "observed_turnover_rows",
             "materialized_rows",
+            "provider_status_override_n",
             "panel_complete",
             "panel_csv_sha256",
             "turnover_ratio_candidate_pit_verified",
