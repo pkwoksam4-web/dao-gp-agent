@@ -34,7 +34,11 @@ def load(path):
 class PitReadinessIntegrationTests(unittest.TestCase):
     def test_frozen_v1_manifest_stays_unmodified(self):
         evidence = load(EVIDENCE)
-        self.assertEqual(evidence['feature_families']['stock_adjusted_close']['binding_state'], 'UNBOUND')
+        stock = evidence['feature_families']['stock_adjusted_close']
+        self.assertEqual(stock['binding_state'], 'BOUND_STRUCTURAL_ONLY')
+        self.assertEqual(stock['pit_state'], 'PIT_UNVERIFIED')
+        self.assertEqual(stock['source_artifact'], 'FORMAL_READINESS_FINAL_V482')
+        self.assertEqual(stock['blockers'], ['ADJUSTED_CLOSE_PIT_UNVERIFIED'])
         self.assertEqual(evidence['feature_families']['intraday_15m']['binding_state'], 'UNBOUND')
         self.assertEqual(evidence['feature_families']['intraday_60m']['binding_state'], 'UNBOUND')
         self.assertTrue(base.validate_production_evidence_manifest(evidence)['production_manifest_valid'])
