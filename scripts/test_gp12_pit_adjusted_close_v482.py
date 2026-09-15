@@ -25,6 +25,8 @@ class PitAdjustedCloseAvailabilityTests(unittest.TestCase):
 
     def test_forward_path_applies_event_from_ex_date_only(self):
         m = _subject()
+        build = getattr(m, 'build_forward_pit_adjusted_path', None)
+        self.assertTrue(callable(build), 'build_forward_pit_adjusted_path is not implemented')
         raw_rows = [
             {'date': '2020-06-30', 'close': 100.0},
             {'date': '2020-07-02', 'close': 90.0},
@@ -36,7 +38,7 @@ class PitAdjustedCloseAvailabilityTests(unittest.TestCase):
             'availability_date': '2020-07-01',
             'event_ratio': 0.9,
         }]
-        path = m.build_forward_pit_adjusted_path(raw_rows, events)
+        path = build(raw_rows, events)
         self.assertEqual([row['date'] for row in path], ['2020-06-30', '2020-07-02', '2020-07-03'])
         self.assertEqual([round(row['adjusted_close'], 10) for row in path], [100.0, 100.0, 110.0])
 
