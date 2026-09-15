@@ -1,0 +1,87 @@
+name: GP12 Main Net Flow Probe V4.82
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v482
+    paths:
+      - '.github/workflows/gp12-main-flow-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install probe dependencies
+        run: pip install -q pandas
+      - name: Download authoritative PIT-ST V4.80 panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Probe Eastmoney long-history main net flow
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p artifact
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          from gp12_eastmoney_adapter_v1 import fetch_flow
+          from baostock_turnover_full_v482 import expected_trade_dates
+
+          pit_path=next(Path('pitst').rglob('PIT_ST_DAILY_MERGED_V480.csv'))
+          pit=pd.read_csv(pit_path,usecols=['symbol','date','tradestatus'])
+          symbols=['000001.SZ','002359.SZ','600000.SH','600634.SH']
+          formal_start='2020-06-01'; formal_end='2026-04-17'
+          out={'artifact':'GP12_MAIN_NET_FLOW_PROBE_V482','formal_window':[formal_start,formal_end],'limit':5000,'symbols':[],'formal_admission':False,'oos_metrics_allowed':False}
+          for symbol in symbols:
+              rec={'symbol':symbol}
+              try:
+                  rows=fetch_flow(symbol,limit=5000,timeout=30)
+                  raw_dates=[r['date'] for r in rows]
+                  formal=[r for r in rows if formal_start <= r['date'] <= formal_end]
+                  actual_dates=[r['date'] for r in formal]
+                  expected=expected_trade_dates(pit,symbol)
+                  aset=set(actual_dates); eset=set(expected)
+                  rec.update({
+                      'status':'RESPONDED',
+                      'raw_rows':len(rows),
+                      'raw_first_date':min(raw_dates) if raw_dates else None,
+                      'raw_last_date':max(raw_dates) if raw_dates else None,
+                      'formal_rows':len(formal),
+                      'formal_first_date':min(actual_dates) if actual_dates else None,
+                      'formal_last_date':max(actual_dates) if actual_dates else None,
+                      'expected_trade_rows':len(expected),
+                      'missing_n':len(eset-aset),
+                      'extra_n':len(aset-eset),
+                      'duplicate_n':len(actual_dates)-len(aset),
+                      'missing_examples':sorted(eset-aset)[:20],
+                      'extra_examples':sorted(aset-eset)[:20],
+                      'exact_formal_dates':len(eset-aset)==0 and len(aset-eset)==0 and len(actual_dates)==len(aset),
+                  })
+              except Exception as exc:
+                  rec.update({'status':'FAILED_SOURCE','error_type':type(exc).__name__,'error':str(exc)})
+              out['symbols'].append(rec)
+          Path('artifact/GP12_MAIN_NET_FLOW_PROBE_V482.json').write_text(json.dumps(out,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gp12-main-net-flow-probe-v482
+          path: artifact/
+          if-no-files-found: warn
+          retention-days: 30
