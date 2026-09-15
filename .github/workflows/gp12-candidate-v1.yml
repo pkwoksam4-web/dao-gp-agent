@@ -23,6 +23,9 @@ on:
       - 'data/GP12_CANDIDATE_BENCHMARK_V1.json'
       - 'data/GP12_CANDIDATE_PARAMETERS_V1.json'
       - 'data/GP12_CANDIDATE_FACTORS_V1.json'
+      - 'data/GP12_FORMAL_INPUT_EVIDENCE_V1.json'
+      - 'data/GP12_INTRADAY_FORMAL847_BINDING_V1.json'
+      - 'data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json'
       - 'docs/gp12-candidate-review.md'
       - '.github/workflows/gp12-candidate-v1.yml'
   workflow_dispatch:
@@ -57,24 +60,137 @@ jobs:
             test_strategy_asset_recovery_v482 \
             test_model_freeze_recovery_v482 \
             test_oos_admission_v482
-      - name: Download verified V4.80 frozen calendar artifact
+
+      - name: Download pinned verified CSI All Share benchmark evidence
         uses: actions/download-artifact@v4
         with:
-          name: gp-pit-st-v480-final-audit
-          path: calendar-final
-          run-id: 33977325822
+          name: gp12-candidate-benchmark-000985-v1
+          path: out/benchmark
+          run-id: 34940789265
           github-token: ${{ github.token }}
-      - name: Validate CSI All Share candidate benchmark over full Formal window
+
+      - name: Verify pinned benchmark acquisition evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('out/benchmark')
+          validation = root / 'GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json'
+          close_csv = root / 'CSI_ALL_SHARE_000985_DAILY_CLOSE_20200601_20260417.csv'
+          assert validation.exists(), validation
+          assert close_csv.exists(), close_csv
+
+          x = json.loads(validation.read_text(encoding='utf-8'))
+          assert x['artifact'] == 'GP12_CANDIDATE_BENCHMARK_VALIDATION_V1'
+          assert x['status'] == 'PASS_CANDIDATE_BENCHMARK_V1', x
+          assert x['strategy_id'] == 'GP12_REBUILD_CANDIDATE_V1'
+          assert x['binding_status'] == 'CANDIDATE_ONLY_UNAPPROVED'
+          assert x['definition_origin'] == 'NEW_RECONSTRUCTION_CANDIDATE'
+          assert x['benchmark']['name'] == 'CSI All Share'
+          assert x['benchmark']['local_name'] == '中证全指'
+          assert x['benchmark']['code'] == '000985'
+          assert x['benchmark']['eastmoney_secid'] == '1.000985'
+          assert x['benchmark']['series_construction'] == 'INDEX_OWN_DAILY_CLOSE_NO_CONSTITUENT_RECONSTRUCTION'
+          assert x['formal_window'] == ['2020-06-01','2026-04-17']
+          assert x['binding_sha256'] == '73e9f84bd5a7a01ae43a6d780c66279a48c63743636e4fb3611996bead544c1a'
+          assert x['factors_sha256'] == 'b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
+          assert x['parameters_sha256'] == '22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
+          assert x['calendar']['expected_n'] == 1426
+          assert x['calendar']['observed_n'] == 1426
+          assert x['calendar']['first'] == '2020-06-01'
+          assert x['calendar']['last'] == '2026-04-17'
+          assert x['calendar']['full_coverage'] is True
+          assert x['calendar']['legacy_sha256'] == '0bfa32175dfccbd24d30eb7ceb0605f6cde2ed0bcc31ac2cac61479ba812add0'
+          assert x['calendar']['semantic_sha256'] == '5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7'
+          assert x['pit']['policy_valid'] is True
+          assert x['pit']['scope'] == 'SESSION_CLOSE_NO_LOOKAHEAD_POLICY'
+          assert x['pit']['historical_provider_publication_timestamp_proven'] is False
+          assert x['source']['identity_valid'] is True
+          assert x['source']['payload_code'] == '000985'
+          assert x['source']['payload_name'] == '中证全指'
+          assert x['close_series_sha256'] == 'e9541cf917893b214ebe31a8602914c793e162bc5280137bfac88d243b75a73e'
+          assert x['candidate_benchmark_blocker_closed'] is True
+          assert x['gp_v11_benchmark_recovered'] is False
+          assert x['historical_recovery_claim_allowed'] is False
+          assert x['blockers'] == []
+
+          lineage = {
+              'source_workflow_run_id': 34940789265,
+              'source_artifact_id': 10385027692,
+              'source_artifact_zip_sha256': '786489265264219bb33dd75c64482a2957e417ed44a0b19ada4d1ffe22c5a411',
+              'validation_binding_sha256': x['binding_sha256'],
+              'close_series_sha256': x['close_series_sha256'],
+              'candidate_only': True,
+              'gp_v11_benchmark_recovered': False,
+          }
+          Path('out/BENCHMARK_EVIDENCE_LINEAGE_V1.json').write_text(
+              json.dumps(lineage, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(json.dumps(lineage, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Build candidate input readiness checkpoint
         env:
           PYTHONPATH: scripts
         run: |
-          mkdir -p out/benchmark
-          python scripts/gp12_candidate_benchmark_v1.py \
-            --binding data/GP12_CANDIDATE_BENCHMARK_V1.json \
-            --factors data/GP12_CANDIDATE_FACTORS_V1.json \
+          python scripts/gp12_candidate_input_readiness_v1.py \
             --parameters data/GP12_CANDIDATE_PARAMETERS_V1.json \
-            --calendar-csv calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv \
-            --out-dir out/benchmark
+            --factors data/GP12_CANDIDATE_FACTORS_V1.json \
+            --base-evidence data/GP12_FORMAL_INPUT_EVIDENCE_V1.json \
+            --intraday-binding data/GP12_INTRADAY_FORMAL847_BINDING_V1.json \
+            --pit-binding data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json \
+            --benchmark-validation out/benchmark/GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json \
+            --out out/GP12_CANDIDATE_INPUT_READINESS_V1.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          x = json.loads(Path('out/GP12_CANDIDATE_INPUT_READINESS_V1.json').read_text(encoding='utf-8'))
+          assert x['artifact'] == 'GP12_CANDIDATE_INPUT_READINESS_V1'
+          assert x['validated_families'] == ['intraday_15m','intraday_60m','market_calendar','stock_adjusted_close']
+          assert set(x['missing_or_unvalidated_families']) == {
+              'amount_turnover','main_net_flow','market_adjusted_close','market_breadth',
+              'sector_adjusted_close','sector_breadth','status'
+          }
+          assert x['ready_factor_ids'] == ['F6','F7','F8','F9','F10','F12']
+          assert x['blocked_factor_ids'] == ['F1','F2','F3','F4','F5','F11']
+          assert x['candidate_benchmark_reference_validated'] is True
+          assert x['candidate_benchmark_reference']['code'] == '000985'
+          assert x['candidate_benchmark_reference']['scope'] == 'BENCHMARK_REFERENCE_ONLY'
+          assert x['benchmark_feature_binding_allowed'] is False
+          assert x['market_adjusted_close_substitution_allowed'] is False
+          assert x['feature_families']['market_adjusted_close']['formal_feature_ready'] is False
+          assert x['feature_families']['market_adjusted_close']['blockers'] == ['MARKET_ADJUSTED_CLOSE_FEATURE_BINDING_UNBOUND']
+          assert 'MARKET_BENCHMARK_UNBOUND' not in x['blockers']
+          assert 'ADJUSTED_CLOSE_PIT_UNVERIFIED' not in x['blockers']
+          assert 'INTRADAY_15M_UNBOUND' not in x['blockers']
+          assert 'INTRADAY_60M_UNBOUND' not in x['blockers']
+          assert 'MARKET_ADJUSTED_CLOSE_FEATURE_BINDING_UNBOUND' in x['blockers']
+          assert x['next_priority_family'] == 'amount_turnover'
+          assert x['next_priority_blocker'] == 'TURNOVER_RATIO_UNBOUND'
+          assert x['candidate_scoring_ready'] is False
+          assert x['real_feature_inputs_validated'] is False
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert x['historical_benchmark_recovered'] is False
+          assert x['historical_strategy_recovered'] is False
+          assert x['candidate_adoption_status'] == 'UNAPPROVED'
+          assert x['asset_hashes']['factor_definition_sha256'] == 'b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
+          assert x['asset_hashes']['parameter_sha256'] == '22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
+          print(json.dumps({
+              'validated_families': x['validated_families'],
+              'missing_or_unvalidated_families': x['missing_or_unvalidated_families'],
+              'ready_factor_ids': x['ready_factor_ids'],
+              'blocked_factor_ids': x['blocked_factor_ids'],
+              'candidate_benchmark_reference': x['candidate_benchmark_reference'],
+              'blockers': x['blockers'],
+              'next_priority_family': x['next_priority_family'],
+              'candidate_scoring_ready': x['candidate_scoring_ready'],
+          }, ensure_ascii=False, indent=2))
+          PY
+
       - name: Review candidate package with benchmark evidence
         env:
           PYTHONPATH: scripts
@@ -125,12 +241,15 @@ jobs:
               'blockers': report['blockers'],
           }, ensure_ascii=False, indent=2))
           PY
+
       - name: Upload reviewable candidate package
         uses: actions/upload-artifact@v4
         with:
           name: gp12-reconstruction-candidate-v1
           path: |
             out/GP12_CANDIDATE_REVIEW_V1.json
+            out/GP12_CANDIDATE_INPUT_READINESS_V1.json
+            out/BENCHMARK_EVIDENCE_LINEAGE_V1.json
             out/benchmark/GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json
             out/benchmark/CSI_ALL_SHARE_000985_DAILY_CLOSE_20200601_20260417.csv
             scripts/gp12_candidate_v1.py
@@ -139,16 +258,16 @@ jobs:
             scripts/test_gp12_candidate_benchmark_integration_v1.py
             scripts/gp12_candidate_benchmark_v1.py
             scripts/test_gp12_candidate_benchmark_v1.py
+            scripts/gp12_candidate_input_readiness_v1.py
             scripts/test_gp12_candidate_input_readiness_v1.py
-            scripts/gp12_eastmoney_adapter_v1.py
-            scripts/test_gp12_eastmoney_adapter_v1.py
-            scripts/gp12_sohu_qfq_adapter_v1.py
-            scripts/test_gp12_sohu_qfq_adapter_v1.py
-            scripts/gp12_source_router_v1.py
-            scripts/test_gp12_source_router_v1.py
+            scripts/gp12_pit_readiness_integration_v482.py
+            scripts/gp12_intraday_readiness_integration_v482.py
             data/GP12_CANDIDATE_BENCHMARK_V1.json
             data/GP12_CANDIDATE_PARAMETERS_V1.json
             data/GP12_CANDIDATE_FACTORS_V1.json
+            data/GP12_FORMAL_INPUT_EVIDENCE_V1.json
+            data/GP12_INTRADAY_FORMAL847_BINDING_V1.json
+            data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json
             docs/gp12-candidate-review.md
           if-no-files-found: error
           retention-days: 30
