@@ -1,0 +1,131 @@
+name: GP12 Turnover Denominator Probe V4.82
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v482
+    paths:
+      - '.github/workflows/gp12-turnover-denominator-probe-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  denominator-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q requests
+      - name: Probe 300059 historical turnover denominator around 2020-05-21 10-for-2 capitalization
+        run: |
+          mkdir -p artifact_turnover_denominator_probe
+          python - <<'PY'
+          import json, math, pathlib, re
+          from decimal import Decimal
+          import requests
+
+          url='https://q.stock.sohu.com/hisHq'
+          params={
+              'code':'cn_300059','start':'20200518','end':'20200522','stat':'1','order':'A','period':'d',
+              'callback':'historySearchHandler','rt':'jsonp',
+          }
+          r=requests.get(url,params=params,timeout=30,headers={
+              'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152 Safari/537.36',
+              'Referer':'https://q.stock.sohu.com/cn/300059/lshq.shtml','Accept':'*/*','Connection':'close',
+          })
+          r.raise_for_status()
+          raw=r.content
+          text=raw.decode('utf-8-sig')
+          m=re.match(r'^\s*historySearchHandler\((.*)\)\s*;?\s*$',text,re.S)
+          assert m, text[:200]
+          obj=json.loads(m.group(1)); rows=obj[0]['hq']
+
+          # Company-reported historical share facts. 2019 distribution was announced 2020-05-14,
+          # record date 2020-05-20, ex/capitalization date 2020-05-21, 10-for-2.
+          # 2020 annual/half-year reports later confirm these exact before/after counts.
+          before_total=6_715_608_655
+          after_total=8_058_730_386
+          before_unrestricted=5_454_254_096
+          after_unrestricted=6_545_104_916
+          facts={
+              '2020-05-18':(before_total,before_unrestricted),
+              '2020-05-19':(before_total,before_unrestricted),
+              '2020-05-20':(before_total,before_unrestricted),
+              '2020-05-21':(after_total,after_unrestricted),
+              '2020-05-22':(after_total,after_unrestricted),
+          }
+
+          def interval(volume_shares, reported_pct):
+              # Sohu exposes turnover rounded to two decimal percentage points.
+              p=Decimal(str(reported_pct))
+              half=Decimal('0.005')
+              lo=max(Decimal('0.0000000001'),p-half)
+              hi=p+half
+              v=Decimal(str(volume_shares))*Decimal('100')
+              # shares = volume*100 / percent
+              return float(v/hi), float(v/lo)
+
+          out=[]
+          for row in rows:
+              d=row[0]; lots=float(row[7]); volume=lots*100.0
+              pct=float(str(row[9]).replace('%',''))
+              lower,upper=interval(volume,pct)
+              total,unrestricted=facts[d]
+              implied=volume*100.0/pct if pct>0 else None
+              out.append({
+                  'date':d,'volume_shares':volume,'reported_turnover_pct':pct,
+                  'implied_denominator_mid':implied,
+                  'rounding_interval_shares':[lower,upper],
+                  'expected_total_shares':total,
+                  'expected_unrestricted_shares':unrestricted,
+                  'total_in_rounding_interval':lower<=total<=upper,
+                  'unrestricted_in_rounding_interval':lower<=unrestricted<=upper,
+              })
+
+          pre=[x for x in out if x['date']=='2020-05-20'][0]
+          post=[x for x in out if x['date']=='2020-05-21'][0]
+          ratio_mid=post['implied_denominator_mid']/pre['implied_denominator_mid']
+          expected_ratio=after_total/before_total
+          report={
+              'artifact':'GP12_TURNOVER_DENOMINATOR_PROBE_300059_V482','version':'V4.82',
+              'symbol':'300059.SZ','provider':'SOHU_HISHQ',
+              'event':'2019 annual capitalization 10-for-2 effective 2020-05-21',
+              'event_announcement_date':'2020-05-14','record_date':'2020-05-20','effective_date':'2020-05-21',
+              'before_total_shares':before_total,'after_total_shares':after_total,
+              'expected_total_share_jump_ratio':expected_ratio,
+              'implied_mid_jump_ratio_20200520_to_20200521':ratio_mid,
+              'rows':out,
+              'all_rows_match_total_not_unrestricted':all(x['total_in_rounding_interval'] and not x['unrestricted_in_rounding_interval'] for x in out),
+              'pit_revision_semantics_proven':False,
+              'readiness_blocker_closed':False,
+              'candidate_adoption_status':'UNAPPROVED','model_freeze_allowed':False,'oos_metrics_allowed':False,
+              'evidence_notes':[
+                  'Sohu historical quote field exposes turnover to two decimal percentage points; denominator is therefore tested as a rounding interval.',
+                  'A date-specific denominator jump consistent with an announced share-count event supports historical-date semantics but does not alone prove no later revisions.',
+              ],
+              'source_urls':[
+                  'https://q.stock.sohu.com/cn/300059/lshq.shtml',
+                  'https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=7123058&stockid=300059',
+                  'https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/300059.phtml',
+              ],
+          }
+          p=pathlib.Path('artifact_turnover_denominator_probe/GP12_TURNOVER_DENOMINATOR_PROBE_300059_V482.json')
+          p.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+          print(json.dumps(report,ensure_ascii=False,indent=2))
+          assert len(out)==5,out
+          assert all(x['total_in_rounding_interval'] for x in out),out
+          assert all(not x['unrestricted_in_rounding_interval'] for x in out),out
+          assert abs(ratio_mid-expected_ratio) < 0.02,(ratio_mid,expected_ratio)
+          assert report['pit_revision_semantics_proven'] is False
+          assert report['readiness_blocker_closed'] is False
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-denominator-probe-300059-v482
+          path: artifact_turnover_denominator_probe/
+          if-no-files-found: error
+          retention-days: 30
