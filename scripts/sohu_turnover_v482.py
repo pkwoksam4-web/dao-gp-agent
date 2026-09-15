@@ -1,0 +1,136 @@
+from __future__ import annotations
+
+import json
+import math
+import re
+
+EXPECTED_SYMBOL_LIST_N = 847
+EXPECTED_TURNOVER_SYMBOL_N = 844
+EXPECTED_TRADE_ROWS = 1_011_607
+
+
+def normalize_symbol(symbol: str) -> str:
+    text = str(symbol or '').strip().upper()
+    if '.' not in text:
+        raise ValueError(f'exchange-qualified symbol required: {symbol!r}')
+    code, exchange = text.split('.', 1)
+    if exchange not in {'SZ', 'SH'} or not code.isdigit():
+        raise ValueError(f'unsupported symbol: {symbol!r}')
+    return f'{code.zfill(6)}.{exchange}'
+
+
+def _decode(raw: bytes) -> str:
+    for encoding in ('utf-8-sig', 'gb18030'):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            pass
+    raise ValueError('Sohu turnover payload decode failed')
+
+
+def _parse_turnover_percent(value: object) -> float:
+    text = str(value or '').strip()
+    if text.endswith('%'):
+        text = text[:-1].strip()
+    if not text or text == '-':
+        raise ValueError('turnover is missing')
+    try:
+        percent = float(text)
+    except ValueError as exc:
+        raise ValueError(f'invalid turnover: {value!r}') from exc
+    if not math.isfinite(percent) or percent < 0:
+        raise ValueError(f'invalid turnover: {value!r}')
+    return percent / 100.0
+
+
+def parse_hishq_turnover_bytes(symbol: str, raw: bytes) -> list[dict]:
+    normalized = normalize_symbol(symbol)
+    text = _decode(raw).strip()
+    match = re.match(r'^\s*historySearchHandler\((.*)\)\s*;?\s*$', text, re.S)
+    if not match:
+        raise ValueError('Sohu JSONP wrapper mismatch')
+    payload = json.loads(match.group(1))
+    if not isinstance(payload, list) or not payload:
+        return []
+    block = payload[0]
+    if not isinstance(block, dict) or int(block.get('status', -1)) != 0:
+        return []
+    hq = block.get('hq') or []
+    if not isinstance(hq, list):
+        return []
+
+    rows = []
+    for row in hq:
+        if not isinstance(row, list) or len(row) < 10:
+            raise ValueError('turnover column is missing from Sohu trade row')
+        date = str(row[0] or '')[:10]
+        if len(date) != 10:
+            raise ValueError('invalid Sohu turnover date')
+        rows.append({
+            'symbol': normalized,
+            'date': date,
+            'turnover_ratio': _parse_turnover_percent(row[9]),
+            'source': 'SOHU_HISHQ_TURNOVER',
+        })
+    rows.sort(key=lambda item: item['date'])
+    if len({row['date'] for row in rows}) != len(rows):
+        raise ValueError(f'duplicate Sohu turnover dates: {normalized}')
+    return rows
+
+
+def crosscheck_eastmoney_turnover(
+    sohu_rows: list[dict],
+    eastmoney_rows: list[dict],
+    *,
+    tolerance_bp: float = 0.01,
+) -> dict:
+    eastmoney = {
+        (normalize_symbol(row.get('symbol')), str(row.get('date') or '')[:10]): row
+        for row in eastmoney_rows or []
+    }
+    diffs = []
+    failures = []
+    for row in sohu_rows or []:
+        key = (normalize_symbol(row.get('symbol')), str(row.get('date') or '')[:10])
+        other = eastmoney.get(key)
+        if other is None:
+            failures.append({'symbol': key[0], 'date': key[1], 'reason': 'MISSING_EASTMONEY'})
+            continue
+        sohu_ratio = float(row.get('turnover_ratio'))
+        eastmoney_ratio = float(other.get('turnover_pct')) / 100.0
+        if not (math.isfinite(sohu_ratio) and math.isfinite(eastmoney_ratio)):
+            failures.append({'symbol': key[0], 'date': key[1], 'reason': 'NONFINITE_TURNOVER'})
+            continue
+        diff_bp = abs(sohu_ratio - eastmoney_ratio) * 10_000.0
+        diffs.append(diff_bp)
+        if diff_bp > float(tolerance_bp):
+            failures.append({'symbol': key[0], 'date': key[1], 'reason': 'TURNOVER_DIFF', 'diff_bp': diff_bp})
+    return {
+        'matched_n': len(diffs),
+        'fail_n': len(failures),
+        'max_diff_bp': max(diffs, default=0.0),
+        'failures': failures,
+    }
+
+
+def full_turnover_global_gate(
+    *,
+    unique_symbol_n: int,
+    symbol_list_n: int,
+    turnover_rows: int,
+    duplicate_rows: int,
+    missing_n: int,
+    extra_n: int,
+    bad_turnover_n: int,
+    shard_error: int,
+) -> bool:
+    return (
+        int(unique_symbol_n) == EXPECTED_TURNOVER_SYMBOL_N
+        and int(symbol_list_n) == EXPECTED_SYMBOL_LIST_N
+        and int(turnover_rows) == EXPECTED_TRADE_ROWS
+        and int(duplicate_rows) == 0
+        and int(missing_n) == 0
+        and int(extra_n) == 0
+        and int(bad_turnover_n) == 0
+        and int(shard_error) == 0
+    )
