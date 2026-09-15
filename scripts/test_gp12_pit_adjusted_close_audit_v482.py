@@ -35,6 +35,34 @@ class PitAdjustedCloseAuditContracts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'MISSING_EVENT_AVAILABILITY'):
             m.finalize_symbol_events('000001.SZ', frozen, {}, {}, {})
 
+    def test_audit_symbol_path_uses_final_events_and_requires_constant_scale(self):
+        m = _subject()
+        raw = [
+            {'date': '2024-01-01', 'close': 100.0},
+            {'date': '2024-01-02', 'close': 50.0},
+            {'date': '2024-01-03', 'close': 55.0},
+        ]
+        factors = [
+            {'d': '2024-01-01', 'f': 2.0},
+            {'d': '2024-01-02', 'f': 1.0},
+        ]
+        frozen = [{'ex_date': '2024-01-02', 'event_ratio': 0.6, 'source': 'NOMINAL'}]
+        nominal = {('000001.SZ', '2024-01-02'): '2023-12-20'}
+        overrides = {('000001.SZ', '2024-01-02'): 0.5}
+        override_availability = {('000001.SZ', '2024-01-02'): '2023-12-28'}
+        result = m.audit_symbol_path(
+            symbol='000001.SZ', raw_rows=raw, qfq_factors=factors,
+            frozen_events=frozen, nominal_availability=nominal,
+            overrides=overrides, override_availability=override_availability,
+            threshold_bp=0.000001,
+        )
+        self.assertEqual(result['status'], 'PASS_CONSTANT_SCALE')
+        self.assertEqual(result['rows'], 3)
+        self.assertAlmostEqual(result['scale'], 0.5, places=12)
+        self.assertLessEqual(result['max_diff_bp'], 0.000001)
+        self.assertEqual(result['final_event_n'], 1)
+        self.assertEqual(result['final_override_n'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
