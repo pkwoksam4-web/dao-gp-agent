@@ -64,6 +64,34 @@ class PitGapEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'EVENT_NOT_PIT_AVAILABLE'):
             m.validate_official_gap_record(event, late, 'a' * 64, terms, threshold_bp=5.0)
 
+    def test_restructuring_capitalization_implementation_title_is_narrowly_accepted(self):
+        m = _subject()
+        cap = 2.2035714
+        event = {
+            'symbol': '000564.SZ',
+            'ex_date': '2021-12-31',
+            'cash_per_share': 0.0,
+            'stock_ratio': 0.0,
+            'capitalization_ratio': cap,
+            'rights_ratio': 0.0,
+            'rights_price': None,
+            'prev_actual_close': 4.28,
+            'event_ratio': 1.0 / (1.0 + cap),
+        }
+        announcement = {
+            'announcementId': '1212058139',
+            'announcementTitle': '关于重整计划资本公积金转增股本事项实施的公告',
+            'announcementTime': int(dt.datetime(2021, 12, 27, tzinfo=dt.timezone.utc).timestamp() * 1000),
+        }
+        terms = {
+            'cash_per_share': None,
+            'cap_ratio': cap,
+            'formula_share_change_ratio': None,
+        }
+        out = m.validate_official_gap_record(event, announcement, 'b' * 64, terms)
+        self.assertEqual(out['status'], 'PASS_OFFICIAL_PIT_AVAILABILITY')
+        self.assertEqual(out['availability_date'], '2021-12-27')
+
 
 if __name__ == '__main__':
     unittest.main()
