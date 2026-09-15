@@ -1,0 +1,141 @@
+name: GP12 BaoStock Turnover Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-baostock-turnover-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install BaoStock probe runtime
+        run: pip install -q baostock pandas pyarrow
+      - name: Download pinned first-round turnover audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-turnover-ratio-full-audit-v1
+          path: upstream/base
+          run-id: 34947196139
+          github-token: ${{ github.token }}
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Probe 10 unresolved symbols through BaoStock
+        run: |
+          mkdir -p out
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+          import baostock as bs
+
+          base=json.loads(Path('upstream/base/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json').read_text(encoding='utf-8'))
+          unresolved=[r['symbol'] for r in base['records'] if r.get('symbol_pass') is not True][:10]
+          raw=pd.read_parquet('upstream/raw/SOHU_RAW_FULL_V482.parquet', columns=['symbol','date','amount'])
+          raw=raw[raw['symbol'].isin(unresolved)].copy()
+          expected={s:[str(v)[:10] for v in part['date'].tolist()] for s,part in raw.groupby('symbol',sort=False)}
+
+          lg=bs.login()
+          login={'error_code':lg.error_code,'error_msg':lg.error_msg}
+          records=[]
+          try:
+              if lg.error_code != '0':
+                  raise RuntimeError(f'BaoStock login failed: {lg.error_code} {lg.error_msg}')
+              for symbol in unresolved:
+                  code,ex=symbol.split('.')
+                  bs_code=('sh.' if ex=='SH' else 'sz.')+code
+                  rs=bs.query_history_k_data_plus(
+                      bs_code,
+                      'date,code,turn,tradestatus',
+                      start_date='2020-06-01',
+                      end_date='2026-04-17',
+                      frequency='d',
+                      adjustflag='3',
+                  )
+                  rows=[]
+                  if rs.error_code == '0':
+                      while rs.next():
+                          row=rs.get_row_data()
+                          rec=dict(zip(rs.fields,row))
+                          if rec.get('tradestatus') != '1':
+                              continue
+                          turn=rec.get('turn','')
+                          try:
+                              value=float(turn)
+                          except (TypeError,ValueError):
+                              continue
+                          if value <= 0:
+                              continue
+                          rows.append({'date':rec['date'],'turnover_ratio':value/100.0})
+                  dates=[r['date'] for r in rows]
+                  exp=expected.get(symbol,[])
+                  missing=sorted(set(exp)-set(dates))
+                  extra=sorted(set(dates)-set(exp))
+                  records.append({
+                      'symbol':symbol,
+                      'baostock_code':bs_code,
+                      'error_code':rs.error_code,
+                      'error_msg':rs.error_msg,
+                      'expected_row_n':len(exp),
+                      'row_n':len(rows),
+                      'first':dates[0] if dates else None,
+                      'last':dates[-1] if dates else None,
+                      'missing_date_n':len(missing),
+                      'extra_date_n':len(extra),
+                      'coverage_exact':dates==exp,
+                      'sample_turnover_ratio':rows[-1]['turnover_ratio'] if rows else None,
+                      'pass':rs.error_code=='0' and dates==exp and bool(rows),
+                  })
+          finally:
+              try: bs.logout()
+              except Exception: pass
+
+          out={
+              'artifact':'GP12_BAOSTOCK_TURNOVER_PROBE_V1',
+              'status':'SPIKE_ONLY_NOT_ADMITTED',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'field':'turn',
+              'source_unit':'percent',
+              'candidate_unit':'decimal_ratio',
+              'adjustflag':'3',
+              'frequency':'d',
+              'login':login,
+              'symbol_n':len(records),
+              'pass_n':sum(r['pass'] for r in records),
+              'fail_n':sum(not r['pass'] for r in records),
+              'records':records,
+              'historical_provider_publication_timestamp_proven':False,
+              'formal_admission':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+          }
+          Path('out/GP12_BAOSTOCK_TURNOVER_PROBE_V1.json').write_text(json.dumps(out,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          if login['error_code'] != '0':
+              raise SystemExit(2)
+          PY
+      - name: Upload BaoStock probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-baostock-turnover-probe-v1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
