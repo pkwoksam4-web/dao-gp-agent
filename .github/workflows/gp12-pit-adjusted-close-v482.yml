@@ -9,6 +9,8 @@ on:
       - 'scripts/test_gp12_pit_adjusted_close_v482.py'
       - 'scripts/gp12_pit_gap_evidence_v482.py'
       - 'scripts/test_gp12_pit_gap_evidence_v482.py'
+      - 'scripts/gp12_pit_adjusted_close_audit_v482.py'
+      - 'scripts/test_gp12_pit_adjusted_close_audit_v482.py'
       - '.github/workflows/gp12-pit-adjusted-close-v482.yml'
   workflow_dispatch:
 
@@ -31,4 +33,5 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_gp12_pit_adjusted_close_v482.py \
-            test_gp12_pit_gap_evidence_v482.py
+            test_gp12_pit_gap_evidence_v482.py \
+            test_gp12_pit_adjusted_close_audit_v482.py
