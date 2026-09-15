@@ -12,7 +12,8 @@ on:
       - 'scripts/gp12_pit_adjusted_close_audit_v482.py'
       - 'scripts/test_gp12_pit_adjusted_close_audit_v482.py'
       - 'scripts/test_gp12_pit_availability_manifest_v482.py'
-      - 'data/GP12_PIT_EVENT_AVAILABILITY_V482.json'
+      - 'scripts/materialize_gp12_pit_availability_manifest_v482.py'
+      - 'data/gp12_pit_event_availability_v482_chunks/**'
       - '.github/workflows/gp12-pit-adjusted-close-v482.yml'
   workflow_dispatch:
 
@@ -28,6 +29,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Materialize frozen PIT availability manifest
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/materialize_gp12_pit_availability_manifest_v482.py
+          python - <<'PY'
+          import hashlib, json, pathlib
+          p=pathlib.Path('data/GP12_PIT_EVENT_AVAILABILITY_V482.json')
+          raw=p.read_bytes()
+          x=json.loads(raw)
+          assert hashlib.sha256(raw).hexdigest()=='0e56d465039c2d374b1cd50e8aea6a7cc69d829485efe19d2020b3d8ae436125'
+          assert len(x['nominal_events'])==2732
+          assert len(x['standard_overrides'])==270
+          assert len(x['special_overrides'])==11
+          print(json.dumps({'manifest_sha256':hashlib.sha256(raw).hexdigest(),'counts':{'nominal_events':2732,'standard_overrides':270,'special_overrides':11}},ensure_ascii=False))
+          PY
       - name: Run PIT adjusted-close contracts
         env:
           PYTHONPATH: scripts
