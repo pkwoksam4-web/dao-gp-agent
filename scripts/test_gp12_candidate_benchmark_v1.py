@@ -4,6 +4,9 @@ import datetime as dt
 import json
 import pathlib
 import unittest
+from unittest.mock import patch
+
+import requests
 
 import gp12_candidate_benchmark_v1 as mod
 
@@ -40,6 +43,23 @@ def fake_binding() -> dict:
             "historical_recovery_claim_allowed": False,
         },
     }
+
+
+class FakeResponse:
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "data": {
+                "code": "000985",
+                "name": "中证全指",
+                "klines": [
+                    "2020-06-01,100,101,102,99,1000,100000",
+                    "2020-06-02,101,102,103,100,1100,110000",
+                ],
+            }
+        }
 
 
 class CandidateBenchmarkBindingV1Tests(unittest.TestCase):
@@ -113,6 +133,23 @@ class CandidateBenchmarkBindingV1Tests(unittest.TestCase):
                 fake_binding(),
             )
         )
+
+    def test_fetch_retries_transient_disconnects_but_still_requires_fresh_source(self):
+        attempts = {"n": 0}
+
+        def flaky_get(*args, **kwargs):
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                raise requests.ConnectionError("transient disconnect")
+            return FakeResponse()
+
+        with patch("requests.get", side_effect=flaky_get), patch("time.sleep", return_value=None):
+            rows, meta = mod.fetch_benchmark_close(fake_binding(), timeout=1)
+
+        self.assertEqual(attempts["n"], 3)
+        self.assertEqual([row["date"] for row in rows], ["2020-06-01", "2020-06-02"])
+        self.assertEqual(meta["payload_code"], "000985")
+        self.assertEqual(meta["payload_name"], "中证全指")
 
 
 if __name__ == "__main__":
