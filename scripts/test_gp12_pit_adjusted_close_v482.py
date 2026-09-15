@@ -23,6 +23,19 @@ class PitAdjustedCloseAvailabilityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'EVENT_NOT_PIT_AVAILABLE'):
             m.validate_event_availability(event)
 
+    def test_final_override_availability_supersedes_same_day_nominal_source(self):
+        m = _subject()
+        resolve = getattr(m, 'resolve_final_event_availability', None)
+        self.assertTrue(callable(resolve), 'resolve_final_event_availability is not implemented')
+        # 000697: the generic F10 row is dated on ex-date, while the final
+        # restructuring implementation terms were already disclosed 3 days earlier.
+        resolved = resolve(
+            ex_date='2025-11-28',
+            nominal_availability_date='2025-11-28',
+            final_override_availability_date='2025-11-25',
+        )
+        self.assertEqual(resolved, '2025-11-25')
+
     def test_forward_path_applies_event_from_ex_date_only(self):
         m = _subject()
         raw_rows = [
@@ -39,6 +52,22 @@ class PitAdjustedCloseAvailabilityTests(unittest.TestCase):
         path = m.build_forward_pit_adjusted_path(raw_rows, events)
         self.assertEqual([row['date'] for row in path], ['2020-06-30', '2020-07-02', '2020-07-03'])
         self.assertEqual([round(row['adjusted_close'], 10) for row in path], [100.0, 100.0, 110.0])
+
+    def test_qfq_path_uses_factor_known_for_each_trade_date(self):
+        m = _subject()
+        build = getattr(m, 'build_qfq_adjusted_path', None)
+        self.assertTrue(callable(build), 'build_qfq_adjusted_path is not implemented')
+        raw_rows = [
+            {'date': '2020-06-30', 'close': 100.0},
+            {'date': '2020-07-02', 'close': 90.0},
+            {'date': '2020-07-03', 'close': 99.0},
+        ]
+        factors = [
+            {'d': '2020-06-01', 'f': 1.1111111111111112},
+            {'d': '2020-07-02', 'f': 1.0},
+        ]
+        path = build(raw_rows, factors)
+        self.assertEqual([round(row['adjusted_close'], 10) for row in path], [90.0, 90.0, 99.0])
 
     def test_qfq_and_pit_paths_must_be_constant_scale_equivalent(self):
         m = _subject()
