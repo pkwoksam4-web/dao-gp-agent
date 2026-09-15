@@ -11,6 +11,8 @@ on:
       - 'scripts/test_gp12_pit_gap_evidence_v482.py'
       - 'scripts/gp12_pit_adjusted_close_audit_v482.py'
       - 'scripts/test_gp12_pit_adjusted_close_audit_v482.py'
+      - 'scripts/gp12_pit_full_audit_v482.py'
+      - 'scripts/test_gp12_pit_full_audit_v482.py'
       - 'scripts/test_gp12_pit_availability_manifest_v482.py'
       - 'scripts/materialize_gp12_pit_availability_manifest_v482.py'
       - 'data/gp12_pit_event_availability_v482_chunks/**'
@@ -54,4 +56,5 @@ jobs:
             test_gp12_pit_adjusted_close_v482.py \
             test_gp12_pit_gap_evidence_v482.py \
             test_gp12_pit_adjusted_close_audit_v482.py \
+            test_gp12_pit_full_audit_v482.py \
             test_gp12_pit_availability_manifest_v482.py
