@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import pathlib
 
@@ -11,6 +12,8 @@ import gp12_pit_readiness_integration_v482 as pit
 
 ARTIFACT = "GP12_CANDIDATE_INPUT_READINESS_V1"
 VERSION = "1.0"
+FACTOR_SHA256 = "b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e"
+PARAMETER_SHA256 = "22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204"
 MARKET_FEATURE_BLOCKER = "MARKET_ADJUSTED_CLOSE_FEATURE_BINDING_UNBOUND"
 NEXT_PRIORITY_FAMILY = "amount_turnover"
 NEXT_PRIORITY_BLOCKER = "TURNOVER_RATIO_UNBOUND"
@@ -24,6 +27,17 @@ def _load(path: pathlib.Path | str) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f"JSON file must contain an object: {path}")
     return value
+
+
+def _canonical_json_sha256(value: object) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _collect_input_blockers(report: dict) -> list[str]:
@@ -50,6 +64,13 @@ def build_checkpoint(
     benchmark reference and is never promoted to the frozen
     ``market_adjusted_close`` feature family.
     """
+    factor_sha = _canonical_json_sha256(factors)
+    parameter_sha = _canonical_json_sha256(parameters)
+    if factor_sha != FACTOR_SHA256:
+        raise ValueError(f"factor definition hash drift: {factor_sha}")
+    if parameter_sha != PARAMETER_SHA256:
+        raise ValueError(f"parameter hash drift: {parameter_sha}")
+
     upstream = pit.build_pit_checkpoint(
         parameters,
         factors,
@@ -101,6 +122,10 @@ def build_checkpoint(
         "version": VERSION,
         "lineage_artifact": upstream.get("artifact"),
         "lineage_version": upstream.get("version"),
+        "asset_hashes": {
+            "factor_definition_sha256": factor_sha,
+            "parameter_sha256": parameter_sha,
+        },
         "candidate_benchmark_reference_validated": benchmark_check["valid"],
         "candidate_benchmark_reference": benchmark_reference,
         "candidate_benchmark_validation_reasons": benchmark_check["reasons"],
@@ -155,6 +180,7 @@ def main() -> int:
         json.dumps(
             {
                 "artifact": report["artifact"],
+                "asset_hashes": report["asset_hashes"],
                 "validated_families": report["validated_families"],
                 "missing_or_unvalidated_families": report[
                     "missing_or_unvalidated_families"
