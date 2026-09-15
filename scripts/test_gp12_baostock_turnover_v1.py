@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import json
+import pathlib
 import unittest
 
 import gp12_baostock_turnover_v1 as mod
+
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+RESIDUAL_BINDING_PATH = ROOT / "data" / "GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1.json"
 
 
 class BaoStockTurnoverContractTests(unittest.TestCase):
@@ -73,6 +79,91 @@ class BaoStockTurnoverContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "code mismatch"):
             mod.parse_baostock_row("000001.SZ", row)
 
+    def test_residual_binding_file_is_candidate_only_and_pit_safe(self):
+        binding = json.loads(RESIDUAL_BINDING_PATH.read_text(encoding="utf-8"))
+        index = mod.validate_residual_denominator_binding(binding)
+        self.assertEqual(binding["artifact"], "GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1")
+        self.assertEqual(binding["status"], "CANDIDATE_ONLY_UNAPPROVED")
+        self.assertEqual(binding["origin"], "NEW_RECONSTRUCTION_CANDIDATE")
+        self.assertEqual(binding["source_turn_precision_percentage_points"], 0.0001)
+        self.assertEqual(set(index), {"300216.SZ", "002604.SZ"})
+        self.assertEqual(index["300216.SZ"]["floating_shares"], 291_684_518)
+        self.assertEqual(index["002604.SZ"]["floating_shares"], 512_281_847)
+        for entry in index.values():
+            self.assertLess(entry["source_publication_date"], entry["coverage_start"])
+        self.assertFalse(binding["historical_gp_v11_source_recovered"])
+        self.assertFalse(binding["model_freeze_allowed"])
+        self.assertFalse(binding["oos_metrics_allowed"])
+
+    def test_residual_denominator_reproduces_positive_source_turn_precision(self):
+        entry = {
+            "symbol": "300216.SZ",
+            "coverage_start": "2020-08-05",
+            "coverage_end": "2020-09-15",
+            "floating_shares": 291_684_518,
+            "source_publication_date": "2020-06-30",
+        }
+        rows = [
+            {"date": "2020-09-04", "volume": "108800", "amount": "36992", "turn": "0.037300", "tradestatus": "1"},
+            {"date": "2020-09-14", "volume": "24593100", "amount": "4672689", "turn": "8.431400", "tradestatus": "1"},
+            {"date": "2020-09-15", "volume": "106728927", "amount": "18945649.29", "turn": "36.590500", "tradestatus": "1"},
+        ]
+        out = mod.validate_residual_precision_neighbors(entry, rows)
+        self.assertTrue(out["valid"])
+        self.assertEqual(out["checked_n"], 3)
+        self.assertLessEqual(out["max_abs_percentage_point_error"], 0.00005)
+
+    def test_precision_zero_recovery_requires_bound_denominator_and_quantized_zero(self):
+        entry = {
+            "symbol": "300216.SZ",
+            "coverage_start": "2020-08-05",
+            "coverage_end": "2020-09-15",
+            "floating_shares": 291_684_518,
+            "source_publication_date": "2020-06-30",
+        }
+        row = {
+            "date": "2020-08-05",
+            "code": "sz.300216",
+            "volume": "100",
+            "amount": "343",
+            "turn": "0.000000",
+            "tradestatus": "1",
+        }
+        out = mod.parse_baostock_row("300216.SZ", row, residual_denominator=entry)
+        self.assertAlmostEqual(out["turnover_ratio"], 100 / 291_684_518)
+        self.assertTrue(out["turnover_precision_reconstruction"])
+        self.assertEqual(out["residual_denominator_shares"], 291_684_518)
+        self.assertEqual(out["residual_binding_symbol"], "300216.SZ")
+
+        with self.assertRaises(ValueError):
+            mod.parse_baostock_row("300216.SZ", row)
+
+        too_large = dict(row, volume="1000", amount="3430")
+        with self.assertRaisesRegex(ValueError, "precision zero"):
+            mod.parse_baostock_row("300216.SZ", too_large, residual_denominator=entry)
+
+    def test_residual_recovery_refuses_wrong_symbol_or_out_of_window(self):
+        entry = {
+            "symbol": "300216.SZ",
+            "coverage_start": "2020-08-05",
+            "coverage_end": "2020-09-15",
+            "floating_shares": 291_684_518,
+            "source_publication_date": "2020-06-30",
+        }
+        wrong_symbol = {
+            "date": "2020-08-05", "code": "sz.000001", "volume": "100", "amount": "343",
+            "turn": "0", "tradestatus": "1",
+        }
+        with self.assertRaises(ValueError):
+            mod.parse_baostock_row("000001.SZ", wrong_symbol, residual_denominator=entry)
+
+        out_of_window = {
+            "date": "2020-08-04", "code": "sz.300216", "volume": "100", "amount": "343",
+            "turn": "0", "tradestatus": "1",
+        }
+        with self.assertRaises(ValueError):
+            mod.parse_baostock_row("300216.SZ", out_of_window, residual_denominator=entry)
+
     def test_exact_date_audit_and_session_close_pit(self):
         expected = ["2020-06-01", "2020-06-02"]
         rows = [
@@ -100,6 +191,27 @@ class BaoStockTurnoverContractTests(unittest.TestCase):
         self.assertTrue(out["symbol_pass"])
         self.assertEqual(out["provider_status_override_n"], 1)
         self.assertEqual(out["provider_status_override_dates"], ["2024-06-13"])
+
+    def test_audit_and_materialization_trace_precision_reconstruction(self):
+        expected = ["2020-08-05", "2020-08-06"]
+        rows = [
+            {
+                "date": "2020-08-05",
+                "turnover_ratio": 100 / 291_684_518,
+                "turnover_precision_reconstruction": True,
+                "residual_denominator_shares": 291_684_518,
+                "residual_binding_symbol": "300216.SZ",
+            },
+            {"date": "2020-08-06", "turnover_ratio": 0.000138},
+        ]
+        audit = mod.audit_symbol_rows("300216.SZ", expected, rows)
+        self.assertTrue(audit["symbol_pass"])
+        self.assertEqual(audit["turnover_precision_reconstruction_n"], 1)
+        self.assertEqual(audit["turnover_precision_reconstruction_dates"], ["2020-08-05"])
+
+        panel = mod.materialize_rows("300216.SZ", rows)
+        self.assertEqual(panel[0]["source"], "BAOSTOCK_TURN_RESIDUAL_DENOMINATOR_RECONSTRUCTION")
+        self.assertEqual(panel[1]["source"], "BAOSTOCK_TURN_DAILY_UNADJUSTED")
 
     def test_materialized_rows_include_source_and_known_at(self):
         rows = [{"date": "2020-06-01", "turnover_ratio": 0.0123}]
