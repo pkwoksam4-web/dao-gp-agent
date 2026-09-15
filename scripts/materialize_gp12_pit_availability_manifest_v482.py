@@ -9,7 +9,7 @@ import pathlib
 
 EXPECTED_B64_SHA256 = 'ff82d254f00f7875a284040b538107ddb5b4b334cbd60bfbe46f8d8f61d6773c'
 EXPECTED_JSON_SHA256 = '0e56d465039c2d374b1cd50e8aea6a7cc69d829485efe19d2020b3d8ae436125'
-EXPECTED_CHUNK_N = 20
+EXPECTED_CHUNK_N = 11
 EXPECTED_COUNTS = {'nominal_events': 2732, 'standard_overrides': 270, 'special_overrides': 11}
 
 
