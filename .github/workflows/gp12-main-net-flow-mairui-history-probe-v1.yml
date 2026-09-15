@@ -1,0 +1,141 @@
+name: GP12 Main Net Flow MaiRui History Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-mairui-history-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -q requests
+      - name: Probe historical windows and cross-check Eastmoney
+        run: |
+          python - <<'PY'
+          import json, math, statistics, time
+          import requests
+
+          LICENCE = 'LICENCE-66D8-9F96-0C7F0FBCD073'  # official public 000001 capability-test certificate
+          BASE = f'https://api.mairuiapi.com/hsstock/history/transaction/000001/{LICENCE}'
+          HEADERS = {'User-Agent': 'Mozilla/5.0 GP12-CANDIDATE-CAPABILITY-PROBE/1.0'}
+          windows = [
+              ('formal_2020_h2', '20200601', '20201231'),
+              ('formal_2024', '20240101', '20241231'),
+              ('formal_2026_to_end', '20260101', '20260417'),
+              ('recent_overlap', '20260325', '20260915'),
+          ]
+
+          def parse_daily(rows):
+              out = {}
+              for row in rows:
+                  if not isinstance(row, dict):
+                      raise RuntimeError('MaiRui row is not object')
+                  date = str(row.get('t',''))[:10]
+                  if not date:
+                      raise RuntimeError('MaiRui row missing t')
+                  required = ('zmbtdcje','zmbddcje','zmstdcje','zmsddcje')
+                  missing = [k for k in required if row.get(k) is None]
+                  if missing:
+                      raise RuntimeError(f'MaiRui row missing fields {missing} on {date}')
+                  values = {k: float(row[k]) for k in required}
+                  if not all(math.isfinite(v) and v >= 0 for v in values.values()):
+                      raise RuntimeError(f'MaiRui invalid amount bucket on {date}')
+                  main = values['zmbtdcje'] + values['zmbddcje'] - values['zmstdcje'] - values['zmsddcje']
+                  if date in out and abs(out[date] - main) > 0.01:
+                      raise RuntimeError(f'conflicting duplicate daily row on {date}')
+                  out[date] = main
+              return out
+
+          reports = []
+          recent = None
+          for label, st, et in windows:
+              item = {'label': label, 'st': st, 'et': et}
+              try:
+                  r = requests.get(BASE, params={'st': st, 'et': et}, headers=HEADERS, timeout=30)
+                  item['http_status'] = r.status_code
+                  item['url'] = r.url.replace(LICENCE, '<TEST_LICENCE>')
+                  item['head'] = r.text[:300]
+                  r.raise_for_status()
+                  payload = r.json()
+                  if isinstance(payload, dict) and isinstance(payload.get('data'), list):
+                      payload = payload['data']
+                  if not isinstance(payload, list):
+                      raise RuntimeError(f'unexpected payload type {type(payload).__name__}')
+                  daily = parse_daily(payload)
+                  item['raw_row_n'] = len(payload)
+                  item['daily_row_n'] = len(daily)
+                  item['first'] = min(daily) if daily else None
+                  item['last'] = max(daily) if daily else None
+                  item['sample_first'] = payload[0] if payload else None
+                  item['main_net_flow_sample'] = (
+                      {'date': min(daily), 'main_net_flow_cny': daily[min(daily)]} if daily else None
+                  )
+                  if label == 'recent_overlap':
+                      recent = daily
+              except Exception as exc:
+                  item['error'] = f'{type(exc).__name__}: {exc}'
+              reports.append(item)
+              print(json.dumps(item, ensure_ascii=False))
+              time.sleep(0.5)
+
+          cross = {'attempted': False}
+          if recent:
+              cross['attempted'] = True
+              em_url = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get'
+              em_params = {
+                  'lmt': '1000', 'klt': '101', 'secid': '0.000001',
+                  'fields1': 'f1,f2,f3,f7',
+                  'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
+                  'ut': '7eea3edcaed734bea9cbfc24409ed989', 'rtntype': '6',
+              }
+              eh = {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152 Safari/537.36',
+                  'Accept': 'application/json,text/plain,*/*',
+                  'Referer': 'https://data.eastmoney.com/',
+              }
+              try:
+                  er = requests.get(em_url, params=em_params, headers=eh, timeout=30)
+                  cross['eastmoney_http'] = er.status_code
+                  er.raise_for_status()
+                  data = (er.json().get('data') or {})
+                  klines = data.get('klines') or []
+                  east = {}
+                  for line in klines:
+                      p = str(line).split(',')
+                      if len(p) >= 2:
+                          east[p[0][:10]] = float(p[1])
+                  overlap = sorted(set(recent) & set(east))
+                  diffs = [recent[d] - east[d] for d in overlap]
+                  absdiff = [abs(x) for x in diffs]
+                  denom = [max(1.0, abs(east[d])) for d in overlap]
+                  rel = [abs(recent[d]-east[d])/denom[i] for i,d in enumerate(overlap)]
+                  cross.update({
+                      'eastmoney_row_n': len(east),
+                      'eastmoney_first': min(east) if east else None,
+                      'eastmoney_last': max(east) if east else None,
+                      'overlap_n': len(overlap),
+                      'max_abs_diff': max(absdiff) if absdiff else None,
+                      'median_abs_diff': statistics.median(absdiff) if absdiff else None,
+                      'median_relative_diff': statistics.median(rel) if rel else None,
+                      'same_sign_n': sum((recent[d] > 0) == (east[d] > 0) or (recent[d] == 0 == east[d]) for d in overlap),
+                      'sample': [
+                          {'date': d, 'mairui': recent[d], 'eastmoney': east[d], 'diff': recent[d]-east[d]}
+                          for d in overlap[:10]
+                      ],
+                  })
+              except Exception as exc:
+                  cross['error'] = f'{type(exc).__name__}: {exc}'
+
+          summary = {'windows': reports, 'crosscheck': cross}
+          print('===SUMMARY===')
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          PY
