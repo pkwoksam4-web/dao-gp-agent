@@ -1,0 +1,30 @@
+name: GP12 PIT Adjusted Close V4.82
+
+on:
+  push:
+    branches:
+      - gp/gp12-pit-adjusted-close-v482
+    paths:
+      - 'scripts/gp12_pit_adjusted_close_v482.py'
+      - 'scripts/test_gp12_pit_adjusted_close_v482.py'
+      - '.github/workflows/gp12-pit-adjusted-close-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  pit-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run PIT adjusted-close contracts
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_pit_adjusted_close_v482.py
