@@ -1,0 +1,140 @@
+name: GP12 Sina Turnover Precision Probe
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-sina-turnover-precision-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install probe runtime
+        run: pip install -q akshare pandas pyarrow
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+          repository: pkwoksam4-web/dao-gp-agent
+      - name: Probe Sina daily turnover precision
+        run: |
+          mkdir -p out
+          python - <<'PY'
+          import json, math
+          from pathlib import Path
+          import akshare as ak
+          import pandas as pd
+
+          raw = pd.read_parquet(
+              'upstream/raw/SOHU_RAW_FULL_V482.parquet',
+              columns=['symbol','date','amount'],
+          )
+          targets = {
+              '300216.SZ': 'sz300216',
+              '002604.SZ': 'sz002604',
+          }
+          records=[]
+          for symbol, sina_symbol in targets.items():
+              expected = raw[raw['symbol'].eq(symbol)].copy()
+              expected_dates = [str(x)[:10] for x in expected['date'].tolist()]
+              rec = {
+                  'symbol': symbol,
+                  'sina_symbol': sina_symbol,
+                  'expected_row_n': len(expected_dates),
+                  'expected_first': expected_dates[0] if expected_dates else None,
+                  'expected_last': expected_dates[-1] if expected_dates else None,
+              }
+              try:
+                  df = ak.stock_zh_a_daily(
+                      symbol=sina_symbol,
+                      start_date='20200601',
+                      end_date='20260417',
+                      adjust='',
+                  )
+                  df = df.reset_index(drop=False)
+                  df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+                  got = df[df['date'].isin(expected_dates)].copy()
+                  got_dates = got['date'].tolist()
+                  rec.update({
+                      'query_ok': True,
+                      'returned_row_n': len(df),
+                      'matched_expected_row_n': len(got),
+                      'missing_dates': sorted(set(expected_dates)-set(got_dates)),
+                      'extra_dates_in_expected_window': sorted(set(got_dates)-set(expected_dates)),
+                      'columns': list(df.columns),
+                      'rows': [],
+                  })
+                  for _, row in got.iterrows():
+                      vol = float(row['volume'])
+                      shares = float(row['outstanding_share'])
+                      turnover = float(row['turnover'])
+                      derived = vol/shares if shares > 0 else None
+                      rec['rows'].append({
+                          'date': row['date'],
+                          'volume': vol,
+                          'outstanding_share': shares,
+                          'turnover': turnover,
+                          'derived_turnover': derived,
+                          'finite_positive_turnover': bool(math.isfinite(turnover) and turnover > 0),
+                          'derived_matches': bool(
+                              derived is not None and math.isfinite(turnover)
+                              and abs(turnover-derived) <= max(1e-12, abs(derived)*1e-8)
+                          ),
+                      })
+              except Exception as exc:
+                  rec.update({
+                      'query_ok': False,
+                      'error': f'{type(exc).__name__}: {exc}',
+                      'rows': [],
+                  })
+              records.append(rec)
+
+          out = {
+              'artifact': 'GP12_SINA_TURNOVER_PRECISION_PROBE_V1',
+              'status': 'SPIKE_ONLY_NOT_ADMITTED',
+              'formal_window': ['2020-06-01','2026-04-17'],
+              'targets': records,
+              'candidate_source_origin': 'NEW_RECONSTRUCTION_CANDIDATE',
+              'historical_gp_v11_source_recovered': False,
+              'formal_admission': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          Path('out/GP12_SINA_TURNOVER_PRECISION_PROBE_V1.json').write_text(
+              json.dumps(out, ensure_ascii=False, indent=2)+'\n', encoding='utf-8'
+          )
+          print(json.dumps({
+              'artifact': out['artifact'],
+              'targets': [{
+                  'symbol': r['symbol'],
+                  'query_ok': r.get('query_ok'),
+                  'expected_row_n': r['expected_row_n'],
+                  'matched_expected_row_n': r.get('matched_expected_row_n'),
+                  'missing_dates': r.get('missing_dates'),
+                  'positive_turnover_n': sum(x['finite_positive_turnover'] for x in r.get('rows',[])),
+                  'derived_match_n': sum(x['derived_matches'] for x in r.get('rows',[])),
+                  'error': r.get('error'),
+              } for r in records]
+          }, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-sina-turnover-precision-probe-v1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
