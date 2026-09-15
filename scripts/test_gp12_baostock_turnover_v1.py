@@ -12,10 +12,50 @@ class BaoStockTurnoverContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.symbol_to_baostock_code("000001")
 
+    def test_query_contract_requests_trade_evidence_for_status_override(self):
+        self.assertEqual(
+            mod.BAOSTOCK_QUERY_FIELDS,
+            "date,code,volume,amount,turn,tradestatus",
+        )
+
     def test_active_trade_turn_percent_converts_to_decimal(self):
         row = {"date": "2026-04-17", "code": "sz.000001", "turn": "2.500000", "tradestatus": "1"}
         out = mod.parse_baostock_row("000001.SZ", row)
         self.assertEqual(out, {"date": "2026-04-17", "turnover_ratio": 0.025})
+
+    def test_status_zero_with_positive_trade_evidence_is_accepted_and_traced(self):
+        row = {
+            "date": "2024-06-13",
+            "code": "sz.002087",
+            "volume": "20061549",
+            "amount": "3286917.8400",
+            "turn": "2.459600",
+            "tradestatus": "0",
+        }
+        out = mod.parse_baostock_row("002087.SZ", row)
+        self.assertEqual(out, {
+            "date": "2024-06-13",
+            "turnover_ratio": 0.024596,
+            "provider_status_override": True,
+        })
+
+    def test_status_zero_without_complete_positive_trade_evidence_is_ignored(self):
+        cases = [
+            {"volume": "", "amount": "", "turn": ""},
+            {"volume": "0", "amount": "3286917.84", "turn": "2.4596"},
+            {"volume": "20061549", "amount": "0", "turn": "2.4596"},
+            {"volume": "20061549", "amount": "3286917.84", "turn": "0"},
+            {"volume": "bad", "amount": "3286917.84", "turn": "2.4596"},
+        ]
+        for evidence in cases:
+            with self.subTest(evidence=evidence):
+                row = {
+                    "date": "2024-06-13",
+                    "code": "sz.002087",
+                    "tradestatus": "0",
+                    **evidence,
+                }
+                self.assertIsNone(mod.parse_baostock_row("002087.SZ", row))
 
     def test_nontrading_row_is_ignored(self):
         row = {"date": "2026-04-17", "code": "sz.000001", "turn": "", "tradestatus": "0"}
@@ -45,6 +85,21 @@ class BaoStockTurnoverContractTests(unittest.TestCase):
         self.assertEqual(out["known_at_first"], "2020-06-01T15:00:00+08:00")
         self.assertFalse(out["same_session_turnover_usable_before_close"])
         self.assertFalse(out["historical_provider_publication_timestamp_proven"])
+
+    def test_audit_traces_provider_status_overrides(self):
+        expected = ["2024-06-12", "2024-06-13"]
+        rows = [
+            {"date": "2024-06-12", "turnover_ratio": 0.01},
+            {
+                "date": "2024-06-13",
+                "turnover_ratio": 0.024596,
+                "provider_status_override": True,
+            },
+        ]
+        out = mod.audit_symbol_rows("002087.SZ", expected, rows)
+        self.assertTrue(out["symbol_pass"])
+        self.assertEqual(out["provider_status_override_n"], 1)
+        self.assertEqual(out["provider_status_override_dates"], ["2024-06-13"])
 
     def test_materialized_rows_include_source_and_known_at(self):
         rows = [{"date": "2020-06-01", "turnover_ratio": 0.0123}]
