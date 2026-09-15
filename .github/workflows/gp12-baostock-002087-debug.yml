@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Sina probe runtime
+      - name: Install NetEase probe runtime
         run: pip install -q akshare pandas pyarrow
       - name: Download pinned Sohu RAW evidence
         uses: actions/download-artifact@v4
@@ -30,7 +30,7 @@ jobs:
           run-id: 34192233633
           github-token: ${{ github.token }}
           repository: pkwoksam4-web/dao-gp-agent
-      - name: Probe 300216 and 002604 through Sina/AkShare
+      - name: Probe 300216 and 002604 through NetEase/AkShare
         run: |
           python - <<'PY'
           import json, math
@@ -42,36 +42,41 @@ jobs:
               columns=['symbol','date','amount'],
           )
           targets = {'300216.SZ':'sz300216','002604.SZ':'sz002604'}
-          for symbol, sina_symbol in targets.items():
+          for symbol, source_symbol in targets.items():
               exp = raw[raw['symbol'].eq(symbol)].copy()
               expected_dates = [str(x)[:10] for x in exp['date'].tolist()]
               print('TARGET', symbol, 'EXPECTED', len(expected_dates), expected_dates[0], expected_dates[-1])
               try:
-                  df = ak.stock_zh_a_daily(
-                      symbol=sina_symbol,
+                  df = ak.stock_zh_a_hist_163(
+                      symbol=source_symbol,
                       start_date='20200601',
                       end_date='20260417',
-                      adjust='',
-                  ).reset_index(drop=False)
+                  )
                   print('COLUMNS', list(df.columns), 'RETURNED', len(df))
-                  df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-                  got = df[df['date'].isin(expected_dates)].copy()
-                  print('MATCHED', len(got), 'MISSING', sorted(set(expected_dates)-set(got['date'])))
+                  df['date_norm'] = pd.to_datetime(df['日期']).dt.strftime('%Y-%m-%d')
+                  got = df[df['date_norm'].isin(expected_dates)].copy()
+                  print('MATCHED', len(got), 'MISSING', sorted(set(expected_dates)-set(got['date_norm'])))
                   rows=[]
                   for _, r in got.iterrows():
-                      vol=float(r['volume'])
-                      shares=float(r['outstanding_share'])
-                      turn=float(r['turnover'])
-                      derived=vol/shares if shares > 0 else float('nan')
+                      close=float(r['收盘价'])
+                      volume=float(r['成交量'])
+                      turnover_pct=float(r['换手率'])
+                      float_mcap=float(r['流通市值'])
+                      shares=float_mcap/close if close > 0 else float('nan')
+                      derived=volume/shares if shares > 0 else float('nan')
+                      source_ratio=turnover_pct/100.0
                       rows.append({
-                          'date':r['date'],
-                          'volume':vol,
-                          'outstanding_share':shares,
-                          'turnover':turn,
-                          'derived_turnover':derived,
-                          'positive':bool(math.isfinite(turn) and turn>0),
-                          'derived_positive':bool(math.isfinite(derived) and derived>0),
-                          'abs_diff':abs(turn-derived) if math.isfinite(turn) and math.isfinite(derived) else None,
+                          'date':r['date_norm'],
+                          'close':close,
+                          'volume':volume,
+                          'turnover_pct':turnover_pct,
+                          'turnover_ratio':source_ratio,
+                          'float_mcap':float_mcap,
+                          'derived_outstanding_share':shares,
+                          'derived_turnover_ratio':derived,
+                          'positive_source':bool(math.isfinite(source_ratio) and source_ratio>0),
+                          'positive_derived':bool(math.isfinite(derived) and derived>0),
+                          'abs_diff':abs(source_ratio-derived) if math.isfinite(source_ratio) and math.isfinite(derived) else None,
                       })
                   print(json.dumps(rows, ensure_ascii=False, indent=2))
               except Exception as exc:
