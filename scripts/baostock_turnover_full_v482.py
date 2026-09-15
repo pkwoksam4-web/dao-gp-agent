@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 
 import pandas as pd
 
@@ -15,6 +16,38 @@ from baostock_turnover_v482 import (
 )
 
 ZERO_TRADE_SYMBOLS = {'600074.SH', '600485.SH', '600677.SH'}
+_SYMBOL_RE = re.compile(r'^\d{6}\.(?:SZ|SH)$')
+
+
+def validate_scope_symbols(symbols: list[str]) -> list[str]:
+    normalized = [str(s).strip().upper() for s in symbols if str(s).strip()]
+    if len(set(normalized)) != len(normalized):
+        raise ValueError('duplicate symbols in Formal turnover scope')
+    bad = [s for s in normalized if not _SYMBOL_RE.fullmatch(s)]
+    if bad:
+        raise ValueError(f'exchange-qualified symbols required: {bad[:10]}')
+    if len(normalized) != EXPECTED_SCOPE_N:
+        raise ValueError(f'Formal turnover scope must contain exactly {EXPECTED_SCOPE_N} symbols; got {len(normalized)}')
+    return normalized
+
+
+def shard_gate(
+    *,
+    symbols_selected: int,
+    symbols_audited: int,
+    expected_trade_rows: int,
+    turnover_rows: int,
+    review_n: int,
+    error_n: int,
+    unresolved_symbol_n: int,
+) -> bool:
+    return (
+        int(symbols_selected) == int(symbols_audited)
+        and int(expected_trade_rows) == int(turnover_rows)
+        and int(review_n) == 0
+        and int(error_n) == 0
+        and int(unresolved_symbol_n) == 0
+    )
 
 
 def select_shard(symbols: list[str], shard_index: int, shard_count: int) -> list[str]:
