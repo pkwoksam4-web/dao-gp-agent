@@ -96,7 +96,7 @@ def validate_special_prev_close(
     for row in raw_rows or []:
         d = _date(row.get('date'), 'raw date')
         if d < ex_date:
-            prior.append((d, _positive(row.get('close'), 'raw close'))
+            prior.append((d, _positive(row.get('close'), 'raw close')))
     if not prior:
         raise ValueError(f'SPECIAL_PREV_CLOSE_MISSING:{normalized_symbol}:{ex_date}')
     previous_trade_date, previous_close = max(prior, key=lambda item: item[0])
