@@ -1,0 +1,122 @@
+name: GP12 Main Net Flow Rolling Reconstruction Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-rolling-reconstruction-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -q requests
+      - name: Probe ten-year rolling-flow archive and cross-check Eastmoney
+        run: |
+          python - <<'PY'
+          import json, math, statistics
+          import requests
+
+          archive_url = 'http://api.chagubang.com:3388/data'
+          archive_params = {
+              'key': 'mushuju.com',
+              'path': 'time/zijin/jdzldx/000001',
+              'type': '2',
+          }
+          ar = requests.get(archive_url, params=archive_params, timeout=30)
+          print('ARCHIVE_HTTP', ar.status_code, ar.url)
+          print('ARCHIVE_HEAD', ar.text[:300])
+          ar.raise_for_status()
+          payload = ar.json()
+          if isinstance(payload, dict):
+              for key in ('data','result','rows'):
+                  if isinstance(payload.get(key), list):
+                      payload = payload[key]
+                      break
+          if not isinstance(payload, list):
+              raise RuntimeError(f'archive payload not list: {type(payload).__name__}')
+          rows = []
+          for raw in payload:
+              if not isinstance(raw, dict) or not raw.get('t'):
+                  continue
+              item = {'date': str(raw['t'])[:10]}
+              for key in ('jlr3','jlr5','jlr10'):
+                  val = raw.get(key)
+                  if val is not None and str(val).strip() != '':
+                      item[key] = float(val)
+              rows.append(item)
+          rows.sort(key=lambda x: x['date'])
+          print('ARCHIVE_ROWS', len(rows), 'FIRST', rows[0] if rows else None, 'LAST', rows[-1] if rows else None)
+          if len(rows) < 500:
+              raise RuntimeError('archive history unexpectedly shallow')
+
+          # For day k (k>=2): x_k = S3_k - (S5_{k+2} - S3_{k+2}).
+          daily = {}
+          for k in range(2, len(rows)-2):
+              a = rows[k]
+              b = rows[k+2]
+              if all(key in a for key in ('jlr3',)) and all(key in b for key in ('jlr3','jlr5')):
+                  daily[a['date']] = a['jlr3'] - (b['jlr5'] - b['jlr3'])
+          formal = {d:v for d,v in daily.items() if '2020-06-01' <= d <= '2026-04-17'}
+          print('RECONSTRUCTED_ROWS', len(daily), 'FORMAL_ROWS', len(formal),
+                'FORMAL_FIRST', min(formal) if formal else None,
+                'FORMAL_LAST', max(formal) if formal else None)
+
+          em_url = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get'
+          em_params = {
+              'lmt': '1000', 'klt': '101', 'secid': '0.000001',
+              'fields1': 'f1,f2,f3,f7',
+              'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
+              'ut': '7eea3edcaed734bea9cbfc24409ed989', 'rtntype': '6',
+          }
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152 Safari/537.36',
+              'Accept': 'application/json,text/plain,*/*',
+              'Referer': 'https://data.eastmoney.com/',
+          }
+          er = requests.get(em_url, params=em_params, headers=headers, timeout=30)
+          print('EASTMONEY_HTTP', er.status_code)
+          er.raise_for_status()
+          edata = er.json().get('data') or {}
+          klines = edata.get('klines') or []
+          east = {}
+          for line in klines:
+              parts = str(line).split(',')
+              if len(parts) >= 2:
+                  east[parts[0][:10]] = float(parts[1])
+          overlap = sorted(set(daily) & set(east))
+          diffs = [daily[d] - east[d] for d in overlap]
+          absdiff = [abs(x) for x in diffs]
+          exact_cent = sum(abs(x) <= 0.011 for x in diffs)
+          within_yuan = sum(abs(x) <= 1.01 for x in diffs)
+          print(json.dumps({
+              'archive_row_n': len(rows),
+              'archive_first': rows[0]['date'] if rows else None,
+              'archive_last': rows[-1]['date'] if rows else None,
+              'reconstructed_row_n': len(daily),
+              'formal_reconstructed_row_n': len(formal),
+              'formal_first': min(formal) if formal else None,
+              'formal_last': max(formal) if formal else None,
+              'eastmoney_row_n': len(east),
+              'eastmoney_first': min(east) if east else None,
+              'eastmoney_last': max(east) if east else None,
+              'overlap_n': len(overlap),
+              'exact_to_cent_n': exact_cent,
+              'within_1yuan_n': within_yuan,
+              'max_abs_diff': max(absdiff) if absdiff else None,
+              'median_abs_diff': statistics.median(absdiff) if absdiff else None,
+              'sample': [
+                  {'date': d, 'archive_reconstructed': daily[d], 'eastmoney': east[d], 'diff': daily[d]-east[d]}
+                  for d in overlap[:10]
+              ],
+          }, ensure_ascii=False, indent=2))
+          if not overlap:
+              raise RuntimeError('no overlap for semantic cross-check')
+          PY
