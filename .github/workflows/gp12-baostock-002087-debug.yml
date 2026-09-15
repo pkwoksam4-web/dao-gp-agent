@@ -1,4 +1,4 @@
-name: GP12 BaoStock 002087 Debug
+name: GP12 BaoStock Turnover Boundary Debug
 
 on:
   push:
@@ -16,27 +16,49 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -q baostock
-      - name: Print raw BaoStock rows around missing date
+      - name: Print raw BaoStock boundary anomalies
         run: |
           python - <<'PY'
-          import json
+          import json, math
           import baostock as bs
-          lg=bs.login()
+
+          symbols = {
+              '300216.SZ': 'sz.300216',
+              '600647.SH': 'sh.600647',
+              '002087.SZ': 'sz.002087',
+              '002604.SZ': 'sz.002604',
+              '300356.SZ': 'sz.300356',
+              '603133.SH': 'sh.603133',
+              '600766.SH': 'sh.600766',
+          }
+
+          lg = bs.login()
           print('LOGIN', lg.error_code, lg.error_msg)
           try:
-              rs=bs.query_history_k_data_plus(
-                  'sz.002087',
-                  'date,code,open,high,low,close,volume,amount,turn,tradestatus,isST',
-                  start_date='2024-06-10',
-                  end_date='2024-06-17',
-                  frequency='d',
-                  adjustflag='3',
-              )
-              print('QUERY', rs.error_code, rs.error_msg, rs.fields)
-              rows=[]
-              while rs.next():
-                  rows.append(dict(zip(rs.fields, rs.get_row_data())))
-              print(json.dumps(rows, ensure_ascii=False, indent=2))
+              for symbol, code in symbols.items():
+                  rs = bs.query_history_k_data_plus(
+                      code,
+                      'date,code,open,high,low,close,volume,amount,turn,tradestatus,isST',
+                      start_date='2020-06-01',
+                      end_date='2026-04-17',
+                      frequency='d',
+                      adjustflag='3',
+                  )
+                  anomalies = []
+                  n = 0
+                  while rs.next():
+                      n += 1
+                      row = dict(zip(rs.fields, rs.get_row_data()))
+                      turn_raw = row.get('turn', '')
+                      try:
+                          turn = float(turn_raw)
+                          bad_turn = (not math.isfinite(turn)) or turn <= 0
+                      except (TypeError, ValueError):
+                          bad_turn = True
+                      if row.get('tradestatus') != '1' or bad_turn:
+                          anomalies.append(row)
+                  print('SYMBOL', symbol, 'QUERY', rs.error_code, rs.error_msg, 'ROWS', n)
+                  print(json.dumps(anomalies, ensure_ascii=False, indent=2))
           finally:
               bs.logout()
           PY
