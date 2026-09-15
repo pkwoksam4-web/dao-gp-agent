@@ -30,10 +30,30 @@ class PitFullAuditContracts(unittest.TestCase):
         out = m.validate_special_prev_close('000697.SZ', raw, special, tolerance_bp=0.01)
         self.assertEqual(out['status'], 'PASS_SPECIAL_PREV_CLOSE_PIT')
         self.assertEqual(out['previous_trade_date'], '2025-11-27')
+        self.assertEqual(out['ratio_availability_date'], '2025-11-27')
         self.assertAlmostEqual(out['previous_close'], 8.52, places=12)
         self.assertLessEqual(out['previous_close_diff_bp'], 0.01)
 
-    def test_special_formula_after_previous_market_close_fails_closed(self):
+    def test_special_formula_between_previous_close_and_ex_date_is_valid(self):
+        m = _subject()
+        raw = [
+            {'date': '2025-12-25', 'close': 7.90},
+            {'date': '2025-12-29', 'close': 6.90},
+        ]
+        special = {
+            'symbol': '000430.SZ',
+            'ex_date': '2025-12-29',
+            'formula_availability_date': '2025-12-27',
+            'expected_prev_close': 7.90,
+            'adjusted_reference_price': 6.87,
+            'corrected_event_ratio': 6.87 / 7.90,
+        }
+        out = m.validate_special_prev_close('000430.SZ', raw, special, tolerance_bp=0.01)
+        self.assertEqual(out['status'], 'PASS_SPECIAL_PREV_CLOSE_PIT')
+        self.assertEqual(out['previous_trade_date'], '2025-12-25')
+        self.assertEqual(out['ratio_availability_date'], '2025-12-27')
+
+    def test_special_formula_on_ex_date_fails_closed(self):
         m = _subject()
         raw = [
             {'date': '2025-11-27', 'close': 8.52},
@@ -47,7 +67,7 @@ class PitFullAuditContracts(unittest.TestCase):
             'adjusted_reference_price': 8.05,
             'corrected_event_ratio': 8.05 / 8.52,
         }
-        with self.assertRaisesRegex(ValueError, 'SPECIAL_FORMULA_NOT_AVAILABLE_BY_PREV_CLOSE'):
+        with self.assertRaisesRegex(ValueError, 'SPECIAL_RATIO_NOT_AVAILABLE_BEFORE_EX_DATE'):
             m.validate_special_prev_close('000697.SZ', raw, special, tolerance_bp=0.01)
 
     def test_final_override_assembly_is_exact_and_pairs_availability(self):
