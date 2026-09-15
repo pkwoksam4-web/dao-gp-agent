@@ -25,8 +25,6 @@ class PitAdjustedCloseAvailabilityTests(unittest.TestCase):
 
     def test_forward_path_applies_event_from_ex_date_only(self):
         m = _subject()
-        build = getattr(m, 'build_forward_pit_adjusted_path', None)
-        self.assertTrue(callable(build), 'build_forward_pit_adjusted_path is not implemented')
         raw_rows = [
             {'date': '2020-06-30', 'close': 100.0},
             {'date': '2020-07-02', 'close': 90.0},
@@ -38,9 +36,28 @@ class PitAdjustedCloseAvailabilityTests(unittest.TestCase):
             'availability_date': '2020-07-01',
             'event_ratio': 0.9,
         }]
-        path = build(raw_rows, events)
+        path = m.build_forward_pit_adjusted_path(raw_rows, events)
         self.assertEqual([row['date'] for row in path], ['2020-06-30', '2020-07-02', '2020-07-03'])
         self.assertEqual([round(row['adjusted_close'], 10) for row in path], [100.0, 100.0, 110.0])
+
+    def test_qfq_and_pit_paths_must_be_constant_scale_equivalent(self):
+        m = _subject()
+        compare = getattr(m, 'compare_constant_scale_paths', None)
+        self.assertTrue(callable(compare), 'compare_constant_scale_paths is not implemented')
+        pit_rows = [
+            {'date': '2020-06-30', 'adjusted_close': 100.0},
+            {'date': '2020-07-02', 'adjusted_close': 100.0},
+            {'date': '2020-07-03', 'adjusted_close': 110.0},
+        ]
+        qfq_rows = [
+            {'date': '2020-06-30', 'adjusted_close': 90.0},
+            {'date': '2020-07-02', 'adjusted_close': 90.0},
+            {'date': '2020-07-03', 'adjusted_close': 99.0},
+        ]
+        report = compare(pit_rows, qfq_rows, threshold_bp=5.0)
+        self.assertEqual(report['status'], 'PASS_CONSTANT_SCALE')
+        self.assertAlmostEqual(report['scale'], 0.9, places=12)
+        self.assertLessEqual(report['max_diff_bp'], 1e-9)
 
 
 if __name__ == '__main__':
