@@ -1,0 +1,206 @@
+name: GP12 Turnover Repair V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/gp12_turnover_ratio_v1.py'
+      - 'scripts/test_gp12_turnover_ratio_v1.py'
+      - '.github/workflows/gp12-turnover-repair-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Turnover ratio repair contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_turnover_ratio_v1.py
+
+  repair-shards:
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install repair runtime
+        run: pip install -q requests pandas pyarrow
+      - name: Download pinned first-round turnover audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-turnover-ratio-full-audit-v1
+          path: upstream/base
+          run-id: 34947196139
+          github-token: ${{ github.token }}
+      - name: Download pinned Sohu RAW date and amount evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Verify immutable repair inputs
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          base = Path('upstream/base/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json')
+          raw_audit = Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json')
+          raw_panel = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          assert base.exists(), base
+          assert raw_audit.exists(), raw_audit
+          assert raw_panel.exists(), raw_panel
+
+          raw_bytes = base.read_bytes()
+          assert hashlib.sha256(raw_bytes).hexdigest() == '774106468d1ffbd37e9b05f43338bfc228d980f5dccf517fe9a2b65a497833c3'
+          x = json.loads(raw_bytes)
+          canonical = json.dumps(x, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
+          assert hashlib.sha256(canonical).hexdigest() == '3db6966af24f64f9303aba143d8a7c8732d973b127751c52d1678542aaa6ca4b'
+          assert x['artifact'] == 'GP12_TURNOVER_RATIO_FULL_AUDIT_V1'
+          assert x['version'] == '1.0'
+          assert x['formal_window'] == ['2020-06-01', '2026-04-17']
+          assert x['formal_symbol_n'] == 844
+          assert x['pass_n'] == 86
+          assert x['fail_n'] == 758
+          assert x['expected_trade_rows'] == 1011607
+          assert x['observed_turnover_rows'] == 115459
+          assert x['turnover_ratio_candidate_pit_verified'] is False
+          assert x['blockers'] == ['TURNOVER_SYMBOL_AUDIT_FAILURES', 'TURNOVER_TOTAL_ROW_COVERAGE_MISMATCH']
+
+          r = json.loads(raw_audit.read_text(encoding='utf-8'))
+          assert r['artifact'] == 'SOHU_RAW_FULL_V482'
+          assert r['status'] == 'PASS_FULL_RAW_V482'
+          assert r['symbol_n'] == 847
+          assert r['raw_rows'] == 1011607
+          assert r['expected_trade_rows'] == 1011607
+          assert r['duplicate_symbol_dates'] == 0
+          assert r['missing_trade_dates_n'] == 0
+          assert r['extra_trade_dates_n'] == 0
+          assert r['bad_amount_rows'] == 0
+          assert r['zero_trade_symbols'] == ['600074.SH','600485.SH','600677.SH']
+          PY
+      - name: Repair unresolved turnover symbols only
+        id: repair
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/repair-${{ matrix.shard }}
+          python scripts/gp12_turnover_ratio_v1.py repair-shard \
+            --base-audit upstream/base/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json \
+            --raw-parquet upstream/raw/SOHU_RAW_FULL_V482.parquet \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 8 \
+            --timeout 15 \
+            --retries 6 \
+            --inter-symbol-delay 1.0 \
+            --out out/repair-${{ matrix.shard }}/TURNOVER_REPAIR_SHARD_${{ matrix.shard }}.json \
+            --data-out out/repair-${{ matrix.shard }}/TURNOVER_REPAIR_SHARD_${{ matrix.shard }}.csv
+      - name: Upload repair shard evidence and materialized rows
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-repair-shard-${{ matrix.shard }}
+          path: out/repair-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  repair-aggregate:
+    needs: repair-shards
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download pinned first-round turnover audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-turnover-ratio-full-audit-v1
+          path: upstream/base
+          run-id: 34947196139
+          github-token: ${{ github.token }}
+      - name: Download all repair shard evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp12-turnover-repair-shard-*
+          path: out/repair-shards
+          merge-multiple: true
+      - name: Aggregate fail-only repair
+        id: aggregate
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/full
+          python scripts/gp12_turnover_ratio_v1.py repair-aggregate \
+            --base-audit upstream/base/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json \
+            --repair-dir out/repair-shards \
+            --out out/full/GP12_TURNOVER_RATIO_REPAIR_AUDIT_V1.json \
+            --data-out out/full/GP12_TURNOVER_RATIO_REPAIR_ROWS_V1.csv
+      - name: Assert conservative repair semantics
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/full/GP12_TURNOVER_RATIO_REPAIR_AUDIT_V1.json')
+          assert p.exists(), p
+          x = json.loads(p.read_text(encoding='utf-8'))
+          assert x['artifact'] == 'GP12_TURNOVER_RATIO_REPAIR_AUDIT_V1'
+          assert x['version'] == '1.0'
+          assert x['base_artifact'] == 'GP12_TURNOVER_RATIO_FULL_AUDIT_V1'
+          assert x['base_audit_sha256'] == '3db6966af24f64f9303aba143d8a7c8732d973b127751c52d1678542aaa6ca4b'
+          assert x['base_pass_n'] == 86
+          assert x['base_fail_n'] == 758
+          assert x['repair_attempted_n'] == 758
+          assert x['formal_symbol_n'] == 844
+          assert x['expected_trade_rows'] == 1011607
+          assert x['panel_complete'] is False
+          assert x['turnover_ratio_candidate_pit_verified'] is False
+          assert 'TURNOVER_PANEL_NOT_MATERIALIZED' in x['blockers']
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          if x['audit_exact_after_repair']:
+              assert x['pass_n'] == 844
+              assert x['fail_n'] == 0
+              assert x['unresolved_symbol_n'] == 0
+              assert x['observed_turnover_rows'] == 1011607
+          else:
+              assert x['unresolved_symbol_n'] > 0
+          print(json.dumps({k: x.get(k) for k in [
+              'base_pass_n','base_fail_n','repair_attempted_n','repair_recovered_n',
+              'pass_n','fail_n','unresolved_symbol_n','observed_turnover_rows',
+              'materialized_repair_symbol_n','materialized_repair_rows',
+              'audit_exact_after_repair','turnover_ratio_candidate_pit_verified','blockers'
+          ]}, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload repair aggregate and materialized data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-ratio-repair-v1
+          path: out/full/
+          if-no-files-found: error
+          retention-days: 30
