@@ -49,6 +49,19 @@ def _normalize_event(event: dict) -> dict:
     return out
 
 
+def _is_allowed_implementation_title(symbol: str, title: str) -> bool:
+    if is_distribution_implementation_title(title):
+        return True
+    compact = re.sub(r'\s+', '', str(title or ''))
+    return (
+        symbol == '000564.SZ'
+        and '重整计划' in compact
+        and '资本公积金转增股本' in compact
+        and '实施' in compact
+        and '公告' in compact
+    )
+
+
 def validate_official_gap_record(
     event: dict,
     announcement: dict,
@@ -63,8 +76,8 @@ def validate_official_gap_record(
         raise ValueError(f'unexpected PIT gap key: {symbol}/{ex_date}')
 
     title = str((announcement or {}).get('announcementTitle') or '')
-    if not is_distribution_implementation_title(title):
-        raise ValueError('announcement is not a distribution implementation notice')
+    if not _is_allowed_implementation_title(symbol, title):
+        raise ValueError('announcement is not an allowed implementation notice')
     announcement_id = str((announcement or {}).get('announcementId') or '').strip()
     if not announcement_id:
         raise ValueError('announcementId is required')
