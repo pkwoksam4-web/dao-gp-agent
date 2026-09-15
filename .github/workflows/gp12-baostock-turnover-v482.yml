@@ -68,7 +68,7 @@ jobs:
                   while rs.next():
                       rows.append(dict(zip(rs.fields,rs.get_row_data())))
                   audit=audit_and_extract(symbol,rows)
-                  assert audit['status']=='PASS_TURNOVER_ROWS'],audit
+                  assert audit['status']=='PASS_TURNOVER_ROWS',audit
                   by_date={r['date']:r for r in rows}
                   for d,sohu_pct in expected.items():
                       assert d in by_date,(symbol,d,rows)
