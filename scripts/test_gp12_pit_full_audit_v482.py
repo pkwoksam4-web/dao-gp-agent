@@ -50,6 +50,44 @@ class PitFullAuditContracts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'SPECIAL_FORMULA_NOT_AVAILABLE_BY_PREV_CLOSE'):
             m.validate_special_prev_close('000697.SZ', raw, special, tolerance_bp=0.01)
 
+    def test_final_override_assembly_is_exact_and_pairs_availability(self):
+        m = _subject()
+        stages = [
+            [{'symbol': '000001.SZ', 'ex_date': '2024-01-02', 'corrected_event_ratio': 0.9}],
+            [{'symbol': '000002.SZ', 'ex_date': '2024-02-02', 'corrected_event_ratio': 0.8}],
+        ]
+        specials = [
+            {'symbol': '000003.SZ', 'ex_date': '2024-03-02', 'corrected_event_ratio': 0.7},
+        ]
+        availability = {
+            ('000001.SZ', '2024-01-02'): '2023-12-20',
+            ('000002.SZ', '2024-02-02'): '2024-01-20',
+            ('000003.SZ', '2024-03-02'): '2024-02-20',
+        }
+        out = m.merge_final_override_ratios(
+            stages,
+            specials,
+            availability,
+            expected_standard_n=2,
+            expected_special_n=1,
+        )
+        self.assertEqual(out['standard_n'], 2)
+        self.assertEqual(out['special_n'], 1)
+        self.assertEqual(out['total_n'], 3)
+        self.assertEqual(out['ratios'][('000003.SZ', '2024-03-02')], 0.7)
+        self.assertEqual(out['availability'][('000003.SZ', '2024-03-02')], '2024-02-20')
+
+    def test_final_override_assembly_rejects_collision(self):
+        m = _subject()
+        stages = [[{'symbol': '000001.SZ', 'ex_date': '2024-01-02', 'corrected_event_ratio': 0.9}]]
+        specials = [{'symbol': '000001.SZ', 'ex_date': '2024-01-02', 'corrected_event_ratio': 0.8}]
+        availability = {('000001.SZ', '2024-01-02'): '2023-12-20'}
+        with self.assertRaisesRegex(ValueError, 'override collision'):
+            m.merge_final_override_ratios(
+                stages, specials, availability,
+                expected_standard_n=1, expected_special_n=1,
+            )
+
 
 if __name__ == '__main__':
     unittest.main()
