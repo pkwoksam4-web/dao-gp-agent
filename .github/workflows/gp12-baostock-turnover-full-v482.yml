@@ -32,3 +32,135 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_baostock_turnover_full_v482.py test_baostock_turnover_materializer_v482.py
+
+  materialize:
+    needs: full-contracts
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install collector dependencies
+        run: pip install -q baostock==0.9.3 pandas pyarrow
+      - name: Download authoritative PIT-ST V4.80 panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Materialize BaoStock turnover shard ${{ matrix.shard }}
+        env:
+          PYTHONPATH: scripts
+        run: |
+          PITST="$(find pitst -name PIT_ST_DAILY_MERGED_V480.csv -type f | head -1)"
+          test -n "$PITST"
+          python scripts/baostock_turnover_full_v482.py shard \
+            --scope data/pit_st_scope_v480.txt \
+            --pitst "$PITST" \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 4 \
+            --out-dir artifact_baostock_turnover_v482_shard_${{ matrix.shard }}
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-baostock-turnover-v482-shard-${{ matrix.shard }}
+          path: artifact_baostock_turnover_v482_shard_${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Fail closed if shard is incomplete
+        run: |
+          python - <<'PY'
+          import glob,json
+          p=glob.glob('artifact_baostock_turnover_v482_shard_*/BAOSTOCK_TURNOVER_SHARD_*_AUDIT_V482.json')
+          assert len(p)==1,p
+          x=json.load(open(p[0],encoding='utf-8'))
+          assert x['scope_n']==847,x
+          assert x['shard_gate_pass'] is True,x
+          assert x['symbols_audited']==x['symbols_selected'],x
+          assert x['turnover_rows']==x['expected_trade_rows'],x
+          assert x['review_n']==0 and x['error_n']==0 and x['unresolved_symbol_n']==0,x
+          assert x['formal_admission'] is False
+          assert x['candidate_adoption_status']=='UNAPPROVED'
+          assert x['model_freeze_allowed'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in ('shard_index','symbols_selected','expected_trade_rows','turnover_rows','pass_n','review_n','error_n','unresolved_symbol_n','shard_gate_pass')},indent=2))
+          PY
+
+  merge:
+    needs: materialize
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install merge dependencies
+        run: pip install -q pandas pyarrow
+      - name: Download all turnover shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp12-baostock-turnover-v482-shard-*
+          path: shards
+          merge-multiple: true
+      - name: Download authoritative PIT-ST V4.80 panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Merge and independently re-audit full turnover panel
+        env:
+          PYTHONPATH: scripts
+        run: |
+          PITST="$(find pitst -name PIT_ST_DAILY_MERGED_V480.csv -type f | head -1)"
+          test -n "$PITST"
+          python scripts/baostock_turnover_full_v482.py merge \
+            --scope data/pit_st_scope_v480.txt \
+            --pitst "$PITST" \
+            --shards-dir shards \
+            --out-dir artifact_baostock_turnover_full_v482
+      - name: Gate exact Formal PIT turnover panel
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_baostock_turnover_full_v482/BAOSTOCK_TURNOVER_FULL_AUDIT_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['scope_n']==847,x
+          assert x['turnover_symbol_n']==844,x
+          assert x['turnover_rows']==1011607,x
+          assert x['missing_n']==0 and x['extra_n']==0 and x['duplicate_n']==0,x
+          assert x['bad_turnover_n']==0 and x['unresolved_symbol_n']==0,x
+          assert x['shard_review_n']==0 and x['shard_error_n']==0 and x['all_shards_pass'] is True,x
+          assert x['zero_trade_symbols']==['600074.SH','600485.SH','600677.SH'],x
+          assert x['source_semantics_verified'] is True,x
+          c=x['cross_source_sohu_anchor_check']
+          assert c['verified'] is True and c['fail_n']==0 and c['matched_n']==2,c
+          assert c['tolerance_bp']==0.5,c
+          assert c['max_diff_bp'] <= 0.5,c
+          assert x['coverage_verified'] is True,x
+          assert x['turnover_ratio_pit_verified'] is True,x
+          assert x['readiness_blocker_closed'] is True,x
+          assert x['formal_admission'] is False
+          assert x['candidate_adoption_status']=='UNAPPROVED'
+          assert x['candidate_freeze_ready'] is False
+          assert x['model_freeze_allowed'] is False and x['oos_metrics_allowed'] is False
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload full turnover evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-baostock-turnover-full-v482
+          path: artifact_baostock_turnover_full_v482/
+          if-no-files-found: warn
+          retention-days: 30
