@@ -108,6 +108,26 @@ class BaoStockTurnoverV482Contracts(unittest.TestCase):
         ]
         self.assertEqual(m.audit_and_extract('002359.SZ', wrong)['status'], 'REVIEW_INVALID_RESPONSE')
 
+    def test_v482_false_zero_corrections_are_exact_and_not_broadened(self):
+        m = _subject()
+        expected = {
+            ('002087.SZ','2024-06-13'),
+            ('300356.SZ','2023-06-20'),
+            ('600647.SH','2024-06-13'),
+            ('600766.SH','2024-06-13'),
+            ('603133.SH','2024-06-13'),
+        }
+        self.assertEqual(set(m.PITST_TRADESTATUS_ONE_CORRECTIONS), expected)
+        rows = [
+            {'date':'2024-06-12','code':'sz.002087','turn':'1.000000','tradestatus':'0','isST':'0'},
+            {'date':'2024-06-13','code':'sz.002087','turn':'1.100000','tradestatus':'0','isST':'0'},
+            {'date':'2024-06-14','code':'sz.002087','turn':'1.200000','tradestatus':'0','isST':'0'},
+        ]
+        corrected, applied = m.apply_trade_status_corrections('002087.SZ', rows)
+        self.assertEqual(applied, [('002087.SZ','2024-06-13')])
+        self.assertEqual([r['tradestatus'] for r in corrected], ['0','1','0'])
+        self.assertEqual([r['tradestatus'] for r in rows], ['0','0','0'])
+
     def test_exact_global_gate_uses_formal_trade_rows_and_844_symbols(self):
         m = _subject()
         self.assertTrue(m.full_turnover_global_gate(
