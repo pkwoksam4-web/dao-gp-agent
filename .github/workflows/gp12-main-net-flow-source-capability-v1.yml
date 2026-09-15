@@ -1,0 +1,87 @@
+name: GP12 Main Net Flow Source Capability V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-source-capability-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install probe runtime
+        run: pip install -q requests
+      - name: Probe Eastmoney individual historical main net flow limits
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import requests
+
+          URL = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get'
+          HEADERS = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152 Safari/537.36',
+              'Accept': 'application/json,text/plain,*/*',
+              'Referer': 'https://data.eastmoney.com/',
+          }
+          BASE = {
+              'klt': '101',
+              'fields1': 'f1,f2,f3,f7',
+              'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
+              'ut': '7eea3edcaed734bea9cbfc24409ed989',
+              'rtntype': '6',
+          }
+          symbols = {
+              '000001.SZ': '0.000001',
+              '600000.SH': '1.600000',
+              '300750.SZ': '0.300750',
+          }
+          variants = [
+              ('lmt_100', {'lmt': '100'}),
+              ('lmt_1000', {'lmt': '1000'}),
+              ('lmt_5000', {'lmt': '5000'}),
+              ('lmt_0', {'lmt': '0'}),
+              ('beg_end_lmt5000', {'lmt': '5000', 'beg': '20200601', 'end': '20260417'}),
+              ('beg_end_lmt0', {'lmt': '0', 'beg': '20200601', 'end': '20260417'}),
+          ]
+          results = []
+          for symbol, secid in symbols.items():
+              for label, extra in variants:
+                  params = {**BASE, 'secid': secid, **extra}
+                  item = {'symbol': symbol, 'secid': secid, 'variant': label, 'params': extra}
+                  try:
+                      r = requests.get(URL, params=params, headers=HEADERS, timeout=20)
+                      item['http_status'] = r.status_code
+                      item['content_type'] = r.headers.get('content-type')
+                      r.raise_for_status()
+                      payload = r.json()
+                      data = payload.get('data') if isinstance(payload, dict) else None
+                      klines = data.get('klines') if isinstance(data, dict) else None
+                      item['payload_code'] = data.get('code') if isinstance(data, dict) else None
+                      item['payload_name'] = data.get('name') if isinstance(data, dict) else None
+                      item['row_n'] = len(klines) if isinstance(klines, list) else None
+                      if isinstance(klines, list) and klines:
+                          item['first'] = str(klines[0]).split(',', 1)[0]
+                          item['last'] = str(klines[-1]).split(',', 1)[0]
+                          item['first_row'] = klines[0]
+                          item['last_row'] = klines[-1]
+                      else:
+                          item['first'] = None
+                          item['last'] = None
+                      item['data_present'] = bool(isinstance(klines, list) and klines)
+                  except Exception as exc:
+                      item['error'] = f'{type(exc).__name__}: {exc}'
+                  results.append(item)
+                  print(json.dumps(item, ensure_ascii=False))
+                  time.sleep(0.5)
+
+          print('===SUMMARY===')
+          print(json.dumps(results, ensure_ascii=False, indent=2))
+          PY
