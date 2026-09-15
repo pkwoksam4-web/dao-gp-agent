@@ -88,6 +88,63 @@ class PitFullAuditContracts(unittest.TestCase):
                 expected_standard_n=1, expected_special_n=1,
             )
 
+    def test_audit_universe_preserves_na_and_closes_only_pit_adjusted_close(self):
+        m = _subject()
+        raw_by_symbol = {
+            '000001.SZ': [
+                {'date': '2024-01-01', 'close': 100.0},
+                {'date': '2024-01-02', 'close': 50.0},
+                {'date': '2024-01-03', 'close': 55.0},
+            ],
+        }
+        factors_by_symbol = {
+            '000001.SZ': [
+                {'d': '2024-01-01', 'f': 2.0},
+                {'d': '2024-01-02', 'f': 1.0},
+            ],
+        }
+        frozen_records = [
+            {'symbol': '000001.SZ', 'events': [
+                {'ex_date': '2024-01-02', 'event_ratio': 0.6, 'source': 'NOMINAL'}
+            ]},
+            {'symbol': '600074.SH', 'events': []},
+        ]
+        manifest = {
+            'nominal_events': [
+                {'symbol': '000001.SZ', 'ex_date': '2024-01-02', 'availability_date': '2023-12-15'}
+            ],
+            'standard_overrides': [],
+            'special_overrides': [{
+                'symbol': '000001.SZ', 'ex_date': '2024-01-02',
+                'formula_availability_date': '2023-12-20',
+                'expected_prev_close': 100.0,
+                'adjusted_reference_price': 50.0,
+                'corrected_event_ratio': 0.5,
+            }],
+        }
+        out = m.audit_universe(
+            raw_by_symbol=raw_by_symbol,
+            factors_by_symbol=factors_by_symbol,
+            frozen_records=frozen_records,
+            standard_stages=[],
+            special_rows=manifest['special_overrides'],
+            manifest=manifest,
+            na_symbols=['600074.SH'],
+            expected_standard_n=0,
+            expected_special_n=1,
+            threshold_bp=0.000001,
+        )
+        self.assertEqual(out['universe_n'], 2)
+        self.assertEqual(out['formal_symbol_n'], 1)
+        self.assertEqual(out['na_symbols'], ['600074.SH'])
+        self.assertEqual(out['constant_scale_pass_n'], 1)
+        self.assertEqual(out['constant_scale_fail_n'], 0)
+        self.assertEqual(out['special_prev_close_pass_n'], 1)
+        self.assertTrue(out['adjusted_close_pit_verified'])
+        self.assertFalse(out['candidate_approval'])
+        self.assertFalse(out['model_freeze_allowed'])
+        self.assertFalse(out['oos_metrics_allowed'])
+
 
 if __name__ == '__main__':
     unittest.main()
