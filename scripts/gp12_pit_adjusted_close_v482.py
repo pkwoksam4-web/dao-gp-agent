@@ -63,3 +63,37 @@ def build_forward_pit_adjusted_path(raw_rows: list[dict], events: list[dict]) ->
             'adjusted_close': close / cumulative,
         })
     return rows
+
+
+def compare_constant_scale_paths(pit_rows: list[dict], qfq_rows: list[dict], threshold_bp: float = 5.0) -> dict:
+    if len(pit_rows or []) != len(qfq_rows or []) or not pit_rows:
+        raise ValueError('path lengths must match and be nonzero')
+    threshold = float(threshold_bp)
+    if not math.isfinite(threshold) or threshold < 0:
+        raise ValueError('threshold_bp must be finite and nonnegative')
+
+    scale = None
+    max_diff_bp = 0.0
+    worst_date = None
+    for index, (pit, qfq) in enumerate(zip(pit_rows, qfq_rows)):
+        pit_date = _date(pit.get('date'), f'pit_rows[{index}].date')
+        qfq_date = _date(qfq.get('date'), f'qfq_rows[{index}].date')
+        if pit_date != qfq_date:
+            raise ValueError(f'path date mismatch at index {index}: {pit_date} != {qfq_date}')
+        pit_value = _positive(pit.get('adjusted_close'), f'pit_rows[{index}].adjusted_close')
+        qfq_value = _positive(qfq.get('adjusted_close'), f'qfq_rows[{index}].adjusted_close')
+        if scale is None:
+            scale = qfq_value / pit_value
+        diff_bp = abs(qfq_value / (pit_value * scale) - 1.0) * 10000.0
+        if diff_bp > max_diff_bp:
+            max_diff_bp = diff_bp
+            worst_date = pit_date
+
+    return {
+        'status': 'PASS_CONSTANT_SCALE' if max_diff_bp <= threshold else 'FAIL_CONSTANT_SCALE',
+        'scale': scale,
+        'rows': len(pit_rows),
+        'threshold_bp': threshold,
+        'max_diff_bp': max_diff_bp,
+        'worst_date': worst_date,
+    }
