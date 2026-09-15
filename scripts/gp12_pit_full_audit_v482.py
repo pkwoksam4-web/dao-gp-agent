@@ -102,9 +102,10 @@ def validate_special_prev_close(
     if not prior:
         raise ValueError(f'SPECIAL_PREV_CLOSE_MISSING:{normalized_symbol}:{ex_date}')
     previous_trade_date, previous_close = max(prior, key=lambda item: item[0])
-    if formula_date > previous_trade_date:
+    ratio_availability_date = max(formula_date, previous_trade_date)
+    if ratio_availability_date >= ex_date:
         raise ValueError(
-            f'SPECIAL_FORMULA_NOT_AVAILABLE_BY_PREV_CLOSE:{normalized_symbol}:{ex_date}:{formula_date}:{previous_trade_date}'
+            f'SPECIAL_RATIO_NOT_AVAILABLE_BEFORE_EX_DATE:{normalized_symbol}:{ex_date}:{ratio_availability_date}'
         )
 
     previous_close_diff_bp = abs(previous_close / expected_prev - 1.0) * 10000.0
@@ -123,6 +124,7 @@ def validate_special_prev_close(
         'status': 'PASS_SPECIAL_PREV_CLOSE_PIT',
         'formula_availability_date': formula_date,
         'previous_trade_date': previous_trade_date,
+        'ratio_availability_date': ratio_availability_date,
         'previous_close': previous_close,
         'expected_prev_close': expected_prev,
         'previous_close_diff_bp': previous_close_diff_bp,
