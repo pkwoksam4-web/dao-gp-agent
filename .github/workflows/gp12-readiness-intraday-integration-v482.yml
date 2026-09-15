@@ -1,0 +1,69 @@
+name: GP12 Readiness Intraday Integration V4.82
+
+on:
+  push:
+    branches:
+      - gp/gp12-readiness-intraday-integration-v482
+    paths:
+      - 'scripts/test_gp12_intraday_integration_v482.py'
+      - 'scripts/gp12_intraday_readiness_integration_v482.py'
+      - 'scripts/test_gp12_formal_input_readiness_v1.py'
+      - 'scripts/test_gp12_formal_input_readiness_production_v1.py'
+      - 'scripts/gp12_formal_input_readiness_v1.py'
+      - 'data/GP12_FORMAL_INPUT_EVIDENCE_V1.json'
+      - 'data/GP12_INTRADAY_FORMAL847_BINDING_V1.json'
+      - '.github/workflows/gp12-readiness-intraday-integration-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run GP12 readiness integration contracts
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_gp12_intraday_integration_v482.py \
+            test_gp12_formal_input_readiness_v1.py \
+            test_gp12_formal_input_readiness_production_v1.py \
+            test_gp12_formal_input_readiness_cli_v1.py \
+            test_gp12_candidate_v1.py \
+            test_gp12_eastmoney_adapter_v1.py \
+            test_gp12_sohu_qfq_adapter_v1.py \
+            test_gp12_source_router_v1.py \
+            test_strategy_asset_recovery_v482.py \
+            test_model_freeze_recovery_v482.py \
+            test_oos_admission_v482.py
+
+  materialize-checkpoint:
+    needs: integration-contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize downstream checkpoint
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p artifact
+          python scripts/gp12_intraday_readiness_integration_v482.py \
+            --parameters data/GP12_CANDIDATE_PARAMETERS_V1.json \
+            --factors data/GP12_CANDIDATE_FACTORS_V1.json \
+            --upstream-evidence data/GP12_FORMAL_INPUT_EVIDENCE_V1.json \
+            --intraday-binding data/GP12_INTRADAY_FORMAL847_BINDING_V1.json \
+            --out artifact/GP12_FORMAL_INPUT_READINESS_INTRADAY_V482.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-formal-input-readiness-intraday-v482
+          path: artifact/GP12_FORMAL_INPUT_READINESS_INTRADAY_V482.json

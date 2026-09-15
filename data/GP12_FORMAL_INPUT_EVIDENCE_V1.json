@@ -1,0 +1,152 @@
+{
+  "artifact": "GP12_FORMAL_INPUT_EVIDENCE_V1",
+  "version": "1.0",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "formal_end": "2026-04-17",
+  "formal_artifact_sha256": "e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796",
+  "formal_calendar_sha256": "5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7",
+  "universe_sha256": "dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb",
+  "supporting_evidence": {
+    "formal_universe": {
+      "binding_state": "BOUND_VERIFIED_ARTIFACT",
+      "pit_state": "PIT_NOT_APPLICABLE",
+      "source_artifact": "PIT_ST_SCOPE_V480",
+      "source_sha256": "dfe5c75692d38e5fde7cd5c32eb2ed090a8ab6dffcfd41d5ebda07dc2d6d96fb",
+      "ready": true,
+      "blockers": []
+    },
+    "raw_daily_panel": {
+      "binding_state": "BOUND_VERIFIED_ARTIFACT",
+      "pit_state": "PIT_PARTIAL",
+      "source_artifact": "gp-sohu-full-raw-v482-reaudit",
+      "source_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+      "ready": true,
+      "blockers": []
+    },
+    "liquidity_contract": {
+      "binding_state": "BOUND_VERIFIED_ARTIFACT",
+      "pit_state": "PIT_VERIFIED",
+      "source_artifact": "gp-liquidity-80m-v482",
+      "source_sha256": "a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+      "ready": true,
+      "blockers": []
+    },
+    "historical_label_provenance": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "ready": false,
+      "blockers": ["LABEL_PROVENANCE_UNBOUND"]
+    },
+    "sector_membership_pit": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "ready": false,
+      "blockers": ["SECTOR_MEMBERSHIP_PIT_UNBOUND"]
+    }
+  },
+  "feature_families": {
+    "market_calendar": {
+      "binding_state": "BOUND_VERIFIED_ARTIFACT",
+      "pit_state": "PIT_VERIFIED",
+      "source_artifact": "OFFICIAL_A_SHARE_OPEN_DATES_V357",
+      "source_sha256": "5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7",
+      "coverage_start": "2020-06-01",
+      "coverage_end": "2026-04-17",
+      "blockers": []
+    },
+    "stock_adjusted_close": {
+      "binding_state": "BOUND_STRUCTURAL_ONLY",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": "FORMAL_READINESS_FINAL_V482",
+      "source_sha256": "e642481399a05635d07b1baa39f57d3aa84dfd1c18e315edd927ec42da553796",
+      "coverage_start": "2020-06-01",
+      "coverage_end": "2026-04-17",
+      "blockers": ["ADJUSTED_CLOSE_PIT_UNVERIFIED"]
+    },
+    "market_adjusted_close": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["MARKET_BENCHMARK_UNBOUND"]
+    },
+    "sector_adjusted_close": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["SECTOR_SERIES_UNBOUND"]
+    },
+    "amount_turnover": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["TURNOVER_RATIO_UNBOUND"]
+    },
+    "main_net_flow": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["MAIN_NET_FLOW_UNBOUND"]
+    },
+    "market_breadth": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["MARKET_BREADTH_UNBOUND"]
+    },
+    "sector_breadth": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["SECTOR_BREADTH_UNBOUND"]
+    },
+    "status": {
+      "binding_state": "BOUND_STRUCTURAL_ONLY",
+      "pit_state": "PIT_PARTIAL",
+      "source_artifact": "gp-liquidity-80m-v482",
+      "source_sha256": "a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+      "coverage_start": "2020-06-01",
+      "coverage_end": "2026-04-17",
+      "blockers": ["STATUS_SEMANTICS_INCOMPLETE"]
+    },
+    "intraday_15m": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["INTRADAY_15M_UNBOUND"]
+    },
+    "intraday_60m": {
+      "binding_state": "UNBOUND",
+      "pit_state": "PIT_UNVERIFIED",
+      "source_artifact": null,
+      "source_sha256": null,
+      "coverage_start": null,
+      "coverage_end": null,
+      "blockers": ["INTRADAY_60M_UNBOUND"]
+    }
+  }
+}

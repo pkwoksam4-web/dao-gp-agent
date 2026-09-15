@@ -1,0 +1,54 @@
+{
+  "artifact": "GP12_PIT_ADJUSTED_CLOSE_BINDING_V1",
+  "coverage": {
+    "candidate_scale_invariance_test": "test_gp12_candidate_v1.ScoringTests.test_price_and_currency_scale_do_not_change_factors",
+    "f6_f10_scale_invariance_verified": true,
+    "stock_adjusted_close_pit_verified": true
+  },
+  "formal_end": "2026-04-17",
+  "formal_start": "2020-06-01",
+  "safety": {
+    "candidate_adoption_status": "UNAPPROVED",
+    "candidate_scoring_ready": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "source_audit": {
+    "adjusted_close_pit_verified": true,
+    "artifact_id": 10380675799,
+    "artifact_name": "gp12-pit-adjusted-close-full-audit-v482",
+    "artifact_zip_sha256": "fb57bce61a9156fa3d2bb327dc1d8dba70c6fa9739eb7d87bfb5a3e88c6e9b3f",
+    "audit_json_sha256": "2d75ace7461d4e7879e49a1678bb0d51f0acc3ca3abdc380c068876c1c569c6e",
+    "constant_scale_fail_n": 0,
+    "constant_scale_pass_n": 844,
+    "formal_symbol_n": 844,
+    "max_constant_scale_diff_bp": 4.874600172237731,
+    "na_symbols": [
+      "600074.SH",
+      "600485.SH",
+      "600677.SH"
+    ],
+    "nominal_event_n": 2732,
+    "raw_trade_rows": 1011607,
+    "special_override_n": 11,
+    "special_prev_close_pass_n": 11,
+    "standard_override_n": 270,
+    "threshold_bp": 5.0,
+    "total_override_n": 281,
+    "universe_n": 847,
+    "workflow_head": "30a826f2e4e1dc4350b3e89453e66848a8d5141f",
+    "workflow_run": 34928104668
+  },
+  "source_runs": {
+    "effective": 34102907115,
+    "final_four": 34117443729,
+    "final_six": 34116386540,
+    "frozen_closure": 34078398130,
+    "full_raw": 34192233633,
+    "recovered": 34111100684,
+    "reparsed": 34109448536,
+    "secondary": 34106853526,
+    "source_census": 34009079533
+  },
+  "version": "1.0"
+}
