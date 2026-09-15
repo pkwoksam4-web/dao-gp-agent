@@ -93,6 +93,37 @@ class SohuTurnoverContracts(unittest.TestCase):
         self.assertEqual(out['status'], 'REVIEW_BAD_TURNOVER')
         self.assertEqual(out['bad_turnover_n'], 2)
 
+    def test_request_params_are_raw_daily_ascending_and_exact(self):
+        m = _subject()
+        params = m.build_request_params('600634.SH', '2020-06-01', '2020-08-29')
+        self.assertEqual(params, {
+            'code':'cn_600634',
+            'start':'20200601',
+            'end':'20200829',
+            'stat':'1',
+            'order':'A',
+            'period':'d',
+            'callback':'historySearchHandler',
+            'rt':'jsonp',
+        })
+
+    def test_calendar_chunk_plan_is_gapless_and_bounded(self):
+        m = _subject()
+        chunks = m.plan_chunks('2020-06-01', '2020-12-31', max_calendar_days=90)
+        self.assertEqual(chunks[0], ('2020-06-01','2020-08-29'))
+        self.assertEqual(chunks[-1][1], '2020-12-31')
+        self.assertTrue(all((__import__('datetime').date.fromisoformat(b) - __import__('datetime').date.fromisoformat(a)).days + 1 <= 90 for a,b in chunks))
+        for (_, left_end), (right_start, _) in zip(chunks, chunks[1:]):
+            self.assertEqual((__import__('datetime').date.fromisoformat(right_start) - __import__('datetime').date.fromisoformat(left_end)).days, 1)
+
+    def test_merge_turnover_rows_rejects_conflicting_duplicate(self):
+        m = _subject()
+        a = [{'symbol':'600634.SH','date':'2020-07-22','turnover_ratio':0.0071,'source':'SOHU_HISHQ_TURNOVER'}]
+        self.assertEqual(m.merge_turnover_rows_unique('600634.SH', a, list(a)), a)
+        b = [{'symbol':'600634.SH','date':'2020-07-22','turnover_ratio':0.0072,'source':'SOHU_HISHQ_TURNOVER'}]
+        with self.assertRaisesRegex(ValueError, 'conflicting duplicate'):
+            m.merge_turnover_rows_unique('600634.SH', a, b)
+
     def test_global_gate_requires_exact_formal_trade_date_coverage(self):
         m = _subject()
         self.assertTrue(m.full_turnover_global_gate(
