@@ -20,7 +20,26 @@ FORMAL_SYMBOL_N = 844
 EXPECTED_TRADE_ROWS = 1_011_607
 NA_SYMBOLS = ["600074.SH", "600485.SH", "600677.SH"]
 SOURCE_ID = "BAOSTOCK_TURN_DAILY_UNADJUSTED"
+RESIDUAL_SOURCE_ID = "BAOSTOCK_TURN_RESIDUAL_DENOMINATOR_RECONSTRUCTION"
 BAOSTOCK_QUERY_FIELDS = "date,code,volume,amount,turn,tradestatus"
+RESIDUAL_BINDING_ARTIFACT = "GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1"
+RESIDUAL_PRECISION_PERCENTAGE_POINTS = 0.0001
+RESIDUAL_EXPECTED = {
+    "300216.SZ": {
+        "coverage_start": "2020-08-05",
+        "coverage_end": "2020-09-15",
+        "floating_shares": 291_684_518,
+        "source_publication_date": "2020-06-30",
+        "source_url": "https://static.cninfo.com.cn/finalpage/2020-06-30/1207967627.PDF",
+    },
+    "002604.SZ": {
+        "coverage_start": "2020-06-01",
+        "coverage_end": "2020-07-14",
+        "floating_shares": 512_281_847,
+        "source_publication_date": "2020-04-29",
+        "source_url": "https://static.cninfo.com.cn/finalpage/2020-04-29/1207665018.PDF",
+    },
+}
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
@@ -69,6 +88,17 @@ def _positive_finite_or_none(value: object) -> float | None:
     return out
 
 
+def _canonical_json_sha256(value: object) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def provider_metadata() -> dict:
     return {
         "provider": "BaoStock",
@@ -85,12 +115,148 @@ def provider_metadata() -> dict:
             "tradestatus=0 may be retained only when volume, amount, and turn "
             "are all strictly positive finite values"
         ),
+        "precision_zero_reconstruction_rule": (
+            "tradestatus=1 and source turn=0 may be reconstructed only from a "
+            "PIT-bound exact floating-share denominator after positive-turn "
+            "neighbors reproduce the source within half a 0.0001 percentage-point unit"
+        ),
         "historical_gp_v11_source_recovered": False,
         "historical_provider_publication_timestamp_proven": False,
     }
 
 
-def parse_baostock_row(symbol: str, row: dict) -> dict | None:
+def _validate_residual_entry(entry: dict, *, expected_symbol: str | None = None) -> dict:
+    if not isinstance(entry, dict):
+        raise ValueError("residual denominator entry must be an object")
+    symbol = normalize_symbol(entry.get("symbol", ""))
+    if expected_symbol is not None and symbol != normalize_symbol(expected_symbol):
+        raise ValueError("residual denominator symbol mismatch")
+    start = str(entry.get("coverage_start", ""))
+    end = str(entry.get("coverage_end", ""))
+    publication = str(entry.get("source_publication_date", ""))
+    start_date = dt.date.fromisoformat(start)
+    end_date = dt.date.fromisoformat(end)
+    publication_date = dt.date.fromisoformat(publication)
+    if start_date > end_date:
+        raise ValueError("residual denominator coverage window invalid")
+    if publication_date >= start_date:
+        raise ValueError("residual denominator is not PIT-public before coverage")
+    shares = entry.get("floating_shares")
+    if isinstance(shares, bool) or not isinstance(shares, int) or shares <= 0:
+        raise ValueError("residual floating_shares must be a positive integer")
+    return entry
+
+
+def validate_residual_denominator_binding(binding: dict) -> dict[str, dict]:
+    if not isinstance(binding, dict):
+        raise ValueError("residual denominator binding must be an object")
+    if binding.get("artifact") != RESIDUAL_BINDING_ARTIFACT:
+        raise ValueError("residual denominator artifact mismatch")
+    if binding.get("version") != "1.0":
+        raise ValueError("residual denominator version mismatch")
+    if binding.get("strategy_id") != "GP12_REBUILD_CANDIDATE_V1":
+        raise ValueError("residual denominator strategy mismatch")
+    if binding.get("status") != "CANDIDATE_ONLY_UNAPPROVED":
+        raise ValueError("residual denominator status mismatch")
+    if binding.get("origin") != "NEW_RECONSTRUCTION_CANDIDATE":
+        raise ValueError("residual denominator origin mismatch")
+    if float(binding.get("source_turn_precision_percentage_points")) != RESIDUAL_PRECISION_PERCENTAGE_POINTS:
+        raise ValueError("residual source precision mismatch")
+    if binding.get("historical_gp_v11_source_recovered") is not False:
+        raise ValueError("residual binding cannot claim GP V1.1 recovery")
+    if binding.get("model_freeze_allowed") is not False or binding.get("oos_metrics_allowed") is not False:
+        raise ValueError("residual binding cannot open freeze/OOS gates")
+
+    entries = binding.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("residual denominator entries must be a list")
+    index: dict[str, dict] = {}
+    for entry in entries:
+        checked = _validate_residual_entry(entry)
+        symbol = checked["symbol"]
+        if symbol in index:
+            raise ValueError("duplicate residual denominator symbol")
+        index[symbol] = checked
+    if set(index) != set(RESIDUAL_EXPECTED):
+        raise ValueError("residual denominator scope mismatch")
+    for symbol, expected in RESIDUAL_EXPECTED.items():
+        entry = index[symbol]
+        for key, value in expected.items():
+            if entry.get(key) != value:
+                raise ValueError(f"residual denominator identity mismatch for {symbol}: {key}")
+        if entry.get("pit_before_coverage") is not True:
+            raise ValueError(f"residual denominator PIT flag missing for {symbol}")
+    return index
+
+
+def _entry_applies(symbol: str, date_value: str, entry: dict) -> dict:
+    entry = _validate_residual_entry(entry, expected_symbol=symbol)
+    date = dt.date.fromisoformat(date_value)
+    start = dt.date.fromisoformat(str(entry["coverage_start"]))
+    end = dt.date.fromisoformat(str(entry["coverage_end"]))
+    if not (start <= date <= end):
+        raise ValueError("residual denominator row outside bound coverage window")
+    return entry
+
+
+def validate_residual_precision_neighbors(entry: dict, rows: list[dict]) -> dict:
+    entry = _validate_residual_entry(entry)
+    symbol = normalize_symbol(entry["symbol"])
+    shares = int(entry["floating_shares"])
+    start = dt.date.fromisoformat(str(entry["coverage_start"]))
+    end = dt.date.fromisoformat(str(entry["coverage_end"]))
+    tolerance = RESIDUAL_PRECISION_PERCENTAGE_POINTS / 2.0
+    errors: list[dict] = []
+    checked_n = 0
+    max_error = 0.0
+    for row in rows:
+        if str(row.get("tradestatus", "")) != "1":
+            continue
+        date_value = str(row.get("date", ""))[:10]
+        try:
+            date = dt.date.fromisoformat(date_value)
+        except ValueError:
+            continue
+        if not (start <= date <= end):
+            continue
+        try:
+            turn_percent = float(row.get("turn"))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(turn_percent) or turn_percent <= 0:
+            continue
+        volume = _positive_finite_or_none(row.get("volume"))
+        amount = _positive_finite_or_none(row.get("amount"))
+        if volume is None or amount is None:
+            errors.append({"date": date_value, "reason": "positive neighbor lacks trade evidence"})
+            continue
+        reconstructed_percent = volume / shares * 100.0
+        error = abs(reconstructed_percent - turn_percent)
+        checked_n += 1
+        max_error = max(max_error, error)
+        if error > tolerance + 1e-12:
+            errors.append({
+                "date": date_value,
+                "source_turn_percent": turn_percent,
+                "reconstructed_turn_percent": reconstructed_percent,
+                "abs_percentage_point_error": error,
+            })
+    return {
+        "symbol": symbol,
+        "checked_n": checked_n,
+        "max_abs_percentage_point_error": max_error,
+        "tolerance_percentage_points": tolerance,
+        "valid": checked_n > 0 and not errors,
+        "errors": errors,
+    }
+
+
+def parse_baostock_row(
+    symbol: str,
+    row: dict,
+    *,
+    residual_denominator: dict | None = None,
+) -> dict | None:
     symbol = normalize_symbol(symbol)
     if not isinstance(row, dict):
         raise ValueError("BaoStock row must be an object")
@@ -104,8 +270,31 @@ def parse_baostock_row(symbol: str, row: dict) -> dict | None:
 
     status = str(row.get("tradestatus", ""))
     if status == "1":
-        turn_percent = _positive_finite(row.get("turn"), "BaoStock turn")
-        return {"date": date_value, "turnover_ratio": turn_percent / 100.0}
+        try:
+            turn_percent = float(row.get("turn"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("BaoStock turn must be numeric") from exc
+        if not math.isfinite(turn_percent) or turn_percent < 0:
+            raise ValueError("BaoStock turn must be nonnegative and finite")
+        if turn_percent > 0:
+            return {"date": date_value, "turnover_ratio": turn_percent / 100.0}
+        if residual_denominator is None:
+            raise ValueError("BaoStock turn must be positive and finite")
+        entry = _entry_applies(symbol, date_value, residual_denominator)
+        volume = _positive_finite(row.get("volume"), "BaoStock volume")
+        _positive_finite(row.get("amount"), "BaoStock amount")
+        shares = int(entry["floating_shares"])
+        turnover_ratio = volume / shares
+        true_percent = turnover_ratio * 100.0
+        if true_percent >= RESIDUAL_PRECISION_PERCENTAGE_POINTS / 2.0:
+            raise ValueError("BaoStock precision zero inconsistent with bound denominator")
+        return {
+            "date": date_value,
+            "turnover_ratio": turnover_ratio,
+            "turnover_precision_reconstruction": True,
+            "residual_denominator_shares": shares,
+            "residual_binding_symbol": symbol,
+        }
 
     if status == "0":
         volume = _positive_finite_or_none(row.get("volume"))
@@ -127,6 +316,8 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
     invalid_value = False
     invalid_date = False
     provider_status_override_dates: list[str] = []
+    precision_reconstruction_dates: list[str] = []
+    precision_reconstruction_denominators: set[int] = set()
     for row in rows:
         date_value = str(row.get("date", "")).strip()
         try:
@@ -136,6 +327,12 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
         observed_dates.append(date_value)
         if row.get("provider_status_override") is True:
             provider_status_override_dates.append(date_value)
+        if row.get("turnover_precision_reconstruction") is True:
+            precision_reconstruction_dates.append(date_value)
+            try:
+                precision_reconstruction_denominators.add(int(row["residual_denominator_shares"]))
+            except (KeyError, TypeError, ValueError):
+                invalid_value = True
         try:
             turnover = float(row.get("turnover_ratio"))
             if not math.isfinite(turnover) or turnover <= 0:
@@ -175,6 +372,9 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
         "extra_dates_sample": extra[:20],
         "provider_status_override_n": len(provider_status_override_dates),
         "provider_status_override_dates": provider_status_override_dates,
+        "turnover_precision_reconstruction_n": len(precision_reconstruction_dates),
+        "turnover_precision_reconstruction_dates": precision_reconstruction_dates,
+        "turnover_precision_reconstruction_denominators": sorted(precision_reconstruction_denominators),
         "coverage_exact": not any(
             b in blockers
             for b in (
@@ -202,13 +402,14 @@ def materialize_rows(symbol: str, rows: list[dict]) -> list[dict]:
     for row in rows:
         date_value = str(row["date"])
         turnover = _positive_finite(row["turnover_ratio"], "turnover_ratio")
+        source = RESIDUAL_SOURCE_ID if row.get("turnover_precision_reconstruction") is True else SOURCE_ID
         result.append(
             {
                 "symbol": symbol,
                 "date": date_value,
                 "turnover_ratio": turnover,
                 "known_at": close_known_at(date_value).isoformat(),
-                "source": SOURCE_ID,
+                "source": source,
             }
         )
     return result
@@ -234,12 +435,18 @@ def summarize_full_audit(
     if not panel_complete:
         _append_once(blockers, "TURNOVER_PANEL_ROW_COVERAGE_MISMATCH")
     override_records = [
-        {
-            "symbol": str(record.get("symbol")),
-            "dates": list(record.get("provider_status_override_dates") or []),
-        }
+        {"symbol": str(record.get("symbol")), "dates": list(record.get("provider_status_override_dates") or [])}
         for record in records
         if int(record.get("provider_status_override_n") or 0) > 0
+    ]
+    reconstruction_records = [
+        {
+            "symbol": str(record.get("symbol")),
+            "dates": list(record.get("turnover_precision_reconstruction_dates") or []),
+            "denominators": list(record.get("turnover_precision_reconstruction_denominators") or []),
+        }
+        for record in records
+        if int(record.get("turnover_precision_reconstruction_n") or 0) > 0
     ]
     return {
         "artifact": ARTIFACT_AUDIT,
@@ -253,11 +460,12 @@ def summarize_full_audit(
         "expected_trade_rows": expected_trade_rows,
         "observed_turnover_rows": observed_rows,
         "materialized_rows": materialized_rows,
-        "provider_status_override_n": sum(
-            int(record.get("provider_status_override_n") or 0) for record in records
-        ),
+        "provider_status_override_n": sum(int(record.get("provider_status_override_n") or 0) for record in records),
         "provider_status_override_symbol_n": len(override_records),
         "provider_status_overrides": override_records,
+        "turnover_precision_reconstruction_n": sum(int(record.get("turnover_precision_reconstruction_n") or 0) for record in records),
+        "turnover_precision_reconstruction_symbol_n": len(reconstruction_records),
+        "turnover_precision_reconstructions": reconstruction_records,
         "panel_complete": panel_complete,
         "turnover_ratio_candidate_pit_verified": not blockers,
         "provider": provider_metadata(),
@@ -298,7 +506,7 @@ def _load_expected_dates(raw_parquet: pathlib.Path, symbols: list[str]) -> dict[
     return result
 
 
-def _query_symbol(bs, symbol: str) -> tuple[list[dict], dict]:
+def _query_symbol(bs, symbol: str, residual_denominator: dict | None = None) -> tuple[list[dict], dict]:
     code = symbol_to_baostock_code(symbol)
     rs = bs.query_history_k_data_plus(
         code,
@@ -310,15 +518,27 @@ def _query_symbol(bs, symbol: str) -> tuple[list[dict], dict]:
     )
     if rs.error_code != "0":
         raise RuntimeError(f"BaoStock query failed for {symbol}: {rs.error_code} {rs.error_msg}")
-    rows: list[dict] = []
+    raw_rows: list[dict] = []
     while rs.next():
-        raw = dict(zip(rs.fields, rs.get_row_data()))
-        parsed = parse_baostock_row(symbol, raw)
+        raw_rows.append(dict(zip(rs.fields, rs.get_row_data())))
+
+    precision_validation = None
+    if residual_denominator is not None:
+        precision_validation = validate_residual_precision_neighbors(residual_denominator, raw_rows)
+        if not precision_validation["valid"]:
+            raise RuntimeError(f"residual denominator precision validation failed for {symbol}: {precision_validation['errors']}")
+
+    rows: list[dict] = []
+    for raw in raw_rows:
+        parsed = parse_baostock_row(symbol, raw, residual_denominator=residual_denominator)
         if parsed is not None:
             rows.append(parsed)
     if not rows:
         raise RuntimeError(f"BaoStock returned no active turnover rows for {symbol}")
-    return rows, {"provider": "BaoStock", "code": code, "error_code": rs.error_code}
+    source = {"provider": "BaoStock", "code": code, "error_code": rs.error_code}
+    if precision_validation is not None:
+        source["residual_precision_validation"] = precision_validation
+    return rows, source
 
 
 def run_shard(
@@ -327,6 +547,7 @@ def run_shard(
     *,
     shard_index: int,
     shard_count: int,
+    residual_binding: dict | None = None,
 ) -> tuple[dict, list[dict]]:
     if shard_count < 1 or shard_index < 0 or shard_index >= shard_count:
         raise ValueError("invalid shard coordinates")
@@ -334,6 +555,8 @@ def run_shard(
     formal_symbols = [symbol for symbol in scope if symbol not in NA_SYMBOLS]
     shard_symbols = [symbol for index, symbol in enumerate(formal_symbols) if index % shard_count == shard_index]
     expected = _load_expected_dates(raw_parquet, shard_symbols)
+    residual_index = validate_residual_denominator_binding(residual_binding) if residual_binding is not None else {}
+    residual_binding_sha = _canonical_json_sha256(residual_binding) if residual_binding is not None else None
 
     import baostock as bs
 
@@ -346,7 +569,7 @@ def run_shard(
         for symbol in shard_symbols:
             expected_dates = expected.get(symbol, [])
             try:
-                rows, source = _query_symbol(bs, symbol)
+                rows, source = _query_symbol(bs, symbol, residual_index.get(symbol))
                 audited = audit_symbol_rows(symbol, expected_dates, rows)
                 audited["source"] = source
                 if audited["symbol_pass"]:
@@ -364,6 +587,9 @@ def run_shard(
                     "extra_dates_sample": [],
                     "provider_status_override_n": 0,
                     "provider_status_override_dates": [],
+                    "turnover_precision_reconstruction_n": 0,
+                    "turnover_precision_reconstruction_dates": [],
+                    "turnover_precision_reconstruction_denominators": [],
                     "coverage_exact": False,
                     "pit_policy_valid": False,
                     "pit_scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
@@ -392,9 +618,10 @@ def run_shard(
         "expected_trade_rows": sum(int(record["expected_row_n"]) for record in records),
         "observed_turnover_rows": sum(int(record["row_n"]) for record in records),
         "materialized_rows": len(materialized),
-        "provider_status_override_n": sum(
-            int(record.get("provider_status_override_n") or 0) for record in records
-        ),
+        "provider_status_override_n": sum(int(record.get("provider_status_override_n") or 0) for record in records),
+        "turnover_precision_reconstruction_n": sum(int(record.get("turnover_precision_reconstruction_n") or 0) for record in records),
+        "residual_denominator_binding_artifact": RESIDUAL_BINDING_ARTIFACT if residual_binding is not None else None,
+        "residual_denominator_binding_sha256": residual_binding_sha,
         "provider": provider_metadata(),
         "records": records,
         "model_freeze_allowed": False,
@@ -430,12 +657,22 @@ def _load_json(path: pathlib.Path) -> dict:
 
 def aggregate_shards(shard_reports: list[dict], panel_paths: list[pathlib.Path]) -> tuple[dict, list[dict]]:
     records: list[dict] = []
+    residual_artifacts: set[str] = set()
+    residual_hashes: set[str] = set()
     for report in shard_reports:
         if report.get("artifact") != ARTIFACT_SHARD or report.get("version") != VERSION:
             raise ValueError("BaoStock turnover shard identity mismatch")
         if report.get("provider") != provider_metadata():
             raise ValueError("BaoStock provider metadata mismatch")
+        artifact = report.get("residual_denominator_binding_artifact")
+        digest = report.get("residual_denominator_binding_sha256")
+        if artifact:
+            residual_artifacts.add(str(artifact))
+        if digest:
+            residual_hashes.add(str(digest))
         records.extend(report.get("records") or [])
+    if len(residual_artifacts) > 1 or len(residual_hashes) > 1:
+        raise ValueError("residual denominator binding lineage mismatch across shards")
 
     panel: list[dict] = []
     for path in panel_paths:
@@ -446,13 +683,14 @@ def aggregate_shards(shard_reports: list[dict], panel_paths: list[pathlib.Path])
     panel_blockers: list[str] = []
     if len(panel_keys) != len(set(panel_keys)):
         _append_once(panel_blockers, "TURNOVER_PANEL_DUPLICATE_SYMBOL_DATE")
+    allowed_sources = {SOURCE_ID, RESIDUAL_SOURCE_ID}
     for row in panel:
         try:
             symbol = normalize_symbol(str(row.get("symbol", "")))
             date_value = str(row.get("date", ""))
             ratio = _positive_finite(row.get("turnover_ratio"), "panel turnover_ratio")
             expected_known_at = close_known_at(date_value).isoformat()
-            if row.get("known_at") != expected_known_at or row.get("source") != SOURCE_ID:
+            if row.get("known_at") != expected_known_at or row.get("source") not in allowed_sources:
                 raise ValueError("panel provenance/known_at mismatch")
             if not symbol or not ratio:
                 raise ValueError("invalid panel row")
@@ -460,11 +698,9 @@ def aggregate_shards(shard_reports: list[dict], panel_paths: list[pathlib.Path])
             _append_once(panel_blockers, "TURNOVER_PANEL_INVALID_ROW")
             break
 
-    out = summarize_full_audit(
-        records,
-        expected_trade_rows=EXPECTED_TRADE_ROWS,
-        materialized_rows=len(panel),
-    )
+    out = summarize_full_audit(records, expected_trade_rows=EXPECTED_TRADE_ROWS, materialized_rows=len(panel))
+    out["residual_denominator_binding_artifact"] = next(iter(residual_artifacts)) if residual_artifacts else None
+    out["residual_denominator_binding_sha256"] = next(iter(residual_hashes)) if residual_hashes else None
     for blocker in panel_blockers:
         _append_once(out["blockers"], blocker)
     out["panel_complete"] = not any(blocker.startswith("TURNOVER_PANEL_") for blocker in out["blockers"])
@@ -480,6 +716,7 @@ def main() -> int:
     shard = sub.add_parser("shard")
     shard.add_argument("--scope", required=True)
     shard.add_argument("--raw-parquet", required=True)
+    shard.add_argument("--residual-denominators")
     shard.add_argument("--shard-index", type=int, required=True)
     shard.add_argument("--shard-count", type=int, required=True)
     shard.add_argument("--out", required=True)
@@ -492,11 +729,13 @@ def main() -> int:
 
     args = parser.parse_args()
     if args.command == "shard":
+        residual_binding = _load_json(pathlib.Path(args.residual_denominators)) if args.residual_denominators else None
         report, panel = run_shard(
             pathlib.Path(args.scope),
             pathlib.Path(args.raw_parquet),
             shard_index=args.shard_index,
             shard_count=args.shard_count,
+            residual_binding=residual_binding,
         )
         write_panel(pathlib.Path(args.data_out), panel)
         report["materialized_csv"] = pathlib.Path(args.data_out).name
@@ -520,21 +759,11 @@ def main() -> int:
     summary = {
         key: report.get(key)
         for key in (
-            "artifact",
-            "shard_index",
-            "shard_count",
-            "symbol_n",
-            "formal_symbol_n",
-            "pass_n",
-            "fail_n",
-            "expected_trade_rows",
-            "observed_turnover_rows",
-            "materialized_rows",
-            "provider_status_override_n",
-            "panel_complete",
-            "panel_csv_sha256",
-            "turnover_ratio_candidate_pit_verified",
-            "blockers",
+            "artifact", "shard_index", "shard_count", "symbol_n", "formal_symbol_n",
+            "pass_n", "fail_n", "expected_trade_rows", "observed_turnover_rows",
+            "materialized_rows", "provider_status_override_n", "turnover_precision_reconstruction_n",
+            "residual_denominator_binding_artifact", "residual_denominator_binding_sha256",
+            "panel_complete", "panel_csv_sha256", "turnover_ratio_candidate_pit_verified", "blockers",
         )
         if key in report
     }
