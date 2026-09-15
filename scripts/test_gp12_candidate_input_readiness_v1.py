@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import pathlib
 import unittest
@@ -75,7 +76,67 @@ def valid_benchmark_evidence() -> dict:
     }
 
 
-def build(benchmark: dict | None = None) -> dict:
+def valid_amount_turnover_binding() -> dict:
+    return {
+        "artifact": "GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1",
+        "version": "1.0",
+        "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+        "status": "CANDIDATE_ONLY_UNAPPROVED",
+        "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+        "formal_window": ["2020-06-01", "2026-04-17"],
+        "universe_n": 847,
+        "formal_symbol_n": 844,
+        "na_symbols": ["600074.SH", "600485.SH", "600677.SH"],
+        "expected_trade_rows": 1011607,
+        "amount_source": {
+            "field": "amount",
+            "unit": "CNY",
+            "artifact_name": "gp-sohu-full-raw-v482-reaudit",
+            "workflow_run": 34192233633,
+            "artifact_id": 10042614517,
+            "artifact_zip_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+            "positive_amount_rows": 1011607,
+        },
+        "turnover_source": {
+            "provider": "BaoStock",
+            "field": "turn",
+            "source_unit": "percent",
+            "candidate_unit": "decimal_ratio",
+            "workflow_run": 34981310300,
+            "workflow_head": "66571bc360f77ba989c47dbe6e8dc0708aac46f9",
+            "artifact_name": "gp12-baostock-turnover-full-v1",
+            "artifact_id": 10403125922,
+            "artifact_zip_sha256": "9fcda20e7d7ab01ce22ea377c15726126dfd62d28b5ad7df6d694fda545be6ad",
+            "audit_json_sha256": "7c3c85315f53956df96a59f2703210077bdc67d758d454c77de7edce03e24e0c",
+            "panel_csv_sha256": "90b483f5f55668c0243523c5cf997c5251611e59dc5007fa6429ddf441b515a4",
+            "observed_turnover_rows": 1011607,
+            "materialized_rows": 1011607,
+            "provider_status_override_n": 5,
+            "turnover_precision_reconstruction_n": 9,
+            "residual_denominator_binding_artifact": "GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1",
+            "residual_denominator_binding_sha256": "74e00c11098c4fe46b1b60048306b5b64c6836ca929c54fdb58064e4a14fce4f",
+        },
+        "coverage": {
+            "amount_turnover_full_window_aligned": True,
+            "turnover_ratio_candidate_pit_verified": True,
+            "pit_scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
+            "same_session_turnover_usable_before_close": False,
+            "historical_provider_publication_timestamp_proven": False,
+        },
+        "historical_gp_v11_source_recovered": False,
+        "model_freeze_allowed": False,
+        "oos_metrics_allowed": False,
+        "blockers": [],
+    }
+
+
+def build(
+    benchmark: dict | None = None,
+    turnover: dict | None = None,
+) -> dict:
+    signature = inspect.signature(mod.build_checkpoint)
+    if "amount_turnover_binding" not in signature.parameters:
+        raise AssertionError("build_checkpoint must accept amount_turnover_binding")
     return mod.build_checkpoint(
         load("data/GP12_CANDIDATE_PARAMETERS_V1.json"),
         load("data/GP12_CANDIDATE_FACTORS_V1.json"),
@@ -83,16 +144,37 @@ def build(benchmark: dict | None = None) -> dict:
         load("data/GP12_INTRADAY_FORMAL847_BINDING_V1.json"),
         load("data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json"),
         valid_benchmark_evidence() if benchmark is None else benchmark,
+        valid_amount_turnover_binding() if turnover is None else turnover,
     )
 
 
 class CandidateInputReadinessTests(unittest.TestCase):
-    def test_current_verified_overlay_has_exact_ready_families_and_factors(self):
+    def test_amount_turnover_binding_validator_is_exact_and_fail_closed(self):
+        self.assertTrue(
+            hasattr(mod, "validate_amount_turnover_binding"),
+            "amount-turnover binding validator is missing",
+        )
+        valid = valid_amount_turnover_binding()
+        binding_sha = mod.validate_amount_turnover_binding(valid)
+        self.assertRegex(binding_sha, r"^[0-9a-f]{64}$")
+
+        bad = copy.deepcopy(valid)
+        bad["turnover_source"]["panel_csv_sha256"] = "0" * 64
+        with self.assertRaises(ValueError):
+            mod.validate_amount_turnover_binding(bad)
+
+    def test_current_verified_overlay_promotes_amount_turnover_only(self):
         out = build()
         self.assertEqual(out["artifact"], "GP12_CANDIDATE_INPUT_READINESS_V1")
         self.assertEqual(
             out["validated_families"],
-            ["intraday_15m", "intraday_60m", "market_calendar", "stock_adjusted_close"],
+            [
+                "amount_turnover",
+                "intraday_15m",
+                "intraday_60m",
+                "market_calendar",
+                "stock_adjusted_close",
+            ],
         )
         self.assertEqual(out["ready_factor_ids"], ["F6", "F7", "F8", "F9", "F10", "F12"])
         self.assertEqual(out["blocked_factor_ids"], ["F1", "F2", "F3", "F4", "F5", "F11"])
@@ -108,13 +190,25 @@ class CandidateInputReadinessTests(unittest.TestCase):
             out["feature_families"]["market_adjusted_close"]["blockers"],
             ["MARKET_ADJUSTED_CLOSE_FEATURE_BINDING_UNBOUND"],
         )
+        amount_turnover = out["feature_families"]["amount_turnover"]
+        self.assertTrue(amount_turnover["formal_feature_ready"])
+        self.assertEqual(amount_turnover["binding_state"], "BOUND_VERIFIED_ARTIFACT")
+        self.assertEqual(amount_turnover["pit_state"], "PIT_VERIFIED")
+        self.assertEqual(amount_turnover["blockers"], [])
+        self.assertEqual(
+            amount_turnover["source_artifact"],
+            "GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1",
+        )
+        self.assertRegex(amount_turnover["source_sha256"], r"^[0-9a-f]{64}$")
         self.assertNotIn("MARKET_BENCHMARK_UNBOUND", out["blockers"])
         self.assertNotIn("ADJUSTED_CLOSE_PIT_UNVERIFIED", out["blockers"])
         self.assertNotIn("INTRADAY_15M_UNBOUND", out["blockers"])
         self.assertNotIn("INTRADAY_60M_UNBOUND", out["blockers"])
+        self.assertNotIn("TURNOVER_RATIO_UNBOUND", out["blockers"])
+        self.assertIn("MAIN_NET_FLOW_UNBOUND", out["blockers"])
         self.assertIn("MARKET_ADJUSTED_CLOSE_FEATURE_BINDING_UNBOUND", out["blockers"])
-        self.assertEqual(out["next_priority_family"], "amount_turnover")
-        self.assertEqual(out["next_priority_blocker"], "TURNOVER_RATIO_UNBOUND")
+        self.assertEqual(out["next_priority_family"], "main_net_flow")
+        self.assertEqual(out["next_priority_blocker"], "MAIN_NET_FLOW_UNBOUND")
         self.assertFalse(out["candidate_scoring_ready"])
         self.assertFalse(out["real_feature_inputs_validated"])
         self.assertFalse(out["model_freeze_allowed"])
@@ -122,15 +216,22 @@ class CandidateInputReadinessTests(unittest.TestCase):
         self.assertFalse(out["historical_benchmark_recovered"])
         self.assertFalse(out["historical_strategy_recovered"])
 
+    def test_invalid_turnover_binding_fails_closed_without_promoting_family(self):
+        evidence = copy.deepcopy(valid_amount_turnover_binding())
+        evidence["turnover_source"]["workflow_run"] = 1
+        with self.assertRaises(ValueError):
+            build(turnover=evidence)
+
     def test_invalid_benchmark_reference_fails_closed_without_promoting_market_feature(self):
         evidence = copy.deepcopy(valid_benchmark_evidence())
         evidence["benchmark"]["code"] = "000300"
-        out = build(evidence)
+        out = build(benchmark=evidence)
         self.assertEqual(out["asset_hashes"]["factor_definition_sha256"], FACTOR_SHA256)
         self.assertEqual(out["asset_hashes"]["parameter_sha256"], PARAMETER_SHA256)
         self.assertFalse(out["candidate_benchmark_reference_validated"])
         self.assertIn("CANDIDATE_BENCHMARK_EVIDENCE_INVALID", out["blockers"])
         self.assertFalse(out["feature_families"]["market_adjusted_close"]["formal_feature_ready"])
+        self.assertTrue(out["feature_families"]["amount_turnover"]["formal_feature_ready"])
         self.assertFalse(out["market_adjusted_close_substitution_allowed"])
         self.assertFalse(out["candidate_scoring_ready"])
 
