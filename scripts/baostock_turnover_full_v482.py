@@ -9,6 +9,9 @@ from baostock_turnover_v482 import (
     EXPECTED_TRADE_ROWS,
     EXPECTED_TURNOVER_SYMBOL_N,
     PITST_TRADESTATUS_ONE_CORRECTIONS,
+    apply_trade_status_corrections,
+    audit_and_extract,
+    query_rows,
 )
 
 ZERO_TRADE_SYMBOLS = {'600074.SH', '600485.SH', '600677.SH'}
@@ -75,6 +78,63 @@ def audit_exact_dates(symbol: str, expected_dates: list[str], rows: list[dict]) 
         'extra_dates': extra,
         'status': status,
     }
+
+
+def collect_symbol(bs, pitst: pd.DataFrame, symbol: str) -> tuple[list[dict], dict]:
+    normalized = str(symbol).strip().upper()
+    expected = expected_trade_dates(pitst, normalized)
+    raw_rows, error_code, error_msg = query_rows(bs, normalized)
+    if str(error_code) != '0':
+        core = audit_and_extract(
+            normalized,
+            [],
+            query_error_code=error_code,
+            query_error_msg=error_msg,
+        )
+        return [], {
+            **core,
+            'expected_trade_rows': len(expected),
+            'missing_dates_n': len(expected),
+            'extra_dates_n': 0,
+            'duplicate_dates_n': 0,
+            'applied_trade_status_corrections': [],
+            'unresolved_symbol': True,
+        }
+
+    corrected_rows, applied = apply_trade_status_corrections(normalized, raw_rows)
+    core = audit_and_extract(normalized, corrected_rows)
+    applied_json = [list(item) for item in applied]
+    if core['status'] != 'PASS_TURNOVER_ROWS':
+        return [], {
+            **core,
+            'expected_trade_rows': len(expected),
+            'missing_dates_n': len(expected),
+            'extra_dates_n': 0,
+            'duplicate_dates_n': 0,
+            'applied_trade_status_corrections': applied_json,
+            'unresolved_symbol': False,
+        }
+
+    turnover_rows = core['turnover_rows']
+    exact = audit_exact_dates(normalized, expected, turnover_rows)
+    if normalized in ZERO_TRADE_SYMBOLS:
+        if not expected and not turnover_rows and exact['status'] == 'PASS_EXACT_TURNOVER_DATES':
+            status = 'PASS_ZERO_TRADE_SYMBOL'
+        else:
+            status = 'REVIEW_ZERO_TRADE_SYMBOL'
+    else:
+        status = exact['status']
+
+    audit = {
+        **core,
+        **exact,
+        'status': status,
+        'applied_trade_status_corrections': applied_json,
+        'unresolved_symbol': False,
+        'formal_admission': False,
+        'oos_metrics_allowed': False,
+    }
+    return turnover_rows if status.startswith('PASS_') else [], audit
 
 
 def full_global_gate(
