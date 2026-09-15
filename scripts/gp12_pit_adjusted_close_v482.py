@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 import datetime as dt
 import math
 
@@ -39,6 +40,30 @@ def validate_event_availability(event: dict) -> dict:
     }
 
 
+def resolve_final_event_availability(
+    *,
+    ex_date: str,
+    nominal_availability_date: str,
+    final_override_availability_date: str | None = None,
+) -> str:
+    """Return the availability date for the ratio that is actually used.
+
+    If an event ratio was corrected by later-stage official evidence, the PIT
+    clock must follow that final evidence rather than the nominal source row.
+    Both dates remain fail-closed against the ex-date.
+    """
+    ex = _date(ex_date, 'ex_date')
+    nominal = _date(nominal_availability_date, 'nominal_availability_date')
+    if nominal > ex:
+        raise ValueError(f'EVENT_NOT_PIT_AVAILABLE:NOMINAL:{ex}:{nominal}')
+    if final_override_availability_date in (None, ''):
+        return nominal
+    final = _date(final_override_availability_date, 'final_override_availability_date')
+    if final > ex:
+        raise ValueError(f'EVENT_NOT_PIT_AVAILABLE:FINAL_OVERRIDE:{ex}:{final}')
+    return final
+
+
 def build_forward_pit_adjusted_path(raw_rows: list[dict], events: list[dict]) -> list[dict]:
     normalized_events = sorted(
         (validate_event_availability(event) for event in events or []),
@@ -63,6 +88,39 @@ def build_forward_pit_adjusted_path(raw_rows: list[dict], events: list[dict]) ->
             'adjusted_close': close / cumulative,
         })
     return rows
+
+
+def build_qfq_adjusted_path(raw_rows: list[dict], factors: list[dict]) -> list[dict]:
+    factor_rows = sorted(
+        (_date(row.get('d'), 'factor date'), _positive(row.get('f'), 'qfq factor'))
+        for row in factors or [] if row.get('d') not in (None, '')
+    )
+    if not factor_rows:
+        raise ValueError('qfq factor series is empty')
+    factor_dates = [row[0] for row in factor_rows]
+    if len(set(factor_dates)) != len(factor_dates):
+        raise ValueError('qfq factor dates must be unique')
+    factor_values = [row[1] for row in factor_rows]
+
+    out = []
+    previous_date = None
+    for index, raw in enumerate(raw_rows or []):
+        date = _date(raw.get('date'), f'raw_rows[{index}].date')
+        if previous_date is not None and date <= previous_date:
+            raise ValueError('raw rows must be strictly increasing by date')
+        previous_date = date
+        close = _positive(raw.get('close'), f'raw_rows[{index}].close')
+        factor_index = bisect.bisect_right(factor_dates, date) - 1
+        if factor_index < 0:
+            raise ValueError(f'no qfq factor covering {date}')
+        factor = factor_values[factor_index]
+        out.append({
+            'date': date,
+            'raw_close': close,
+            'qfq_factor': factor,
+            'adjusted_close': close / factor,
+        })
+    return out
 
 
 def compare_constant_scale_paths(pit_rows: list[dict], qfq_rows: list[dict], threshold_bp: float = 5.0) -> dict:
