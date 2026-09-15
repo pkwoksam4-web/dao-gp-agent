@@ -126,6 +126,53 @@ def crosscheck_eastmoney_turnover(
     }
 
 
+def select_shard(symbols: list[str], shard_index: int, shard_count: int) -> list[str]:
+    if int(shard_count) <= 0 or not (0 <= int(shard_index) < int(shard_count)):
+        raise ValueError('invalid shard index/count')
+    return list(symbols)[int(shard_index)::int(shard_count)]
+
+
+def audit_trade_dates(symbol: str, expected_dates: list[str], rows: list[dict]) -> dict:
+    normalized = normalize_symbol(symbol)
+    expected = sorted(set(str(date)[:10] for date in expected_dates))
+    actual_dates = [str(row.get('date') or '')[:10] for row in rows or []]
+    actual_unique = sorted(set(actual_dates))
+    missing = sorted(set(expected) - set(actual_unique))
+    extra = sorted(set(actual_unique) - set(expected))
+    duplicate_dates_n = len(actual_dates) - len(actual_unique)
+    bad_turnover_n = 0
+    for row in rows or []:
+        if normalize_symbol(row.get('symbol')) != normalized:
+            bad_turnover_n += 1
+            continue
+        try:
+            value = float(row.get('turnover_ratio'))
+        except (TypeError, ValueError):
+            bad_turnover_n += 1
+            continue
+        if not math.isfinite(value) or value < 0:
+            bad_turnover_n += 1
+
+    if bad_turnover_n:
+        status = 'REVIEW_BAD_TURNOVER'
+    elif missing or extra or duplicate_dates_n:
+        status = 'REVIEW_TURNOVER_DATES'
+    else:
+        status = 'PASS_EXACT_TURNOVER_DATES'
+    return {
+        'symbol': normalized,
+        'expected_trade_rows': len(expected),
+        'turnover_rows': len(rows or []),
+        'missing_dates_n': len(missing),
+        'extra_dates_n': len(extra),
+        'duplicate_dates_n': duplicate_dates_n,
+        'bad_turnover_n': bad_turnover_n,
+        'missing_dates': missing,
+        'extra_dates': extra,
+        'status': status,
+    }
+
+
 def full_turnover_global_gate(
     *,
     unique_symbol_n: int,
