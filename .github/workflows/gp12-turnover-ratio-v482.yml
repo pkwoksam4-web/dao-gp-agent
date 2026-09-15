@@ -1,0 +1,29 @@
+name: GP12 Turnover Ratio V4.82
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v482
+    paths:
+      - 'scripts/test_sohu_turnover_v482.py'
+      - 'scripts/sohu_turnover_v482.py'
+      - '.github/workflows/gp12-turnover-ratio-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  turnover-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run turnover contracts
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_sohu_turnover_v482.py
