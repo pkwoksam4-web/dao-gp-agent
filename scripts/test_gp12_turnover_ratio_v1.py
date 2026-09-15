@@ -23,6 +23,17 @@ class TurnoverRatioContractTests(unittest.TestCase):
         self.assertEqual(meta["source_unit"], "percent")
         self.assertEqual(meta["candidate_unit"], "decimal_ratio")
 
+    def test_empty_historical_kline_is_source_failure_not_date_gap(self):
+        payload = {
+            "data": {
+                "code": "000532",
+                "name": "华金资本",
+                "klines": [],
+            }
+        }
+        with self.assertRaisesRegex(ValueError, "no historical klines"):
+            mod.parse_turnover_payload("000532.SZ", payload)
+
     def test_exact_trade_date_coverage_and_session_close_pit_pass(self):
         expected = ["2020-06-01", "2020-06-02", "2020-06-03"]
         rows = [
@@ -89,6 +100,41 @@ class TurnoverRatioContractTests(unittest.TestCase):
         self.assertFalse(bad["turnover_ratio_candidate_pit_verified"])
         self.assertIn("TURNOVER_FORMAL_SYMBOL_COVERAGE_INCOMPLETE", bad["blockers"])
         self.assertIn("TURNOVER_TOTAL_ROW_COVERAGE_MISMATCH", bad["blockers"])
+
+    def test_repair_replaces_only_failed_records_with_passing_retry(self):
+        base = [
+            {"symbol": "000001.SZ", "symbol_pass": True, "row_n": 3, "blockers": []},
+            {"symbol": "000002.SZ", "symbol_pass": False, "row_n": 0, "blockers": ["TURNOVER_SOURCE_FETCH_FAILED"]},
+            {"symbol": "000004.SZ", "symbol_pass": False, "row_n": 0, "blockers": ["TURNOVER_SOURCE_FETCH_FAILED"]},
+        ]
+        repair = [
+            {"symbol": "000001.SZ", "symbol_pass": False, "row_n": 0, "blockers": ["TURNOVER_SOURCE_FETCH_FAILED"]},
+            {"symbol": "000002.SZ", "symbol_pass": True, "row_n": 4, "blockers": []},
+            {"symbol": "000004.SZ", "symbol_pass": False, "row_n": 0, "blockers": ["TURNOVER_SOURCE_FETCH_FAILED"]},
+        ]
+        merged = mod.merge_repair_records(base, repair)
+        by_symbol = {r["symbol"]: r for r in merged["records"]}
+        self.assertTrue(by_symbol["000001.SZ"]["symbol_pass"])
+        self.assertEqual(by_symbol["000001.SZ"]["row_n"], 3)
+        self.assertTrue(by_symbol["000002.SZ"]["symbol_pass"])
+        self.assertEqual(by_symbol["000002.SZ"]["row_n"], 4)
+        self.assertFalse(by_symbol["000004.SZ"]["symbol_pass"])
+        self.assertEqual(merged["repaired_n"], 1)
+        self.assertEqual(merged["unresolved_symbols"], ["000004.SZ"])
+
+    def test_repair_rejects_duplicate_or_unknown_symbols(self):
+        base = [
+            {"symbol": "000001.SZ", "symbol_pass": False, "row_n": 0, "blockers": ["TURNOVER_SOURCE_FETCH_FAILED"]},
+        ]
+        with self.assertRaisesRegex(ValueError, "duplicate repair symbol"):
+            mod.merge_repair_records(base, [
+                {"symbol": "000001.SZ", "symbol_pass": True, "row_n": 1, "blockers": []},
+                {"symbol": "000001.SZ", "symbol_pass": True, "row_n": 1, "blockers": []},
+            ])
+        with self.assertRaisesRegex(ValueError, "unknown repair symbol"):
+            mod.merge_repair_records(base, [
+                {"symbol": "000002.SZ", "symbol_pass": True, "row_n": 1, "blockers": []},
+            ])
 
 
 if __name__ == "__main__":
