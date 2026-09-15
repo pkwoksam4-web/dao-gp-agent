@@ -12,6 +12,7 @@ on:
       - 'scripts/gp12_pit_adjusted_close_audit_v482.py'
       - 'scripts/test_gp12_pit_adjusted_close_audit_v482.py'
       - 'scripts/gp12_pit_full_audit_v482.py'
+      - 'scripts/run_gp12_pit_full_audit_v482.py'
       - 'scripts/test_gp12_pit_full_audit_v482.py'
       - 'scripts/test_gp12_pit_availability_manifest_v482.py'
       - 'scripts/materialize_gp12_pit_availability_manifest_v482.py'
@@ -58,3 +59,136 @@ jobs:
             test_gp12_pit_adjusted_close_audit_v482.py \
             test_gp12_pit_full_audit_v482.py \
             test_gp12_pit_availability_manifest_v482.py
+
+  full-audit:
+    needs: pit-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet runtime
+        run: python -m pip install -q pandas pyarrow
+      - name: Materialize frozen PIT availability manifest
+        env:
+          PYTHONPATH: scripts
+        run: python scripts/materialize_gp12_pit_availability_manifest_v482.py
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download 792/52 effective closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download 821/23 secondary closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - name: Download 826/18 reparsed closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - name: Download 838/6 recovered closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+      - name: Download 840/4 final-six closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+      - name: Download 844/0 final-four closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: final_four
+          run-id: 34117443729
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina QFQ source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Download signed 847 Full RAW re-audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: market_raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Run exact 844-symbol PIT adjusted-close audit
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/run_gp12_pit_full_audit_v482.py \
+            --manifest data/GP12_PIT_EVENT_AVAILABILITY_V482.json \
+            --frozen-dir frozen \
+            --effective-dir effective \
+            --secondary-dir secondary \
+            --reparsed-dir reparsed \
+            --recovered-dir recovered \
+            --final-six-dir final_six \
+            --final-four-dir final_four \
+            --source-census-dir source_census \
+            --raw-dir market_raw \
+            --out-dir artifact_gp12_pit_full_audit_v482 \
+            --threshold-bp 5.0
+      - name: Verify exact PIT closure invariants
+        run: |
+          python - <<'PY'
+          import json
+          p='artifact_gp12_pit_full_audit_v482/GP12_PIT_ADJUSTED_CLOSE_FULL_AUDIT_V482.json'
+          x=json.load(open(p,encoding='utf-8'))
+          assert x['universe_n']==847
+          assert x['formal_symbol_n']==844
+          assert x['na_symbols']==['600074.SH','600485.SH','600677.SH']
+          assert x['raw_trade_rows']==1011607
+          assert x['nominal_event_n']==2732
+          assert x['standard_override_n']==270
+          assert x['special_override_n']==11
+          assert x['total_override_n']==281
+          assert x['special_prev_close_pass_n']==11
+          assert x['constant_scale_pass_n']==844
+          assert x['constant_scale_fail_n']==0
+          assert x['max_constant_scale_diff_bp']<=5.0
+          assert x['adjusted_close_pit_verified'] is True
+          assert x['candidate_approval'] is False
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          print(json.dumps({k:x[k] for k in ('universe_n','formal_symbol_n','raw_trade_rows','special_prev_close_pass_n','constant_scale_pass_n','constant_scale_fail_n','max_constant_scale_diff_bp','adjusted_close_pit_verified','oos_metrics_allowed')},ensure_ascii=False,indent=2))
+          PY
+      - name: Verify GP12 price-scale invariance
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_candidate_v1.ScoringTests.test_price_and_currency_scale_do_not_change_factors
+      - name: Upload PIT adjusted-close full audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-pit-adjusted-close-full-audit-v482
+          path: artifact_gp12_pit_full_audit_v482/
+          if-no-files-found: error
+          retention-days: 30
