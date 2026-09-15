@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 EXPECTED_SYMBOL_LIST_N = 847
@@ -18,6 +19,39 @@ def normalize_symbol(symbol: str) -> str:
     if exchange not in {'SZ', 'SH'} or not code.isdigit():
         raise ValueError(f'unsupported symbol: {symbol!r}')
     return f'{code.zfill(6)}.{exchange}'
+
+
+def build_request_params(symbol: str, start: str, end: str) -> dict:
+    normalized = normalize_symbol(symbol)
+    start_date = date.fromisoformat(str(start)[:10])
+    end_date = date.fromisoformat(str(end)[:10])
+    if end_date < start_date:
+        raise ValueError('Sohu turnover request range reversed')
+    return {
+        'code': f"cn_{normalized.split('.', 1)[0]}",
+        'start': start_date.strftime('%Y%m%d'),
+        'end': end_date.strftime('%Y%m%d'),
+        'stat': '1',
+        'order': 'A',
+        'period': 'd',
+        'callback': 'historySearchHandler',
+        'rt': 'jsonp',
+    }
+
+
+def plan_chunks(start: str, end: str, *, max_calendar_days: int = 90) -> list[tuple[str, str]]:
+    if int(max_calendar_days) <= 0:
+        raise ValueError('max_calendar_days must be positive')
+    cursor = date.fromisoformat(str(start)[:10])
+    stop = date.fromisoformat(str(end)[:10])
+    if stop < cursor:
+        raise ValueError('chunk range reversed')
+    chunks = []
+    while cursor <= stop:
+        chunk_end = min(stop, cursor + timedelta(days=int(max_calendar_days) - 1))
+        chunks.append((cursor.isoformat(), chunk_end.isoformat()))
+        cursor = chunk_end + timedelta(days=1)
+    return chunks
 
 
 def _decode(raw: bytes) -> str:
@@ -64,12 +98,12 @@ def parse_hishq_turnover_bytes(symbol: str, raw: bytes) -> list[dict]:
     for row in hq:
         if not isinstance(row, list) or len(row) < 10:
             raise ValueError('turnover column is missing from Sohu trade row')
-        date = str(row[0] or '')[:10]
-        if len(date) != 10:
+        row_date = str(row[0] or '')[:10]
+        if len(row_date) != 10:
             raise ValueError('invalid Sohu turnover date')
         rows.append({
             'symbol': normalized,
-            'date': date,
+            'date': row_date,
             'turnover_ratio': _parse_turnover_percent(row[9]),
             'source': 'SOHU_HISHQ_TURNOVER',
         })
@@ -77,6 +111,22 @@ def parse_hishq_turnover_bytes(symbol: str, raw: bytes) -> list[dict]:
     if len({row['date'] for row in rows}) != len(rows):
         raise ValueError(f'duplicate Sohu turnover dates: {normalized}')
     return rows
+
+
+def merge_turnover_rows_unique(symbol: str, *chunks: list[dict]) -> list[dict]:
+    normalized = normalize_symbol(symbol)
+    by_date: dict[str, dict] = {}
+    for chunk in chunks:
+        for raw_row in chunk or []:
+            row = dict(raw_row)
+            if normalize_symbol(row.get('symbol')) != normalized:
+                raise ValueError(f'turnover symbol mismatch: {normalized}')
+            row_date = str(row.get('date') or '')[:10]
+            prior = by_date.get(row_date)
+            if prior is not None and prior != row:
+                raise ValueError(f'conflicting duplicate turnover row: {normalized}:{row_date}')
+            by_date[row_date] = row
+    return [by_date[row_date] for row_date in sorted(by_date)]
 
 
 def _finite_decimal(value: object, label: str) -> Decimal:
@@ -134,7 +184,7 @@ def select_shard(symbols: list[str], shard_index: int, shard_count: int) -> list
 
 def audit_trade_dates(symbol: str, expected_dates: list[str], rows: list[dict]) -> dict:
     normalized = normalize_symbol(symbol)
-    expected = sorted(set(str(date)[:10] for date in expected_dates))
+    expected = sorted(set(str(day)[:10] for day in expected_dates))
     actual_dates = [str(row.get('date') or '')[:10] for row in rows or []]
     actual_unique = sorted(set(actual_dates))
     missing = sorted(set(expected) - set(actual_unique))
