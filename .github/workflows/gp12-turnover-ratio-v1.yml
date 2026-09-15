@@ -28,3 +28,151 @@ jobs:
         run: |
           cd scripts
           python -m unittest -v test_gp12_turnover_ratio_v1.py
+
+  turnover-shards:
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet runtime
+        run: pip install -q pandas pyarrow
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Verify pinned RAW amount/date evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          audit = Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json')
+          panel = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          assert audit.exists(), audit
+          assert panel.exists(), panel
+          x = json.loads(audit.read_text(encoding='utf-8'))
+          assert x['artifact'] == 'SOHU_RAW_FULL_V482'
+          assert x['version'] == 'V4.82'
+          assert x['status'] == 'PASS_FULL_RAW_V482'
+          assert x['symbol_n'] == 847
+          assert x['raw_rows'] == 1011607
+          assert x['expected_trade_rows'] == 1011607
+          assert x['duplicate_symbol_dates'] == 0
+          assert x['missing_trade_dates_n'] == 0
+          assert x['extra_trade_dates_n'] == 0
+          assert x['bad_amount_rows'] == 0
+          assert x['zero_trade_symbols'] == ['600074.SH','600485.SH','600677.SH']
+          assert x['global_reaudit_pass'] is True
+          assert x['formal_admission'] is False
+          assert x['oos_metrics_allowed'] is False
+          PY
+      - name: Audit Eastmoney f61 turnover shard
+        id: audit
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/turnover-${{ matrix.shard }}
+          python scripts/gp12_turnover_ratio_v1.py shard \
+            --scope data/pit_st_scope_v480.txt \
+            --raw-parquet upstream/raw/SOHU_RAW_FULL_V482.parquet \
+            --shard-index ${{ matrix.shard }} \
+            --shard-count 16 \
+            --timeout 12 \
+            --out out/turnover-${{ matrix.shard }}/TURNOVER_SHARD_${{ matrix.shard }}.json
+      - name: Upload turnover shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-shard-${{ matrix.shard }}
+          path: out/turnover-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  turnover-aggregate:
+    needs: turnover-shards
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download all turnover shard evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp12-turnover-shard-*
+          path: out/shards
+          merge-multiple: true
+      - name: Aggregate exact Formal847 turnover audit
+        id: aggregate
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/full
+          python scripts/gp12_turnover_ratio_v1.py aggregate \
+            --shard-dir out/shards \
+            --out out/full/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json
+      - name: Assert full turnover gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p = Path('out/full/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json')
+          assert p.exists(), p
+          x = json.loads(p.read_text(encoding='utf-8'))
+          assert x['artifact'] == 'GP12_TURNOVER_RATIO_FULL_AUDIT_V1'
+          assert x['version'] == '1.0'
+          assert x['formal_window'] == ['2020-06-01','2026-04-17']
+          assert x['universe_n'] == 847
+          assert x['formal_symbol_n'] == 844
+          assert x['na_symbols'] == ['600074.SH','600485.SH','600677.SH']
+          assert x['pass_n'] == 844
+          assert x['fail_n'] == 0
+          assert x['expected_trade_rows'] == 1011607
+          assert x['observed_turnover_rows'] == 1011607
+          assert x['field'] == 'f61'
+          assert x['source_unit'] == 'percent'
+          assert x['candidate_unit'] == 'decimal_ratio'
+          assert x['pit_scope'] == 'SESSION_CLOSE_NO_LOOKAHEAD_POLICY'
+          assert x['same_session_turnover_usable_before_close'] is False
+          assert x['historical_provider_publication_timestamp_proven'] is False
+          assert x['turnover_ratio_candidate_pit_verified'] is True
+          assert x['amount_evidence']['raw_artifact_id'] == 10042614517
+          assert x['amount_evidence']['raw_artifact_zip_sha256'] == 'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550'
+          assert x['amount_evidence']['liquidity_artifact_id'] == 10042615093
+          assert x['amount_evidence']['liquidity_artifact_zip_sha256'] == 'a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b'
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert x['blockers'] == []
+          print(json.dumps({
+              'formal_symbol_n': x['formal_symbol_n'],
+              'pass_n': x['pass_n'],
+              'fail_n': x['fail_n'],
+              'expected_trade_rows': x['expected_trade_rows'],
+              'observed_turnover_rows': x['observed_turnover_rows'],
+              'turnover_ratio_candidate_pit_verified': x['turnover_ratio_candidate_pit_verified'],
+              'blockers': x['blockers'],
+          }, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload full turnover audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-ratio-full-audit-v1
+          path: out/full/
+          if-no-files-found: warn
+          retention-days: 30
