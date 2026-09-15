@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from gp12_pit_adjusted_close_v482 import (
+    build_forward_pit_adjusted_path,
+    build_qfq_adjusted_path,
+    compare_constant_scale_paths,
     resolve_final_event_availability,
     validate_event_availability,
 )
@@ -71,3 +74,31 @@ def finalize_symbol_events(
         rows.append(row)
 
     return sorted(rows, key=lambda row: row['ex_date'])
+
+
+def audit_symbol_path(
+    *,
+    symbol: str,
+    raw_rows: list[dict],
+    qfq_factors: list[dict],
+    frozen_events: list[dict],
+    nominal_availability: dict[tuple[str, str], str],
+    overrides: dict[tuple[str, str], float],
+    override_availability: dict[tuple[str, str], str],
+    threshold_bp: float = 5.0,
+) -> dict:
+    final_events = finalize_symbol_events(
+        symbol,
+        frozen_events,
+        nominal_availability,
+        overrides,
+        override_availability,
+    )
+    pit_path = build_forward_pit_adjusted_path(raw_rows, final_events)
+    qfq_path = build_qfq_adjusted_path(raw_rows, qfq_factors)
+    result = compare_constant_scale_paths(pit_path, qfq_path, threshold_bp=threshold_bp)
+    result = dict(result)
+    result['symbol'] = str(symbol or '').upper()
+    result['final_event_n'] = len(final_events)
+    result['final_override_n'] = sum(row.get('availability_kind') == 'FINAL_OVERRIDE' for row in final_events)
+    return result
