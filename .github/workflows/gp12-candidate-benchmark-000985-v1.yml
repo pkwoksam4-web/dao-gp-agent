@@ -1,0 +1,96 @@
+name: GP12 Candidate Benchmark 000985 V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-candidate-benchmark-000985-v1
+    paths:
+      - 'scripts/gp12_candidate_benchmark_v1.py'
+      - 'scripts/test_gp12_candidate_benchmark_v1.py'
+      - 'data/GP12_CANDIDATE_BENCHMARK_V1.json'
+      - 'data/GP12_CANDIDATE_FACTORS_V1.json'
+      - 'data/GP12_CANDIDATE_PARAMETERS_V1.json'
+      - '.github/workflows/gp12-candidate-benchmark-000985-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Candidate benchmark contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_candidate_benchmark_v1.py
+
+  full-window-validation:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependency
+        run: pip install -q requests
+      - name: Download verified V4.80 frozen calendar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Validate CSI All Share candidate benchmark over full Formal window
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/gp12_candidate_benchmark_v1.py \
+            --binding data/GP12_CANDIDATE_BENCHMARK_V1.json \
+            --factors data/GP12_CANDIDATE_FACTORS_V1.json \
+            --parameters data/GP12_CANDIDATE_PARAMETERS_V1.json \
+            --calendar-csv calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv \
+            --out-dir artifact_gp12_candidate_benchmark_000985_v1
+      - name: Assert candidate-only semantics and strict closure gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifact_gp12_candidate_benchmark_000985_v1/GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json')
+          x=json.loads(p.read_text(encoding='utf-8'))
+          assert x['status']=='PASS_CANDIDATE_BENCHMARK_V1', x
+          assert x['benchmark']['name']=='CSI All Share'
+          assert x['benchmark']['code']=='000985'
+          assert x['benchmark']['eastmoney_secid']=='1.000985'
+          assert x['formal_window']==['2020-06-01','2026-04-17']
+          assert x['factors_sha256']=='b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
+          assert x['parameters_sha256']=='22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
+          assert x['calendar']['expected_n']==1426
+          assert x['calendar']['observed_n']==1426
+          assert x['calendar']['first']=='2020-06-01'
+          assert x['calendar']['last']=='2026-04-17'
+          assert x['calendar']['full_coverage'] is True
+          assert x['pit']['policy_valid'] is True
+          assert x['candidate_benchmark_blocker_closed'] is True
+          assert x['gp_v11_benchmark_recovered'] is False
+          assert x['historical_recovery_claim_allowed'] is False
+          assert x['blockers']==[]
+          print(json.dumps(x, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload benchmark validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-candidate-benchmark-000985-v1
+          path: artifact_gp12_candidate_benchmark_000985_v1/
+          if-no-files-found: warn
+          retention-days: 30
