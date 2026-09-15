@@ -1,0 +1,33 @@
+name: GP12 BaoStock Turnover Full V4.82
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v482
+    paths:
+      - 'scripts/test_baostock_turnover_full_v482.py'
+      - 'scripts/baostock_turnover_full_v482.py'
+      - 'scripts/baostock_turnover_v482.py'
+      - '.github/workflows/gp12-baostock-turnover-full-v482.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  full-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install contract dependencies
+        run: pip install -q pandas
+      - name: Run full-panel contracts
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_baostock_turnover_full_v482.py
