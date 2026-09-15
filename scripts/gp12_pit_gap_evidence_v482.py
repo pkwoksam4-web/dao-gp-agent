@@ -62,6 +62,63 @@ def _is_allowed_implementation_title(symbol: str, title: str) -> bool:
     )
 
 
+def _close(a: float, b: float, tolerance: float = 1e-9) -> bool:
+    return abs(float(a) - float(b)) <= max(tolerance, abs(float(b)) * 1e-9)
+
+
+def extract_gap_terms_from_text(event: dict, text: str) -> dict:
+    """Extract only a frozen final term that is explicitly present in official text.
+
+    This intentionally does not infer terms from board proposals or generic wording.
+    It searches implementation-style per-10-share cash/capitalization expressions and
+    requires the parsed value to match the already-frozen event term.
+    """
+    normalized = _normalize_event(event)
+    body = re.sub(r'[\s,，]+', '', str(text or ''))
+    frozen_cash = float(normalized.get('cash_per_share') or normalized.get('cash_per_share_nominal') or 0.0)
+    frozen_cap = float(normalized.get('capitalization_ratio') or normalized.get('cap_ratio') or 0.0)
+
+    cash = None
+    cap = None
+    cash_patterns = (
+        r'每10股(?:派发|派|分配|发放)(?:现金红利|现金股利|现金)?([0-9]+(?:\.[0-9]+)?)元',
+        r'10股(?:派发|派|分配|发放)(?:现金红利|现金股利|现金)?([0-9]+(?:\.[0-9]+)?)元',
+    )
+    cap_patterns = (
+        r'每10股(?:转增|转)([0-9]+(?:\.[0-9]+)?)股',
+        r'10股(?:转增|转)([0-9]+(?:\.[0-9]+)?)股',
+    )
+
+    if frozen_cash > 0:
+        for pattern in cash_patterns:
+            for match in re.finditer(pattern, body):
+                value = float(match.group(1)) / 10.0
+                if _close(value, frozen_cash):
+                    cash = value
+                    break
+            if cash is not None:
+                break
+    if frozen_cap > 0:
+        for pattern in cap_patterns:
+            for match in re.finditer(pattern, body):
+                value = float(match.group(1)) / 10.0
+                if _close(value, frozen_cap):
+                    cap = value
+                    break
+            if cap is not None:
+                break
+
+    required_cash_ok = frozen_cash <= 0 or cash is not None
+    required_cap_ok = frozen_cap <= 0 or cap is not None
+    if not (required_cash_ok and required_cap_ok) or (cash is None and cap is None):
+        raise ValueError('OFFICIAL_FINAL_TERM_NOT_FOUND')
+    return {
+        'cash_per_share': cash,
+        'cap_ratio': cap,
+        'formula_share_change_ratio': None,
+    }
+
+
 def validate_official_gap_record(
     event: dict,
     announcement: dict,
