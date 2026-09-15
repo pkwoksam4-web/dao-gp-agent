@@ -54,6 +54,45 @@ class SohuTurnoverContracts(unittest.TestCase):
         self.assertEqual(out['fail_n'], 0)
         self.assertEqual(out['max_diff_bp'], 0.0)
 
+    def test_shard_selection_is_deterministic_and_complete(self):
+        m = _subject()
+        symbols = [f'{i:06d}.SZ' for i in range(17)]
+        shards = [m.select_shard(symbols, i, 4) for i in range(4)]
+        flattened = [symbol for shard in shards for symbol in shard]
+        self.assertEqual(sorted(flattened), sorted(symbols))
+        self.assertEqual(len(flattened), len(set(flattened)))
+        self.assertEqual(shards[0], symbols[0::4])
+
+    def test_trade_date_audit_requires_exact_dates_once(self):
+        m = _subject()
+        rows = [
+            {'symbol':'000001.SZ','date':'2024-01-02','turnover_ratio':0.01},
+            {'symbol':'000001.SZ','date':'2024-01-03','turnover_ratio':0.02},
+        ]
+        ok = m.audit_trade_dates('000001.SZ', ['2024-01-02','2024-01-03'], rows)
+        self.assertEqual(ok['status'], 'PASS_EXACT_TURNOVER_DATES')
+        self.assertEqual(ok['missing_dates_n'], 0)
+        self.assertEqual(ok['extra_dates_n'], 0)
+        self.assertEqual(ok['duplicate_dates_n'], 0)
+
+        missing = m.audit_trade_dates('000001.SZ', ['2024-01-02','2024-01-03'], rows[:1])
+        self.assertEqual(missing['status'], 'REVIEW_TURNOVER_DATES')
+        self.assertEqual(missing['missing_dates'], ['2024-01-03'])
+
+        duplicate = m.audit_trade_dates('000001.SZ', ['2024-01-02','2024-01-03'], rows + [dict(rows[1])])
+        self.assertEqual(duplicate['status'], 'REVIEW_TURNOVER_DATES')
+        self.assertEqual(duplicate['duplicate_dates_n'], 1)
+
+    def test_trade_date_audit_rejects_negative_or_nonfinite_turnover(self):
+        m = _subject()
+        rows = [
+            {'symbol':'000001.SZ','date':'2024-01-02','turnover_ratio':-0.01},
+            {'symbol':'000001.SZ','date':'2024-01-03','turnover_ratio':float('nan')},
+        ]
+        out = m.audit_trade_dates('000001.SZ', ['2024-01-02','2024-01-03'], rows)
+        self.assertEqual(out['status'], 'REVIEW_BAD_TURNOVER')
+        self.assertEqual(out['bad_turnover_n'], 2)
+
     def test_global_gate_requires_exact_formal_trade_date_coverage(self):
         m = _subject()
         self.assertTrue(m.full_turnover_global_gate(
