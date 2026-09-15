@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 
+from gp12_pit_adjusted_close_audit_v482 import audit_symbol_path
+
 
 def _date(value: object, label: str) -> str:
     text = str(value or '')[:10]
@@ -127,4 +129,108 @@ def validate_special_prev_close(
         'derived_event_ratio': derived_ratio,
         'corrected_event_ratio': corrected_ratio,
         'ratio_diff_bp': ratio_diff_bp,
+    }
+
+
+def audit_universe(
+    *,
+    raw_by_symbol: dict[str, list[dict]],
+    factors_by_symbol: dict[str, list[dict]],
+    frozen_records: list[dict],
+    standard_stages: list[list[dict]],
+    special_rows: list[dict],
+    manifest: dict,
+    na_symbols: list[str],
+    expected_standard_n: int = 270,
+    expected_special_n: int = 11,
+    threshold_bp: float = 5.0,
+) -> dict:
+    nominal_availability = {
+        _event_key(row): _date(row.get('availability_date'), 'availability_date')
+        for row in manifest.get('nominal_events') or []
+    }
+    final_availability = {
+        _event_key(row): _date(row.get('availability_date'), 'availability_date')
+        for row in manifest.get('standard_overrides') or []
+    }
+    for row in manifest.get('special_overrides') or []:
+        key = _event_key(row)
+        if key in final_availability:
+            raise ValueError(f'override collision: {key}')
+        final_availability[key] = _date(row.get('formula_availability_date'), 'formula_availability_date')
+
+    merged = merge_final_override_ratios(
+        standard_stages,
+        special_rows,
+        final_availability,
+        expected_standard_n=expected_standard_n,
+        expected_special_n=expected_special_n,
+    )
+    na = sorted(str(symbol).upper() for symbol in na_symbols)
+    records_by_symbol = {}
+    for record in frozen_records or []:
+        symbol = str(record.get('symbol') or '').upper()
+        if not symbol or symbol in records_by_symbol:
+            raise ValueError(f'duplicate/missing frozen symbol: {symbol}')
+        records_by_symbol[symbol] = record
+    if sorted(records_by_symbol) != sorted(set(records_by_symbol)):
+        raise ValueError('frozen symbol partition is not unique')
+
+    path_records = []
+    failures = []
+    for symbol, record in sorted(records_by_symbol.items()):
+        if symbol in na:
+            continue
+        raw_rows = raw_by_symbol.get(symbol)
+        factor_rows = factors_by_symbol.get(symbol)
+        if not raw_rows:
+            raise ValueError(f'MISSING_RAW_SYMBOL:{symbol}')
+        if not factor_rows:
+            raise ValueError(f'MISSING_QFQ_FACTOR_SYMBOL:{symbol}')
+        result = audit_symbol_path(
+            symbol=symbol,
+            raw_rows=raw_rows,
+            qfq_factors=factor_rows,
+            frozen_events=record.get('events') or [],
+            nominal_availability=nominal_availability,
+            overrides=merged['ratios'],
+            override_availability=merged['availability'],
+            threshold_bp=threshold_bp,
+        )
+        path_records.append(result)
+        if result.get('status') != 'PASS_CONSTANT_SCALE':
+            failures.append(result)
+
+    special_checks = []
+    for row in special_rows or []:
+        symbol = str(row.get('symbol') or '').upper()
+        raw_rows = raw_by_symbol.get(symbol)
+        if not raw_rows:
+            raise ValueError(f'MISSING_SPECIAL_RAW_SYMBOL:{symbol}')
+        special_checks.append(validate_special_prev_close(symbol, raw_rows, row))
+
+    formal_n = len(path_records)
+    max_diff = max((float(row.get('max_diff_bp') or 0.0) for row in path_records), default=0.0)
+    verified = bool(not failures and len(special_checks) == int(expected_special_n))
+    return {
+        'artifact': 'GP12_PIT_ADJUSTED_CLOSE_FULL_AUDIT_V482',
+        'version': 'V4.82',
+        'universe_n': len(records_by_symbol),
+        'formal_symbol_n': formal_n,
+        'na_symbols': na,
+        'nominal_event_n': len(manifest.get('nominal_events') or []),
+        'standard_override_n': merged['standard_n'],
+        'special_override_n': merged['special_n'],
+        'total_override_n': merged['total_n'],
+        'special_prev_close_pass_n': sum(row.get('status') == 'PASS_SPECIAL_PREV_CLOSE_PIT' for row in special_checks),
+        'constant_scale_pass_n': sum(row.get('status') == 'PASS_CONSTANT_SCALE' for row in path_records),
+        'constant_scale_fail_n': len(failures),
+        'max_constant_scale_diff_bp': max_diff,
+        'adjusted_close_pit_verified': verified,
+        'candidate_approval': False,
+        'model_freeze_allowed': False,
+        'oos_metrics_allowed': False,
+        'records': path_records,
+        'failures': failures,
+        'special_checks': special_checks,
     }
