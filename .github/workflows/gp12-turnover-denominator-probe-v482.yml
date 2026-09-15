@@ -39,7 +39,14 @@ jobs:
           })
           r.raise_for_status()
           raw=r.content
-          text=raw.decode('utf-8-sig')
+          text=None
+          for enc in ('utf-8-sig','gb18030'):
+              try:
+                  text=raw.decode(enc)
+                  break
+              except UnicodeDecodeError:
+                  pass
+          assert text is not None, 'Sohu payload decode failed'
           m=re.match(r'^\s*historySearchHandler\((.*)\)\s*;?\s*$',text,re.S)
           assert m, text[:200]
           obj=json.loads(m.group(1)); rows=obj[0]['hq']
