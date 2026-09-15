@@ -1,0 +1,86 @@
+name: GP12 Turnover Repair Pilot V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-turnover-repair-pilot-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -q requests pandas pyarrow
+      - name: Download pinned first-round turnover audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-turnover-ratio-full-audit-v1
+          path: upstream/base
+          run-id: 34947196139
+          github-token: ${{ github.token }}
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Run low-rate unresolved-only pilot
+        id: pilot
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/pilot
+          python scripts/gp12_turnover_ratio_v1.py repair-shard \
+            --base-audit upstream/base/GP12_TURNOVER_RATIO_FULL_AUDIT_V1.json \
+            --raw-parquet upstream/raw/SOHU_RAW_FULL_V482.parquet \
+            --shard-index 0 \
+            --shard-count 80 \
+            --timeout 10 \
+            --retries 3 \
+            --inter-symbol-delay 1.5 \
+            --out out/pilot/TURNOVER_REPAIR_SHARD_0.json \
+            --data-out out/pilot/TURNOVER_REPAIR_SHARD_0.csv
+      - name: Print pilot evidence
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('out/pilot/TURNOVER_REPAIR_SHARD_0.json')
+          assert p.exists(), p
+          x=json.loads(p.read_text(encoding='utf-8'))
+          print(json.dumps({
+              'symbol_n': x['symbol_n'],
+              'pass_n': x['pass_n'],
+              'fail_n': x['fail_n'],
+              'expected_trade_rows': x['expected_trade_rows'],
+              'observed_turnover_rows': x['observed_turnover_rows'],
+              'materialized_rows': x['materialized_rows'],
+              'failures': [
+                  {'symbol': r['symbol'], 'blockers': r.get('blockers'), 'source_error': r.get('source_error')}
+                  for r in x['records'] if not r.get('symbol_pass')
+              ],
+          }, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload pilot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-turnover-repair-pilot-v1
+          path: out/pilot/
+          if-no-files-found: error
+          retention-days: 30
