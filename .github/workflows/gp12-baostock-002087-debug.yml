@@ -20,8 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install direct-source probe runtime
-        run: pip install -q requests pandas pyarrow
+      - name: Install probe runtime
+        run: pip install -q baostock pandas pyarrow
       - name: Download pinned Sohu RAW evidence
         uses: actions/download-artifact@v4
         with:
@@ -30,72 +30,62 @@ jobs:
           run-id: 34192233633
           github-token: ${{ github.token }}
           repository: pkwoksam4-web/dao-gp-agent
-      - name: Probe direct NetEase historical CSV
+      - name: Infer residual turnover denominators
         run: |
           python - <<'PY'
-          import io, json, math
+          import json, math
+          import baostock as bs
           import pandas as pd
-          import requests
 
-          raw = pd.read_parquet(
-              'upstream/raw/SOHU_RAW_FULL_V482.parquet',
-              columns=['symbol','date','amount'],
-          )
-          targets = {
-              '300216.SZ': ('1300216','20200805','20200915'),
-              '002604.SZ': ('1002604','20200601','20200714'),
+          panel_path='upstream/raw/SOHU_RAW_FULL_V482.parquet'
+          full=pd.read_parquet(panel_path)
+          print('SOHU_COLUMNS',list(full.columns))
+          target_symbols=['300216.SZ','002604.SZ']
+          wanted=['symbol','date']+[c for c in ['open','high','low','close','volume','amount'] if c in full.columns]
+          target=full[full['symbol'].isin(target_symbols)][wanted].copy()
+          print('SOHU_TARGET_ROWS')
+          print(target.to_json(orient='records',date_format='iso',force_ascii=False))
+
+          targets={
+              '300216.SZ':('sz.300216',291684518,297447027),
+              '002604.SZ':('sz.002604',512281847,453618223),
           }
-          url='https://quotes.money.163.com/service/chddata.html'
-          fields='TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP'
-          for symbol,(source_code,start,end) in targets.items():
-              expected = raw[raw['symbol'].eq(symbol)].copy()
-              expected_dates = [str(x)[:10] for x in expected['date'].tolist()]
-              print('TARGET',symbol,'EXPECTED',len(expected_dates),expected_dates[0],expected_dates[-1])
-              try:
-                  r=requests.get(
-                      url,
-                      params={'code':source_code,'start':start,'end':end,'fields':fields},
-                      timeout=30,
-                      headers={'User-Agent':'Mozilla/5.0'},
+          lg=bs.login()
+          print('LOGIN',lg.error_code,lg.error_msg)
+          try:
+              for symbol,(code,denom_a,denom_b) in targets.items():
+                  rs=bs.query_history_k_data_plus(
+                      code,
+                      'date,code,volume,amount,turn,tradestatus',
+                      start_date='2020-06-01',
+                      end_date='2020-09-30',
+                      frequency='d',
+                      adjustflag='3',
                   )
-                  print('HTTP',r.status_code,'LEN',len(r.content),'CTYPE',r.headers.get('content-type'))
-                  print('HEAD',repr(r.content[:160]))
-                  r.raise_for_status()
-                  text=r.content.decode('gbk',errors='strict')
-                  df=pd.read_csv(io.StringIO(text))
-                  print('COLUMNS',list(df.columns),'RETURNED',len(df))
-                  date_col='日期'
-                  df['date_norm']=pd.to_datetime(df[date_col]).dt.strftime('%Y-%m-%d')
-                  got=df[df['date_norm'].isin(expected_dates)].copy()
-                  print('MATCHED',len(got),'MISSING',sorted(set(expected_dates)-set(got['date_norm'])))
                   rows=[]
-                  for _,x in got.sort_values('date_norm').iterrows():
-                      def fv(name):
-                          value=x.get(name)
-                          if pd.isna(value) or str(value).strip() in {'','None','nan'}:
-                              return float('nan')
-                          return float(value)
-                      close=fv('收盘价')
-                      volume=fv('成交量')
-                      turnover_pct=fv('换手率')
-                      float_mcap=fv('流通市值')
-                      shares=float_mcap/close if math.isfinite(float_mcap) and close>0 else float('nan')
-                      derived=volume/shares if math.isfinite(shares) and shares>0 else float('nan')
-                      source_ratio=turnover_pct/100.0 if math.isfinite(turnover_pct) else float('nan')
-                      rows.append({
-                          'date':x['date_norm'],
-                          'close':close,
-                          'volume':volume,
-                          'turnover_pct':turnover_pct,
-                          'turnover_ratio':source_ratio,
-                          'float_mcap':float_mcap,
-                          'derived_outstanding_share':shares,
-                          'derived_turnover_ratio':derived,
-                          'positive_source':bool(math.isfinite(source_ratio) and source_ratio>0),
-                          'positive_derived':bool(math.isfinite(derived) and derived>0),
-                          'abs_diff':abs(source_ratio-derived) if math.isfinite(source_ratio) and math.isfinite(derived) else None,
-                      })
+                  while rs.next():
+                      r=dict(zip(rs.fields,rs.get_row_data()))
+                      if r.get('tradestatus')!='1':
+                          continue
+                      vol=float(r['volume']) if r.get('volume') else float('nan')
+                      amount=float(r['amount']) if r.get('amount') else float('nan')
+                      turn_pct=float(r['turn']) if r.get('turn') else float('nan')
+                      implied=vol/(turn_pct/100.0) if math.isfinite(turn_pct) and turn_pct>0 else None
+                      row={
+                          'date':r['date'],
+                          'volume':vol,
+                          'amount':amount,
+                          'turn_pct':turn_pct,
+                          'implied_shares':implied,
+                          'ratio_using_denom_a':vol/denom_a if math.isfinite(vol) and denom_a>0 else None,
+                          'ratio_using_denom_b':vol/denom_b if math.isfinite(vol) and denom_b>0 else None,
+                      }
+                      if implied is not None:
+                          row['rel_err_denom_a']=abs(implied-denom_a)/denom_a
+                          row['rel_err_denom_b']=abs(implied-denom_b)/denom_b
+                      rows.append(row)
+                  print('BAOSTOCK',symbol,'QUERY',rs.error_code,rs.error_msg,'ROWS',len(rows))
                   print(json.dumps(rows,ensure_ascii=False,indent=2))
-              except Exception as exc:
-                  print('ERROR',symbol,type(exc).__name__,str(exc))
+          finally:
+              bs.logout()
           PY
