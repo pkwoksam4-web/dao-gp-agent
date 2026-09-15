@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import pathlib
+import time
 from zoneinfo import ZoneInfo
 
 
@@ -248,8 +249,15 @@ def verify_frozen_calendar_csv(csv_text: str) -> dict:
     }
 
 
-def fetch_benchmark_close(binding: dict, timeout: int = 30) -> tuple[list[dict], dict]:
+def fetch_benchmark_close(
+    binding: dict,
+    timeout: int = 30,
+    retries: int = 3,
+) -> tuple[list[dict], dict]:
     import requests
+
+    if retries < 1:
+        raise ValueError("retries must be at least one")
 
     benchmark = binding["benchmark"]
     window = binding["formal_window"]
@@ -263,42 +271,54 @@ def fetch_benchmark_close(binding: dict, timeout: int = 30) -> tuple[list[dict],
         "fields1": "f1,f2,f3,f4,f5,f6",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
     }
-    response = requests.get(
-        EASTMONEY_BASE,
-        params=params,
-        headers={"User-Agent": "Mozilla/5.0 GP12-Candidate-Benchmark-V1"},
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, dict):
-        raise RuntimeError("Eastmoney benchmark payload has no data object")
-    klines = data.get("klines")
-    if not isinstance(klines, list) or not klines:
-        raise RuntimeError("Eastmoney benchmark payload has no daily klines")
-
-    rows: list[dict] = []
-    for line in klines:
-        parts = str(line).split(",")
-        if len(parts) < 3:
-            continue
+    last_error: Exception | None = None
+    for attempt in range(retries):
         try:
-            rows.append({"date": parts[0], "close": float(parts[2])})
-        except (TypeError, ValueError):
-            rows.append({"date": parts[0] if parts else "", "close": None})
+            response = requests.get(
+                EASTMONEY_BASE,
+                params=params,
+                headers={"User-Agent": "Mozilla/5.0 GP12-Candidate-Benchmark-V1"},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if not isinstance(data, dict):
+                raise RuntimeError("Eastmoney benchmark payload has no data object")
+            klines = data.get("klines")
+            if not isinstance(klines, list) or not klines:
+                raise RuntimeError("Eastmoney benchmark payload has no daily klines")
 
-    meta = {
-        "provider": "Eastmoney",
-        "endpoint": EASTMONEY_BASE,
-        "secid": benchmark["eastmoney_secid"],
-        "payload_code": str(data.get("code", "")),
-        "payload_name": str(data.get("name", "")),
-        "klt": 101,
-        "fqt": 0,
-        "series_construction": benchmark.get("series_construction"),
-    }
-    return rows, meta
+            rows: list[dict] = []
+            for line in klines:
+                parts = str(line).split(",")
+                if len(parts) < 3:
+                    continue
+                try:
+                    rows.append({"date": parts[0], "close": float(parts[2])})
+                except (TypeError, ValueError):
+                    rows.append({"date": parts[0] if parts else "", "close": None})
+
+            meta = {
+                "provider": "Eastmoney",
+                "endpoint": EASTMONEY_BASE,
+                "secid": benchmark["eastmoney_secid"],
+                "payload_code": str(data.get("code", "")),
+                "payload_name": str(data.get("name", "")),
+                "klt": 101,
+                "fqt": 0,
+                "series_construction": benchmark.get("series_construction"),
+                "fetch_attempts": attempt + 1,
+            }
+            return rows, meta
+        except Exception as exc:
+            last_error = exc
+            if attempt + 1 < retries:
+                time.sleep(float(attempt + 1))
+
+    raise RuntimeError(
+        f"Eastmoney benchmark fetch failed after {retries} attempts: {last_error}"
+    ) from last_error
 
 
 def write_close_csv(path: pathlib.Path, rows: list[dict], binding: dict) -> None:
