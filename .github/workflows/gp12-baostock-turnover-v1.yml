@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/gp12_baostock_turnover_v1.py'
       - 'scripts/test_gp12_baostock_turnover_v1.py'
+      - 'data/GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1.json'
       - '.github/workflows/gp12-baostock-turnover-v1.yml'
   workflow_dispatch:
 
@@ -52,15 +53,21 @@ jobs:
           path: upstream/raw
           run-id: 34192233633
           github-token: ${{ github.token }}
-      - name: Verify pinned RAW amount/date evidence
+      - name: Verify pinned RAW amount/date evidence and residual binding
+        env:
+          PYTHONPATH: scripts
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
+          import gp12_baostock_turnover_v1 as turnover
+
           audit = Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json')
           panel = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          binding_path = Path('data/GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1.json')
           assert audit.exists(), audit
           assert panel.exists(), panel
+          assert binding_path.exists(), binding_path
           x = json.loads(audit.read_text(encoding='utf-8'))
           assert x['artifact'] == 'SOHU_RAW_FULL_V482'
           assert x['version'] == 'V4.82'
@@ -76,6 +83,12 @@ jobs:
           assert x['global_reaudit_pass'] is True
           assert x['formal_admission'] is False
           assert x['oos_metrics_allowed'] is False
+          binding = json.loads(binding_path.read_text(encoding='utf-8'))
+          index = turnover.validate_residual_denominator_binding(binding)
+          assert set(index) == {'300216.SZ','002604.SZ'}
+          assert index['300216.SZ']['floating_shares'] == 291684518
+          assert index['002604.SZ']['floating_shares'] == 512281847
+          print('residual_binding_sha256', turnover._canonical_json_sha256(binding))
           PY
       - name: Audit and materialize BaoStock turnover shard
         id: audit
@@ -87,6 +100,7 @@ jobs:
           python scripts/gp12_baostock_turnover_v1.py shard \
             --scope data/pit_st_scope_v480.txt \
             --raw-parquet upstream/raw/SOHU_RAW_FULL_V482.parquet \
+            --residual-denominators data/GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1.json \
             --shard-index ${{ matrix.shard }} \
             --shard-count 8 \
             --out out/turnover-${{ matrix.shard }}/BAOSTOCK_TURNOVER_SHARD_${{ matrix.shard }}.json \
@@ -147,6 +161,13 @@ jobs:
           assert x['expected_trade_rows'] == 1011607
           assert x['observed_turnover_rows'] == 1011607
           assert x['materialized_rows'] == 1011607
+          assert x['provider_status_override_n'] == 5
+          assert x['provider_status_override_symbol_n'] == 5
+          assert x['turnover_precision_reconstruction_n'] > 0
+          assert x['turnover_precision_reconstruction_symbol_n'] == 2
+          assert {r['symbol'] for r in x['turnover_precision_reconstructions']} == {'300216.SZ','002604.SZ'}
+          assert x['residual_denominator_binding_artifact'] == 'GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1'
+          assert re.fullmatch(r'[0-9a-f]{64}', x['residual_denominator_binding_sha256'])
           assert x['panel_complete'] is True
           assert x['turnover_ratio_candidate_pit_verified'] is True
           p = x['provider']
@@ -174,6 +195,9 @@ jobs:
               'expected_trade_rows': x['expected_trade_rows'],
               'observed_turnover_rows': x['observed_turnover_rows'],
               'materialized_rows': x['materialized_rows'],
+              'provider_status_override_n': x['provider_status_override_n'],
+              'turnover_precision_reconstruction_n': x['turnover_precision_reconstruction_n'],
+              'residual_denominator_binding_sha256': x['residual_denominator_binding_sha256'],
               'panel_csv_sha256': x['panel_csv_sha256'],
               'turnover_ratio_candidate_pit_verified': x['turnover_ratio_candidate_pit_verified'],
               'blockers': x['blockers'],
