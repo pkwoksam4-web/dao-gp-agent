@@ -9,6 +9,13 @@ SOURCE = 'BAOSTOCK_QUERY_HISTORY_K_DATA_PLUS_TURN_V482'
 EXPECTED_SCOPE_N = 847
 EXPECTED_TURNOVER_SYMBOL_N = 844
 EXPECTED_TRADE_ROWS = 1_011_607
+PITST_TRADESTATUS_ONE_CORRECTIONS = {
+    ('002087.SZ', '2024-06-13'),
+    ('300356.SZ', '2023-06-20'),
+    ('600647.SH', '2024-06-13'),
+    ('600766.SH', '2024-06-13'),
+    ('603133.SH', '2024-06-13'),
+}
 
 
 def query_rows(bs, symbol: str):
@@ -26,6 +33,19 @@ def query_rows(bs, symbol: str):
         while rs.next():
             rows.append(dict(zip(rs.fields, rs.get_row_data())))
     return rows, str(rs.error_code), str(rs.error_msg or '')
+
+
+def apply_trade_status_corrections(symbol: str, rows: list[dict]) -> tuple[list[dict], list[tuple[str, str]]]:
+    normalized = str(symbol).strip().upper()
+    corrected = [dict(row) for row in (rows or [])]
+    applied = []
+    for row in corrected:
+        date = str(row.get('date') or '').strip()[:10]
+        key = (normalized, date)
+        if key in PITST_TRADESTATUS_ONE_CORRECTIONS:
+            row['tradestatus'] = '1'
+            applied.append(key)
+    return corrected, applied
 
 
 def _base(symbol: str, rows, query_error_code='0', query_error_msg='') -> dict:
