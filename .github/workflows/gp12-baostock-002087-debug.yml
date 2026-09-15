@@ -1,0 +1,42 @@
+name: GP12 BaoStock 002087 Debug
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-baostock-002087-debug.yml'
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q baostock
+      - name: Print raw BaoStock rows around missing date
+        run: |
+          python - <<'PY'
+          import json
+          import baostock as bs
+          lg=bs.login()
+          print('LOGIN', lg.error_code, lg.error_msg)
+          try:
+              rs=bs.query_history_k_data_plus(
+                  'sz.002087',
+                  'date,code,open,high,low,close,volume,amount,turn,tradestatus,isST',
+                  start_date='2024-06-10',
+                  end_date='2024-06-17',
+                  frequency='d',
+                  adjustflag='3',
+              )
+              print('QUERY', rs.error_code, rs.error_msg, rs.fields)
+              rows=[]
+              while rs.next():
+                  rows.append(dict(zip(rs.fields, rs.get_row_data())))
+              print(json.dumps(rows, ensure_ascii=False, indent=2))
+          finally:
+              bs.logout()
+          PY
