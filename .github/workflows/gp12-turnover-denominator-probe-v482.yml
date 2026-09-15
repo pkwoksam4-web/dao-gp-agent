@@ -24,7 +24,7 @@ jobs:
         run: |
           mkdir -p artifact_turnover_denominator_probe
           python - <<'PY'
-          import json, math, pathlib, re
+          import json, pathlib, re
           from decimal import Decimal
           import requests
 
@@ -51,9 +51,9 @@ jobs:
           assert m, text[:200]
           obj=json.loads(m.group(1)); rows=obj[0]['hq']
 
-          # Company-reported historical share facts. 2019 distribution was announced 2020-05-14,
-          # record date 2020-05-20, ex/capitalization date 2020-05-21, 10-for-2.
-          # 2020 annual/half-year reports later confirm these exact before/after counts.
+          # Company-reported historical share facts around the 2020-05-21 10-for-2 capitalization.
+          # The first probe disproved total shares as Sohu's denominator and matched the unrestricted/
+          # immediately tradable share base on all five dates. Preserve both candidates explicitly.
           before_total=6_715_608_655
           after_total=8_058_730_386
           before_unrestricted=5_454_254_096
@@ -67,13 +67,9 @@ jobs:
           }
 
           def interval(volume_shares, reported_pct):
-              # Sohu exposes turnover rounded to two decimal percentage points.
-              p=Decimal(str(reported_pct))
-              half=Decimal('0.005')
-              lo=max(Decimal('0.0000000001'),p-half)
-              hi=p+half
+              p=Decimal(str(reported_pct)); half=Decimal('0.005')
+              lo=max(Decimal('0.0000000001'),p-half); hi=p+half
               v=Decimal(str(volume_shares))*Decimal('100')
-              # shares = volume*100 / percent
               return float(v/hi), float(v/lo)
 
           out=[]
@@ -96,43 +92,48 @@ jobs:
           pre=[x for x in out if x['date']=='2020-05-20'][0]
           post=[x for x in out if x['date']=='2020-05-21'][0]
           ratio_mid=post['implied_denominator_mid']/pre['implied_denominator_mid']
-          expected_ratio=after_total/before_total
+          expected_unrestricted_ratio=after_unrestricted/before_unrestricted
           report={
               'artifact':'GP12_TURNOVER_DENOMINATOR_PROBE_300059_V482','version':'V4.82',
               'symbol':'300059.SZ','provider':'SOHU_HISHQ',
               'event':'2019 annual capitalization 10-for-2 effective 2020-05-21',
               'event_announcement_date':'2020-05-14','record_date':'2020-05-20','effective_date':'2020-05-21',
               'before_total_shares':before_total,'after_total_shares':after_total,
-              'expected_total_share_jump_ratio':expected_ratio,
+              'before_unrestricted_shares':before_unrestricted,'after_unrestricted_shares':after_unrestricted,
+              'expected_unrestricted_share_jump_ratio':expected_unrestricted_ratio,
               'implied_mid_jump_ratio_20200520_to_20200521':ratio_mid,
               'rows':out,
-              'all_rows_match_total_not_unrestricted':all(x['total_in_rounding_interval'] and not x['unrestricted_in_rounding_interval'] for x in out),
+              'all_rows_match_unrestricted_not_total':all(x['unrestricted_in_rounding_interval'] and not x['total_in_rounding_interval'] for x in out),
+              'historical_date_denominator_behavior_supported':True,
               'pit_revision_semantics_proven':False,
               'readiness_blocker_closed':False,
               'candidate_adoption_status':'UNAPPROVED','model_freeze_allowed':False,'oos_metrics_allowed':False,
               'evidence_notes':[
-                  'Sohu historical quote field exposes turnover to two decimal percentage points; denominator is therefore tested as a rounding interval.',
-                  'A date-specific denominator jump consistent with an announced share-count event supports historical-date semantics but does not alone prove no later revisions.',
+                  'All five Sohu observations match the unrestricted/tradable share base and reject total shares within the two-decimal turnover rounding interval.',
+                  'The implied denominator jumps on the effective capitalization date by approximately the announced 10-for-2 ratio.',
+                  'This supports date-specific historical denominator semantics, but one event does not prove that historical turnover values are never revised later.',
               ],
               'source_urls':[
                   'https://q.stock.sohu.com/cn/300059/lshq.shtml',
+                  'https://money.finance.sina.com.cn/corp/view/vCI_StockStructurePicture/stockid/300059/alertdate/20200521.phtml',
                   'https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=7123058&stockid=300059',
-                  'https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/300059.phtml',
               ],
           }
           p=pathlib.Path('artifact_turnover_denominator_probe/GP12_TURNOVER_DENOMINATOR_PROBE_300059_V482.json')
           p.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
           print(json.dumps(report,ensure_ascii=False,indent=2))
           assert len(out)==5,out
-          assert all(x['total_in_rounding_interval'] for x in out),out
-          assert all(not x['unrestricted_in_rounding_interval'] for x in out),out
-          assert abs(ratio_mid-expected_ratio) < 0.02,(ratio_mid,expected_ratio)
+          assert all(x['unrestricted_in_rounding_interval'] for x in out),out
+          assert all(not x['total_in_rounding_interval'] for x in out),out
+          assert abs(ratio_mid-expected_unrestricted_ratio) < 0.02,(ratio_mid,expected_unrestricted_ratio)
+          assert report['historical_date_denominator_behavior_supported'] is True
           assert report['pit_revision_semantics_proven'] is False
           assert report['readiness_blocker_closed'] is False
           PY
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: gp12-turnover-denominator-probe-300059-v482
           path: artifact_turnover_denominator_probe/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
