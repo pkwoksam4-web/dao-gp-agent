@@ -20,8 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install NetEase probe runtime
-        run: pip install -q akshare pandas pyarrow
+      - name: Install direct-source probe runtime
+        run: pip install -q requests pandas pyarrow
       - name: Download pinned Sohu RAW evidence
         uses: actions/download-artifact@v4
         with:
@@ -30,43 +30,60 @@ jobs:
           run-id: 34192233633
           github-token: ${{ github.token }}
           repository: pkwoksam4-web/dao-gp-agent
-      - name: Probe 300216 and 002604 through NetEase/AkShare
+      - name: Probe direct NetEase historical CSV
         run: |
           python - <<'PY'
-          import json, math
-          import akshare as ak
+          import io, json, math
           import pandas as pd
+          import requests
 
           raw = pd.read_parquet(
               'upstream/raw/SOHU_RAW_FULL_V482.parquet',
               columns=['symbol','date','amount'],
           )
-          targets = {'300216.SZ':'sz300216','002604.SZ':'sz002604'}
-          for symbol, source_symbol in targets.items():
-              exp = raw[raw['symbol'].eq(symbol)].copy()
-              expected_dates = [str(x)[:10] for x in exp['date'].tolist()]
-              print('TARGET', symbol, 'EXPECTED', len(expected_dates), expected_dates[0], expected_dates[-1])
+          targets = {
+              '300216.SZ': ('1300216','20200805','20200915'),
+              '002604.SZ': ('1002604','20200601','20200714'),
+          }
+          url='https://quotes.money.163.com/service/chddata.html'
+          fields='TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP'
+          for symbol,(source_code,start,end) in targets.items():
+              expected = raw[raw['symbol'].eq(symbol)].copy()
+              expected_dates = [str(x)[:10] for x in expected['date'].tolist()]
+              print('TARGET',symbol,'EXPECTED',len(expected_dates),expected_dates[0],expected_dates[-1])
               try:
-                  df = ak.stock_zh_a_hist_163(
-                      symbol=source_symbol,
-                      start_date='20200601',
-                      end_date='20260417',
+                  r=requests.get(
+                      url,
+                      params={'code':source_code,'start':start,'end':end,'fields':fields},
+                      timeout=30,
+                      headers={'User-Agent':'Mozilla/5.0'},
                   )
-                  print('COLUMNS', list(df.columns), 'RETURNED', len(df))
-                  df['date_norm'] = pd.to_datetime(df['日期']).dt.strftime('%Y-%m-%d')
-                  got = df[df['date_norm'].isin(expected_dates)].copy()
-                  print('MATCHED', len(got), 'MISSING', sorted(set(expected_dates)-set(got['date_norm'])))
+                  print('HTTP',r.status_code,'LEN',len(r.content),'CTYPE',r.headers.get('content-type'))
+                  print('HEAD',repr(r.content[:160]))
+                  r.raise_for_status()
+                  text=r.content.decode('gbk',errors='strict')
+                  df=pd.read_csv(io.StringIO(text))
+                  print('COLUMNS',list(df.columns),'RETURNED',len(df))
+                  date_col='日期'
+                  df['date_norm']=pd.to_datetime(df[date_col]).dt.strftime('%Y-%m-%d')
+                  got=df[df['date_norm'].isin(expected_dates)].copy()
+                  print('MATCHED',len(got),'MISSING',sorted(set(expected_dates)-set(got['date_norm'])))
                   rows=[]
-                  for _, r in got.iterrows():
-                      close=float(r['收盘价'])
-                      volume=float(r['成交量'])
-                      turnover_pct=float(r['换手率'])
-                      float_mcap=float(r['流通市值'])
-                      shares=float_mcap/close if close > 0 else float('nan')
-                      derived=volume/shares if shares > 0 else float('nan')
-                      source_ratio=turnover_pct/100.0
+                  for _,x in got.sort_values('date_norm').iterrows():
+                      def fv(name):
+                          value=x.get(name)
+                          if pd.isna(value) or str(value).strip() in {'','None','nan'}:
+                              return float('nan')
+                          return float(value)
+                      close=fv('收盘价')
+                      volume=fv('成交量')
+                      turnover_pct=fv('换手率')
+                      float_mcap=fv('流通市值')
+                      shares=float_mcap/close if math.isfinite(float_mcap) and close>0 else float('nan')
+                      derived=volume/shares if math.isfinite(shares) and shares>0 else float('nan')
+                      source_ratio=turnover_pct/100.0 if math.isfinite(turnover_pct) else float('nan')
                       rows.append({
-                          'date':r['date_norm'],
+                          'date':x['date_norm'],
                           'close':close,
                           'volume':volume,
                           'turnover_pct':turnover_pct,
@@ -78,7 +95,7 @@ jobs:
                           'positive_derived':bool(math.isfinite(derived) and derived>0),
                           'abs_diff':abs(source_ratio-derived) if math.isfinite(source_ratio) and math.isfinite(derived) else None,
                       })
-                  print(json.dumps(rows, ensure_ascii=False, indent=2))
+                  print(json.dumps(rows,ensure_ascii=False,indent=2))
               except Exception as exc:
-                  print('ERROR', symbol, type(exc).__name__, str(exc))
+                  print('ERROR',symbol,type(exc).__name__,str(exc))
           PY
