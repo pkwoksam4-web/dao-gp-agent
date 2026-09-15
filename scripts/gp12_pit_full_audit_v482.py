@@ -17,6 +17,66 @@ def _positive(value: object, label: str) -> float:
     return x
 
 
+def _event_key(row: dict) -> tuple[str, str]:
+    symbol = str(row.get('symbol') or '').upper()
+    ex_date = _date(row.get('ex_date'), 'ex_date')
+    if not symbol:
+        raise ValueError('event symbol is required')
+    return symbol, ex_date
+
+
+def merge_final_override_ratios(
+    standard_stages: list[list[dict]],
+    special_rows: list[dict],
+    availability: dict[tuple[str, str], str],
+    *,
+    expected_standard_n: int = 270,
+    expected_special_n: int = 11,
+) -> dict:
+    ratios: dict[tuple[str, str], float] = {}
+    paired_availability: dict[tuple[str, str], str] = {}
+    standard_n = 0
+    for stage in standard_stages or []:
+        for row in stage or []:
+            key = _event_key(row)
+            if key in ratios:
+                raise ValueError(f'override collision: {key}')
+            date = availability.get(key)
+            if not date:
+                raise ValueError(f'MISSING_OVERRIDE_AVAILABILITY:{key[0]}:{key[1]}')
+            if _date(date, 'availability_date') > key[1]:
+                raise ValueError(f'OVERRIDE_NOT_PIT_AVAILABLE:{key[0]}:{key[1]}:{date}')
+            ratios[key] = _positive(row.get('corrected_event_ratio'), 'corrected_event_ratio')
+            paired_availability[key] = str(date)[:10]
+            standard_n += 1
+    if standard_n != int(expected_standard_n):
+        raise ValueError(f'expected {expected_standard_n} standard overrides; got {standard_n}')
+
+    special_n = 0
+    for row in special_rows or []:
+        key = _event_key(row)
+        if key in ratios:
+            raise ValueError(f'override collision: {key}')
+        date = availability.get(key)
+        if not date:
+            raise ValueError(f'MISSING_OVERRIDE_AVAILABILITY:{key[0]}:{key[1]}')
+        if _date(date, 'availability_date') > key[1]:
+            raise ValueError(f'OVERRIDE_NOT_PIT_AVAILABLE:{key[0]}:{key[1]}:{date}')
+        ratios[key] = _positive(row.get('corrected_event_ratio'), 'corrected_event_ratio')
+        paired_availability[key] = str(date)[:10]
+        special_n += 1
+    if special_n != int(expected_special_n):
+        raise ValueError(f'expected {expected_special_n} special overrides; got {special_n}')
+
+    return {
+        'standard_n': standard_n,
+        'special_n': special_n,
+        'total_n': len(ratios),
+        'ratios': ratios,
+        'availability': paired_availability,
+    }
+
+
 def validate_special_prev_close(
     symbol: str,
     raw_rows: list[dict],
@@ -36,7 +96,7 @@ def validate_special_prev_close(
     for row in raw_rows or []:
         d = _date(row.get('date'), 'raw date')
         if d < ex_date:
-            prior.append((d, _positive(row.get('close'), 'raw close')))
+            prior.append((d, _positive(row.get('close'), 'raw close'))
     if not prior:
         raise ValueError(f'SPECIAL_PREV_CLOSE_MISSING:{normalized_symbol}:{ex_date}')
     previous_trade_date, previous_close = max(prior, key=lambda item: item[0])
