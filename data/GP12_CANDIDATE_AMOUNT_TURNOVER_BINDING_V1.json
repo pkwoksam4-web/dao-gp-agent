@@ -1,0 +1,58 @@
+{
+  "artifact": "GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1",
+  "version": "1.0",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "status": "CANDIDATE_ONLY_UNAPPROVED",
+  "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+  "formal_window": [
+    "2020-06-01",
+    "2026-04-17"
+  ],
+  "universe_n": 847,
+  "formal_symbol_n": 844,
+  "na_symbols": [
+    "600074.SH",
+    "600485.SH",
+    "600677.SH"
+  ],
+  "expected_trade_rows": 1011607,
+  "amount_source": {
+    "field": "amount",
+    "unit": "CNY",
+    "artifact_name": "gp-sohu-full-raw-v482-reaudit",
+    "workflow_run": 34192233633,
+    "artifact_id": 10042614517,
+    "artifact_zip_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+    "positive_amount_rows": 1011607
+  },
+  "turnover_source": {
+    "provider": "BaoStock",
+    "field": "turn",
+    "source_unit": "percent",
+    "candidate_unit": "decimal_ratio",
+    "workflow_run": 34981310300,
+    "workflow_head": "66571bc360f77ba989c47dbe6e8dc0708aac46f9",
+    "artifact_name": "gp12-baostock-turnover-full-v1",
+    "artifact_id": 10403125922,
+    "artifact_zip_sha256": "9fcda20e7d7ab01ce22ea377c15726126dfd62d28b5ad7df6d694fda545be6ad",
+    "audit_json_sha256": "7c3c85315f53956df96a59f2703210077bdc67d758d454c77de7edce03e24e0c",
+    "panel_csv_sha256": "90b483f5f55668c0243523c5cf997c5251611e59dc5007fa6429ddf441b515a4",
+    "observed_turnover_rows": 1011607,
+    "materialized_rows": 1011607,
+    "provider_status_override_n": 5,
+    "turnover_precision_reconstruction_n": 9,
+    "residual_denominator_binding_artifact": "GP12_CANDIDATE_TURNOVER_RESIDUAL_DENOMINATORS_V1",
+    "residual_denominator_binding_sha256": "74e00c11098c4fe46b1b60048306b5b64c6836ca929c54fdb58064e4a14fce4f"
+  },
+  "coverage": {
+    "amount_turnover_full_window_aligned": true,
+    "turnover_ratio_candidate_pit_verified": true,
+    "pit_scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
+    "same_session_turnover_usable_before_close": false,
+    "historical_provider_publication_timestamp_proven": false
+  },
+  "historical_gp_v11_source_recovered": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "blockers": []
+}
