@@ -1,0 +1,138 @@
+name: GP12 Status Tradable Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-tradable-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet reader
+        run: python -m pip install --quiet pyarrow pandas
+      - name: Download pinned PIT-ST final audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: pit_st
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Download pinned Sohu full raw
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: sohu
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Crosscheck tradable semantics
+        run: |
+          python - <<'PY'
+          import csv, json, hashlib
+          from pathlib import Path
+          import pandas as pd
+
+          pit_path = Path('pit_st/PIT_ST_FORMAL_OVERLAY_V480.csv')
+          sohu_path = Path('sohu/SOHU_RAW_FULL_V482.parquet')
+          assert pit_path.exists(), pit_path
+          assert sohu_path.exists(), sohu_path
+
+          sohu_sha = hashlib.sha256(sohu_path.read_bytes()).hexdigest()
+          assert sohu_sha == 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb', sohu_sha
+
+          trade = pd.read_parquet(sohu_path, columns=['symbol','date','volume','amount'])
+          trade['symbol'] = trade['symbol'].astype(str).str.upper().str.strip()
+          trade['date'] = trade['date'].astype(str).str[:10]
+          assert len(trade) == 1_011_607, len(trade)
+          assert trade[['symbol','date']].duplicated().sum() == 0
+          positive = (pd.to_numeric(trade['volume'], errors='raise') > 0) & (pd.to_numeric(trade['amount'], errors='raise') > 0)
+          assert positive.all(), int((~positive).sum())
+          trade_keys = set(zip(trade['symbol'], trade['date']))
+
+          rows = []
+          with pit_path.open(encoding='utf-8', newline='') as f:
+              for r in csv.DictReader(f):
+                  rows.append((r['symbol'].strip().upper(), r['date'].strip(), r['tradestatus'].strip(), r['isST'].strip()))
+          assert len(rows) == 1_021_953, len(rows)
+          overlay_keys = {(s,d) for s,d,_,_ in rows}
+          assert len(overlay_keys) == len(rows)
+          assert trade_keys <= overlay_keys
+
+          counts = {
+              'overlay_rows': len(rows),
+              'positive_trade_rows': len(trade_keys),
+              'nontrade_lifecycle_rows': len(overlay_keys - trade_keys),
+              'tradestatus_0_rows': 0,
+              'tradestatus_1_rows': 0,
+              'status0_but_positive_trade': 0,
+              'status1_but_no_positive_trade': 0,
+          }
+          anomalies = []
+          for s,d,ts,st in rows:
+              has_trade = (s,d) in trade_keys
+              if ts == '0': counts['tradestatus_0_rows'] += 1
+              elif ts == '1': counts['tradestatus_1_rows'] += 1
+              else: raise AssertionError((s,d,ts))
+              if ts == '0' and has_trade:
+                  counts['status0_but_positive_trade'] += 1
+                  anomalies.append({'symbol':s,'date':d,'tradestatus':ts,'isST':st,'positive_trade':True})
+              if ts == '1' and not has_trade:
+                  counts['status1_but_no_positive_trade'] += 1
+                  anomalies.append({'symbol':s,'date':d,'tradestatus':ts,'isST':st,'positive_trade':False})
+
+          assert counts['tradestatus_0_rows'] == 10_351, counts
+          assert counts['nontrade_lifecycle_rows'] == 10_346, counts
+          assert counts['status0_but_positive_trade'] == 5, counts
+          assert counts['status1_but_no_positive_trade'] == 0, counts
+
+          out = {
+              'artifact': 'GP12_STATUS_TRADABLE_PROBE_V1',
+              'status': 'PASS_EXACT_TRADE_KEY_BINDING',
+              'formal_window': ['2020-06-01','2026-04-17'],
+              'scope': 'PIT_ST_FORMAL_LIFECYCLE_847',
+              'tradable_candidate_definition': 'True iff pinned Sohu raw has same symbol-date with volume>0 and amount>0; otherwise False for lifecycle-required date',
+              'pit_scope': 'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
+              'same_session_tradable_usable_before_close': False,
+              'historical_provider_publication_timestamp_proven': False,
+              'counts': counts,
+              'provider_status_misflags': anomalies,
+              'source_identity': {
+                  'pit_st_run': 33977325822,
+                  'pit_st_artifact_id': 9972698555,
+                  'pit_st_artifact_zip_sha256': 'a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58',
+                  'pit_st_overlay_sha256': hashlib.sha256(pit_path.read_bytes()).hexdigest(),
+                  'sohu_run': 34192233633,
+                  'sohu_artifact_id': 10042614517,
+                  'sohu_artifact_zip_sha256': 'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550',
+                  'sohu_parquet_sha256': sohu_sha,
+              },
+              'historical_gp_v11_source_recovered': False,
+              'status_family_ready': False,
+              'remaining_status_semantics': ['upper_limit'],
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          Path('artifact_gp12_status_tradable_probe_v1').mkdir(exist_ok=True)
+          Path('artifact_gp12_status_tradable_probe_v1/GP12_STATUS_TRADABLE_PROBE_V1.json').write_text(
+              json.dumps(out, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(json.dumps(out, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload probe artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-tradable-probe-v1
+          path: artifact_gp12_status_tradable_probe_v1/
+          if-no-files-found: error
+          retention-days: 30
