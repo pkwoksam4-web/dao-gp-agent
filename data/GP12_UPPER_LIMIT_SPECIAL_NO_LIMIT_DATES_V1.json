@@ -1,0 +1,82 @@
+{
+  "artifact": "GP12_UPPER_LIMIT_SPECIAL_NO_LIMIT_DATES_V1",
+  "version": "1.0",
+  "status": "NEW_RECONSTRUCTION_CANDIDATE",
+  "historical_gp_v11_source_recovered": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "events": [
+    {
+      "symbol": "000670.SZ",
+      "date": "2022-08-22",
+      "event_type": "RESTORED_LISTING_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2022-08-22/1214345659.PDF",
+      "evidence_note": "Issuer notice: restored listing first day; no price limit."
+    },
+    {
+      "symbol": "000792.SZ",
+      "date": "2021-08-10",
+      "event_type": "RESTORED_LISTING_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://epaper.cs.com.cn/zgzqb/html/2021-08/10/nw.D110000zgzqb_20210810_6-B015.htm",
+      "evidence_note": "Issuer notice republished by China Securities Journal: restored listing first day; no price limit."
+    },
+    {
+      "symbol": "000995.SZ",
+      "date": "2020-12-16",
+      "event_type": "RESTORED_LISTING_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=6787936&stockid=000995",
+      "evidence_note": "Issuer notice mirror: restored listing first day; no price limit."
+    },
+    {
+      "symbol": "001267.SZ",
+      "date": "2021-11-17",
+      "event_type": "RELISTING_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2021-11-11/1211553600.PDF",
+      "evidence_note": "Relisting report: relisting first day; no price limit."
+    },
+    {
+      "symbol": "001289.SZ",
+      "date": "2022-01-24",
+      "event_type": "ABSORPTION_MERGER_LISTING_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://money.finance.sina.com.cn/corp/view/vISSUE_MarketBulletinDetail.php?id=7799969&stockid=001289",
+      "evidence_note": "Listing announcement mirror: absorption-merger A-share listing first day; no price limit."
+    },
+    {
+      "symbol": "600190.SH",
+      "date": "2025-06-30",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://paper.cnstock.com/html/2025-06/21/content_2083482.htm",
+      "evidence_note": "Issuer delisting-arrangement notice: first trading day in delisting arrangement."
+    },
+    {
+      "symbol": "600200.SH",
+      "date": "2025-12-09",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://paper.cnstock.com/html/2025-12/02/content_2152794.htm",
+      "evidence_note": "Issuer delisting-arrangement notice: first trading day has no price limit."
+    },
+    {
+      "symbol": "600387.SH",
+      "date": "2025-06-16",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://paper.cnstock.com/html/2025-06/07/content_2078379.htm",
+      "evidence_note": "Issuer delisting-arrangement notice: first trading day has no price limit."
+    },
+    {
+      "symbol": "600462.SH",
+      "date": "2025-06-24",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "no_price_limit": true,
+      "evidence_url": "https://www.sse.com.cn/disclosure/announcement/general/mainsuspension/c/c_20250624_10782857.shtml",
+      "evidence_note": "SSE first-day trading activity evidence; issuer risk notice also states delisting-arrangement start date."
+    }
+  ]
+}
