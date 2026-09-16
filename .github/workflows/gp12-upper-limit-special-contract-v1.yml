@@ -1,0 +1,29 @@
+name: GP12 Upper Limit Special Contract V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/test_gp12_upper_limit_special_v1.py'
+      - 'scripts/gp12_upper_limit_special_v1.py'
+      - 'data/GP12_UPPER_LIMIT_SPECIAL_NO_LIMIT_DATES_V1.json'
+      - '.github/workflows/gp12-upper-limit-special-contract-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run upper-limit special contract tests
+        env:
+          PYTHONPATH: scripts
+        run: python -m unittest -v scripts/test_gp12_upper_limit_special_v1.py
