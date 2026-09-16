@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import math
+import pathlib
 from zoneinfo import ZoneInfo
 
 
@@ -11,6 +13,35 @@ FORMAL_SYMBOL_N = 844
 EXPECTED_TRADE_ROWS = 1_011_607
 SOURCE = "TUSHARE_MONEYFLOW_LG_ELG_ACTIVE_BUY_MINUS_SELL"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
+MONEYFLOW_FIELDS = (
+    "ts_code",
+    "trade_date",
+    "buy_sm_vol",
+    "buy_sm_amount",
+    "sell_sm_vol",
+    "sell_sm_amount",
+    "buy_md_vol",
+    "buy_md_amount",
+    "sell_md_vol",
+    "sell_md_amount",
+    "buy_lg_vol",
+    "buy_lg_amount",
+    "sell_lg_vol",
+    "sell_lg_amount",
+    "buy_elg_vol",
+    "buy_elg_amount",
+    "sell_elg_vol",
+    "sell_elg_amount",
+    "net_mf_vol",
+    "net_mf_amount",
+)
+PANEL_FIELDS = (
+    "symbol",
+    "date",
+    "main_net_flow_cny",
+    "known_at",
+    "source",
+)
 
 
 def _append_once(blockers: list[str], value: str) -> None:
@@ -49,9 +80,36 @@ def _trade_date_to_iso(value: object) -> str:
     return day.isoformat()
 
 
+def _trade_date_to_api(value: object) -> str:
+    return _trade_date_to_iso(value).replace("-", "")
+
+
 def close_known_at(date_value: str) -> str:
     day = dt.date.fromisoformat(date_value)
     return dt.datetime.combine(day, dt.time(15, 0), tzinfo=SHANGHAI).isoformat()
+
+
+def fetch_moneyflow_records(
+    api: object,
+    symbol: str,
+    *,
+    start_date: str = FORMAL_START,
+    end_date: str = FORMAL_END,
+) -> list[dict]:
+    symbol = normalize_symbol(symbol)
+    frame = api.moneyflow(
+        ts_code=symbol,
+        start_date=_trade_date_to_api(start_date),
+        end_date=_trade_date_to_api(end_date),
+        fields=",".join(MONEYFLOW_FIELDS),
+    )
+    to_dict = getattr(frame, "to_dict", None)
+    if not callable(to_dict):
+        raise ValueError("Tushare moneyflow response does not support to_dict")
+    records = to_dict("records")
+    if not isinstance(records, list):
+        raise ValueError("Tushare moneyflow response did not produce a records list")
+    return records
 
 
 def normalize_moneyflow_records(symbol: str, records: list[dict]) -> list[dict]:
@@ -166,6 +224,39 @@ def audit_symbol_rows(symbol: str, expected_dates: list[str], rows: list[dict]) 
     }
 
 
+def build_symbol_evidence(
+    api: object,
+    symbol: str,
+    expected_dates: list[str],
+    *,
+    start_date: str = FORMAL_START,
+    end_date: str = FORMAL_END,
+) -> dict:
+    raw_records = fetch_moneyflow_records(
+        api,
+        symbol,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    rows = normalize_moneyflow_records(symbol, raw_records)
+    return {
+        "rows": rows,
+        "audit": audit_symbol_rows(symbol, expected_dates, rows),
+    }
+
+
+def write_panel_csv(path: pathlib.Path | str, rows: list[dict]) -> pathlib.Path:
+    destination = pathlib.Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(rows, key=lambda row: (str(row.get("symbol", "")), str(row.get("date", ""))))
+    with destination.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(PANEL_FIELDS), lineterminator="\n")
+        writer.writeheader()
+        for row in ordered:
+            writer.writerow({field: row.get(field) for field in PANEL_FIELDS})
+    return destination
+
+
 def summarize_formal_audit(
     records: list[dict], *, expected_trade_rows: int = EXPECTED_TRADE_ROWS
 ) -> dict:
@@ -205,4 +296,15 @@ def summarize_formal_audit(
         "model_freeze_allowed": False,
         "oos_metrics_allowed": False,
         "blockers": blockers,
+    }
+
+
+def aggregate_shard_records(shards: list[list[dict]]) -> dict:
+    records = [record for shard in shards for record in shard]
+    symbols = [str(record.get("symbol", "")) for record in records]
+    if len(symbols) != len(set(symbols)):
+        raise ValueError("duplicate shard symbol")
+    return {
+        "records": records,
+        "audit": summarize_formal_audit(records),
     }
