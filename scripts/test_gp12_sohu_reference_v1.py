@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from unittest import mock
 
 import gp12_sohu_reference_v1 as sut
 
@@ -48,6 +49,38 @@ class SohuReferenceContractTests(unittest.TestCase):
         ])
         with self.assertRaises(ValueError):
             sut.parse_hishq_reference_bytes("000001.SZ", raw)
+
+    def test_plan_chunks_is_stable_and_non_overlapping(self):
+        chunks = sut.plan_chunks("2020-06-01", "2020-09-01", max_calendar_days=90)
+        self.assertEqual(chunks, [("2020-06-01", "2020-08-29"), ("2020-08-30", "2020-09-01")])
+
+    def test_select_shard_partitions_without_overlap(self):
+        symbols = [f"{i:06d}.SZ" for i in range(17)]
+        shards = [sut.select_shard(symbols, i, 4) for i in range(4)]
+        flattened = [symbol for shard in shards for symbol in shard]
+        self.assertEqual(sorted(flattened), sorted(symbols))
+        self.assertEqual(len(flattened), len(set(flattened)))
+
+    def test_audit_expected_dates_fails_closed_on_missing_extra_or_duplicate(self):
+        good = [
+            {"symbol": "000001.SZ", "date": "2024-01-02"},
+            {"symbol": "000001.SZ", "date": "2024-01-03"},
+        ]
+        audit = sut.audit_expected_dates("000001.SZ", ["2024-01-02", "2024-01-03"], good)
+        self.assertEqual(audit["status"], "PASS_EXACT_DATES")
+        self.assertEqual(audit["duplicate_dates_n"], 0)
+        bad = good + [{"symbol": "000001.SZ", "date": "2024-01-03"}]
+        audit = sut.audit_expected_dates("000001.SZ", ["2024-01-02", "2024-01-03"], bad)
+        self.assertEqual(audit["status"], "REVIEW_DATE_AXIS")
+        self.assertEqual(audit["duplicate_dates_n"], 1)
+
+    def test_fetch_symbol_reference_propagates_source_failure(self):
+        with mock.patch.object(sut, "fetch_chunk_reference", side_effect=RuntimeError("source down")):
+            with self.assertRaisesRegex(RuntimeError, "source down"):
+                sut.fetch_symbol_reference(
+                    "000001.SZ", "2024-01-02", "2024-01-03",
+                    max_calendar_days=90, retries=1, delay=0,
+                )
 
 
 if __name__ == "__main__":
