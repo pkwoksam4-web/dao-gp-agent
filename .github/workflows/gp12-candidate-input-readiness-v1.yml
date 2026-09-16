@@ -66,8 +66,9 @@ jobs:
             --benchmark-validation benchmark/GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json \
             --amount-turnover-binding data/GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1.json \
             --main-net-flow-requirement data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json \
+            --status-partial-binding data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json \
             --out artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json
-      - name: Assert amount turnover closure and main net flow external blockers
+      - name: Assert verified closures and remaining blockers
         run: |
           python - <<'PY'
           import json
@@ -81,6 +82,13 @@ jobs:
           assert x['amount_turnover_binding_sha256']=='47b83c11b7190f4bb8f3bc69900f75fd682362ed5e20d6cbb3b9c4d7bdbe4998'
           assert x['main_net_flow_requirement_artifact']=='GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1'
           assert x['main_net_flow_requirement_sha256']=='13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3'
+          assert x['status_partial_binding_artifact']=='GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1'
+          assert x['status_partial_binding_sha256']=='e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10'
+          assert x['status_semantic_state']=={
+              'is_st':'BOUND_PIT_VERIFIED',
+              'tradable':'BOUND_PIT_VERIFIED',
+              'upper_limit':'UNBOUND',
+          }
           assert x['validated_families']==['amount_turnover','intraday_15m','intraday_60m','market_calendar','stock_adjusted_close']
           assert x['feature_families']['amount_turnover']['formal_feature_ready'] is True
           assert x['feature_families']['amount_turnover']['binding_state']=='BOUND_VERIFIED_ARTIFACT'
@@ -95,9 +103,17 @@ jobs:
               'TUSHARE_CREDENTIAL_REQUIRED',
               'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED',
           ]
+          assert x['feature_families']['status']['formal_feature_ready'] is False
+          assert x['feature_families']['status']['binding_state']=='BOUND_STRUCTURAL_ONLY'
+          assert x['feature_families']['status']['pit_state']=='PIT_PARTIAL'
+          assert x['feature_families']['status']['source_artifact']=='GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1'
+          assert x['feature_families']['status']['source_sha256']=='e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10'
+          assert x['feature_families']['status']['blockers']==['STATUS_UPPER_LIMIT_UNBOUND']
           assert 'MAIN_NET_FLOW_UNBOUND' in x['blockers']
           assert 'TUSHARE_CREDENTIAL_REQUIRED' in x['blockers']
           assert 'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED' in x['blockers']
+          assert 'STATUS_SEMANTICS_INCOMPLETE' not in x['blockers']
+          assert 'STATUS_UPPER_LIMIT_UNBOUND' in x['blockers']
           assert x['ready_factor_ids']==['F6','F7','F8','F9','F10','F12']
           assert x['blocked_factor_ids']==['F1','F2','F3','F4','F5','F11']
           assert x['next_priority_family']=='main_net_flow'
@@ -115,9 +131,11 @@ jobs:
               'validated_families': x['validated_families'],
               'ready_factor_ids': x['ready_factor_ids'],
               'blocked_factor_ids': x['blocked_factor_ids'],
+              'status_semantic_state': x['status_semantic_state'],
               'blockers': x['blockers'],
               'next_priority_family': x['next_priority_family'],
               'main_net_flow_requirement_sha256': x['main_net_flow_requirement_sha256'],
+              'status_partial_binding_sha256': x['status_partial_binding_sha256'],
           }, ensure_ascii=False, indent=2))
           PY
       - name: Upload candidate readiness checkpoint
