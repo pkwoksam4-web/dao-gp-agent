@@ -1,0 +1,263 @@
+name: GP12 Full Status Panel V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'data/GP12_STATUS_FULL_TRIGGER_V1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+
+      - name: Resolve pinned source run
+        id: trigger
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          x=json.load(open('data/GP12_STATUS_FULL_TRIGGER_V1.json',encoding='utf-8'))
+          assert x['artifact']=='GP12_STATUS_FULL_TRIGGER_V1',x
+          assert int(x['sohu_reference_run_id'])>0,x
+          print('run_id='+str(int(x['sohu_reference_run_id'])))
+          PY
+
+      - name: Download full Sohu reference panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-sohu-reference-full-v1
+          path: reference
+          run-id: ${{ steps.trigger.outputs.run_id }}
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download pinned Sohu raw panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: raw
+          run-id: 34192233633
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download final PIT-ST overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: pitst_final
+          run-id: 33977325822
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download PIT-ST lifecycle basics
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst_merged
+          run-id: 33971534669
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download canonical partial upper-limit truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-canonical-v1
+          path: truth
+          run-id: 35060927372
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Build exact Formal status panel
+        env:
+          PYTHONPATH: scripts
+          SOHU_REFERENCE_RUN_ID: ${{ steps.trigger.outputs.run_id }}
+        run: |
+          python - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          import pandas as pd
+          import gp12_status_panel_v1 as status
+
+          def one(root,name):
+              hits=list(Path(root).rglob(name))
+              assert len(hits)==1,(root,name,hits)
+              return hits[0]
+
+          raw_path=one('raw','SOHU_RAW_FULL_V482.parquet')
+          raw_sha=hashlib.sha256(raw_path.read_bytes()).hexdigest()
+          assert raw_sha=='bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb',raw_sha
+
+          ref_path=one('reference','SOHU_REFERENCE_FULL_V1.parquet')
+          ref_audit_path=one('reference','SOHU_REFERENCE_FULL_AUDIT_V1.json')
+          ref_audit=json.loads(ref_audit_path.read_text(encoding='utf-8'))
+          assert ref_audit['status']=='PASS_FULL_REFERENCE_PANEL',ref_audit
+          assert ref_audit['symbol_n']==844,ref_audit
+          assert ref_audit['reference_rows']==1011607,ref_audit
+          assert ref_audit['missing_rows']==0 and ref_audit['extra_rows']==0,ref_audit
+          assert ref_audit['close_mismatch_n']==0,ref_audit
+          ref_sha=hashlib.sha256(ref_path.read_bytes()).hexdigest()
+
+          overlay_path=one('pitst_final','PIT_ST_FORMAL_OVERLAY_V480.csv')
+          lifecycle=pd.read_csv(overlay_path,dtype={'symbol':str,'date':str,'isST':str})
+          lifecycle=lifecycle[['symbol','date','isST']].copy()
+          assert len(lifecycle)==1021953,len(lifecycle)
+          assert lifecycle['symbol'].nunique()==847,lifecycle['symbol'].nunique()
+
+          raw=pd.read_parquet(raw_path)
+          required_raw={'symbol','date','close','volume','amount'}
+          assert required_raw.issubset(raw.columns),raw.columns.tolist()
+          raw['symbol']=raw['symbol'].astype(str).str.upper()
+          raw['date']=raw['date'].astype(str).str[:10]
+          raw['volume']=pd.to_numeric(raw['volume'],errors='raise')
+          raw['amount']=pd.to_numeric(raw['amount'],errors='raise')
+          raw['close']=pd.to_numeric(raw['close'],errors='raise')
+          trade=raw[(raw['volume']>0)&(raw['amount']>0)][['symbol','date','close']].copy()
+          assert len(trade)==1011607,len(trade)
+          assert trade['symbol'].nunique()==844,trade['symbol'].nunique()
+          assert not trade.duplicated(['symbol','date']).any()
+
+          reference=pd.read_parquet(ref_path)
+          assert len(reference)==1011607,len(reference)
+
+          pit_audit=json.loads(one('pitst_merged','PIT_ST_AUDIT_MERGED_V480.json').read_text(encoding='utf-8'))
+          basics={}
+          for item in pit_audit['audits']:
+              rows=(item.get('basic') or {}).get('rows') or []
+              assert len(rows)==1,(item.get('symbol'),len(rows))
+              basics[str(item['symbol']).upper()]=rows[0]
+          assert len(basics)==847,len(basics)
+
+          special_doc=json.load(open('data/GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1.json',encoding='utf-8'))
+          special=status.load_special_no_limit_evidence(special_doc,expected_entry_count=9)
+
+          panel,audit=status.build_status_panel(lifecycle,trade,reference,basics,special)
+          assert audit['status']=='PASS_EXACT_STATUS_PANEL',audit
+          assert audit['lifecycle_rows']==1021953,audit
+          assert audit['lifecycle_symbols']==847,audit
+          assert audit['tradable_rows']==1011607,audit
+          assert audit['nontradable_rows']==10346,audit
+          assert audit['special_no_limit_rows']==9,audit
+
+          truth_path=one('truth','HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet')
+          truth_sha=hashlib.sha256(truth_path.read_bytes()).hexdigest()
+          assert truth_sha=='d11b415b74d44d63d1aa927e8652f395dd039c28f6e1b4c24964e53759405308',truth_sha
+          truth=pd.read_parquet(truth_path)
+          cross=status.crosscheck_upper_limit_truth(panel,truth,special,require_exact=True)
+          assert cross['overlap_rows']==896827,cross
+          assert cross['overlap_symbols']==698,cross
+          assert cross['no_limit_mismatch_n']==0,cross
+          assert cross['price_mismatch_n']==0,cross
+          assert cross['boolean_mismatch_n']==0,cross
+
+          metadata={
+              'origin':'NEW_RECONSTRUCTION_CANDIDATE',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'sohu_reference_run_id':int(os.environ['SOHU_REFERENCE_RUN_ID']),
+              'sohu_reference_panel_sha256':ref_sha,
+              'sohu_raw_run_id':34192233633,
+              'sohu_raw_parquet_sha256':raw_sha,
+              'pit_st_final_run_id':33977325822,
+              'pit_st_merged_run_id':33971534669,
+              'special_evidence_artifact':'GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1',
+              'special_evidence_entries':9,
+              'partial_truth_sha256':truth_sha,
+              'partial_truth_crosscheck':cross,
+              'pit_policy':'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
+              'historical_provider_publication_timestamp_proven':False,
+          }
+          out=Path('artifact_gp12_status_full_v1')
+          manifest=status.materialize_status_artifact(panel,audit,out,metadata=metadata)
+
+          binding={
+              'artifact':'GP12_CANDIDATE_STATUS_BINDING_V1',
+              'version':'1.0',
+              'origin':'NEW_RECONSTRUCTION_CANDIDATE',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'family':'status',
+              'required_fields':['is_st','tradable','upper_limit'],
+              'semantic_state':{
+                  'is_st':'BOUND_PIT_VERIFIED',
+                  'tradable':'BOUND_PIT_VERIFIED',
+                  'upper_limit':'BOUND_PIT_VERIFIED'
+              },
+              'family_ready':True,
+              'blockers':[],
+              'panel_rows':1021953,
+              'panel_symbols':847,
+              'tradable_rows':1011607,
+              'nontradable_rows':10346,
+              'special_no_limit_rows':9,
+              'panel_sha256':manifest['panel_sha256'],
+              'panel_audit_payload_sha256':manifest['audit_sha256'],
+              'panel_audit_file_sha256':manifest['audit_file_sha256'],
+              'sohu_reference_run_id':int(os.environ['SOHU_REFERENCE_RUN_ID']),
+              'sohu_reference_panel_sha256':ref_sha,
+              'sohu_raw_run_id':34192233633,
+              'sohu_raw_parquet_sha256':raw_sha,
+              'pit_st_final_run_id':33977325822,
+              'pit_st_merged_run_id':33971534669,
+              'partial_truth_rows':896827,
+              'partial_truth_symbols':698,
+              'partial_truth_sha256':truth_sha,
+              'partial_truth_mismatches':{
+                  'no_limit':0,'price':0,'boolean':0
+              },
+              'special_evidence_artifact':'GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1',
+              'special_evidence_entries':9,
+              'pit_policy':'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
+              'historical_provider_publication_timestamp_proven':False,
+              'historical_gp_v11_source_recovered':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False
+          }
+          (out/'GP12_CANDIDATE_STATUS_BINDING_V1.json').write_text(
+              json.dumps(binding,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8'
+          )
+          print(json.dumps({'audit':audit,'crosscheck':cross,'manifest':manifest,'binding':binding},ensure_ascii=False,indent=2))
+          PY
+
+      - name: Gate exact full status artifact
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('artifact_gp12_status_full_v1')
+          a=json.loads((root/'GP12_STATUS_PANEL_AUDIT_V1.json').read_text(encoding='utf-8'))
+          b=json.loads((root/'GP12_CANDIDATE_STATUS_BINDING_V1.json').read_text(encoding='utf-8'))
+          assert a['status']=='PASS_EXACT_STATUS_PANEL',a
+          assert a['lifecycle_rows']==1021953,a
+          assert a['lifecycle_symbols']==847,a
+          assert a['tradable_rows']==1011607,a
+          assert a['nontradable_rows']==10346,a
+          assert a['special_no_limit_rows']==9,a
+          c=a['partial_truth_crosscheck']
+          assert c['overlap_rows']==896827 and c['overlap_symbols']==698,c
+          assert c['no_limit_mismatch_n']==0 and c['price_mismatch_n']==0 and c['boolean_mismatch_n']==0,c
+          assert b['family_ready'] is True,b
+          assert b['blockers']==[],b
+          assert b['semantic_state']=={'is_st':'BOUND_PIT_VERIFIED','tradable':'BOUND_PIT_VERIFIED','upper_limit':'BOUND_PIT_VERIFIED'},b
+          assert b['historical_gp_v11_source_recovered'] is False,b
+          assert b['model_freeze_allowed'] is False and b['oos_metrics_allowed'] is False,b
+          print(json.dumps(b,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload full status artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-full-v1
+          path: artifact_gp12_status_full_v1/
+          if-no-files-found: error
+          retention-days: 30
