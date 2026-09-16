@@ -1,0 +1,90 @@
+name: GP12 Status Upper Limit HF Extract V2
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-upper-limit-hf-extract-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install local parquet runtime
+        run: python -m pip install -q duckdb
+      - name: Download converted HF parquet shards serially
+        run: |
+          set -euo pipefail
+          mkdir -p hf_parquet
+          for i in 0 1 2 3 4 5 6; do
+            f=$(printf '%04d.parquet' "$i")
+            url="https://huggingface.co/datasets/ellendan/a-share-prices/resolve/refs%2Fconvert%2Fparquet/main_data/train/${f}?download=true"
+            echo "Downloading $f"
+            curl -fL --retry 10 --retry-all-errors --retry-delay 8 \
+              --connect-timeout 30 --max-time 600 \
+              -A 'GP12-upper-limit-audit/2.0' \
+              "$url" -o "hf_parquet/$f"
+            test -s "hf_parquet/$f"
+            stat -c '%n %s' "hf_parquet/$f"
+            sleep 3
+          done
+      - name: Filter Formal844 overlap locally
+        run: |
+          python - <<'PY'
+          import duckdb, hashlib, json, pathlib
+          symbols=[x.strip().upper() for x in pathlib.Path('data/pit_st_scope_v480.txt').read_text().splitlines() if x.strip()]
+          symbols=[s for s in symbols if s not in {'600074.SH','600485.SH','600677.SH'}]
+          assert len(symbols)==844,len(symbols)
+          con=duckdb.connect()
+          con.execute('PRAGMA threads=2')
+          con.execute('CREATE TEMP TABLE formal_symbols(code VARCHAR)')
+          con.executemany('INSERT INTO formal_symbols VALUES (?)',[(s,) for s in symbols])
+          con.execute('''
+            COPY (
+              SELECT p.code, CAST(p.date AS VARCHAR) AS date, p.close, p.prev_close, p.high_limit,
+                     p.quote_rate, p.name, p.market, p.exchange, CAST(p.list_date AS VARCHAR) AS list_date
+              FROM read_parquet('hf_parquet/*.parquet') p
+              JOIN formal_symbols s ON p.code=s.code
+              WHERE CAST(p.date AS DATE) BETWEEN DATE '2020-06-01' AND DATE '2026-03-03'
+            ) TO 'artifact_hf_upper_limit_truth/HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet'
+            (FORMAT PARQUET, COMPRESSION ZSTD)
+          ''')
+          p=pathlib.Path('artifact_hf_upper_limit_truth/HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet')
+          x=con.execute("SELECT count(*), count(distinct code), min(date), max(date), sum(high_limit IS NULL) FROM read_parquet(?)",[str(p)]).fetchone()
+          summary={
+            'artifact':'GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2',
+            'dataset':'ellendan/a-share-prices',
+            'dataset_ref':'refs/convert/parquet',
+            'source_file_count':7,
+            'formal_symbol_target_n':844,
+            'rows':int(x[0]),'symbols':int(x[1]),'first_date':str(x[2]),'last_date':str(x[3]),
+            'high_limit_null_n':int(x[4] or 0),
+            'extract_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+            'truth_coverage_end':'2026-03-03',
+            'historical_gp_v11_source_recovered':False,
+            'formal_binding_allowed':False,
+            'model_freeze_allowed':False,
+            'oos_metrics_allowed':False,
+          }
+          assert summary['rows']>900000,summary
+          assert summary['symbols']>800,summary
+          pathlib.Path('artifact_hf_upper_limit_truth/GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload filtered truth only
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-upper-limit-hf-truth-v2
+          path: artifact_hf_upper_limit_truth/
+          if-no-files-found: error
+          retention-days: 30
