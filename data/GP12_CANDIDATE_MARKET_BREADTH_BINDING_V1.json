@@ -1,0 +1,123 @@
+{
+  "artifact": "GP12_CANDIDATE_MARKET_BREADTH_BINDING_V1",
+  "version": "1.0",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "status": "CANDIDATE_ONLY_UNAPPROVED",
+  "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+  "formal_window": [
+    "2020-06-01",
+    "2026-04-17"
+  ],
+  "universe_n": 847,
+  "formal_symbol_n": 844,
+  "na_symbols": [
+    "600074.SH",
+    "600485.SH",
+    "600677.SH"
+  ],
+  "date_n": 1426,
+  "definition": {
+    "candidate_field": "market_breadth_ratio",
+    "formula": "advancers/(advancers+decliners)",
+    "advancer": "current PIT-adjusted close > previous comparable traded PIT-adjusted close",
+    "decliner": "current PIT-adjusted close < previous comparable traded PIT-adjusted close",
+    "flat": "excluded from denominator",
+    "first_trade_without_prior_comparable_trade": "excluded from denominator"
+  },
+  "feasibility_source": {
+    "workflow_run": 35053614838,
+    "artifact_name": "gp12-market-breadth-feasibility-v1",
+    "artifact_id": 10429504424,
+    "artifact_zip_sha256": "96e37573e48c37b9b3f021d59f4bce93a476c87cc53308fc0c1f83e93abb5c99",
+    "raw_trade_rows": 1011607,
+    "directly_comparable_rows": 1010763,
+    "bridge_rows": 844
+  },
+  "bridge_source": {
+    "workflow_run": 35054180237,
+    "workflow_head": "6a0eb77dd54c7cabda128f1d84f9954eba2d0037",
+    "artifact_name": "gp12-market-breadth-bridge-v1",
+    "artifact_id": 10429659699,
+    "artifact_zip_sha256": "9615dba0c2eb9c3db2cd04cf8d5ecf2509752f419fb65ef38815b851185b8031",
+    "candidate_series_sha256": "7aaa527806d373133fbedd202b92d3e5da8b903099cfc3335b267951ead3c788",
+    "status": "PASS_COMPLETE_CANDIDATE_SERIES",
+    "old_lifecycle_bridge_n": 737,
+    "bridge_resolved_n": 737,
+    "old_lifecycle_no_previous_trade_excluded_n": 0,
+    "new_lifecycle_first_trade_excluded_n": 107,
+    "bridge_shards": [
+      {
+        "shard": 0,
+        "artifact_id": 10430435903,
+        "artifact_zip_sha256": "8dfa53d6639873e8fcc9a7a1be6c1a800b4ecfc9a57dc980a301c63fdd4eb744"
+      },
+      {
+        "shard": 1,
+        "artifact_id": 10429857095,
+        "artifact_zip_sha256": "b0cb15e0a3cadfe9004bef4fd4dd652a80c7e5f1620a333256b7f64fe960e563"
+      },
+      {
+        "shard": 2,
+        "artifact_id": 10429329110,
+        "artifact_zip_sha256": "1aa46d19519a71718d1c730ebddd5cd7ba26ee213eaf921912ab92d909d10cc9"
+      },
+      {
+        "shard": 3,
+        "artifact_id": 10430096336,
+        "artifact_zip_sha256": "0a760ca1fe2bc0cda9e886cc907f829ad9008528c45d5a656f763b0d289c103b"
+      },
+      {
+        "shard": 4,
+        "artifact_id": 10430475749,
+        "artifact_zip_sha256": "a01378872d3142f16ab3c3efb2f081908916b92a9a6d3ead420eacc7a6f4a7fd"
+      },
+      {
+        "shard": 5,
+        "artifact_id": 10429808408,
+        "artifact_zip_sha256": "0ba93455fd59e87ee9f6f35227fc0070c31a3b17efb0f152d0f76afe0e6d6509"
+      },
+      {
+        "shard": 6,
+        "artifact_id": 10429817130,
+        "artifact_zip_sha256": "1ae133119fa0aae58e91d2233873140d2b087642cdaa0ea70460c1be2a6e2991"
+      },
+      {
+        "shard": 7,
+        "artifact_id": 10430600407,
+        "artifact_zip_sha256": "53410e8a9147c493230cc4aa1c91913383f93d2bbae93146855bc9b2130ef58a"
+      }
+    ]
+  },
+  "pit_adjusted_close_source": {
+    "workflow_run": 34928104668,
+    "workflow_head": "30a826f2e4e1dc4350b3e89453e66848a8d5141f",
+    "artifact_name": "gp12-pit-adjusted-close-full-audit-v482",
+    "artifact_id": 10380675799,
+    "artifact_zip_sha256": "fb57bce61a9156fa3d2bb327dc1d8dba70c6fa9739eb7d87bfb5a3e88c6e9b3f",
+    "audit_json_sha256": "2d75ace7461d4e7879e49a1678bb0d51f0acc3ca3abdc380c068876c1c569c6e",
+    "formal_symbol_n": 844,
+    "raw_trade_rows": 1011607,
+    "constant_scale_pass_n": 844,
+    "constant_scale_fail_n": 0,
+    "adjusted_close_pit_verified": true
+  },
+  "raw_trade_source": {
+    "provider": "Sohu",
+    "workflow_run": 34192233633,
+    "artifact_name": "gp-sohu-full-raw-v482-reaudit",
+    "artifact_id": 10042614517,
+    "artifact_zip_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+    "formal_trade_rows": 1011607
+  },
+  "pit": {
+    "scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
+    "same_session_market_breadth_usable_before_close": false,
+    "historical_provider_publication_timestamp_proven": false,
+    "market_breadth_candidate_pit_verified": true
+  },
+  "historical_gp_v11_source_recovered": false,
+  "family_ready": true,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "blockers": []
+}
