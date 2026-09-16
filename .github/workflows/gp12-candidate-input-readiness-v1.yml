@@ -70,6 +70,7 @@ jobs:
             --amount-turnover-binding data/GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1.json \
             --main-net-flow-requirement data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json \
             --status-partial-binding data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json \
+            --market-breadth-binding data/GP12_CANDIDATE_MARKET_BREADTH_BINDING_V1.json \
             --out artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json
       - name: Assert verified closures and remaining blockers
         run: |
@@ -87,17 +88,27 @@ jobs:
           assert x['main_net_flow_requirement_sha256']=='13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3'
           assert x['status_partial_binding_artifact']=='GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1'
           assert x['status_partial_binding_sha256']=='e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10'
+          assert x['market_breadth_binding_artifact']=='GP12_CANDIDATE_MARKET_BREADTH_BINDING_V1'
+          assert x['market_breadth_binding_sha256']=='337f6dafa3894c55fb8f24b87779d600c9258b1c09f10b8b140d65a120eed1c1'
+          assert x['market_breadth_definition_origin']=='NEW_RECONSTRUCTION_CANDIDATE'
           assert x['status_semantic_state']=={
               'is_st':'BOUND_PIT_VERIFIED',
               'tradable':'BOUND_PIT_VERIFIED',
               'upper_limit':'UNBOUND',
           }
-          assert x['validated_families']==['amount_turnover','intraday_15m','intraday_60m','market_calendar','stock_adjusted_close']
+          assert x['validated_families']==['amount_turnover','intraday_15m','intraday_60m','market_breadth','market_calendar','stock_adjusted_close']
           assert x['feature_families']['amount_turnover']['formal_feature_ready'] is True
           assert x['feature_families']['amount_turnover']['binding_state']=='BOUND_VERIFIED_ARTIFACT'
           assert x['feature_families']['amount_turnover']['pit_state']=='PIT_VERIFIED'
           assert x['feature_families']['amount_turnover']['blockers']==[]
           assert 'TURNOVER_RATIO_UNBOUND' not in x['blockers']
+          assert x['feature_families']['market_breadth']['formal_feature_ready'] is True
+          assert x['feature_families']['market_breadth']['binding_state']=='BOUND_VERIFIED_ARTIFACT'
+          assert x['feature_families']['market_breadth']['pit_state']=='PIT_VERIFIED'
+          assert x['feature_families']['market_breadth']['source_artifact']=='GP12_CANDIDATE_MARKET_BREADTH_BINDING_V1'
+          assert x['feature_families']['market_breadth']['source_sha256']=='337f6dafa3894c55fb8f24b87779d600c9258b1c09f10b8b140d65a120eed1c1'
+          assert x['feature_families']['market_breadth']['blockers']==[]
+          assert 'MARKET_BREADTH_UNBOUND' not in x['blockers']
           assert x['feature_families']['main_net_flow']['formal_feature_ready'] is False
           assert x['feature_families']['main_net_flow']['binding_state']=='UNBOUND'
           assert x['feature_families']['main_net_flow']['pit_state']=='PIT_UNVERIFIED'
@@ -117,8 +128,8 @@ jobs:
           assert 'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED' in x['blockers']
           assert 'STATUS_SEMANTICS_INCOMPLETE' not in x['blockers']
           assert 'STATUS_UPPER_LIMIT_UNBOUND' in x['blockers']
-          assert x['ready_factor_ids']==['F6','F7','F8','F9','F10','F12']
-          assert x['blocked_factor_ids']==['F1','F2','F3','F4','F5','F11']
+          assert x['ready_factor_ids']==['F2','F6','F7','F8','F9','F10','F12']
+          assert x['blocked_factor_ids']==['F1','F3','F4','F5','F11']
           assert x['next_priority_family']=='main_net_flow'
           assert x['next_priority_blocker']=='MAIN_NET_FLOW_UNBOUND'
           assert x['candidate_benchmark_reference_validated'] is True
@@ -134,6 +145,7 @@ jobs:
               'validated_families': x['validated_families'],
               'ready_factor_ids': x['ready_factor_ids'],
               'blocked_factor_ids': x['blocked_factor_ids'],
+              'market_breadth_binding_sha256': x['market_breadth_binding_sha256'],
               'status_semantic_state': x['status_semantic_state'],
               'blockers': x['blockers'],
               'next_priority_family': x['next_priority_family'],
