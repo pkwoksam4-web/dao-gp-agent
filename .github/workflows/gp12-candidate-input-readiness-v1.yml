@@ -7,7 +7,9 @@ on:
     paths:
       - 'scripts/gp12_candidate_input_readiness_v1.py'
       - 'scripts/test_gp12_candidate_input_readiness_v1.py'
+      - 'scripts/test_gp12_main_net_flow_readiness_requirement_v1.py'
       - 'data/GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1.json'
+      - 'data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json'
       - '.github/workflows/gp12-candidate-input-readiness-v1.yml'
   workflow_dispatch:
 
@@ -28,7 +30,9 @@ jobs:
           PYTHONPATH: scripts
         run: |
           cd scripts
-          python -m unittest -v test_gp12_candidate_input_readiness_v1.py
+          python -m unittest -v \
+            test_gp12_candidate_input_readiness_v1.py \
+            test_gp12_main_net_flow_readiness_requirement_v1.py
 
   checkpoint:
     needs: contract-tests
@@ -58,8 +62,9 @@ jobs:
             --pit-binding data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json \
             --benchmark-validation benchmark/GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json \
             --amount-turnover-binding data/GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1.json \
+            --main-net-flow-requirement data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json \
             --out artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json
-      - name: Assert amount turnover blocker closure and safety invariants
+      - name: Assert amount turnover closure and main net flow external blockers
         run: |
           python - <<'PY'
           import json
@@ -67,17 +72,29 @@ jobs:
           p=Path('artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json')
           x=json.loads(p.read_text(encoding='utf-8'))
           assert x['artifact']=='GP12_CANDIDATE_INPUT_READINESS_V1'
-          assert x['asset_hashes']['factor_definition_sha256']=='b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
+          assert x['asset_hashes']['factor_definition_sha256']=='b52f394fb13417e6f0323f7175a50a7d950bda8af09f63a97e739c6a4c70160e'
           assert x['asset_hashes']['parameter_sha256']=='22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
           assert x['amount_turnover_binding_artifact']=='GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1'
           assert x['amount_turnover_binding_sha256']=='47b83c11b7190f4bb8f3bc69900f75fd682362ed5e20d6cbb3b9c4d7bdbe4998'
+          assert x['main_net_flow_requirement_artifact']=='GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1'
+          assert x['main_net_flow_requirement_sha256']=='13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3'
           assert x['validated_families']==['amount_turnover','intraday_15m','intraday_60m','market_calendar','stock_adjusted_close']
           assert x['feature_families']['amount_turnover']['formal_feature_ready'] is True
           assert x['feature_families']['amount_turnover']['binding_state']=='BOUND_VERIFIED_ARTIFACT'
           assert x['feature_families']['amount_turnover']['pit_state']=='PIT_VERIFIED'
           assert x['feature_families']['amount_turnover']['blockers']==[]
           assert 'TURNOVER_RATIO_UNBOUND' not in x['blockers']
+          assert x['feature_families']['main_net_flow']['formal_feature_ready'] is False
+          assert x['feature_families']['main_net_flow']['binding_state']=='UNBOUND'
+          assert x['feature_families']['main_net_flow']['pit_state']=='PIT_UNVERIFIED'
+          assert x['feature_families']['main_net_flow']['blockers']==[
+              'MAIN_NET_FLOW_UNBOUND',
+              'TUSHARE_CREDENTIAL_REQUIRED',
+              'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED',
+          ]
           assert 'MAIN_NET_FLOW_UNBOUND' in x['blockers']
+          assert 'TUSHARE_CREDENTIAL_REQUIRED' in x['blockers']
+          assert 'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED' in x['blockers']
           assert x['ready_factor_ids']==['F6','F7','F8','F9','F10','F12']
           assert x['blocked_factor_ids']==['F1','F2','F3','F4','F5','F11']
           assert x['next_priority_family']=='main_net_flow'
@@ -97,7 +114,7 @@ jobs:
               'blocked_factor_ids': x['blocked_factor_ids'],
               'blockers': x['blockers'],
               'next_priority_family': x['next_priority_family'],
-              'amount_turnover_binding_sha256': x['amount_turnover_binding_sha256'],
+              'main_net_flow_requirement_sha256': x['main_net_flow_requirement_sha256'],
           }, ensure_ascii=False, indent=2))
           PY
       - name: Upload candidate readiness checkpoint
