@@ -83,8 +83,8 @@ jobs:
           traded['listing_trade_rank']=traded.groupby('symbol').cumcount()+1
           rank=traded[['symbol','date','listing_trade_rank']]
 
-          frame=truth.merge(pit[['symbol','date','tradestatus','isST','ipo_date']],on=['symbol','date'],how='left',validate='one_to-one')
-          frame=frame.merge(rank,on=['symbol','date'],how='left',validate='one-to-one')
+          frame=truth.merge(pit[['symbol','date','tradestatus','isST','ipo_date']],on=['symbol','date'],how='left',validate='one_to_one')
+          frame=frame.merge(rank,on=['symbol','date'],how='left',validate='one_to_one')
           assert frame['isST'].notna().all(),int(frame['isST'].isna().sum())
           pcts=[]
           for r in frame[['symbol','date','isST','ipo_date','listing_trade_rank']].itertuples(index=False):
