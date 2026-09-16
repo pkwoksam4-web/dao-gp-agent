@@ -32,11 +32,20 @@ jobs:
           repository: pkwoksam4-web/dao-gp-agent
           github-token: ${{ github.token }}
 
-      - name: Download pinned PIT-ST merged evidence
+      - name: Download pinned PIT-ST final lifecycle overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: pitst_final
+          run-id: 33977325822
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download pinned PIT-ST basic metadata
         uses: actions/download-artifact@v4
         with:
           name: gp-pit-st-v480-merged
-          path: pitst
+          path: pitst_meta
           run-id: 33971534669
           repository: pkwoksam4-web/dao-gp-agent
           github-token: ${{ github.token }}
@@ -61,6 +70,7 @@ jobs:
           import gp12_status_full_panel_v1 as status_panel
 
           REF_SHA='39f4df606abd4629ab28fac1d7444e73dfdeb3bb36c6764673f378463bd08c7e'
+          OVERLAY_SHA='6ed8ffd09215bccb90f716af26d44f7f590ffd5d455c20841307484a63aaa490'
           TRUTH_SHA='d11b415b74d44d63d1aa927e8652f395dd039c28f6e1b4c24964e53759405308'
           SPECIAL_NO_LIMIT={
               ('000670.SZ','2022-08-22'),
@@ -82,10 +92,12 @@ jobs:
           reference=pd.read_parquet(ref_path)
           assert len(reference)==1_011_607 and reference['symbol'].nunique()==844
 
-          pit_csv=unique('pitst','PIT_ST_DAILY_MERGED_V480.csv')
+          pit_csv=unique('pitst_final','PIT_ST_FORMAL_OVERLAY_V480.csv')
+          assert hashlib.sha256(pit_csv.read_bytes()).hexdigest()==OVERLAY_SHA
           lifecycle=pd.read_csv(pit_csv,dtype={'symbol':str,'date':str})
           assert len(lifecycle)==1_021_953 and lifecycle['symbol'].nunique()==847
-          audit=json.loads(unique('pitst','PIT_ST_AUDIT_MERGED_V480.json').read_text(encoding='utf-8'))
+
+          audit=json.loads(unique('pitst_meta','PIT_ST_AUDIT_MERGED_V480.json').read_text(encoding='utf-8'))
           basics={}
           for item in audit['audits']:
               rows=(item.get('basic') or {}).get('rows') or []
@@ -131,6 +143,7 @@ jobs:
           panel_audit.update({
               'panel_sha256':panel_sha,
               'source_reference_panel_sha256':REF_SHA,
+              'source_pit_st_overlay_sha256':OVERLAY_SHA,
               'hf_overlap_truth_sha256':TRUTH_SHA,
               'hf_overlap_rows':896_827,
               'hf_overlap_boolean_mismatch_n':0,
