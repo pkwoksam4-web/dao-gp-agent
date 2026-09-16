@@ -1,0 +1,61 @@
+{
+  "artifact": "GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1",
+  "blockers": [
+    "STATUS_UPPER_LIMIT_UNBOUND"
+  ],
+  "family_ready": false,
+  "formal_window": [
+    "2020-06-01",
+    "2026-04-17"
+  ],
+  "historical_gp_v11_source_recovered": false,
+  "is_st_source": {
+    "artifact_id": 9972698555,
+    "artifact_name": "gp-pit-st-v480-final-audit",
+    "artifact_zip_sha256": "a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58",
+    "field": "isST",
+    "lifecycle_pass_n": 847,
+    "lifecycle_rows": 1021953,
+    "overlay_csv_sha256": "6ed8ffd09215bccb90f716af26d44f7f590ffd5d455c20841307484a63aaa490",
+    "provider": "BaoStock+CNINFO transition crosscheck",
+    "transition_crosscheck_evidence_n": 6,
+    "transition_crosscheck_pass_n": 6,
+    "workflow_head": "a552c5855a96c526178da15837f2d9d488e2d2e6",
+    "workflow_run": 33977325822
+  },
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+  "pit": {
+    "historical_provider_publication_timestamp_proven": false,
+    "same_session_status_usable_before_close": false,
+    "scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY"
+  },
+  "required_status_fields": [
+    "is_st",
+    "tradable",
+    "upper_limit"
+  ],
+  "semantic_state": {
+    "is_st": "BOUND_PIT_VERIFIED",
+    "tradable": "BOUND_PIT_VERIFIED",
+    "upper_limit": "UNBOUND"
+  },
+  "status": "CANDIDATE_ONLY_UNAPPROVED",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "tradable_source": {
+    "artifact_id": 10428808437,
+    "artifact_name": "gp12-status-tradable-probe-v1",
+    "artifact_zip_sha256": "f9808c65cc953953a9920d730640aa2c1c22225a9de75ceddc1ac55433916ec7",
+    "definition": "True iff pinned Sohu raw has same symbol-date with volume>0 and amount>0; otherwise False for lifecycle-required date",
+    "nontrade_lifecycle_rows": 10346,
+    "positive_trade_rows": 1011607,
+    "probe_json_sha256": "09559b86e0bf7424789c2c6f196b5ca1d2c941fdedb4d8c757ca335084617574",
+    "provider_status_misflag_n": 5,
+    "status1_but_no_positive_trade_n": 0,
+    "workflow_head": "627e5504afa71774437b9ba1c3cc5d95f188d74d",
+    "workflow_run": 35052354861
+  },
+  "universe_n": 847,
+  "version": "1.0"
+}

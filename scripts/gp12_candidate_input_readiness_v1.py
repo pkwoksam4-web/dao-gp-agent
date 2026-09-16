@@ -20,6 +20,9 @@ AMOUNT_TURNOVER_BINDING_ARTIFACT = "GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1"
 AMOUNT_TURNOVER_BINDING_SHA256 = "47b83c11b7190f4bb8f3bc69900f75fd682362ed5e20d6cbb3b9c4d7bdbe4998"
 MAIN_NET_FLOW_REQUIREMENT_ARTIFACT = "GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1"
 MAIN_NET_FLOW_REQUIREMENT_SHA256 = "13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3"
+STATUS_PARTIAL_BINDING_ARTIFACT = "GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1"
+STATUS_PARTIAL_BINDING_SHA256 = "e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10"
+STATUS_UPPER_LIMIT_BLOCKER = "STATUS_UPPER_LIMIT_UNBOUND"
 MAIN_NET_FLOW_BLOCKERS = [
     "MAIN_NET_FLOW_UNBOUND",
     "TUSHARE_CREDENTIAL_REQUIRED",
@@ -241,6 +244,59 @@ def validate_main_net_flow_requirement(requirement: dict) -> str:
     return requirement_sha
 
 
+def validate_status_partial_binding(binding: dict) -> str:
+    """Validate candidate-only partial status evidence without promoting status."""
+    _require(isinstance(binding, dict), "status partial binding must be an object")
+    binding_sha = _canonical_json_sha256(binding)
+    _require(binding_sha == STATUS_PARTIAL_BINDING_SHA256, "STATUS_PARTIAL_BINDING_IDENTITY_MISMATCH")
+    _require(binding.get("artifact") == STATUS_PARTIAL_BINDING_ARTIFACT, "status partial artifact mismatch")
+    _require(binding.get("version") == "1.0", "status partial version mismatch")
+    _require(binding.get("strategy_id") == "GP12_REBUILD_CANDIDATE_V1", "status partial strategy mismatch")
+    _require(binding.get("status") == "CANDIDATE_ONLY_UNAPPROVED", "status partial status mismatch")
+    _require(binding.get("origin") == "NEW_RECONSTRUCTION_CANDIDATE", "status partial origin mismatch")
+    _require(binding.get("formal_window") == [FORMAL_START, FORMAL_END], "status partial formal window mismatch")
+    _require(binding.get("universe_n") == 847, "status partial universe mismatch")
+    _require(binding.get("required_status_fields") == ["is_st", "tradable", "upper_limit"], "status field contract mismatch")
+
+    st = binding.get("is_st_source") or {}
+    _require(st.get("field") == "isST", "is_st field mismatch")
+    _require(st.get("workflow_run") == 33977325822, "is_st run mismatch")
+    _require(st.get("workflow_head") == "a552c5855a96c526178da15837f2d9d488e2d2e6", "is_st head mismatch")
+    _require(st.get("artifact_name") == "gp-pit-st-v480-final-audit", "is_st artifact mismatch")
+    _require(st.get("artifact_id") == 9972698555, "is_st artifact id mismatch")
+    _require(st.get("artifact_zip_sha256") == "a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58", "is_st artifact digest mismatch")
+    _require(st.get("overlay_csv_sha256") == "6ed8ffd09215bccb90f716af26d44f7f590ffd5d455c20841307484a63aaa490", "is_st overlay digest mismatch")
+    _require(st.get("lifecycle_rows") == 1_021_953, "is_st lifecycle rows mismatch")
+    _require(st.get("lifecycle_pass_n") == 847, "is_st lifecycle coverage mismatch")
+    _require(st.get("transition_crosscheck_pass_n") == 6, "is_st transition pass mismatch")
+    _require(st.get("transition_crosscheck_evidence_n") == 6, "is_st transition evidence mismatch")
+
+    tradable = binding.get("tradable_source") or {}
+    _require(tradable.get("workflow_run") == 35052354861, "tradable run mismatch")
+    _require(tradable.get("workflow_head") == "627e5504afa71774437b9ba1c3cc5d95f188d74d", "tradable head mismatch")
+    _require(tradable.get("artifact_name") == "gp12-status-tradable-probe-v1", "tradable artifact mismatch")
+    _require(tradable.get("artifact_id") == 10428808437, "tradable artifact id mismatch")
+    _require(tradable.get("artifact_zip_sha256") == "f9808c65cc953953a9920d730640aa2c1c22225a9de75ceddc1ac55433916ec7", "tradable artifact digest mismatch")
+    _require(tradable.get("probe_json_sha256") == "09559b86e0bf7424789c2c6f196b5ca1d2c941fdedb4d8c757ca335084617574", "tradable probe digest mismatch")
+    _require(tradable.get("positive_trade_rows") == EXPECTED_TRADE_ROWS, "tradable positive rows mismatch")
+    _require(tradable.get("nontrade_lifecycle_rows") == 10_346, "tradable nontrade rows mismatch")
+    _require(tradable.get("provider_status_misflag_n") == 5, "tradable provider-status trace mismatch")
+    _require(tradable.get("status1_but_no_positive_trade_n") == 0, "tradable false-positive status mismatch")
+
+    semantic = binding.get("semantic_state") or {}
+    _require(semantic == {"is_st": "BOUND_PIT_VERIFIED", "tradable": "BOUND_PIT_VERIFIED", "upper_limit": "UNBOUND"}, "status semantic state mismatch")
+    pit_state = binding.get("pit") or {}
+    _require(pit_state.get("scope") == "SESSION_CLOSE_NO_LOOKAHEAD_POLICY", "status PIT scope mismatch")
+    _require(pit_state.get("same_session_status_usable_before_close") is False, "same-session status lookahead allowed")
+    _require(pit_state.get("historical_provider_publication_timestamp_proven") is False, "status provider publication timestamp must remain unproven")
+    _require(binding.get("family_ready") is False, "partial status binding cannot claim family ready")
+    _require(binding.get("historical_gp_v11_source_recovered") is False, "historical GP V1.1 status source recovery cannot be claimed")
+    _require(binding.get("model_freeze_allowed") is False, "partial status binding cannot open model freeze")
+    _require(binding.get("oos_metrics_allowed") is False, "partial status binding cannot open OOS metrics")
+    _require(binding.get("blockers") == [STATUS_UPPER_LIMIT_BLOCKER], "status partial blockers mismatch")
+    return binding_sha
+
+
 def _collect_input_blockers(report: dict) -> list[str]:
     blockers: list[str] = []
     for state in report.get("feature_families", {}).values():
@@ -266,6 +322,7 @@ def build_checkpoint(
     benchmark_validation: dict,
     amount_turnover_binding: dict,
     main_net_flow_requirement: dict | None = None,
+    status_partial_binding: dict | None = None,
 ) -> dict:
     """Compose current verified GP12 candidate input readiness.
 
@@ -296,6 +353,9 @@ def build_checkpoint(
         main_net_flow_requirement_sha = validate_main_net_flow_requirement(
             main_net_flow_requirement
         )
+    status_partial_binding_sha = None
+    if status_partial_binding is not None:
+        status_partial_binding_sha = validate_status_partial_binding(status_partial_binding)
 
     derived_evidence = copy.deepcopy(base_evidence)
     for family in ("intraday_15m", "intraday_60m", "stock_adjusted_close"):
@@ -309,6 +369,16 @@ def build_checkpoint(
         "coverage_end": FORMAL_END,
         "blockers": [],
     }
+    if status_partial_binding_sha is not None:
+        derived_evidence["feature_families"]["status"] = {
+            "binding_state": "BOUND_STRUCTURAL_ONLY",
+            "pit_state": "PIT_PARTIAL",
+            "source_artifact": STATUS_PARTIAL_BINDING_ARTIFACT,
+            "source_sha256": status_partial_binding_sha,
+            "coverage_start": FORMAL_START,
+            "coverage_end": FORMAL_END,
+            "blockers": [STATUS_UPPER_LIMIT_BLOCKER],
+        }
     report = readiness_base.build_readiness_report(parameters, factors, derived_evidence)
 
     benchmark_check = benchmark_gate.validate_candidate_benchmark_evidence(
@@ -374,6 +444,15 @@ def build_checkpoint(
             else None
         ),
         "main_net_flow_requirement_sha256": main_net_flow_requirement_sha,
+        "status_partial_binding_artifact": (
+            STATUS_PARTIAL_BINDING_ARTIFACT if status_partial_binding_sha is not None else None
+        ),
+        "status_partial_binding_sha256": status_partial_binding_sha,
+        "status_semantic_state": (
+            copy.deepcopy(status_partial_binding["semantic_state"])
+            if status_partial_binding_sha is not None
+            else None
+        ),
         "candidate_benchmark_reference_validated": benchmark_check["valid"],
         "candidate_benchmark_reference": benchmark_reference,
         "candidate_benchmark_validation_reasons": benchmark_check["reasons"],
@@ -414,6 +493,7 @@ def main() -> int:
     parser.add_argument("--benchmark-validation", required=True)
     parser.add_argument("--amount-turnover-binding", required=True)
     parser.add_argument("--main-net-flow-requirement", required=True)
+    parser.add_argument("--status-partial-binding", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -426,6 +506,7 @@ def main() -> int:
         _load(args.benchmark_validation),
         _load(args.amount_turnover_binding),
         _load(args.main_net_flow_requirement),
+        _load(args.status_partial_binding),
     )
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -443,6 +524,9 @@ def main() -> int:
                 ],
                 "main_net_flow_requirement_sha256": report[
                     "main_net_flow_requirement_sha256"
+                ],
+                "status_partial_binding_sha256": report[
+                    "status_partial_binding_sha256"
                 ],
                 "validated_families": report["validated_families"],
                 "missing_or_unvalidated_families": report[
