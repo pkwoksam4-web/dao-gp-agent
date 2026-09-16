@@ -53,6 +53,7 @@ jobs:
           import pandas as pd
           import gp12_upper_limit_rule_v1 as rule
 
+          FORMAL_START='2020-06-01'
           CANON_SHA='d11b415b74d44d63d1aa927e8652f395dd039c28f6e1b4c24964e53759405308'
           def unique(root,name):
               hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits); return hits[0]
@@ -79,7 +80,9 @@ jobs:
           pit['isST']=pd.to_numeric(pit['isST'],errors='raise').astype(int)
           assert not pit.duplicated(['symbol','date']).any()
           pit['ipo_date']=pit['symbol'].map(ipo_map)
-          traded=pit[(pit['tradestatus']==1) & (pit['date']>=pit['ipo_date'])].sort_values(['symbol','date']).copy()
+          # PIT-ST daily evidence begins at FORMAL_START, so listing-session rank is
+          # constructible only when the authoritative IPO date is inside Formal.
+          traded=pit[(pit['tradestatus']==1) & (pit['ipo_date']>=FORMAL_START) & (pit['date']>=pit['ipo_date'])].sort_values(['symbol','date']).copy()
           traded['listing_trade_rank']=traded.groupby('symbol').cumcount()+1
           rank=traded[['symbol','date','listing_trade_rank']]
 
