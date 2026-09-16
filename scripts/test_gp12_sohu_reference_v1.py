@@ -82,6 +82,33 @@ class SohuReferenceContractTests(unittest.TestCase):
                     max_calendar_days=90, retries=1, delay=0,
                 )
 
+    def test_resilient_split_recovers_wide_range_failure(self):
+        def fake_fetch(symbol, start, end, **kwargs):
+            if (start, end) == ("2024-01-01", "2024-01-04"):
+                raise RuntimeError("wide request failed")
+            return [
+                {"symbol": symbol, "date": day}
+                for day in ("2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04")
+                if start <= day <= end
+            ]
+
+        with mock.patch.object(sut, "fetch_chunk_reference", side_effect=fake_fetch):
+            rows, meta = sut.fetch_chunk_reference_resilient(
+                "000001.SZ", "2024-01-01", "2024-01-04", retries=1
+            )
+        self.assertEqual([row["date"] for row in rows], [
+            "2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"
+        ])
+        self.assertEqual(meta["split_recovery_n"], 1)
+        self.assertEqual(meta["leaf_chunk_n"], 2)
+
+    def test_resilient_single_day_failure_stays_hard_failure(self):
+        with mock.patch.object(sut, "fetch_chunk_reference", side_effect=RuntimeError("single day failed")):
+            with self.assertRaisesRegex(RuntimeError, "single day failed"):
+                sut.fetch_chunk_reference_resilient(
+                    "000001.SZ", "2024-01-02", "2024-01-02", retries=1
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
