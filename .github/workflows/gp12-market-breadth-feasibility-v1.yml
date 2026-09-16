@@ -1,0 +1,234 @@
+name: GP12 Market Breadth Feasibility V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-market-breadth-feasibility-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet runtime
+        run: python -m pip install -q pandas pyarrow
+      - name: Restore verified PIT adjusted-close audit code from pinned commit
+        run: |
+          git checkout 30a826f2e4e1dc4350b3e89453e66848a8d5141f -- \
+            scripts/gp12_pit_adjusted_close_v482.py \
+            scripts/gp12_pit_adjusted_close_audit_v482.py \
+            scripts/gp12_pit_full_audit_v482.py \
+            scripts/run_gp12_pit_full_audit_v482.py \
+            scripts/materialize_gp12_pit_availability_manifest_v482.py \
+            scripts/sample50_validate.py \
+            data/gp12_pit_event_availability_v482_chunks
+          python scripts/materialize_gp12_pit_availability_manifest_v482.py
+      - name: Download frozen V4.81 847 closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download 792/52 effective closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download 821/23 secondary closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - name: Download 826/18 reparsed closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - name: Download 838/6 recovered closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+      - name: Download 840/4 final-six closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+      - name: Download 844/0 final-four closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: final_four
+          run-id: 34117443729
+          github-token: ${{ github.token }}
+      - name: Download frozen Sina QFQ source census
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-source-census-v481
+          path: source_census
+          run-id: 34009079533
+          github-token: ${{ github.token }}
+      - name: Download pinned Full RAW
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: market_raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Materialize comparable PIT directions excluding first formal row per symbol
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import csv, hashlib, json
+          from collections import defaultdict
+          from pathlib import Path
+          import pandas as pd
+
+          from gp12_pit_full_audit_v482 import merge_final_override_ratios, _event_key, _date
+          from gp12_pit_adjusted_close_audit_v482 import finalize_symbol_events
+          from gp12_pit_adjusted_close_v482 import build_forward_pit_adjusted_path
+          from run_gp12_pit_full_audit_v482 import find_unique, load_json
+
+          FORMAL_START='2020-06-01'; FORMAL_END='2026-04-17'
+          NA={'600074.SH','600485.SH','600677.SH'}
+          manifest=json.loads(Path('data/GP12_PIT_EVENT_AVAILABILITY_V482.json').read_text(encoding='utf-8'))
+          frozen=load_json(Path('frozen'),'GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json')
+          effective=load_json(Path('effective'),'EFFECTIVE_TERM_CLOSURE_V482.json')
+          secondary=load_json(Path('secondary'),'REMAINING_EXACT_CLOSURE_V482.json')
+          reparsed=load_json(Path('reparsed'),'REPARSED_REMAINING_CLOSURE_V482.json')
+          recovered=load_json(Path('recovered'),'RECOVERED_REMAINING_CLOSURE_V482.json')
+          final_six=load_json(Path('final_six'),'FINAL_SIX_CLOSURE_V482.json')
+          final_four=load_json(Path('final_four'),'FINAL_FOUR_CLOSURE_V482.json')
+          stages=[
+              effective.get('event_overrides') or [], secondary.get('accepted_overrides') or [],
+              reparsed.get('new_overrides') or [], recovered.get('accepted_overrides') or [],
+              final_six.get('accepted_overrides') or [], final_four.get('accepted_overrides') or [],
+          ]
+          nominal_availability={
+              _event_key(r): _date(r.get('availability_date'),'availability_date')
+              for r in manifest.get('nominal_events') or []
+          }
+          final_availability={
+              _event_key(r): _date(r.get('availability_date'),'availability_date')
+              for r in manifest.get('standard_overrides') or []
+          }
+          for r in manifest.get('special_overrides') or []:
+              final_availability[_event_key(r)] = _date(r.get('formula_availability_date'),'formula_availability_date')
+          merged=merge_final_override_ratios(stages, manifest['special_overrides'], final_availability,
+                                             expected_standard_n=270, expected_special_n=11)
+
+          raw_path=find_unique(Path('market_raw'),'SOHU_RAW_FULL_V482.parquet')
+          raw_sha=hashlib.sha256(raw_path.read_bytes()).hexdigest()
+          assert raw_sha=='bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb',raw_sha
+          df=pd.read_parquet(raw_path,columns=['symbol','date','close'])
+          df['symbol']=df['symbol'].astype(str).str.upper(); df['date']=df['date'].astype(str).str[:10]
+          assert len(df)==1_011_607 and not df.duplicated(['symbol','date']).any()
+
+          records={str(r['symbol']).upper():r for r in frozen['records']}
+          formal_symbols=sorted(set(records)-NA)
+          assert len(formal_symbols)==844
+          raw_groups={s:g.sort_values('date')[['date','close']].to_dict('records') for s,g in df.groupby('symbol',sort=True)}
+          assert sorted(raw_groups)==formal_symbols
+
+          daily=defaultdict(lambda:{'advancers':0,'decliners':0,'flat':0,'comparable':0})
+          bridges=[]; comparable_rows=0
+          for symbol in formal_symbols:
+              raw_rows=raw_groups[symbol]
+              final_events=finalize_symbol_events(symbol, records[symbol].get('events') or [],
+                                                  nominal_availability, merged['ratios'], merged['availability'])
+              path=build_forward_pit_adjusted_path(raw_rows,final_events)
+              assert len(path)==len(raw_rows) and path
+              first=path[0]
+              bridges.append({'symbol':symbol,'first_formal_trade_date':first['date'],'raw_close':first['raw_close']})
+              prev=first
+              for row in path[1:]:
+                  cur=float(row['adjusted_close']); prv=float(prev['adjusted_close'])
+                  d=row['date']; daily[d]['comparable']+=1; comparable_rows+=1
+                  if cur>prv: daily[d]['advancers']+=1
+                  elif cur<prv: daily[d]['decliners']+=1
+                  else: daily[d]['flat']+=1
+                  prev=row
+
+          all_dates=sorted(df['date'].unique().tolist())
+          assert all_dates[0]==FORMAL_START and all_dates[-1]==FORMAL_END
+          rows=[]
+          for d in all_dates:
+              x=daily[d]
+              directional=x['advancers']+x['decliners']
+              rows.append({
+                  'date':d, **x,
+                  'directional_n':directional,
+                  'ratio_without_bridge': (x['advancers']/directional if directional else None),
+              })
+          zero_directional=[r['date'] for r in rows if r['directional_n']==0]
+          result={
+              'artifact':'GP12_MARKET_BREADTH_FEASIBILITY_V1',
+              'status':'PASS_PIT_DIRECTION_MATERIALIZATION_WITH_BRIDGE_GAP',
+              'formal_window':[FORMAL_START,FORMAL_END],
+              'formal_symbol_n':844,
+              'raw_trade_rows':len(df),
+              'bridge_rows':len(bridges),
+              'bridge_definition':'first trade row for each Formal844 symbol inside formal window; requires independent day-return sign to avoid pre-window lookback assumption',
+              'comparable_rows_without_bridge':comparable_rows,
+              'date_n':len(all_dates),
+              'first_date':all_dates[0],
+              'last_date':all_dates[-1],
+              'zero_directional_dates_without_bridge':zero_directional,
+              'pit_scope':'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
+              'same_session_breadth_usable_before_close':False,
+              'historical_gp_v11_source_recovered':False,
+              'candidate_definition_approved':False,
+              'formal_binding_allowed':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+              'source_identity':{
+                  'pit_adjusted_close_verified_run':34928104668,
+                  'pit_adjusted_close_verified_head':'30a826f2e4e1dc4350b3e89453e66848a8d5141f',
+                  'sohu_raw_run':34192233633,
+                  'sohu_raw_artifact_id':10042614517,
+                  'sohu_raw_parquet_sha256':raw_sha,
+              },
+          }
+          out=Path('artifact_gp12_market_breadth_feasibility_v1'); out.mkdir(exist_ok=True)
+          (out/'GP12_MARKET_BREADTH_FEASIBILITY_V1.json').write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          with (out/'GP12_MARKET_BREADTH_BRIDGES_V1.csv').open('w',newline='',encoding='utf-8') as f:
+              w=csv.DictWriter(f,fieldnames=['symbol','first_formal_trade_date','raw_close']); w.writeheader(); w.writerows(bridges)
+          with (out/'GP12_MARKET_BREADTH_PARTIAL_DAILY_V1.csv').open('w',newline='',encoding='utf-8') as f:
+              fields=['date','advancers','decliners','flat','comparable','directional_n','ratio_without_bridge']
+              w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(rows)
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload feasibility artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-market-breadth-feasibility-v1
+          path: artifact_gp12_market_breadth_feasibility_v1/
+          if-no-files-found: error
+          retention-days: 30
