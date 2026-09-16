@@ -1,11 +1,41 @@
-import math
+import csv
+import pathlib
+import tempfile
 import unittest
 
 from gp12_main_net_flow_tushare_v1 import (
+    MONEYFLOW_FIELDS,
+    aggregate_shard_records,
     audit_symbol_rows,
+    build_symbol_evidence,
+    fetch_moneyflow_records,
     normalize_moneyflow_records,
     summarize_formal_audit,
+    write_panel_csv,
 )
+
+
+class _FakeFrame:
+    def __init__(self, records):
+        self.records = list(records)
+
+    def to_dict(self, orient):
+        if orient != "records":
+            raise AssertionError(f"unexpected orient: {orient}")
+        return list(self.records)
+
+
+class _FakeApi:
+    def __init__(self, records=None, error=None):
+        self.records = records or []
+        self.error = error
+        self.calls = []
+
+    def moneyflow(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return _FakeFrame(self.records)
 
 
 class MainNetFlowTushareContractTests(unittest.TestCase):
@@ -88,6 +118,62 @@ class MainNetFlowTushareContractTests(unittest.TestCase):
         self.assertFalse(report["oos_metrics_allowed"])
         self.assertIn("MAIN_NET_FLOW_FORMAL_SYMBOL_COVERAGE_INCOMPLETE", report["blockers"])
         self.assertIn("MAIN_NET_FLOW_TOTAL_ROW_COVERAGE_MISMATCH", report["blockers"])
+
+    def test_fetch_uses_exchange_symbol_formal_dates_and_explicit_fields(self):
+        api = _FakeApi(records=[])
+        records = fetch_moneyflow_records(
+            api,
+            "000001.SZ",
+            start_date="2020-06-01",
+            end_date="2026-04-17",
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(len(api.calls), 1)
+        self.assertEqual(api.calls[0], {
+            "ts_code": "000001.SZ",
+            "start_date": "20200601",
+            "end_date": "20260417",
+            "fields": ",".join(MONEYFLOW_FIELDS),
+        })
+
+    def test_source_errors_propagate_and_symbol_evidence_fails_closed_on_gap(self):
+        error = RuntimeError("permission denied")
+        with self.assertRaisesRegex(RuntimeError, "permission denied"):
+            fetch_moneyflow_records(_FakeApi(error=error), "000001.SZ")
+
+        api = _FakeApi(records=[{
+            "ts_code":"000001.SZ","trade_date":"20200601",
+            "buy_lg_amount":1,"sell_lg_amount":0,"buy_elg_amount":0,"sell_elg_amount":0,
+            "net_mf_amount":1,
+        }])
+        evidence = build_symbol_evidence(
+            api,
+            "000001.SZ",
+            ["2020-06-01", "2020-06-02"],
+        )
+        self.assertFalse(evidence["audit"]["symbol_pass"])
+        self.assertIn("MAIN_NET_FLOW_DATE_GAP", evidence["audit"]["blockers"])
+        self.assertEqual(len(evidence["rows"]), 1)
+
+    def test_write_panel_csv_is_deterministic(self):
+        rows = [
+            {"symbol":"600000.SH","date":"2020-06-02","main_net_flow_cny":-1.0,"known_at":"2020-06-02T15:00:00+08:00","source":"S"},
+            {"symbol":"000001.SZ","date":"2020-06-01","main_net_flow_cny":2.0,"known_at":"2020-06-01T15:00:00+08:00","source":"S"},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "panel.csv"
+            write_panel_csv(path, rows)
+            with path.open(newline="", encoding="utf-8") as handle:
+                got = list(csv.DictReader(handle))
+        self.assertEqual([(r["symbol"], r["date"]) for r in got], [
+            ("000001.SZ", "2020-06-01"),
+            ("600000.SH", "2020-06-02"),
+        ])
+
+    def test_aggregate_shards_rejects_duplicate_symbols(self):
+        record = {"symbol":"000001.SZ","symbol_pass":True,"row_n":1,"blockers":[]}
+        with self.assertRaisesRegex(ValueError, "duplicate shard symbol"):
+            aggregate_shard_records([[record], [record]])
 
 
 if __name__ == "__main__":
