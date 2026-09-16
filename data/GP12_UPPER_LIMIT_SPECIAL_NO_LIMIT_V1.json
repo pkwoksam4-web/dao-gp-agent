@@ -1,0 +1,82 @@
+{
+  "artifact": "GP12_UPPER_LIMIT_SPECIAL_NO_LIMIT_V1",
+  "status": "NEW_RECONSTRUCTION_CANDIDATE_EVIDENCE",
+  "historical_gp_v11_source_recovered": false,
+  "formal_binding_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "rows": [
+    {
+      "symbol": "000670.SZ",
+      "date": "2022-08-22",
+      "event_type": "RESTORED_LISTING_FIRST_DAY",
+      "source_authority": "CNINFO",
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2022-08-22/1214345659.PDF",
+      "evidence_statement": "Company stock resumed listing on 2022-08-22 and the first resumed-listing session had no price-limit restriction."
+    },
+    {
+      "symbol": "000792.SZ",
+      "date": "2021-08-10",
+      "event_type": "RESTORED_LISTING_FIRST_DAY",
+      "source_authority": "CNINFO",
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2021-08-10/1210709225.PDF",
+      "evidence_statement": "Company stock resumed listing on 2021-08-10 and that first session had no price-limit restriction."
+    },
+    {
+      "symbol": "000995.SZ",
+      "date": "2020-12-16",
+      "event_type": "RESTORED_LISTING_FIRST_DAY",
+      "source_authority": "CNINFO",
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2020-12-09/1208871265.PDF",
+      "evidence_statement": "The first trading day after listing restoration was 2020-12-16 and A-share trading had no price-limit restriction that day."
+    },
+    {
+      "symbol": "001267.SZ",
+      "date": "2021-11-17",
+      "event_type": "RELISTING_FIRST_DAY",
+      "source_authority": "CNINFO",
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2021-11-11/1211553595.PDF",
+      "evidence_statement": "The stock relisted on 2021-11-17 and the relisting first day had no price-limit restriction."
+    },
+    {
+      "symbol": "001289.SZ",
+      "date": "2022-01-24",
+      "event_type": "MERGER_LISTING_FIRST_DAY",
+      "source_authority": "SZSE",
+      "evidence_url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2022-01-21/a6274d47-d0ce-44c8-8dde-0a047c9a4532.PDF",
+      "evidence_statement": "The A-share stock listed on 2022-01-24 after the share-swap merger and the listing first day had no price-limit restriction."
+    },
+    {
+      "symbol": "600190.SH",
+      "date": "2025-06-30",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "source_authority": "SSE",
+      "evidence_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2025-07-15/600190_20250715_QCG8.pdf",
+      "evidence_statement": "The delisting-arrangement period began on 2025-06-30 and its first trading day had no price-limit restriction."
+    },
+    {
+      "symbol": "600200.SH",
+      "date": "2025-12-09",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "source_authority": "CNINFO",
+      "evidence_url": "https://static.cninfo.com.cn/finalpage/2025-12-02/1224842172.PDF",
+      "evidence_statement": "The delisting-arrangement trading period began on 2025-12-09; the first session is treated as the no-limit first day under the exchange rule."
+    },
+    {
+      "symbol": "600387.SH",
+      "date": "2025-06-16",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "source_authority": "SSE",
+      "evidence_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2025-07-03/600387_20250703_7CTK.pdf",
+      "evidence_statement": "The delisting-arrangement period began on 2025-06-16 and its first trading day had no price-limit restriction."
+    },
+    {
+      "symbol": "600462.SH",
+      "date": "2025-06-24",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_DAY",
+      "source_authority": "SSE",
+      "evidence_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2025-07-09/600462_20250709_ESG4.pdf",
+      "evidence_statement": "The delisting-arrangement period began on 2025-06-24 and its first trading day had no price-limit restriction."
+    }
+  ]
+}
