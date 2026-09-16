@@ -1,0 +1,161 @@
+name: GP12 Status Full Composition Audit V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-full-composition-audit-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+
+      - name: Download verified full upper-limit source
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-upper-limit-full-source-v1
+          path: upper
+          run-id: 35069676486
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download pinned PIT-ST lifecycle evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Compose and hard-gate full lifecycle status panel
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          import pandas as pd
+
+          UPPER_PANEL_SHA='a08a0705621c41bfdc704ff281f6f3a6c01ba17485e3981d55707f18303ad08e'
+          UPPER_AUDIT_SHA='44ada4ca0429963ae19f9c4ed4a5ba60e915e31b3677172cfefe63384ba1d6b8'
+          LIFECYCLE_ROWS=1021953
+          TRADE_ROWS=1011607
+          NONTRADE_ROWS=10346
+          UPPER_LIMIT_ROWS=25742
+
+          def unique(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits); return hits[0]
+
+          upper_path=unique('upper','GP12_UPPER_LIMIT_FULL_V1.parquet')
+          upper_audit_path=unique('upper','GP12_UPPER_LIMIT_FULL_AUDIT_V1.json')
+          assert hashlib.sha256(upper_path.read_bytes()).hexdigest()==UPPER_PANEL_SHA
+          assert hashlib.sha256(upper_audit_path.read_bytes()).hexdigest()==UPPER_AUDIT_SHA
+          upper_audit=json.loads(upper_audit_path.read_text(encoding='utf-8'))
+          assert upper_audit['status']=='PASS_FULL_UPPER_LIMIT_SOURCE_CANDIDATE',upper_audit
+          assert upper_audit['rows']==TRADE_ROWS and upper_audit['symbol_n']==844,upper_audit
+          assert upper_audit['truth_close_mismatch_n']==0,upper_audit
+          assert upper_audit['truth_no_limit_mismatch_n']==0,upper_audit
+          assert upper_audit['truth_price_mismatch_n']==0,upper_audit
+          assert upper_audit['truth_boolean_mismatch_n']==0,upper_audit
+          upper=pd.read_parquet(upper_path,columns=['symbol','date','upper_limit'])
+          upper['symbol']=upper['symbol'].astype(str).str.upper()
+          upper['date']=upper['date'].astype(str).str[:10]
+          upper['upper_limit']=upper['upper_limit'].astype(bool)
+          assert len(upper)==TRADE_ROWS
+          assert not upper.duplicated(['symbol','date']).any()
+          assert int(upper['upper_limit'].sum())==UPPER_LIMIT_ROWS
+
+          lifecycle_path=unique('pitst','PIT_ST_DAILY_MERGED_V480.csv')
+          lifecycle_sha=hashlib.sha256(lifecycle_path.read_bytes()).hexdigest()
+          life=pd.read_csv(lifecycle_path,dtype={'symbol':str,'date':str})
+          assert {'symbol','date','isST'}.issubset(life.columns),life.columns.tolist()
+          life['symbol']=life['symbol'].str.upper(); life['date']=life['date'].str[:10]
+          life['isST']=pd.to_numeric(life['isST'],errors='raise').astype(int)
+          assert len(life)==LIFECYCLE_ROWS,len(life)
+          assert life['symbol'].nunique()==847,life['symbol'].nunique()
+          assert not life.duplicated(['symbol','date']).any()
+          assert set(life['isST'].unique()).issubset({0,1})
+
+          merged=life[['symbol','date','isST']].merge(
+              upper,on=['symbol','date'],how='left',validate='one_to_one',indicator=True
+          )
+          trade_mask=merged['_merge'].eq('both')
+          assert int(trade_mask.sum())==TRADE_ROWS,int(trade_mask.sum())
+          assert int((~trade_mask).sum())==NONTRADE_ROWS,int((~trade_mask).sum())
+          # Fail closed: every upper-limit row must be a lifecycle row.
+          coverage=upper[['symbol','date']].merge(
+              life[['symbol','date']],on=['symbol','date'],how='left',indicator=True,validate='one_to_one'
+          )
+          assert int((coverage['_merge']!='both').sum())==0
+
+          merged['tradable']=trade_mask
+          merged['upper_limit']=merged['upper_limit'].fillna(False).astype(bool)
+          merged=merged.drop(columns=['_merge']).sort_values(['symbol','date']).reset_index(drop=True)
+          assert len(merged)==LIFECYCLE_ROWS
+          assert int(merged['tradable'].sum())==TRADE_ROWS
+          assert int((~merged['tradable']).sum())==NONTRADE_ROWS
+          assert int(merged['upper_limit'].sum())==UPPER_LIMIT_ROWS
+          assert not bool((merged.loc[~merged['tradable'],'upper_limit']).any())
+          assert merged[['isST','tradable','upper_limit']].notna().all().all()
+
+          audit={
+              'artifact':'GP12_STATUS_FULL_COMPOSITION_AUDIT_V1',
+              'version':'1.0',
+              'status':'PASS_FULL_STATUS_LIFECYCLE_COMPOSITION',
+              'formal_window':['2020-06-01','2026-04-17'],
+              'universe_n':847,
+              'formal_trade_symbol_n':844,
+              'lifecycle_rows':LIFECYCLE_ROWS,
+              'tradable_true_rows':TRADE_ROWS,
+              'tradable_false_rows':NONTRADE_ROWS,
+              'upper_limit_true_rows':UPPER_LIMIT_ROWS,
+              'nontradable_upper_limit_true_rows':0,
+              'duplicate_symbol_dates':0,
+              'missing_status_values':0,
+              'pit_st_lifecycle_csv_sha256':lifecycle_sha,
+              'upper_limit_source_run':35069676486,
+              'upper_limit_source_artifact_id':10435886487,
+              'upper_limit_panel_sha256':UPPER_PANEL_SHA,
+              'upper_limit_audit_sha256':UPPER_AUDIT_SHA,
+              'tradable_definition':'True iff verified positive-trade upper-limit source has same symbol-date; False otherwise on PIT lifecycle axis',
+              'nontradable_upper_limit_semantics':'False because no trading session occurred on that lifecycle symbol-date',
+              'pit':{
+                  'scope':'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
+                  'same_session_status_usable_before_close':False,
+                  'historical_provider_publication_timestamp_proven':False,
+              },
+              'historical_gp_v11_source_recovered':False,
+              'formal_binding_allowed':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+          }
+          out=Path('artifact_gp12_status_full_composition_v1'); out.mkdir(exist_ok=True)
+          panel_path=out/'GP12_STATUS_FULL_LIFECYCLE_V1.parquet'
+          audit_path=out/'GP12_STATUS_FULL_COMPOSITION_AUDIT_V1.json'
+          merged.to_parquet(panel_path,index=False,compression='zstd')
+          audit_path.write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          print('panel_sha256='+hashlib.sha256(panel_path.read_bytes()).hexdigest())
+          print('audit_sha256='+hashlib.sha256(audit_path.read_bytes()).hexdigest())
+          PY
+
+      - name: Upload full status composition
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-full-composition-v1
+          path: artifact_gp12_status_full_composition_v1/
+          if-no-files-found: error
+          retention-days: 30
