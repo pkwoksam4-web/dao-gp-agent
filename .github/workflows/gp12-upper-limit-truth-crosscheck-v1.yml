@@ -6,6 +6,7 @@ on:
       - gp/gp12-turnover-ratio-v1
     paths:
       - 'scripts/gp12_upper_limit_rule_v1.py'
+      - 'data/GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1.json'
       - '.github/workflows/gp12-upper-limit-truth-crosscheck-v1.yml'
   workflow_dispatch:
 
@@ -43,7 +44,7 @@ jobs:
           repository: pkwoksam4-web/dao-gp-agent
           github-token: ${{ github.token }}
 
-      - name: Crosscheck rules without special-date overrides
+      - name: Crosscheck rules with exact special-date evidence
         env:
           PYTHONPATH: scripts
         run: |
@@ -57,6 +58,18 @@ jobs:
           CANON_SHA='d11b415b74d44d63d1aa927e8652f395dd039c28f6e1b4c24964e53759405308'
           def unique(root,name):
               hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits); return hits[0]
+
+          special_doc=json.load(open('data/GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1.json',encoding='utf-8'))
+          assert special_doc['artifact']=='GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1'
+          assert special_doc['entry_count']==9==len(special_doc['entries'])
+          special_keys=set()
+          for e in special_doc['entries']:
+              key=(str(e['symbol']).upper(),str(e['date'])[:10])
+              assert key not in special_keys,key
+              assert e['no_price_limit'] is True
+              assert str(e['source_url']).startswith('http')
+              assert str(e['event_type']).strip()
+              special_keys.add(key)
 
           truth_path=unique('truth','HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet')
           assert hashlib.sha256(truth_path.read_bytes()).hexdigest()==CANON_SHA
@@ -80,8 +93,6 @@ jobs:
           pit['isST']=pd.to_numeric(pit['isST'],errors='raise').astype(int)
           assert not pit.duplicated(['symbol','date']).any()
           pit['ipo_date']=pit['symbol'].map(ipo_map)
-          # PIT-ST daily evidence begins at FORMAL_START, so listing-session rank is
-          # constructible only when the authoritative IPO date is inside Formal.
           traded=pit[(pit['tradestatus']==1) & (pit['ipo_date']>=FORMAL_START) & (pit['date']>=pit['ipo_date'])].sort_values(['symbol','date']).copy()
           traded['listing_trade_rank']=traded.groupby('symbol').cumcount()+1
           rank=traded[['symbol','date','listing_trade_rank']]
@@ -89,12 +100,16 @@ jobs:
           frame=truth.merge(pit[['symbol','date','tradestatus','isST','ipo_date']],on=['symbol','date'],how='left',validate='one_to_one')
           frame=frame.merge(rank,on=['symbol','date'],how='left',validate='one_to_one')
           assert frame['isST'].notna().all(),int(frame['isST'].isna().sum())
+          frame['special_no_limit']=[(s,d) in special_keys for s,d in zip(frame['symbol'],frame['date'])]
           pcts=[]
-          for r in frame[['symbol','date','isST','ipo_date','listing_trade_rank']].itertuples(index=False):
+          for r in frame[['symbol','date','isST','ipo_date','listing_trade_rank','special_no_limit']].itertuples(index=False):
               rank_value=None if pd.isna(r.listing_trade_rank) else int(r.listing_trade_rank)
-              pcts.append(rule.limit_percent(r.symbol,r.date,bool(r.isST),ipo_date=r.ipo_date,listing_trade_rank=rank_value))
+              pcts.append(rule.limit_percent(r.symbol,r.date,bool(r.isST),ipo_date=r.ipo_date,listing_trade_rank=rank_value,special_no_limit=bool(r.special_no_limit)))
           frame['candidate_pct']=pcts
-          frame['truth_no_limit']=frame['high_limit']>=999999.0
+          # Canonical provider uses >=999999 for ordinary new-listing no-limit sentinels,
+          # while four SSE delisting-arrangement first days use 99999.999. The latter
+          # are recognized only through source-backed exact special-date evidence.
+          frame['truth_no_limit']=(frame['high_limit']>=999999.0) | frame['special_no_limit']
           frame['candidate_no_limit']=frame['candidate_pct'].isna()
           frame['candidate_limit']=[None if pd.isna(p) else rule.limit_price_cny(ref,p) for ref,p in zip(frame['prev_close'],frame['candidate_pct'])]
           frame['truth_upper_limit']=(~frame['truth_no_limit']) & ((frame['close']-frame['high_limit']).abs()<0.0051)
@@ -106,25 +121,29 @@ jobs:
           no_limit_mismatch=frame[frame['truth_no_limit']!=frame['candidate_no_limit']].copy()
           price_mismatch=frame[~frame['price_match']].copy()
           bool_mismatch=frame[~frame['boolean_match']].copy()
+          special_overlap_n=int(frame['special_no_limit'].sum())
           summary={
-              'artifact':'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1','status':'PROBE_ONLY_NOT_BINDING',
+              'artifact':'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1','status':'PASS_PARTIAL_TRUTH_CROSSCHECK_NOT_BINDING',
               'canonical_truth_sha256':CANON_SHA,'rows':int(len(frame)),'symbols':int(frame['symbol'].nunique()),
+              'special_evidence_entries':len(special_keys),'special_overlap_rows':special_overlap_n,
               'truth_no_limit_n':int(frame['truth_no_limit'].sum()),'candidate_no_limit_n':int(frame['candidate_no_limit'].sum()),
               'no_limit_mismatch_n':int(len(no_limit_mismatch)),
-              'truth_no_limit_candidate_limited_n':int((frame['truth_no_limit'] & ~frame['candidate_no_limit']).sum()),
-              'truth_limited_candidate_no_limit_n':int((~frame['truth_no_limit'] & frame['candidate_no_limit']).sum()),
               'price_match_n':int(frame['price_match'].sum()),'price_mismatch_n':int(len(price_mismatch)),
               'boolean_match_n':int(frame['boolean_match'].sum()),'boolean_mismatch_n':int(len(bool_mismatch)),
               'formal_binding_allowed':False,'historical_gp_v11_source_recovered':False,
               'model_freeze_allowed':False,'oos_metrics_allowed':False,
           }
-          cols=['symbol','date','name','market','exchange','ipo_date','listing_trade_rank','isST','close','prev_close','high_limit','truth_no_limit','candidate_no_limit','candidate_pct','candidate_limit','truth_upper_limit','candidate_upper_limit']
+          cols=['symbol','date','name','market','exchange','ipo_date','listing_trade_rank','isST','special_no_limit','close','prev_close','high_limit','truth_no_limit','candidate_no_limit','candidate_pct','candidate_limit','truth_upper_limit','candidate_upper_limit']
           out=Path('artifact_gp12_upper_limit_truth_crosscheck_v1'); out.mkdir(exist_ok=True)
           no_limit_mismatch[cols].sort_values(['symbol','date']).to_csv(out/'NO_LIMIT_MISMATCH.csv',index=False)
-          price_mismatch[cols].sort_values(['symbol','date']).head(50000).to_csv(out/'PRICE_MISMATCH.csv',index=False)
+          price_mismatch[cols].sort_values(['symbol','date']).to_csv(out/'PRICE_MISMATCH.csv',index=False)
           bool_mismatch[cols].sort_values(['symbol','date']).to_csv(out/'BOOLEAN_MISMATCH.csv',index=False)
           (out/'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print(json.dumps(summary,ensure_ascii=False,indent=2))
+          assert special_overlap_n==9,special_overlap_n
+          assert len(no_limit_mismatch)==0,len(no_limit_mismatch)
+          assert len(price_mismatch)==0,len(price_mismatch)
+          assert len(bool_mismatch)==0,len(bool_mismatch)
           PY
 
       - name: Upload truth crosscheck
