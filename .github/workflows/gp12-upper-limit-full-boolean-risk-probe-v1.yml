@@ -1,0 +1,170 @@
+name: GP12 Upper Limit Full Boolean Risk Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-upper-limit-full-boolean-risk-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+
+      - name: Download full Sohu reference panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-sohu-reference-full-v1
+          path: reference
+          run-id: 35064830592
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download pinned PIT-ST merged evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Audit candidate-true special-day risk
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+          import gp12_upper_limit_rule_v1 as rule
+
+          FORMAL_START='2020-06-01'
+          FORMAL_END='2026-04-17'
+          PANEL_SHA='39f4df606abd4629ab28fac1d7444e73dfdeb3bb36c6764673f378463bd08c7e'
+
+          def unique(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits); return hits[0]
+
+          panel_path=unique('reference','SOHU_REFERENCE_FULL_V1.parquet')
+          assert hashlib.sha256(panel_path.read_bytes()).hexdigest()==PANEL_SHA
+          ref=pd.read_parquet(panel_path)
+          ref['symbol']=ref['symbol'].astype(str).str.upper()
+          ref['date']=ref['date'].astype(str).str[:10]
+          for c in ('close','pct_percent','reference_close_cny'):
+              ref[c]=pd.to_numeric(ref[c],errors='raise')
+          assert len(ref)==1011607 and ref['symbol'].nunique()==844
+          assert not ref.duplicated(['symbol','date']).any()
+          assert ref['date'].min()==FORMAL_START and ref['date'].max()==FORMAL_END
+
+          audit=json.loads(unique('pitst','PIT_ST_AUDIT_MERGED_V480.json').read_text(encoding='utf-8'))
+          basics={}
+          for a in audit['audits']:
+              rows=(a.get('basic') or {}).get('rows') or []
+              if len(rows)==1:
+                  basics[str(a['symbol']).upper()]=rows[0]
+          assert len(basics)==847
+          ipo_map={s:str(b.get('ipoDate') or '')[:10] for s,b in basics.items()}
+          out_map={s:str(b.get('outDate') or '')[:10] for s,b in basics.items()}
+
+          pit=pd.read_csv(unique('pitst','PIT_ST_DAILY_MERGED_V480.csv'),dtype={'symbol':str,'date':str})
+          pit['symbol']=pit['symbol'].str.upper(); pit['date']=pit['date'].str[:10]
+          pit['isST']=pd.to_numeric(pit['isST'],errors='raise').astype(int)
+          assert not pit.duplicated(['symbol','date']).any()
+          st=pit[['symbol','date','isST']]
+
+          frame=ref.merge(st,on=['symbol','date'],how='left',validate='one_to_one')
+          assert frame['isST'].notna().all(),int(frame['isST'].isna().sum())
+          frame['ipo_date']=frame['symbol'].map(ipo_map).fillna('')
+          frame['out_date']=frame['symbol'].map(out_map).fillna('')
+          frame=frame.sort_values(['symbol','date']).reset_index(drop=True)
+          frame['prev_trade_date']=frame.groupby('symbol')['date'].shift(1)
+          d=pd.to_datetime(frame['date'])
+          pdprev=pd.to_datetime(frame['prev_trade_date'])
+          frame['calendar_gap_days']=(d-pdprev).dt.days
+
+          # Listing-session rank is constructible only for authoritative IPO dates inside Formal.
+          in_formal_ipo=(frame['ipo_date']>=FORMAL_START) & (frame['date']>=frame['ipo_date'])
+          frame['listing_trade_rank']=pd.NA
+          tmp=frame.loc[in_formal_ipo,['symbol','date']].copy()
+          tmp['listing_trade_rank']=tmp.groupby('symbol').cumcount()+1
+          frame.loc[tmp.index,'listing_trade_rank']=tmp['listing_trade_rank']
+
+          pcts=[]
+          for r in frame[['symbol','date','isST','ipo_date','listing_trade_rank']].itertuples(index=False):
+              rank=None if pd.isna(r.listing_trade_rank) else int(r.listing_trade_rank)
+              pcts.append(rule.limit_percent(r.symbol,r.date,bool(r.isST),ipo_date=r.ipo_date,listing_trade_rank=rank))
+          frame['candidate_pct']=pcts
+          frame['candidate_upper_limit']=[False if pd.isna(p) else rule.is_upper_limit(c,refc,p)
+                                           for c,refc,p in zip(frame['close'],frame['reference_close_cny'],frame['candidate_pct'])]
+
+          # Detect likely special/no-limit sessions independently of candidate boolean.
+          finite=frame['candidate_pct'].notna()
+          frame['pct_exceeds_normal_band']=finite & (frame['pct_percent'].abs() > (frame['candidate_pct'].astype(float).abs()+0.75))
+          frame['legacy_or_special_listing_day']=(frame['listing_trade_rank']==1) & (frame['candidate_pct'].notna())
+          frame['post_long_gap_day']=frame['calendar_gap_days'].fillna(0)>=30
+          first_by_symbol=frame.groupby('symbol').cumcount()==0
+          frame['first_formal_trade_late_old_stock']=first_by_symbol & (frame['date']>FORMAL_START) & (frame['ipo_date']<FORMAL_START)
+
+          # Delisting arrangement first day candidate: first of final 15 observed trade sessions
+          # for symbols with an authoritative outDate inside/near Formal. This is a REVIEW flag,
+          # not an automatic semantic assertion.
+          frame['delist_final15_first_candidate']=False
+          for symbol,g in frame.groupby('symbol',sort=False):
+              outd=str(out_map.get(symbol) or '')[:10]
+              if outd and outd>='2020-06-01' and len(g)>=15:
+                  last15=g.tail(15)
+                  frame.loc[last15.index[0],'delist_final15_first_candidate']=True
+
+          cand=frame[frame['candidate_upper_limit']].copy()
+          risk_cols=['legacy_or_special_listing_day','post_long_gap_day','first_formal_trade_late_old_stock','delist_final15_first_candidate']
+          cand['special_risk_any']=cand[risk_cols].any(axis=1)
+          risk=cand[cand['special_risk_any']].copy()
+          abnormal=frame[frame['pct_exceeds_normal_band']].copy()
+
+          summary={
+              'artifact':'GP12_UPPER_LIMIT_FULL_BOOLEAN_RISK_PROBE_V1',
+              'status':'PROBE_ONLY_NOT_BINDING',
+              'panel_sha256':PANEL_SHA,
+              'rows':int(len(frame)),'symbols':int(frame['symbol'].nunique()),
+              'candidate_upper_limit_n':int(frame['candidate_upper_limit'].sum()),
+              'candidate_upper_limit_special_risk_n':int(len(risk)),
+              'candidate_true_listing_day_n':int((cand['legacy_or_special_listing_day']).sum()),
+              'candidate_true_post_long_gap_n':int((cand['post_long_gap_day']).sum()),
+              'candidate_true_first_formal_late_old_n':int((cand['first_formal_trade_late_old_stock']).sum()),
+              'candidate_true_delist_final15_first_n':int((cand['delist_final15_first_candidate']).sum()),
+              'pct_exceeds_normal_band_n':int(len(abnormal)),
+              'formal_binding_allowed':False,
+              'historical_gp_v11_source_recovered':False,
+              'model_freeze_allowed':False,'oos_metrics_allowed':False,
+          }
+          out=Path('artifact_gp12_upper_limit_full_boolean_risk_probe_v1'); out.mkdir(exist_ok=True)
+          cols=['symbol','date','ipo_date','out_date','listing_trade_rank','isST','close','reference_close_cny','pct_percent','candidate_pct','candidate_upper_limit','calendar_gap_days']+risk_cols
+          cand[cols+['special_risk_any']].to_csv(out/'CANDIDATE_UPPER_LIMIT_ROWS.csv',index=False)
+          risk[cols+['special_risk_any']].to_csv(out/'CANDIDATE_TRUE_SPECIAL_RISK.csv',index=False)
+          abnormal[cols+['pct_exceeds_normal_band']].to_csv(out/'ABNORMAL_MOVE_SPECIAL_CANDIDATES.csv',index=False)
+          (out/'GP12_UPPER_LIMIT_FULL_BOOLEAN_RISK_PROBE_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload full boolean risk probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-upper-limit-full-boolean-risk-probe-v1
+          path: artifact_gp12_upper_limit_full_boolean_risk_probe_v1/
+          if-no-files-found: error
+          retention-days: 30
