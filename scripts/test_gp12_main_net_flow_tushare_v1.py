@@ -5,11 +5,16 @@ import unittest
 
 from gp12_main_net_flow_tushare_v1 import (
     MONEYFLOW_FIELDS,
+    NA_SYMBOLS,
     aggregate_shard_records,
+    aggregate_shard_reports,
     audit_symbol_rows,
     build_symbol_evidence,
+    expected_dates_from_records,
     fetch_moneyflow_records,
+    formal_symbols_from_scope,
     normalize_moneyflow_records,
+    run_shard,
     summarize_formal_audit,
     write_panel_csv,
 )
@@ -36,6 +41,20 @@ class _FakeApi:
         if self.error is not None:
             raise self.error
         return _FakeFrame(self.records)
+
+
+class _PerSymbolApi:
+    def __init__(self, mapping=None, errors=None):
+        self.mapping = mapping or {}
+        self.errors = errors or {}
+        self.calls = []
+
+    def moneyflow(self, **kwargs):
+        self.calls.append(kwargs)
+        symbol = kwargs["ts_code"]
+        if symbol in self.errors:
+            raise self.errors[symbol]
+        return _FakeFrame(self.mapping.get(symbol, []))
 
 
 class MainNetFlowTushareContractTests(unittest.TestCase):
@@ -174,6 +193,76 @@ class MainNetFlowTushareContractTests(unittest.TestCase):
         record = {"symbol":"000001.SZ","symbol_pass":True,"row_n":1,"blockers":[]}
         with self.assertRaisesRegex(ValueError, "duplicate shard symbol"):
             aggregate_shard_records([[record], [record]])
+
+    def test_formal_scope_is_exact_847_minus_three_na_symbols(self):
+        scope = [f"{i:06d}.SZ" for i in range(1, 845)] + list(NA_SYMBOLS)
+        formal = formal_symbols_from_scope(scope)
+        self.assertEqual(len(scope), 847)
+        self.assertEqual(len(formal), 844)
+        self.assertTrue(all(symbol not in formal for symbol in NA_SYMBOLS))
+        with self.assertRaisesRegex(ValueError, "Formal847 scope identity mismatch"):
+            formal_symbols_from_scope(scope[:-1] + [scope[0]])
+
+    def test_expected_dates_are_taken_from_positive_amount_raw_rows(self):
+        records = [
+            {"symbol":"000001.SZ","date":"2020-06-01","amount":10},
+            {"symbol":"000001.SZ","date":"2020-06-02","amount":20},
+            {"symbol":"600000.SH","date":"2020-06-01","amount":30},
+        ]
+        expected = expected_dates_from_records(records, ["000001.SZ", "600000.SH"])
+        self.assertEqual(expected["000001.SZ"], ["2020-06-01", "2020-06-02"])
+        self.assertEqual(expected["600000.SH"], ["2020-06-01"])
+        with self.assertRaisesRegex(ValueError, "nonpositive or missing"):
+            expected_dates_from_records([
+                {"symbol":"000001.SZ","date":"2020-06-01","amount":0},
+            ], ["000001.SZ"])
+
+    def test_run_shard_continues_after_source_failure_but_materializes_only_passes(self):
+        api = _PerSymbolApi(
+            mapping={
+                "000001.SZ": [{
+                    "ts_code":"000001.SZ","trade_date":"20200601",
+                    "buy_lg_amount":2,"sell_lg_amount":1,"buy_elg_amount":1,"sell_elg_amount":0,
+                    "net_mf_amount":2,
+                }],
+            },
+            errors={"000002.SZ": RuntimeError("temporary source failure")},
+        )
+        report, materialized = run_shard(
+            api,
+            ["000001.SZ", "000002.SZ"],
+            {
+                "000001.SZ": ["2020-06-01"],
+                "000002.SZ": ["2020-06-01"],
+            },
+            shard_index=0,
+            shard_count=1,
+            inter_symbol_delay=0,
+        )
+        self.assertEqual(report["symbol_n"], 2)
+        self.assertEqual(report["pass_n"], 1)
+        self.assertEqual(report["fail_n"], 1)
+        failed = next(r for r in report["records"] if r["symbol"] == "000002.SZ")
+        self.assertEqual(failed["blockers"], ["MAIN_NET_FLOW_SOURCE_FETCH_FAILED"])
+        self.assertEqual(len(materialized), 1)
+        self.assertEqual(materialized[0]["symbol"], "000001.SZ")
+
+    def test_aggregate_shard_reports_requires_complete_unique_shard_partition(self):
+        base = {
+            "artifact":"GP12_MAIN_NET_FLOW_SHARD_V1",
+            "version":"1.0",
+            "shard_count":2,
+            "symbol_n":1,
+            "pass_n":1,
+            "fail_n":0,
+        }
+        r0 = {**base, "shard_index":0, "records":[{"symbol":"000001.SZ","symbol_pass":True,"row_n":1,"blockers":[]}]}
+        r1 = {**base, "shard_index":1, "records":[{"symbol":"000002.SZ","symbol_pass":True,"row_n":1,"blockers":[]}]}
+        out = aggregate_shard_reports([r0, r1])
+        self.assertEqual(len(out["records"]), 2)
+        self.assertFalse(out["main_net_flow_candidate_pit_verified"])
+        with self.assertRaisesRegex(ValueError, "shard partition incomplete"):
+            aggregate_shard_reports([r0])
 
 
 if __name__ == "__main__":
