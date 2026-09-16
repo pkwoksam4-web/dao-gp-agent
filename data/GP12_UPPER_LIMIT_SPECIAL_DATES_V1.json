@@ -1,0 +1,83 @@
+{
+  "artifact": "GP12_UPPER_LIMIT_SPECIAL_DATES_V1",
+  "version": "1.0",
+  "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+  "historical_gp_v11_source_recovered": false,
+  "formal_binding_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "evidence": [
+    {
+      "symbol": "000670.SZ",
+      "date": "2022-08-22",
+      "event_type": "RESUME_LISTING_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2022-08-15/87fef1d8-b6ce-4561-b0d0-d152df0772a0.PDF",
+      "source_note": "Issuer announcement states resumed listing on 2022-08-22 and no price limit on the first resumed trading day."
+    },
+    {
+      "symbol": "000792.SZ",
+      "date": "2021-08-10",
+      "event_type": "RESUME_LISTING_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://disc.static.szse.cn/disc/disk02/finalpage/2021-08-03/226f764b-539a-4c13-80b8-a2453ccf49ff.PDF",
+      "source_note": "Issuer resumption prospectus states the first resumed trading day 2021-08-10 had no price limit."
+    },
+    {
+      "symbol": "000995.SZ",
+      "date": "2020-12-16",
+      "event_type": "RESUME_LISTING_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://disc.static.szse.cn/download/disc/disk02/finalpage/2020-12-15/03bcc8ea-5b2d-4b00-a2c1-74dd60c52484.PDF",
+      "source_note": "Issuer announcement states resumed listing on 2020-12-16 and no price limit that day."
+    },
+    {
+      "symbol": "001267.SZ",
+      "date": "2021-11-17",
+      "event_type": "RELISTING_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://disc.static.szse.cn/download/disc/disk02/finalpage/2021-11-11/1e353b59-91ff-4ef4-9309-978731901caa.PDF",
+      "source_note": "Issuer relisting document applies the no-price-limit first-day trading mechanism to 2021-11-17."
+    },
+    {
+      "symbol": "001289.SZ",
+      "date": "2022-01-24",
+      "event_type": "ABSORPTION_MERGER_LISTING_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2022-01-21/a6274d47-d0ce-44c8-8dde-0a047c9a4532.PDF",
+      "source_note": "Listing announcement for the share-exchange absorption merger states no price limit on 2022-01-24."
+    },
+    {
+      "symbol": "600190.SH",
+      "date": "2025-06-30",
+      "event_type": "DELISTING_PERIOD_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250620_10782528.shtml",
+      "source_note": "SSE termination decision states the delisting-period first trading day has no price limit; the period starts 2025-06-30."
+    },
+    {
+      "symbol": "600200.SH",
+      "date": "2025-12-09",
+      "event_type": "DELISTING_PERIOD_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20251201_10800406.shtml",
+      "source_note": "SSE termination decision states the delisting-period first trading day has no price limit; the observed first trading date is 2025-12-09."
+    },
+    {
+      "symbol": "600387.SH",
+      "date": "2025-06-16",
+      "event_type": "DELISTING_PERIOD_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250606_10781122.shtml",
+      "source_note": "SSE termination decision states the delisting-period first trading day has no price limit; the period starts 2025-06-16."
+    },
+    {
+      "symbol": "600462.SH",
+      "date": "2025-06-24",
+      "event_type": "DELISTING_PERIOD_FIRST_DAY",
+      "evidence_status": "PRIMARY_SOURCE_VERIFIED",
+      "source_url": "https://www.sse.com.cn/disclosure/announcement/listing/stock/c/c_20250616_10782058.shtml",
+      "source_note": "SSE termination decision states the delisting-period first trading day has no price limit; trading on 2025-06-24 is independently evidenced by the SSE intraday suspension notice."
+    }
+  ]
+}
