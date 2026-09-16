@@ -1,0 +1,82 @@
+name: GP12 Main Net Flow HF Global Search V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-hf-global-search-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Hugging Face client
+        run: pip install -q huggingface_hub pyarrow pandas requests
+      - name: Search public datasets and inspect candidate schemas
+        run: |
+          python - <<'PY'
+          import io, json, re, requests
+          import pyarrow.parquet as pq
+          from huggingface_hub import HfApi, hf_hub_url
+
+          api = HfApi()
+          queries = ['tushare', 'moneyflow', 'money flow', 'A股', 'china stock', 'Chinese stock', 'stock data china']
+          repos = {}
+          for q in queries:
+              try:
+                  for ds in api.list_datasets(search=q, limit=100, full=False):
+                      repos[ds.id] = {'queries': sorted(set(repos.get(ds.id,{}).get('queries',[])+[q]))}
+              except Exception as exc:
+                  print('SEARCH_ERROR', q, type(exc).__name__, str(exc)[:300])
+          print('DATASET_N', len(repos))
+
+          path_needles = ('moneyflow','money_flow','net_mf','buy_lg','sell_lg','buy_elg','sell_elg','fund_flow','capital_flow')
+          schema_needles = {'net_mf_amount','buy_lg_amount','sell_lg_amount','buy_elg_amount','sell_elg_amount'}
+          hits=[]
+          inspected=0
+          for repo_id, meta in list(repos.items())[:500]:
+              try:
+                  files=api.list_repo_files(repo_id=repo_id, repo_type='dataset')
+              except Exception as exc:
+                  print('LIST_ERROR', repo_id, type(exc).__name__, str(exc)[:200])
+                  continue
+              path_hits=[p for p in files if any(n in p.lower() for n in path_needles)]
+              data_files=[p for p in files if p.lower().endswith(('.parquet','.csv','.csv.gz','.jsonl','.jsonl.gz'))]
+              candidate={'repo':repo_id,'queries':meta['queries'],'file_n':len(files),'path_hits':path_hits[:100]}
+              schema_hits=[]
+              # Inspect limited parquet schemas without full download where possible.
+              for p in data_files[:30]:
+                  if not p.lower().endswith('.parquet'):
+                      continue
+                  try:
+                      url=hf_hub_url(repo_id=repo_id, filename=p, repo_type='dataset')
+                      rr=requests.get(url,headers={'Range':'bytes=0-65535'},timeout=15,allow_redirects=True)
+                      # Range often cannot expose parquet footer. Try metadata only if file is small enough.
+                      size=int(rr.headers.get('content-range','bytes */0').split('/')[-1]) if '/' in rr.headers.get('content-range','') else int(rr.headers.get('content-length','0') or 0)
+                      if size and size <= 25_000_000:
+                          full=requests.get(url,timeout=30)
+                          if full.status_code==200:
+                              table=pq.read_schema(io.BytesIO(full.content))
+                              cols=set(table.names)
+                              matched=sorted(cols & schema_needles)
+                              if matched:
+                                  schema_hits.append({'path':p,'matched':matched,'cols':table.names[:120],'bytes':len(full.content)})
+                  except Exception as exc:
+                      pass
+              if path_hits or schema_hits:
+                  candidate['schema_hits']=schema_hits
+                  hits.append(candidate)
+                  print('CANDIDATE',json.dumps(candidate,ensure_ascii=False))
+              inspected += 1
+          print('INSPECTED_N', inspected)
+          print('HIT_N', len(hits))
+          print('SUMMARY', json.dumps(hits,ensure_ascii=False,indent=2))
+          if not hits:
+              raise RuntimeError('NO_PUBLIC_HF_MONEYFLOW_DATASET_FOUND')
+          PY
