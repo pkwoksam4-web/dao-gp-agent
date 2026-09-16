@@ -1,0 +1,377 @@
+name: GP12 Market Breadth Bridge V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-market-breadth-bridge-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  collect:
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas requests
+      - name: Download breadth feasibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-market-breadth-feasibility-v1
+          path: feasibility
+          run-id: 35053614838
+          github-token: ${{ github.token }}
+      - name: Download authoritative PIT-ST panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Collect previous traded close for old-lifecycle bridge rows
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          python - <<'PY'
+          import csv, json, os, re, time
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          SHARD=int(os.environ['SHARD']); N=8
+          bridges=pd.read_csv('feasibility/GP12_MARKET_BREADTH_BRIDGES_V1.csv',dtype={'symbol':str})
+          pit=pd.read_csv('pitst/PIT_ST_DAILY_MERGED_V480.csv',dtype={'symbol':str})
+          bridges['symbol']=bridges['symbol'].str.upper()
+          pit['symbol']=pit['symbol'].str.upper(); pit['date']=pit['date'].astype(str).str[:10]
+          first_pit=pit.groupby('symbol',sort=True)['date'].min().to_dict()
+          bridges['first_pit_date']=bridges['symbol'].map(first_pit)
+          old=bridges[bridges['first_pit_date']=='2020-06-01'].sort_values('symbol').reset_index(drop=True)
+          new=bridges[bridges['first_pit_date']!='2020-06-01'].sort_values('symbol').reset_index(drop=True)
+          assert len(bridges)==844, len(bridges)
+          assert len(old)==737, len(old)
+          assert len(new)==107, len(new)
+          selected=old.iloc[[i for i in range(len(old)) if i % N == SHARD]]
+
+          def parse(raw:bytes):
+              text=None
+              for enc in ('utf-8-sig','gb18030'):
+                  try: text=raw.decode(enc); break
+                  except UnicodeDecodeError: pass
+              if text is None: raise ValueError('decode failed')
+              m=re.match(r'^\s*historySearchHandler\((.*)\)\s*;?\s*$',text.strip(),re.S)
+              if not m: raise ValueError('jsonp wrapper mismatch')
+              obj=json.loads(m.group(1))
+              if not isinstance(obj,list) or not obj: return [], 'VALID_EMPTY'
+              block=obj[0]
+              status=int(block.get('status',-1)) if isinstance(block,dict) else -1
+              if status != 0:
+                  # Sohu uses nonzero status for legitimate empty history on some symbols.
+                  return [], f'VALID_EMPTY_STATUS_{status}'
+              out=[]
+              for p in block.get('hq') or []:
+                  if not isinstance(p,list) or len(p)<3: continue
+                  d=str(p[0])[:10]
+                  try: c=float(p[2])
+                  except (TypeError,ValueError): continue
+                  if re.fullmatch(r'\d{4}-\d{2}-\d{2}',d) and c>0:
+                      out.append((d,c))
+              return out, 'VALID_ROWS'
+
+          def request_history(symbol):
+              code=symbol.split('.')[0]
+              params={
+                  'code':f'cn_{code}','start':'19900101','end':'20200531','stat':'1',
+                  'order':'D','period':'d','callback':'historySearchHandler','rt':'jsonp'
+              }
+              last=None
+              for attempt in range(4):
+                  for base in ('https://q.stock.sohu.com/hisHq','http://q.stock.sohu.com/hisHq'):
+                      try:
+                          r=requests.get(base,params=params,timeout=20,headers={
+                              'User-Agent':'Mozilla/5.0 GP12-MARKET-BREADTH-BRIDGE/1.0',
+                              'Referer':f'https://q.stock.sohu.com/cn/{code}/lshq.shtml',
+                              'Connection':'close','Accept':'*/*'})
+                          r.raise_for_status()
+                          rows,state=parse(r.content)
+                          # Any syntactically valid Sohu response is authoritative for this probe.
+                          return rows,state,None
+                      except Exception as exc:
+                          last=f'{type(exc).__name__}: {exc}'
+                  time.sleep(0.6*(attempt+1))
+              return [],'SOURCE_ERROR',last
+
+          results=[]
+          for _,r in selected.iterrows():
+              symbol=r['symbol']; rows,state,error=request_history(symbol)
+              before=[x for x in rows if x[0]<'2020-06-01']
+              previous=max(before,key=lambda x:x[0]) if before else None
+              rec={
+                  'symbol':symbol,
+                  'first_formal_trade_date':str(r['first_formal_trade_date'])[:10],
+                  'first_pit_date':str(r['first_pit_date'])[:10],
+                  'provider_state':state,
+                  'previous_trade_date':previous[0] if previous else '',
+                  'previous_close':previous[1] if previous else '',
+                  'rows_returned':len(rows),
+                  'error':error or '',
+              }
+              results.append(rec)
+              print(json.dumps(rec,ensure_ascii=False),flush=True)
+              time.sleep(0.08)
+
+          out=Path(f'artifact_bridge_{SHARD}'); out.mkdir(exist_ok=True)
+          fields=['symbol','first_formal_trade_date','first_pit_date','provider_state','previous_trade_date','previous_close','rows_returned','error']
+          with (out/f'bridge_{SHARD}.csv').open('w',newline='',encoding='utf-8') as f:
+              w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(results)
+          summary={
+              'artifact':'GP12_MARKET_BREADTH_BRIDGE_SHARD_V1','shard':SHARD,'shard_count':N,
+              'selected_n':len(selected),'resolved_n':sum(bool(x['previous_trade_date']) for x in results),
+              'valid_empty_n':sum(x['provider_state'].startswith('VALID_EMPTY') and not x['previous_trade_date'] for x in results),
+              'source_error_n':sum(x['provider_state']=='SOURCE_ERROR' for x in results),
+              'candidate_definition_approved':False,'formal_binding_allowed':False,
+              'model_freeze_allowed':False,'oos_metrics_allowed':False,
+          }
+          (out/f'bridge_{SHARD}.json').write_text(json.dumps(summary,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          if summary['source_error_n']:
+              raise SystemExit('SOURCE_ERROR_PRESENT')
+          PY
+      - name: Upload bridge shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-market-breadth-bridge-v1-shard-${{ matrix.shard }}
+          path: artifact_bridge_${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  merge:
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas
+      - name: Restore verified PIT adjusted-close code
+        run: |
+          git checkout 30a826f2e4e1dc4350b3e89453e66848a8d5141f -- \
+            scripts/gp12_pit_adjusted_close_v482.py \
+            scripts/gp12_pit_adjusted_close_audit_v482.py \
+            scripts/gp12_pit_full_audit_v482.py \
+            scripts/run_gp12_pit_full_audit_v482.py \
+            scripts/materialize_gp12_pit_availability_manifest_v482.py \
+            data/gp12_pit_event_availability_v482_chunks
+          python scripts/materialize_gp12_pit_availability_manifest_v482.py
+      - name: Download breadth feasibility evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-market-breadth-feasibility-v1
+          path: feasibility
+          run-id: 35053614838
+          github-token: ${{ github.token }}
+      - name: Download authoritative PIT-ST panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Download bridge shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp12-market-breadth-bridge-v1-shard-*
+          path: bridge_shards
+          merge-multiple: true
+      - name: Download frozen event closure
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download event override stages
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: final_four
+          run-id: 34117443729
+          github-token: ${{ github.token }}
+      - name: Merge bridge evidence and materialize complete candidate breadth series
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import csv, glob, hashlib, json
+          from collections import defaultdict
+          from pathlib import Path
+          import pandas as pd
+          from gp12_pit_full_audit_v482 import merge_final_override_ratios, _event_key, _date
+          from gp12_pit_adjusted_close_audit_v482 import finalize_symbol_events
+          from gp12_pit_adjusted_close_v482 import build_forward_pit_adjusted_path
+          from run_gp12_pit_full_audit_v482 import load_json
+
+          bridges=pd.read_csv('feasibility/GP12_MARKET_BREADTH_BRIDGES_V1.csv',dtype={'symbol':str})
+          partial=pd.read_csv('feasibility/GP12_MARKET_BREADTH_PARTIAL_DAILY_V1.csv')
+          pit=pd.read_csv('pitst/PIT_ST_DAILY_MERGED_V480.csv',dtype={'symbol':str})
+          bridges['symbol']=bridges['symbol'].str.upper(); pit['symbol']=pit['symbol'].str.upper()
+          pit['date']=pit['date'].astype(str).str[:10]
+          first_pit=pit.groupby('symbol')['date'].min().to_dict()
+          bridges['first_pit_date']=bridges['symbol'].map(first_pit)
+          old=bridges[bridges['first_pit_date']=='2020-06-01'].copy()
+          new=bridges[bridges['first_pit_date']!='2020-06-01'].copy()
+          assert len(old)==737 and len(new)==107
+
+          shard_files=sorted(glob.glob('bridge_shards/bridge_*.csv'))
+          assert len(shard_files)==8, shard_files
+          fetched=pd.concat([pd.read_csv(p,dtype={'symbol':str}) for p in shard_files],ignore_index=True)
+          fetched['symbol']=fetched['symbol'].str.upper()
+          assert len(fetched)==737 and fetched['symbol'].nunique()==737
+          assert set(fetched['symbol'])==set(old['symbol'])
+          errors=fetched[fetched['provider_state']=='SOURCE_ERROR']
+          assert errors.empty, errors[['symbol','error']].to_dict('records')[:20]
+
+          manifest=json.loads(Path('data/GP12_PIT_EVENT_AVAILABILITY_V482.json').read_text(encoding='utf-8'))
+          frozen=load_json(Path('frozen'),'GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json')
+          records={str(r['symbol']).upper():r for r in frozen['records']}
+          effective=load_json(Path('effective'),'EFFECTIVE_TERM_CLOSURE_V482.json')
+          secondary=load_json(Path('secondary'),'REMAINING_EXACT_CLOSURE_V482.json')
+          reparsed=load_json(Path('reparsed'),'REPARSED_REMAINING_CLOSURE_V482.json')
+          recovered=load_json(Path('recovered'),'RECOVERED_REMAINING_CLOSURE_V482.json')
+          final_six=load_json(Path('final_six'),'FINAL_SIX_CLOSURE_V482.json')
+          final_four=load_json(Path('final_four'),'FINAL_FOUR_CLOSURE_V482.json')
+          stages=[effective.get('event_overrides') or [],secondary.get('accepted_overrides') or [],
+                  reparsed.get('new_overrides') or [],recovered.get('accepted_overrides') or [],
+                  final_six.get('accepted_overrides') or [],final_four.get('accepted_overrides') or []]
+          nominal={_event_key(r):_date(r.get('availability_date'),'availability_date') for r in manifest['nominal_events']}
+          final_av={_event_key(r):_date(r.get('availability_date'),'availability_date') for r in manifest['standard_overrides']}
+          for r in manifest['special_overrides']:
+              final_av[_event_key(r)]=_date(r.get('formula_availability_date'),'formula_availability_date')
+          merged=merge_final_override_ratios(stages,manifest['special_overrides'],final_av,expected_standard_n=270,expected_special_n=11)
+
+          bridge_dirs=[]; resolved=0; no_previous=0
+          old_map={r['symbol']:r for _,r in old.iterrows()}
+          for _,fr in fetched.sort_values('symbol').iterrows():
+              symbol=fr['symbol']; b=old_map[symbol]
+              prev_date=str(fr.get('previous_trade_date') or '')[:10]
+              prev_close=fr.get('previous_close')
+              if not prev_date or pd.isna(prev_close):
+                  no_previous+=1
+                  bridge_dirs.append({'symbol':symbol,'date':str(b['first_formal_trade_date'])[:10],
+                                      'bridge_status':'EXCLUDE_NO_PREVIOUS_TRADE','direction':''})
+                  continue
+              prev_close=float(prev_close); cur_close=float(b['raw_close'])
+              final_events=finalize_symbol_events(symbol,records[symbol].get('events') or [],nominal,merged['ratios'],merged['availability'])
+              path=build_forward_pit_adjusted_path([
+                  {'date':prev_date,'close':prev_close},
+                  {'date':str(b['first_formal_trade_date'])[:10],'close':cur_close},
+              ],final_events)
+              assert len(path)==2 and path[0]['date']<path[1]['date']
+              a=float(path[0]['adjusted_close']); c=float(path[1]['adjusted_close'])
+              direction='UP' if c>a else ('DOWN' if c<a else 'FLAT')
+              bridge_dirs.append({'symbol':symbol,'date':path[1]['date'],'bridge_status':'RESOLVED_PIT_ADJUSTED','direction':direction})
+              resolved+=1
+
+          for _,b in new.iterrows():
+              bridge_dirs.append({'symbol':b['symbol'],'date':str(b['first_formal_trade_date'])[:10],
+                                  'bridge_status':'EXCLUDE_NEW_LIFECYCLE_FIRST_TRADE','direction':''})
+
+          adds=defaultdict(lambda:{'advancers':0,'decliners':0,'flat':0,'comparable':0})
+          for r in bridge_dirs:
+              if r['bridge_status']!='RESOLVED_PIT_ADJUSTED': continue
+              d=r['date']; adds[d]['comparable']+=1
+              if r['direction']=='UP': adds[d]['advancers']+=1
+              elif r['direction']=='DOWN': adds[d]['decliners']+=1
+              else: adds[d]['flat']+=1
+
+          final_rows=[]
+          for _,r in partial.iterrows():
+              d=str(r['date'])[:10]; a=adds[d]
+              adv=int(r['advancers'])+a['advancers']; dec=int(r['decliners'])+a['decliners']
+              flat=int(r['flat'])+a['flat']; comp=int(r['comparable'])+a['comparable']
+              directional=adv+dec
+              assert directional>0, d
+              ratio=adv/directional
+              assert 0.0<=ratio<=1.0
+              final_rows.append({'date':d,'advancers':adv,'decliners':dec,'flat':flat,'comparable':comp,
+                                 'directional_n':directional,'market_breadth_ratio':ratio})
+          assert len(final_rows)==1426
+          assert final_rows[0]['date']=='2020-06-01' and final_rows[-1]['date']=='2026-04-17'
+
+          out=Path('artifact_gp12_market_breadth_bridge_v1'); out.mkdir(exist_ok=True)
+          with (out/'GP12_MARKET_BREADTH_BRIDGE_DIRECTIONS_V1.csv').open('w',newline='',encoding='utf-8') as f:
+              w=csv.DictWriter(f,fieldnames=['symbol','date','bridge_status','direction']); w.writeheader(); w.writerows(sorted(bridge_dirs,key=lambda x:x['symbol']))
+          with (out/'GP12_MARKET_BREADTH_CANDIDATE_DAILY_V1.csv').open('w',newline='',encoding='utf-8') as f:
+              fields=['date','advancers','decliners','flat','comparable','directional_n','market_breadth_ratio']
+              w=csv.DictWriter(f,fieldnames=fields); w.writeheader(); w.writerows(final_rows)
+          series_path=out/'GP12_MARKET_BREADTH_CANDIDATE_DAILY_V1.csv'
+          audit={
+              'artifact':'GP12_MARKET_BREADTH_BRIDGE_V1','status':'PASS_COMPLETE_CANDIDATE_SERIES',
+              'definition':'advancers/(advancers+decliners); flat and first trade without prior comparable trade are excluded from denominator',
+              'formal_window':['2020-06-01','2026-04-17'],'formal_symbol_n':844,'date_n':1426,
+              'old_lifecycle_bridge_n':737,'new_lifecycle_first_trade_excluded_n':107,
+              'bridge_resolved_n':resolved,'old_lifecycle_no_previous_trade_excluded_n':no_previous,
+              'candidate_series_sha256':hashlib.sha256(series_path.read_bytes()).hexdigest(),
+              'pit_scope':'SESSION_CLOSE_NO_LOOKAHEAD_POLICY','same_session_usable_before_close':False,
+              'historical_gp_v11_source_recovered':False,'candidate_definition_approved':False,
+              'formal_binding_allowed':False,'model_freeze_allowed':False,'oos_metrics_allowed':False,
+          }
+          (out/'GP12_MARKET_BREADTH_BRIDGE_V1.json').write_text(json.dumps(audit,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(audit,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload complete candidate breadth evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-market-breadth-bridge-v1
+          path: artifact_gp12_market_breadth_bridge_v1/
+          if-no-files-found: error
+          retention-days: 30
