@@ -72,7 +72,7 @@ jobs:
           p=Path('artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json')
           x=json.loads(p.read_text(encoding='utf-8'))
           assert x['artifact']=='GP12_CANDIDATE_INPUT_READINESS_V1'
-          assert x['asset_hashes']['factor_definition_sha256']=='b52f394fb13417e6f0323f7175a50a7d950bda8af09f63a97e739c6a4c70160e'
+          assert x['asset_hashes']['factor_definition_sha256']=='b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e'
           assert x['asset_hashes']['parameter_sha256']=='22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204'
           assert x['amount_turnover_binding_artifact']=='GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1'
           assert x['amount_turnover_binding_sha256']=='47b83c11b7190f4bb8f3bc69900f75fd682362ed5e20d6cbb3b9c4d7bdbe4998'
