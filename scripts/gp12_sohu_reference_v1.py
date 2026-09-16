@@ -40,6 +40,13 @@ def _percent(value: object, field: str) -> Decimal:
     return _decimal(text[:-1], field)
 
 
+def _optional_percent(value: object, field: str) -> Decimal | None:
+    text = str(value).strip()
+    if text in {"", "-"}:
+        return None
+    return _percent(text, field)
+
+
 def _money_cents(value: Decimal) -> Decimal:
     return value.quantize(CENT, rounding=ROUND_HALF_UP)
 
@@ -96,7 +103,7 @@ def parse_hishq_reference_bytes(symbol: str, raw: bytes) -> list[dict]:
         close = _decimal(source_row[2], "close")
         change = _decimal(source_row[3], "change_cny")
         pct = _percent(source_row[4], "pct_percent")
-        turnover = _percent(source_row[9], "turnover_percent")
+        turnover = _optional_percent(source_row[9], "turnover_percent")
         reference = _money_cents(close - change)
         rows.append(
             {
@@ -105,7 +112,7 @@ def parse_hishq_reference_bytes(symbol: str, raw: bytes) -> list[dict]:
                 "close": float(close),
                 "change_cny": float(change),
                 "pct_percent": float(pct),
-                "turnover_percent": float(turnover),
+                "turnover_percent": None if turnover is None else float(turnover),
                 "reference_close_cny": float(reference),
                 "source": "SOHU_HISHQ_REFERENCE_V1",
             }
