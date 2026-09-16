@@ -1,0 +1,87 @@
+name: GP12 Upper Limit Risk Truth Coverage V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-upper-limit-risk-truth-coverage-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -q pandas pyarrow
+
+      - name: Download full boolean risk probe
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-upper-limit-full-boolean-risk-probe-v1
+          path: risk
+          run-id: 35071618075
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download canonical high-limit truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-canonical-v1
+          path: truth
+          run-id: 35060927372
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Crosscheck risk rows
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          risk_path=next(Path('risk').rglob('CANDIDATE_TRUE_SPECIAL_RISK.csv'))
+          truth_path=next(Path('truth').rglob('HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet'))
+          risk=pd.read_csv(risk_path,dtype={'symbol':str,'date':str})
+          truth=pd.read_parquet(truth_path)
+          truth['symbol']=truth['code'].astype(str).str.upper(); truth['date']=truth['date'].astype(str).str[:10]
+          truth=truth[['symbol','date','close','prev_close','high_limit']]
+          merged=risk.merge(truth,on=['symbol','date'],how='left',suffixes=('_risk','_truth'),validate='one_to_one')
+          covered=merged[merged['high_limit'].notna()].copy()
+          uncovered=merged[merged['high_limit'].isna()].copy()
+          covered['truth_upper_limit']=(covered['high_limit']<99999.0) & ((covered['close_truth']-covered['high_limit']).abs()<0.0051)
+          covered['candidate_truth_match']=covered['candidate_upper_limit'].astype(bool)==covered['truth_upper_limit'].astype(bool)
+          summary={
+            'artifact':'GP12_UPPER_LIMIT_RISK_TRUTH_COVERAGE_V1',
+            'risk_rows':int(len(risk)),
+            'truth_covered_rows':int(len(covered)),
+            'truth_uncovered_rows':int(len(uncovered)),
+            'covered_boolean_mismatch_n':int((~covered['candidate_truth_match']).sum()),
+            'status':'PROBE_ONLY_NOT_BINDING',
+            'formal_binding_allowed':False,
+            'historical_gp_v11_source_recovered':False,
+            'model_freeze_allowed':False,
+            'oos_metrics_allowed':False,
+          }
+          out=Path('artifact_gp12_upper_limit_risk_truth_coverage_v1'); out.mkdir(exist_ok=True)
+          covered.to_csv(out/'RISK_ROWS_TRUTH_COVERED.csv',index=False)
+          uncovered.to_csv(out/'RISK_ROWS_TRUTH_UNCOVERED.csv',index=False)
+          (out/'GP12_UPPER_LIMIT_RISK_TRUTH_COVERAGE_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload crosscheck
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-upper-limit-risk-truth-coverage-v1
+          path: artifact_gp12_upper_limit_risk_truth_coverage_v1/
+          if-no-files-found: error
+          retention-days: 30
