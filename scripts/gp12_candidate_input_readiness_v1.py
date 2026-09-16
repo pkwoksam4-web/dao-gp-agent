@@ -23,6 +23,8 @@ MAIN_NET_FLOW_REQUIREMENT_SHA256 = "13577a123a506750d1070c91c96bb603aa727fb9f782
 STATUS_PARTIAL_BINDING_ARTIFACT = "GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1"
 STATUS_PARTIAL_BINDING_SHA256 = "e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10"
 STATUS_UPPER_LIMIT_BLOCKER = "STATUS_UPPER_LIMIT_UNBOUND"
+MARKET_BREADTH_BINDING_ARTIFACT = "GP12_CANDIDATE_MARKET_BREADTH_BINDING_V1"
+MARKET_BREADTH_BINDING_SHA256 = "337f6dafa3894c55fb8f24b87779d600c9258b1c09f10b8b140d65a120eed1c1"
 MAIN_NET_FLOW_BLOCKERS = [
     "MAIN_NET_FLOW_UNBOUND",
     "TUSHARE_CREDENTIAL_REQUIRED",
@@ -244,6 +246,97 @@ def validate_main_net_flow_requirement(requirement: dict) -> str:
     return requirement_sha
 
 
+def validate_market_breadth_binding(binding: dict) -> str:
+    """Validate the exact candidate-only market-breadth reconstruction binding."""
+    _require(isinstance(binding, dict), "market-breadth binding must be an object")
+    binding_sha = _canonical_json_sha256(binding)
+    _require(binding_sha == MARKET_BREADTH_BINDING_SHA256, "MARKET_BREADTH_BINDING_IDENTITY_MISMATCH")
+    _require(binding.get("artifact") == MARKET_BREADTH_BINDING_ARTIFACT, "market-breadth artifact mismatch")
+    _require(binding.get("version") == "1.0", "market-breadth version mismatch")
+    _require(binding.get("strategy_id") == "GP12_REBUILD_CANDIDATE_V1", "market-breadth strategy mismatch")
+    _require(binding.get("status") == "CANDIDATE_ONLY_UNAPPROVED", "market-breadth status mismatch")
+    _require(binding.get("origin") == "NEW_RECONSTRUCTION_CANDIDATE", "market-breadth origin mismatch")
+    _require(binding.get("formal_window") == [FORMAL_START, FORMAL_END], "market-breadth formal window mismatch")
+    _require(binding.get("universe_n") == 847, "market-breadth universe mismatch")
+    _require(binding.get("formal_symbol_n") == 844, "market-breadth formal-symbol mismatch")
+    _require(binding.get("na_symbols") == NA_SYMBOLS, "market-breadth N/A partition mismatch")
+    _require(binding.get("date_n") == 1426, "market-breadth date coverage mismatch")
+
+    definition = binding.get("definition") or {}
+    _require(definition.get("candidate_field") == "market_breadth_ratio", "market-breadth field mismatch")
+    _require(definition.get("formula") == "advancers/(advancers+decliners)", "market-breadth formula mismatch")
+    _require(definition.get("advancer") == "current PIT-adjusted close > previous comparable traded PIT-adjusted close", "market-breadth advancer semantics mismatch")
+    _require(definition.get("decliner") == "current PIT-adjusted close < previous comparable traded PIT-adjusted close", "market-breadth decliner semantics mismatch")
+    _require(definition.get("flat") == "excluded from denominator", "market-breadth flat semantics mismatch")
+    _require(definition.get("first_trade_without_prior_comparable_trade") == "excluded from denominator", "market-breadth first-trade semantics mismatch")
+
+    feasibility = binding.get("feasibility_source") or {}
+    _require(feasibility.get("workflow_run") == 35053614838, "market-breadth feasibility run mismatch")
+    _require(feasibility.get("artifact_name") == "gp12-market-breadth-feasibility-v1", "market-breadth feasibility artifact mismatch")
+    _require(feasibility.get("artifact_id") == 10429504424, "market-breadth feasibility artifact id mismatch")
+    _require(feasibility.get("artifact_zip_sha256") == "96e37573e48c37b9b3f021d59f4bce93a476c87cc53308fc0c1f83e93abb5c99", "market-breadth feasibility digest mismatch")
+    _require(feasibility.get("raw_trade_rows") == EXPECTED_TRADE_ROWS, "market-breadth feasibility raw rows mismatch")
+    _require(feasibility.get("directly_comparable_rows") == 1_010_763, "market-breadth comparable rows mismatch")
+    _require(feasibility.get("bridge_rows") == 844, "market-breadth bridge rows mismatch")
+
+    bridge = binding.get("bridge_source") or {}
+    _require(bridge.get("workflow_run") == 35054180237, "market-breadth bridge run mismatch")
+    _require(bridge.get("workflow_head") == "6a0eb77dd54c7cabda128f1d84f9954eba2d0037", "market-breadth bridge head mismatch")
+    _require(bridge.get("artifact_name") == "gp12-market-breadth-bridge-v1", "market-breadth bridge artifact mismatch")
+    _require(bridge.get("artifact_id") == 10429659699, "market-breadth bridge artifact id mismatch")
+    _require(bridge.get("artifact_zip_sha256") == "9615dba0c2eb9c3db2cd04cf8d5ecf2509752f419fb65ef38815b851185b8031", "market-breadth bridge digest mismatch")
+    _require(bridge.get("candidate_series_sha256") == "7aaa527806d373133fbedd202b92d3e5da8b903099cfc3335b267951ead3c788", "market-breadth series digest mismatch")
+    _require(bridge.get("status") == "PASS_COMPLETE_CANDIDATE_SERIES", "market-breadth bridge status mismatch")
+    _require(bridge.get("old_lifecycle_bridge_n") == 737, "market-breadth old-lifecycle bridge count mismatch")
+    _require(bridge.get("bridge_resolved_n") == 737, "market-breadth resolved bridge count mismatch")
+    _require(bridge.get("old_lifecycle_no_previous_trade_excluded_n") == 0, "market-breadth unresolved old-lifecycle bridge remains")
+    _require(bridge.get("new_lifecycle_first_trade_excluded_n") == 107, "market-breadth new-lifecycle exclusion mismatch")
+    expected_shards = [
+        (0, 10430435903, "8dfa53d6639873e8fcc9a7a1be6c1a800b4ecfc9a57dc980a301c63fdd4eb744"),
+        (1, 10429857095, "b0cb15e0a3cadfe9004bef4fd4dd652a80c7e5f1620a333256b7f64fe960e563"),
+        (2, 10429329110, "1aa46d19519a71718d1c730ebddd5cd7ba26ee213eaf921912ab92d909d10cc9"),
+        (3, 10430096336, "0a760ca1fe2bc0cda9e886cc907f829ad9008528c45d5a656f763b0d289c103b"),
+        (4, 10430475749, "a01378872d3142f16ab3c3efb2f081908916b92a9a6d3ead420eacc7a6f4a7fd"),
+        (5, 10429808408, "0ba93455fd59e87ee9f6f35227fc0070c31a3b17efb0f152d0f76afe0e6d6509"),
+        (6, 10429817130, "1ae133119fa0aae58e91d2233873140d2b087642cdaa0ea70460c1be2a6e2991"),
+        (7, 10430600407, "53410e8a9147c493230cc4aa1c91913383f93d2bbae93146855bc9b2130ef58a"),
+    ]
+    actual_shards = [(row.get("shard"), row.get("artifact_id"), row.get("artifact_zip_sha256")) for row in (bridge.get("bridge_shards") or [])]
+    _require(actual_shards == expected_shards, "market-breadth bridge shard identities mismatch")
+
+    adjusted = binding.get("pit_adjusted_close_source") or {}
+    _require(adjusted.get("workflow_run") == 34928104668, "market-breadth adjusted-close run mismatch")
+    _require(adjusted.get("workflow_head") == "30a826f2e4e1dc4350b3e89453e66848a8d5141f", "market-breadth adjusted-close head mismatch")
+    _require(adjusted.get("artifact_name") == "gp12-pit-adjusted-close-full-audit-v482", "market-breadth adjusted-close artifact mismatch")
+    _require(adjusted.get("artifact_id") == 10380675799, "market-breadth adjusted-close artifact id mismatch")
+    _require(adjusted.get("artifact_zip_sha256") == "fb57bce61a9156fa3d2bb327dc1d8dba70c6fa9739eb7d87bfb5a3e88c6e9b3f", "market-breadth adjusted-close digest mismatch")
+    _require(adjusted.get("audit_json_sha256") == "2d75ace7461d4e7879e49a1678bb0d51f0acc3ca3abdc380c068876c1c569c6e", "market-breadth adjusted-close audit digest mismatch")
+    _require(adjusted.get("formal_symbol_n") == 844, "market-breadth adjusted-close symbol coverage mismatch")
+    _require(adjusted.get("raw_trade_rows") == EXPECTED_TRADE_ROWS, "market-breadth adjusted-close row coverage mismatch")
+    _require(adjusted.get("constant_scale_pass_n") == 844 and adjusted.get("constant_scale_fail_n") == 0, "market-breadth adjusted-close audit not fully green")
+    _require(adjusted.get("adjusted_close_pit_verified") is True, "market-breadth adjusted-close PIT not verified")
+
+    raw = binding.get("raw_trade_source") or {}
+    _require(raw.get("provider") == "Sohu", "market-breadth raw provider mismatch")
+    _require(raw.get("workflow_run") == 34192233633, "market-breadth raw run mismatch")
+    _require(raw.get("artifact_name") == "gp-sohu-full-raw-v482-reaudit", "market-breadth raw artifact mismatch")
+    _require(raw.get("artifact_id") == 10042614517, "market-breadth raw artifact id mismatch")
+    _require(raw.get("artifact_zip_sha256") == "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550", "market-breadth raw artifact digest mismatch")
+    _require(raw.get("formal_trade_rows") == EXPECTED_TRADE_ROWS, "market-breadth raw row coverage mismatch")
+
+    pit_state = binding.get("pit") or {}
+    _require(pit_state.get("scope") == "SESSION_CLOSE_NO_LOOKAHEAD_POLICY", "market-breadth PIT scope mismatch")
+    _require(pit_state.get("same_session_market_breadth_usable_before_close") is False, "same-session market breadth lookahead allowed")
+    _require(pit_state.get("historical_provider_publication_timestamp_proven") is False, "market-breadth provider publication timestamp must remain unproven")
+    _require(pit_state.get("market_breadth_candidate_pit_verified") is True, "market-breadth candidate PIT not verified")
+    _require(binding.get("historical_gp_v11_source_recovered") is False, "historical GP V1.1 market breadth recovery cannot be claimed")
+    _require(binding.get("family_ready") is True, "market-breadth family readiness mismatch")
+    _require(binding.get("model_freeze_allowed") is False, "market-breadth binding cannot open model freeze")
+    _require(binding.get("oos_metrics_allowed") is False, "market-breadth binding cannot open OOS metrics")
+    _require(binding.get("blockers") == [], "market-breadth binding blockers remain")
+    return binding_sha
+
+
 def validate_status_partial_binding(binding: dict) -> str:
     """Validate candidate-only partial status evidence without promoting status."""
     _require(isinstance(binding, dict), "status partial binding must be an object")
@@ -323,6 +416,7 @@ def build_checkpoint(
     amount_turnover_binding: dict,
     main_net_flow_requirement: dict | None = None,
     status_partial_binding: dict | None = None,
+    market_breadth_binding: dict | None = None,
 ) -> dict:
     """Compose current verified GP12 candidate input readiness.
 
@@ -356,6 +450,9 @@ def build_checkpoint(
     status_partial_binding_sha = None
     if status_partial_binding is not None:
         status_partial_binding_sha = validate_status_partial_binding(status_partial_binding)
+    market_breadth_binding_sha = None
+    if market_breadth_binding is not None:
+        market_breadth_binding_sha = validate_market_breadth_binding(market_breadth_binding)
 
     derived_evidence = copy.deepcopy(base_evidence)
     for family in ("intraday_15m", "intraday_60m", "stock_adjusted_close"):
@@ -378,6 +475,16 @@ def build_checkpoint(
             "coverage_start": FORMAL_START,
             "coverage_end": FORMAL_END,
             "blockers": [STATUS_UPPER_LIMIT_BLOCKER],
+        }
+    if market_breadth_binding_sha is not None:
+        derived_evidence["feature_families"]["market_breadth"] = {
+            "binding_state": "BOUND_VERIFIED_ARTIFACT",
+            "pit_state": "PIT_VERIFIED",
+            "source_artifact": MARKET_BREADTH_BINDING_ARTIFACT,
+            "source_sha256": market_breadth_binding_sha,
+            "coverage_start": FORMAL_START,
+            "coverage_end": FORMAL_END,
+            "blockers": [],
         }
     report = readiness_base.build_readiness_report(parameters, factors, derived_evidence)
 
@@ -448,6 +555,13 @@ def build_checkpoint(
             STATUS_PARTIAL_BINDING_ARTIFACT if status_partial_binding_sha is not None else None
         ),
         "status_partial_binding_sha256": status_partial_binding_sha,
+        "market_breadth_binding_artifact": (
+            MARKET_BREADTH_BINDING_ARTIFACT if market_breadth_binding_sha is not None else None
+        ),
+        "market_breadth_binding_sha256": market_breadth_binding_sha,
+        "market_breadth_definition_origin": (
+            "NEW_RECONSTRUCTION_CANDIDATE" if market_breadth_binding_sha is not None else None
+        ),
         "status_semantic_state": (
             copy.deepcopy(status_partial_binding["semantic_state"])
             if status_partial_binding_sha is not None
@@ -494,6 +608,7 @@ def main() -> int:
     parser.add_argument("--amount-turnover-binding", required=True)
     parser.add_argument("--main-net-flow-requirement", required=True)
     parser.add_argument("--status-partial-binding", required=True)
+    parser.add_argument("--market-breadth-binding")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -507,6 +622,7 @@ def main() -> int:
         _load(args.amount_turnover_binding),
         _load(args.main_net_flow_requirement),
         _load(args.status_partial_binding),
+        _load(args.market_breadth_binding) if args.market_breadth_binding else None,
     )
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -527,6 +643,9 @@ def main() -> int:
                 ],
                 "status_partial_binding_sha256": report[
                     "status_partial_binding_sha256"
+                ],
+                "market_breadth_binding_sha256": report[
+                    "market_breadth_binding_sha256"
                 ],
                 "validated_families": report["validated_families"],
                 "missing_or_unvalidated_families": report[
