@@ -1,0 +1,104 @@
+name: GP12 Status Upper Limit Truth Duplicate Audit V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-upper-limit-truth-duplicates-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+      - name: Download pinned partial truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-hf-truth-v2
+          path: hf_truth
+          run-id: 35055523109
+          github-token: ${{ github.token }}
+      - name: Audit duplicate keys
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+
+          src=list(Path('hf_truth').rglob('HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet'))
+          assert len(src)==1,src
+          src=src[0]
+          df=pd.read_parquet(src)
+          df['symbol']=df['code'].astype(str).str.upper()
+          df['date']=df['date'].astype(str).str[:10]
+          key=['symbol','date']
+          dup=df[df.duplicated(key,keep=False)].copy()
+          group_sizes=dup.groupby(key,dropna=False).size()
+          duplicate_key_n=int(len(group_sizes))
+          duplicate_row_n=int(len(dup))
+          extra_row_n=int((group_sizes-1).sum())
+
+          compare_cols=[c for c in df.columns if c not in key]
+          conflicts=[]
+          for (symbol,date),g in dup.groupby(key,sort=True,dropna=False):
+              canonical=g[compare_cols].astype(object).where(pd.notna(g[compare_cols]),None)
+              first=canonical.iloc[0].tolist()
+              if any(row.tolist()!=first for _,row in canonical.iloc[1:].iterrows()):
+                  conflicts.append({'symbol':symbol,'date':date,'rows':int(len(g))})
+
+          out=Path('artifact_gp12_status_upper_limit_truth_duplicates_v1')
+          out.mkdir(exist_ok=True)
+          dup.sort_values(key).head(50000).to_csv(out/'DUPLICATE_ROWS.csv',index=False)
+          pd.DataFrame(conflicts).to_csv(out/'CONFLICTING_DUPLICATE_KEYS.csv',index=False)
+          date_counts=dup.groupby('date').size().sort_values(ascending=False)
+          summary={
+              'artifact':'GP12_STATUS_UPPER_LIMIT_TRUTH_DUPLICATE_AUDIT_V1',
+              'source_rows':int(len(df)),
+              'source_symbols':int(df['symbol'].nunique()),
+              'duplicate_key_n':duplicate_key_n,
+              'duplicate_row_n':duplicate_row_n,
+              'extra_row_n':extra_row_n,
+              'duplicate_date_n':int(dup['date'].nunique()),
+              'duplicate_dates_top':{str(k):int(v) for k,v in date_counts.head(30).items()},
+              'conflicting_duplicate_key_n':int(len(conflicts)),
+              'all_duplicate_groups_exact':len(conflicts)==0,
+              'source_sha256':hashlib.sha256(src.read_bytes()).hexdigest(),
+              'deduplication_allowed':len(conflicts)==0,
+              'formal_binding_allowed':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+          }
+          if conflicts:
+              summary['deduped_rows']=None
+              summary['deduped_sha256']=None
+          else:
+              dedup=df.drop_duplicates(key,keep='first').copy()
+              assert len(dedup)==len(df)-extra_row_n
+              p=out/'HF_HIGH_LIMIT_FORMAL844_OVERLAP_DEDUP.parquet'
+              dedup.drop(columns=['symbol']).to_parquet(p,index=False,compression='zstd')
+              summary['deduped_rows']=int(len(dedup))
+              summary['deduped_sha256']=hashlib.sha256(p.read_bytes()).hexdigest()
+          (out/'GP12_STATUS_UPPER_LIMIT_TRUTH_DUPLICATE_AUDIT_V1.json').write_text(
+              json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload duplicate audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-duplicates-v1
+          path: artifact_gp12_status_upper_limit_truth_duplicates_v1/
+          if-no-files-found: error
+          retention-days: 30
