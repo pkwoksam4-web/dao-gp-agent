@@ -1,0 +1,49 @@
+name: GP12 Main Net Flow HF Inventory V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-hf-inventory-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Hugging Face client
+        run: pip install -q huggingface_hub
+      - name: Scan Quant_DataLake for moneyflow assets
+        run: |
+          python - <<'PY'
+          import json, re
+          from huggingface_hub import HfApi
+
+          repo_id = 'zzlmgg/Quant_DataLake'
+          api = HfApi()
+          files = api.list_repo_files(repo_id=repo_id, repo_type='dataset')
+          needles = ('moneyflow', 'money_flow', 'net_mf', 'buy_lg', 'sell_lg', 'buy_elg', 'sell_elg', 'fund_flow', 'capital_flow')
+          matches = [p for p in files if any(n in p.lower() for n in needles)]
+          print('REPO_FILE_N', len(files))
+          print('MATCH_N', len(matches))
+          for p in matches:
+              print('MATCH', p)
+
+          # Also inventory nearby likely stock-data paths so a naming mismatch cannot hide the family.
+          likely = [p for p in files if ('stock_data' in p.lower() or 'raw_data' in p.lower()) and p.lower().endswith(('.parquet','.csv','.json'))]
+          print('LIKELY_DATA_FILE_N', len(likely))
+          for p in likely[:1000]:
+              print('LIKELY', p)
+
+          years = sorted(set(re.findall(r'(?:year=|_|/)(20\d{2})(?:/|_|\.|$)', p) for p in matches))
+          flat_years = sorted({y for groups in years for y in groups if y}) if years else []
+          print('MATCH_YEARS', json.dumps(flat_years))
+
+          if not matches:
+              raise RuntimeError('NO_MONEYFLOW_ASSET_PATH_MATCH')
+          PY
