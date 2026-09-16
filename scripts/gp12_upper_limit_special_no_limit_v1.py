@@ -7,7 +7,7 @@ from typing import Iterable
 DEFAULT_EVIDENCE_PATH = (
     Path(__file__).resolve().parents[1]
     / "data"
-    / "GP12_UPPER_LIMIT_SPECIAL_NO_LIMIT_V1.json"
+    / "GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1.json"
 )
 
 REQUIRED_FIELDS = {
@@ -17,6 +17,13 @@ REQUIRED_FIELDS = {
     "source_authority",
     "evidence_url",
     "evidence_statement",
+}
+
+_EVENT_MAP = {
+    "RESTORED_LISTING_FIRST_TRADING_DAY": "RESTORED_LISTING_FIRST_DAY",
+    "RELISTING_FIRST_TRADING_DAY": "RELISTING_FIRST_DAY",
+    "ABSORPTION_MERGER_A_SHARE_LISTING_FIRST_DAY": "MERGER_LISTING_FIRST_DAY",
+    "DELISTING_ARRANGEMENT_FIRST_TRADING_DAY": "DELISTING_ARRANGEMENT_FIRST_DAY",
 }
 
 
@@ -39,6 +46,17 @@ def _normalize_date(value: object) -> str:
     if year < 1900 or not 1 <= month <= 12 or not 1 <= day <= 31:
         raise ValueError(f"invalid date: {value!r}")
     return f"{year:04d}-{month:02d}-{day:02d}"
+
+
+def _source_authority(source: object) -> str:
+    value = str(source).strip().lower()
+    if "cninfo" in value:
+        return "CNINFO"
+    if "shenzhen" in value:
+        return "SZSE"
+    if "shanghai" in value:
+        return "SSE"
+    raise ValueError(f"unsupported evidence source: {source!r}")
 
 
 def validate_evidence(rows: Iterable[dict]) -> list[dict]:
@@ -68,14 +86,32 @@ def validate_evidence(rows: Iterable[dict]) -> list[dict]:
     return validated
 
 
+def _adapt_canonical_entry(entry: dict) -> dict:
+    if entry.get("no_price_limit") is not True:
+        raise ValueError(f"canonical special evidence must assert no_price_limit: {entry!r}")
+    canonical_event = str(entry.get("event_type") or "").strip()
+    if canonical_event not in _EVENT_MAP:
+        raise ValueError(f"unsupported canonical event_type: {canonical_event!r}")
+    return {
+        "symbol": entry.get("symbol"),
+        "date": entry.get("date"),
+        "event_type": _EVENT_MAP[canonical_event],
+        "source_authority": _source_authority(entry.get("source")),
+        "evidence_url": entry.get("source_url"),
+        "evidence_statement": entry.get("evidence"),
+    }
+
+
 def load_evidence(path: str | Path = DEFAULT_EVIDENCE_PATH) -> list[dict]:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or payload.get("artifact") != "GP12_UPPER_LIMIT_SPECIAL_NO_LIMIT_V1":
+    if not isinstance(payload, dict) or payload.get("artifact") != "GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1":
         raise ValueError("special no-limit evidence artifact identity mismatch")
-    rows = payload.get("rows")
-    if not isinstance(rows, list):
-        raise ValueError("special no-limit evidence rows must be a list")
-    return validate_evidence(rows)
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("special no-limit evidence entries must be a list")
+    if payload.get("entry_count") != len(entries):
+        raise ValueError("special no-limit evidence entry_count mismatch")
+    return validate_evidence(_adapt_canonical_entry(entry) for entry in entries)
 
 
 def is_special_no_limit(
