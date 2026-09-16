@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 CENT = Decimal("0.01")
 HUNDRED = Decimal("100")
+BASES = ("https://q.stock.sohu.com/hisHq", "http://q.stock.sohu.com/hisHq")
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -85,8 +90,8 @@ def parse_hishq_reference_bytes(symbol: str, raw: bytes) -> list[dict]:
     for source_row in hq:
         if not isinstance(source_row, list) or len(source_row) < 10:
             raise ValueError(f"Sohu hq row invalid: {source_row!r}")
-        date = str(source_row[0])[:10]
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        trade_date = str(source_row[0])[:10]
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", trade_date):
             raise ValueError(f"invalid Sohu date: {source_row[0]!r}")
         close = _decimal(source_row[2], "close")
         change = _decimal(source_row[3], "change_cny")
@@ -96,7 +101,7 @@ def parse_hishq_reference_bytes(symbol: str, raw: bytes) -> list[dict]:
         rows.append(
             {
                 "symbol": normalized,
-                "date": date,
+                "date": trade_date,
                 "close": float(close),
                 "change_cny": float(change),
                 "pct_percent": float(pct),
@@ -107,3 +112,146 @@ def parse_hishq_reference_bytes(symbol: str, raw: bytes) -> list[dict]:
         )
     rows.sort(key=lambda row: row["date"])
     return rows
+
+
+def plan_chunks(start: str, end: str, max_calendar_days: int = 90) -> list[tuple[str, str]]:
+    if max_calendar_days < 1:
+        raise ValueError("max_calendar_days must be positive")
+    first = date.fromisoformat(start)
+    last = date.fromisoformat(end)
+    if last < first:
+        raise ValueError("end before start")
+    chunks: list[tuple[str, str]] = []
+    cursor = first
+    while cursor <= last:
+        stop = min(last, cursor + timedelta(days=max_calendar_days - 1))
+        chunks.append((cursor.isoformat(), stop.isoformat()))
+        cursor = stop + timedelta(days=1)
+    return chunks
+
+
+def select_shard(symbols: list[str], shard_index: int, shard_count: int) -> list[str]:
+    if shard_count <= 0 or not 0 <= shard_index < shard_count:
+        raise ValueError("invalid shard index/count")
+    return list(symbols)[shard_index::shard_count]
+
+
+def audit_expected_dates(symbol: str, expected_dates: list[str], rows: list[dict]) -> dict:
+    normalized = normalize_symbol(symbol)
+    expected = sorted(set(str(value)[:10] for value in expected_dates))
+    observed_rows = [row for row in rows if row.get("date")]
+    wrong_symbol_n = sum(
+        normalize_symbol(row.get("symbol")) != normalized for row in observed_rows
+    )
+    observed = [str(row["date"])[:10] for row in observed_rows]
+    observed_unique = sorted(set(observed))
+    duplicate_dates_n = len(observed) - len(observed_unique)
+    missing = sorted(set(expected) - set(observed_unique))
+    extra = sorted(set(observed_unique) - set(expected))
+    passed = (
+        wrong_symbol_n == 0
+        and duplicate_dates_n == 0
+        and not missing
+        and not extra
+        and len(observed_rows) == len(expected)
+    )
+    return {
+        "symbol": normalized,
+        "expected_rows": len(expected),
+        "observed_rows": len(observed_rows),
+        "duplicate_dates_n": duplicate_dates_n,
+        "wrong_symbol_n": wrong_symbol_n,
+        "missing_dates_n": len(missing),
+        "extra_dates_n": len(extra),
+        "missing_dates": missing,
+        "extra_dates": extra,
+        "status": "PASS_EXACT_DATES" if passed else "REVIEW_DATE_AXIS",
+    }
+
+
+def _request_bytes(symbol: str, start: str, end: str, timeout: int, base: str) -> bytes:
+    normalized = normalize_symbol(symbol)
+    code = normalized.split(".", 1)[0]
+    query = urlencode(
+        {
+            "code": f"cn_{code}",
+            "start": start.replace("-", ""),
+            "end": end.replace("-", ""),
+            "stat": "1",
+            "order": "A",
+            "period": "d",
+            "callback": "historySearchHandler",
+            "rt": "jsonp",
+        }
+    )
+    request = Request(
+        f"{base}?{query}",
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152 Safari/537.36",
+            "Referer": f"https://q.stock.sohu.com/cn/{code}/lshq.shtml",
+            "Accept": "*/*",
+            "Connection": "close",
+        },
+    )
+    with urlopen(request, timeout=timeout) as response:
+        return response.read()
+
+
+def fetch_chunk_reference(
+    symbol: str,
+    start: str,
+    end: str,
+    *,
+    timeout: int = 20,
+    retries: int = 3,
+) -> list[dict]:
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        for base in BASES:
+            try:
+                return parse_hishq_reference_bytes(
+                    symbol, _request_bytes(symbol, start, end, timeout, base)
+                )
+            except Exception as exc:
+                last_error = exc
+        if attempt < retries:
+            time.sleep(0.8 * attempt)
+    raise RuntimeError(
+        f"Sohu reference fetch failed for {normalize_symbol(symbol)} {start}..{end}: {last_error}"
+    ) from last_error
+
+
+def fetch_symbol_reference(
+    symbol: str,
+    start: str,
+    end: str,
+    *,
+    max_calendar_days: int = 90,
+    timeout: int = 20,
+    retries: int = 3,
+    delay: float = 0.05,
+) -> list[dict]:
+    normalized = normalize_symbol(symbol)
+    by_date: dict[str, dict] = {}
+    for chunk_start, chunk_end in plan_chunks(start, end, max_calendar_days):
+        rows = fetch_chunk_reference(
+            normalized,
+            chunk_start,
+            chunk_end,
+            timeout=timeout,
+            retries=retries,
+        )
+        if len(rows) >= 80:
+            raise RuntimeError(
+                f"Sohu reference chunk may be truncated ({len(rows)} rows) {normalized} {chunk_start}..{chunk_end}"
+            )
+        for row in rows:
+            trade_date = str(row["date"])[:10]
+            if trade_date in by_date and by_date[trade_date] != row:
+                raise RuntimeError(
+                    f"conflicting duplicate Sohu reference row {normalized} {trade_date}"
+                )
+            by_date[trade_date] = row
+        if delay > 0:
+            time.sleep(delay)
+    return [by_date[trade_date] for trade_date in sorted(by_date)]
