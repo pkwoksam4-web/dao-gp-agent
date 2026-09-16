@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from pathlib import Path
 
 import pandas as pd
 
@@ -107,7 +110,10 @@ def _prepare_basics(basics: dict, lifecycle_symbols: set[str]) -> dict[str, str]
     return result
 
 
-def _prepare_special_keys(special_keys: set[tuple[str, str]] | list[tuple[str, str]], lifecycle_keys: set[tuple[str, str]]) -> set[tuple[str, str]]:
+def _prepare_special_keys(
+    special_keys: set[tuple[str, str]] | list[tuple[str, str]],
+    lifecycle_keys: set[tuple[str, str]],
+) -> set[tuple[str, str]]:
     normalized: set[tuple[str, str]] = set()
     for symbol, trade_date in special_keys:
         key = (_normalize_symbol(symbol), _normalize_date(trade_date))
@@ -250,3 +256,191 @@ def build_status_panel(
         "close_mismatch_n": 0,
     }
     return panel, audit
+
+
+def load_special_no_limit_evidence(doc: dict, *, expected_entry_count: int) -> set[tuple[str, str]]:
+    if not isinstance(doc, dict):
+        raise ValueError("special evidence must be an object")
+    if doc.get("artifact") != "GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1":
+        raise ValueError("special evidence artifact mismatch")
+    entries = doc.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("special evidence entries must be a list")
+    if doc.get("entry_count") != len(entries) or len(entries) != int(expected_entry_count):
+        raise ValueError("special evidence entry count mismatch")
+    keys: set[tuple[str, str]] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("invalid special evidence entry")
+        key = (_normalize_symbol(entry.get("symbol")), _normalize_date(entry.get("date")))
+        if key in keys:
+            raise ValueError(f"duplicate special evidence key: {key}")
+        if entry.get("no_price_limit") is not True:
+            raise ValueError(f"special evidence does not prove no limit: {key}")
+        if not str(entry.get("event_type") or "").strip():
+            raise ValueError(f"special evidence missing event type: {key}")
+        if not str(entry.get("source_url") or "").startswith(("https://", "http://")):
+            raise ValueError(f"special evidence missing source URL: {key}")
+        keys.add(key)
+    return keys
+
+
+def crosscheck_upper_limit_truth(
+    panel: pd.DataFrame,
+    truth: pd.DataFrame,
+    special_no_limit_keys: set[tuple[str, str]] | list[tuple[str, str]],
+    *,
+    require_exact: bool = False,
+) -> dict:
+    panel_required = {"symbol", "date", "tradable", "limit_pct_percent", "limit_price_cny", "upper_limit"}
+    missing = panel_required - set(panel.columns)
+    if missing:
+        raise ValueError(f"missing panel truth-crosscheck columns: {sorted(missing)}")
+    truth_symbol = "symbol" if "symbol" in truth.columns else "code" if "code" in truth.columns else None
+    if truth_symbol is None:
+        raise ValueError("truth symbol/code column missing")
+    truth_required = {truth_symbol, "date", "close", "high_limit"}
+    missing_truth = truth_required - set(truth.columns)
+    if missing_truth:
+        raise ValueError(f"missing truth columns: {sorted(missing_truth)}")
+
+    candidate = panel[["symbol", "date", "tradable", "limit_pct_percent", "limit_price_cny", "upper_limit"]].copy()
+    candidate["symbol"] = candidate["symbol"].map(_normalize_symbol)
+    candidate["date"] = candidate["date"].map(_normalize_date)
+    if candidate.duplicated(["symbol", "date"]).any():
+        raise ValueError("duplicate panel key in truth crosscheck")
+
+    observed = truth[[truth_symbol, "date", "close", "high_limit"]].copy().rename(columns={truth_symbol: "symbol"})
+    observed["symbol"] = observed["symbol"].map(_normalize_symbol)
+    observed["date"] = observed["date"].map(_normalize_date)
+    observed["close"] = pd.to_numeric(observed["close"], errors="raise")
+    observed["high_limit"] = pd.to_numeric(observed["high_limit"], errors="raise")
+    if observed.duplicated(["symbol", "date"]).any():
+        raise ValueError("duplicate truth key")
+
+    joined = observed.merge(candidate, on=["symbol", "date"], how="left", validate="one_to_one", indicator=True)
+    if not (joined["_merge"] == "both").all():
+        missing_keys = joined.loc[joined["_merge"] != "both", ["symbol", "date"]]
+        raise ValueError(f"truth key missing from panel: {missing_keys.head(20).to_dict('records')}")
+    if not joined["tradable"].astype(bool).all():
+        bad = joined.loc[~joined["tradable"].astype(bool), ["symbol", "date"]]
+        raise ValueError(f"truth overlap contains nontradable candidate row: {bad.head(20).to_dict('records')}")
+
+    special = {(_normalize_symbol(symbol), _normalize_date(trade_date)) for symbol, trade_date in special_no_limit_keys}
+    special_mask = pd.Series(
+        [(symbol, trade_date) in special for symbol, trade_date in zip(joined["symbol"], joined["date"])],
+        index=joined.index,
+        dtype=bool,
+    )
+    truth_no_limit = (joined["high_limit"] >= 999999.0) | special_mask
+    candidate_no_limit = joined["limit_pct_percent"].isna()
+    no_limit_mismatch = truth_no_limit != candidate_no_limit
+
+    candidate_limit = pd.to_numeric(joined["limit_price_cny"], errors="coerce")
+    price_equal = pd.Series(
+        [
+            False if pd.isna(left) else _cents_equal(left, right)
+            for left, right in zip(candidate_limit, joined["high_limit"])
+        ],
+        index=joined.index,
+        dtype=bool,
+    )
+    price_match = (truth_no_limit & candidate_no_limit) | ((~truth_no_limit) & (~candidate_no_limit) & price_equal)
+
+    truth_upper = pd.Series(
+        [
+            (not bool(no_limit)) and _cents_equal(close, high_limit)
+            for close, high_limit, no_limit in zip(joined["close"], joined["high_limit"], truth_no_limit)
+        ],
+        index=joined.index,
+        dtype=bool,
+    )
+    candidate_upper = joined["upper_limit"].astype(bool)
+    boolean_match = truth_upper == candidate_upper
+
+    summary = {
+        "status": "PASS_EXACT_TRUTH_CROSSCHECK" if (not no_limit_mismatch.any() and price_match.all() and boolean_match.all()) else "REVIEW_TRUTH_CROSSCHECK",
+        "overlap_rows": int(len(joined)),
+        "overlap_symbols": int(joined["symbol"].nunique()),
+        "special_overlap_rows": int(special_mask.sum()),
+        "truth_no_limit_n": int(truth_no_limit.sum()),
+        "candidate_no_limit_n": int(candidate_no_limit.sum()),
+        "no_limit_mismatch_n": int(no_limit_mismatch.sum()),
+        "price_mismatch_n": int((~price_match).sum()),
+        "boolean_mismatch_n": int((~boolean_match).sum()),
+    }
+    if require_exact and summary["status"] != "PASS_EXACT_TRUTH_CROSSCHECK":
+        raise ValueError(f"truth crosscheck mismatch: {summary}")
+    return summary
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _canonical_sha256(value: object) -> str:
+    payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def materialize_status_artifact(
+    panel: pd.DataFrame,
+    audit: dict,
+    out_dir: Path | str,
+    *,
+    metadata: dict | None = None,
+) -> dict:
+    if audit.get("status") != "PASS_EXACT_STATUS_PANEL":
+        raise ValueError("cannot materialize non-passing status panel")
+    if panel.duplicated(["symbol", "date"]).any():
+        raise ValueError("cannot materialize duplicate status panel")
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    panel_path = out / "GP12_STATUS_PANEL_V1.parquet"
+    audit_path = out / "GP12_STATUS_PANEL_AUDIT_V1.json"
+
+    serial = panel.copy()
+    if "listing_trade_rank" in serial.columns:
+        serial["listing_trade_rank"] = pd.to_numeric(serial["listing_trade_rank"], errors="coerce").astype("Int64")
+    for column in ["reference_close_cny", "limit_pct_percent", "limit_price_cny"]:
+        if column in serial.columns:
+            serial[column] = pd.to_numeric(serial[column], errors="coerce").astype("Float64")
+    for column in ["is_st", "tradable", "special_no_limit", "upper_limit"]:
+        if column in serial.columns:
+            serial[column] = serial[column].astype(bool)
+    serial.to_parquet(panel_path, index=False)
+    panel_sha = _sha256_file(panel_path)
+
+    doc = dict(metadata or {})
+    doc.update(audit)
+    doc.update(
+        {
+            "artifact": "GP12_STATUS_PANEL_AUDIT_V1",
+            "version": "1.0",
+            "panel_file": panel_path.name,
+            "panel_sha256": panel_sha,
+            "formal_binding_allowed": False,
+            "historical_gp_v11_source_recovered": False,
+            "model_freeze_allowed": False,
+            "oos_metrics_allowed": False,
+        }
+    )
+    audit_payload_sha = _canonical_sha256(doc)
+    doc["audit_sha256"] = audit_payload_sha
+    audit_path.write_text(
+        json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "panel_path": str(panel_path),
+        "audit_path": str(audit_path),
+        "panel_sha256": panel_sha,
+        "audit_sha256": audit_payload_sha,
+        "audit_file_sha256": _sha256_file(audit_path),
+    }
