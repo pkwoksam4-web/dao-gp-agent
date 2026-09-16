@@ -1,0 +1,57 @@
+name: GP12 Status Partial Binding Implement V2
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-partial-binding-implement-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reuse verified patch logic but exclude workflow mutation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          wf = Path('.github/workflows/gp12-status-partial-binding-implement-v1.yml').read_text(encoding='utf-8')
+          start_marker = "          python - <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = wf.index(start_marker) + len(start_marker)
+          end = wf.index(end_marker, start)
+          code = textwrap.dedent(wf[start:end])
+          cut_marker = "\nworkflow_path = Path('.github/workflows/gp12-candidate-input-readiness-v1.yml')"
+          cut = code.index(cut_marker)
+          exec(compile(code[:cut], '<status-partial-patch>', 'exec'), {})
+          PY
+      - name: Verify contract suite
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_gp12_candidate_input_readiness_v1.py \
+            test_gp12_main_net_flow_readiness_requirement_v1.py \
+            test_gp12_status_partial_binding_v1.py
+      - name: Commit production files only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/gp12_candidate_input_readiness_v1.py \
+                  data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json
+          git diff --cached --check
+          git commit -m 'feat: bind verified partial status semantics'
+          git push origin HEAD:gp/gp12-turnover-ratio-v1
