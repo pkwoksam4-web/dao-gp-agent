@@ -1,0 +1,244 @@
+name: GP12 Status Upper Limit Rule Audit V3
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-upper-limit-rule-audit-v3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+      - name: Download Sohu raw
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Download PIT-ST
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          github-token: ${{ github.token }}
+      - name: Download frozen QFQ events
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-global-qfq-missing-event-closure-v481
+          path: frozen
+          run-id: 34078398130
+          github-token: ${{ github.token }}
+      - name: Download effective-term overrides
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-effective-term-closure-v482
+          path: effective
+          run-id: 34102907115
+          github-token: ${{ github.token }}
+      - name: Download secondary overrides
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-remaining-exact-closure-v482
+          path: secondary
+          run-id: 34106853526
+          github-token: ${{ github.token }}
+      - name: Download reparsed overrides
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-reparsed-remaining-closure-v482
+          path: reparsed
+          run-id: 34109448536
+          github-token: ${{ github.token }}
+      - name: Download recovered overrides
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-recovered-remaining-closure-v482
+          path: recovered
+          run-id: 34111100684
+          github-token: ${{ github.token }}
+      - name: Download final-six overrides
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-six-closure-v482
+          path: final_six
+          run-id: 34116386540
+          github-token: ${{ github.token }}
+      - name: Download final-four overrides
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-final-four-closure-v482
+          path: final_four
+          run-id: 34117443729
+          github-token: ${{ github.token }}
+      - name: Download verified PIT adjusted-close audit
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-pit-adjusted-close-full-audit-v482
+          path: pit_adj_audit
+          run-id: 34928104668
+          github-token: ${{ github.token }}
+      - name: Download canonical partial high-limit truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-canonical-v1
+          path: truth
+          run-id: 35060927372
+          github-token: ${{ github.token }}
+
+      - name: Baseline rule crosscheck
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from decimal import Decimal, ROUND_HALF_UP
+          from pathlib import Path
+          import pandas as pd
+
+          NA={'600074.SH','600485.SH','600677.SH'}
+          START='2020-06-01'; END='2026-03-03'
+          CANON_SHA='d11b415b74d44d63d1aa927e8652f395dd039c28f6e1b4c24964e53759405308'
+
+          def unique(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits); return hits[0]
+          def load_json(root,name): return json.loads(unique(root,name).read_text(encoding='utf-8'))
+          def cents(x): return float(Decimal(str(x)).quantize(Decimal('0.01'),rounding=ROUND_HALF_UP))
+
+          frozen=load_json('frozen','GLOBAL_QFQ_MISSING_EVENT_CLOSURE_V481.json')
+          audit=load_json('pit_adj_audit','GP12_PIT_ADJUSTED_CLOSE_FULL_AUDIT_V482.json')
+          event_ratio={}
+          for rec in frozen['records']:
+              sym=str(rec['symbol']).upper()
+              if sym in NA: continue
+              for e in rec.get('events') or []:
+                  key=(sym,str(e['ex_date'])[:10]); assert key not in event_ratio,key
+                  event_ratio[key]=float(e['event_ratio'])
+          assert len(event_ratio)==2732
+          stages=[
+              ('effective','EFFECTIVE_TERM_CLOSURE_V482.json','event_overrides'),
+              ('secondary','REMAINING_EXACT_CLOSURE_V482.json','accepted_overrides'),
+              ('reparsed','REPARSED_REMAINING_CLOSURE_V482.json','new_overrides'),
+              ('recovered','RECOVERED_REMAINING_CLOSURE_V482.json','accepted_overrides'),
+              ('final_six','FINAL_SIX_CLOSURE_V482.json','accepted_overrides'),
+              ('final_four','FINAL_FOUR_CLOSURE_V482.json','accepted_overrides')]
+          std=set()
+          for root,name,field in stages:
+              d=load_json(root,name)
+              for e in d.get(field) or []:
+                  if e.get('accepted') is False: continue
+                  ratio=e.get('corrected_event_ratio')
+                  if ratio is None: continue
+                  key=(str(e['symbol']).upper(),str(e['ex_date'])[:10]); assert key in event_ratio,key
+                  event_ratio[key]=float(ratio); std.add(key)
+          assert len(std)==270
+          special=set()
+          for e in audit['special_checks']:
+              key=(str(e['symbol']).upper(),str(e['ex_date'])[:10]); assert key in event_ratio and key not in std,key
+              event_ratio[key]=float(e['corrected_event_ratio']); special.add(key)
+          assert len(special)==11
+          assert audit['adjusted_close_pit_verified'] is True and audit['constant_scale_fail_n']==0
+
+          truth_path=unique('truth','HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet')
+          assert hashlib.sha256(truth_path.read_bytes()).hexdigest()==CANON_SHA
+          truth=pd.read_parquet(truth_path)
+          truth['symbol']=truth['code'].astype(str).str.upper(); truth['date']=truth['date'].astype(str).str[:10]
+          truth['list_date']=truth['list_date'].astype(str).str[:10]
+          truth=truth.rename(columns={'close':'hf_close','prev_close':'hf_prev_close'})
+          assert len(truth)==896827 and truth['symbol'].nunique()==698
+          assert not truth.duplicated(['symbol','date']).any()
+          truth['hf_no_limit']=pd.to_numeric(truth['high_limit'])>=999999.0
+          truth['hf_upper_limit']=(~truth['hf_no_limit']) & ((pd.to_numeric(truth['hf_close'])-pd.to_numeric(truth['high_limit'])).abs()<0.0051)
+
+          raw=pd.read_parquet(unique('raw','SOHU_RAW_FULL_V482.parquet'),columns=['symbol','date','close'])
+          raw['symbol']=raw['symbol'].astype(str).str.upper(); raw['date']=raw['date'].astype(str).str[:10]
+          raw['close']=pd.to_numeric(raw['close'],errors='raise'); raw=raw.sort_values(['symbol','date'])
+          pit=pd.read_csv(unique('pitst','PIT_ST_DAILY_MERGED_V480.csv'),dtype={'symbol':str,'date':str})
+          pit['symbol']=pit['symbol'].str.upper(); pit['date']=pit['date'].str[:10]
+          pit['isST']=pd.to_numeric(pit['isST'],errors='raise').astype(int)
+          st={(r.symbol,r.date):bool(r.isST) for r in pit[['symbol','date','isST']].itertuples(index=False)}
+
+          def pct(sym,date,is_st):
+              code=sym[:6]
+              if code.startswith('688'): return .20
+              if code.startswith(('300','301')):
+                  if date>='2020-08-24': return .20
+                  return .05 if is_st else .10
+              return .05 if is_st else .10
+
+          rows=[]; no_prev=0; no_st=0
+          for sym,g in raw.groupby('symbol',sort=False):
+              prev=None
+              for r in g[['date','close']].itertuples(index=False):
+                  date=str(r.date)[:10]; close=float(r.close)
+                  if date<START: prev=close; continue
+                  if date>END: break
+                  if sym in NA: prev=close; continue
+                  if prev is None: no_prev+=1; prev=close; continue
+                  is_st=st.get((sym,date))
+                  if is_st is None: no_st+=1; prev=close; continue
+                  er=float(event_ratio.get((sym,date),1.0)); ref=prev*er; p=pct(sym,date,is_st)
+                  lim=cents(ref*(1+p)); rows.append((sym,date,close,prev,er,ref,p,lim,is_st)); prev=close
+          calc=pd.DataFrame(rows,columns=['symbol','date','raw_close','raw_prev_trade_close','event_ratio','candidate_reference','candidate_pct','candidate_high_limit','is_st'])
+          joined=calc.merge(truth,on=['symbol','date'],how='inner',validate='one_to_one')
+          assert len(joined)>890000,len(joined)
+          joined['candidate_upper_limit']=(joined['raw_close']-joined['candidate_high_limit']).abs()<0.0051
+          joined['bool_match']=joined['candidate_upper_limit']==joined['hf_upper_limit']
+          joined['limited_price_match']=(~joined['hf_no_limit']) & ((joined['candidate_high_limit']-pd.to_numeric(joined['high_limit'])).abs()<0.0051)
+          joined['would_be_limit_on_no_limit']=joined['hf_no_limit'] & joined['candidate_upper_limit']
+          joined['prefix']=joined['symbol'].str[:3]
+          joined['days_from_list']=(pd.to_datetime(joined['date'])-pd.to_datetime(joined['list_date'])).dt.days
+          # Trading-record rank among truth rows from list_date onward, 1-based.
+          truth_rank=truth.sort_values(['symbol','date']).copy()
+          truth_rank['post_list']=truth_rank['date']>=truth_rank['list_date']
+          truth_rank['listing_trade_rank']=truth_rank[truth_rank['post_list']].groupby('symbol').cumcount()+1
+          ranks=truth_rank[['symbol','date','listing_trade_rank']]
+          joined=joined.merge(ranks,on=['symbol','date'],how='left',validate='one_to_one')
+
+          mismatch=joined[~joined['bool_match']].copy()
+          price_mismatch=joined[(~joined['hf_no_limit']) & (~joined['limited_price_match'])].copy()
+          sentinel=joined[joined['hf_no_limit']].copy()
+          out=Path('artifact_gp12_status_upper_limit_rule_audit_v3'); out.mkdir(exist_ok=True)
+          cols=['symbol','date','raw_close','hf_close','raw_prev_trade_close','hf_prev_close','event_ratio','candidate_reference','candidate_pct','candidate_high_limit','high_limit','hf_no_limit','is_st','name','market','exchange','list_date','days_from_list','listing_trade_rank','quote_rate','hf_upper_limit','candidate_upper_limit']
+          mismatch[cols].sort_values(['symbol','date']).to_csv(out/'BOOL_MISMATCH.csv',index=False)
+          price_mismatch[cols].sort_values(['symbol','date']).head(50000).to_csv(out/'LIMITED_PRICE_MISMATCH_SAMPLE.csv',index=False)
+          sentinel[cols].sort_values(['symbol','date']).to_csv(out/'NO_LIMIT_ROWS_WITH_CANDIDATE.csv',index=False)
+
+          summary={
+              'artifact':'GP12_STATUS_UPPER_LIMIT_RULE_AUDIT_V3','status':'PROBE_ONLY_NOT_BINDING',
+              'canonical_truth_sha256':CANON_SHA,'truth_rows':int(len(truth)),'joined_rows':int(len(joined)),
+              'joined_symbols':int(joined['symbol'].nunique()),'no_previous_trade_rows_skipped':int(no_prev),'missing_pit_st_rows_skipped':int(no_st),
+              'hf_no_limit_n':int(joined['hf_no_limit'].sum()),'hf_upper_limit_true_n':int(joined['hf_upper_limit'].sum()),
+              'candidate_upper_limit_true_n':int(joined['candidate_upper_limit'].sum()),
+              'boolean_match_n':int(joined['bool_match'].sum()),'boolean_mismatch_n':int((~joined['bool_match']).sum()),
+              'would_be_limit_on_no_limit_n':int(joined['would_be_limit_on_no_limit'].sum()),
+              'limited_price_match_n':int(joined['limited_price_match'].sum()),'limited_price_mismatch_n':int(len(price_mismatch)),
+              'boolean_mismatch_prefix_counts':{str(k):int(v) for k,v in mismatch['prefix'].value_counts().sort_index().items()},
+              'boolean_mismatch_no_limit_n':int(mismatch['hf_no_limit'].sum()),
+              'no_limit_listing_trade_rank_counts':{str(k):int(v) for k,v in sentinel['listing_trade_rank'].value_counts(dropna=False).sort_index().items()},
+              'no_limit_long_after_list_n':int((sentinel['days_from_list']>100).sum()),
+              'formal_binding_allowed':False,'historical_gp_v11_source_recovered':False,'model_freeze_allowed':False,'oos_metrics_allowed':False}
+          (out/'GP12_STATUS_UPPER_LIMIT_RULE_AUDIT_V3.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload baseline audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-upper-limit-rule-audit-v3
+          path: artifact_gp12_status_upper_limit_rule_audit_v3/
+          if-no-files-found: error
+          retention-days: 30
