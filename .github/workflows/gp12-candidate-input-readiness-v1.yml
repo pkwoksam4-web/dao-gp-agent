@@ -8,8 +8,10 @@ on:
       - 'scripts/gp12_candidate_input_readiness_v1.py'
       - 'scripts/test_gp12_candidate_input_readiness_v1.py'
       - 'scripts/test_gp12_main_net_flow_readiness_requirement_v1.py'
+      - 'scripts/test_gp12_status_partial_binding_v1.py'
       - 'data/GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1.json'
       - 'data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json'
+      - 'data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json'
       - '.github/workflows/gp12-candidate-input-readiness-v1.yml'
   workflow_dispatch:
 
@@ -32,7 +34,8 @@ jobs:
           cd scripts
           python -m unittest -v \
             test_gp12_candidate_input_readiness_v1.py \
-            test_gp12_main_net_flow_readiness_requirement_v1.py
+            test_gp12_main_net_flow_readiness_requirement_v1.py \
+            test_gp12_status_partial_binding_v1.py
 
   checkpoint:
     needs: contract-tests
