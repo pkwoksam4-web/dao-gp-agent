@@ -4,13 +4,19 @@ import csv
 import datetime as dt
 import math
 import pathlib
+import time
 from zoneinfo import ZoneInfo
 
 
 FORMAL_START = "2020-06-01"
 FORMAL_END = "2026-04-17"
+UNIVERSE_N = 847
 FORMAL_SYMBOL_N = 844
 EXPECTED_TRADE_ROWS = 1_011_607
+NA_SYMBOLS = ("600074.SH", "600485.SH", "600677.SH")
+VERSION = "1.0"
+ARTIFACT_SHARD = "GP12_MAIN_NET_FLOW_SHARD_V1"
+ARTIFACT_FULL = "GP12_MAIN_NET_FLOW_FULL_AUDIT_V1"
 SOURCE = "TUSHARE_MONEYFLOW_LG_ELG_ACTIVE_BUY_MINUS_SELL"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 MONEYFLOW_FIELDS = (
@@ -59,6 +65,27 @@ def normalize_symbol(symbol: str) -> str:
     return f"{code}.{exchange}"
 
 
+def formal_symbols_from_scope(scope: list[str]) -> list[str]:
+    normalized = [normalize_symbol(symbol) for symbol in scope]
+    if len(normalized) != UNIVERSE_N or len(set(normalized)) != UNIVERSE_N:
+        raise ValueError("Formal847 scope identity mismatch")
+    if any(symbol not in normalized for symbol in NA_SYMBOLS):
+        raise ValueError("Formal N/A partition not present in scope")
+    formal = [symbol for symbol in normalized if symbol not in NA_SYMBOLS]
+    if len(formal) != FORMAL_SYMBOL_N:
+        raise ValueError("Formal844 scope partition mismatch")
+    return formal
+
+
+def load_scope(path: pathlib.Path | str) -> list[str]:
+    values = [
+        line.strip()
+        for line in pathlib.Path(path).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return formal_symbols_from_scope(values)
+
+
 def _finite_nonnegative(value: object, label: str) -> float:
     try:
         out = float(value)
@@ -87,6 +114,37 @@ def _trade_date_to_api(value: object) -> str:
 def close_known_at(date_value: str) -> str:
     day = dt.date.fromisoformat(date_value)
     return dt.datetime.combine(day, dt.time(15, 0), tzinfo=SHANGHAI).isoformat()
+
+
+def expected_dates_from_records(records: list[dict], symbols: list[str]) -> dict[str, list[str]]:
+    normalized_symbols = [normalize_symbol(symbol) for symbol in symbols]
+    if len(normalized_symbols) != len(set(normalized_symbols)):
+        raise ValueError("RAW expected-date symbol list contains duplicates")
+    target = set(normalized_symbols)
+    result = {symbol: [] for symbol in normalized_symbols}
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            raise ValueError(f"RAW row {index} must be an object")
+        symbol = normalize_symbol(record.get("symbol", ""))
+        if symbol not in target:
+            continue
+        amount = _finite_nonnegative(record.get("amount"), f"RAW row {index} amount")
+        if amount <= 0:
+            raise ValueError("RAW amount evidence has nonpositive or missing values")
+        result[symbol].append(_trade_date_to_iso(record.get("date", "")))
+    for symbol, dates in result.items():
+        if not dates:
+            raise ValueError(f"RAW expected-date coverage missing for {symbol}")
+        if dates != sorted(dates) or len(dates) != len(set(dates)):
+            raise ValueError(f"RAW date order invalid for {symbol}")
+    return result
+
+
+def load_expected_dates(raw_parquet: pathlib.Path | str, symbols: list[str]) -> dict[str, list[str]]:
+    import pandas as pd
+
+    frame = pd.read_parquet(raw_parquet, columns=["symbol", "date", "amount"])
+    return expected_dates_from_records(frame.to_dict("records"), symbols)
 
 
 def fetch_moneyflow_records(
@@ -245,6 +303,83 @@ def build_symbol_evidence(
     }
 
 
+def _source_failure_record(symbol: str, expected_dates: list[str], exc: Exception) -> dict:
+    return {
+        "symbol": normalize_symbol(symbol),
+        "expected_row_n": len(expected_dates),
+        "row_n": 0,
+        "first": None,
+        "last": None,
+        "missing_date_n": len(expected_dates),
+        "extra_date_n": 0,
+        "missing_dates_sample": expected_dates[:20],
+        "extra_dates_sample": [],
+        "coverage_exact": False,
+        "pit_policy_valid": False,
+        "pit_scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
+        "same_session_main_net_flow_usable_before_close": False,
+        "historical_provider_publication_timestamp_proven": False,
+        "symbol_pass": False,
+        "blockers": ["MAIN_NET_FLOW_SOURCE_FETCH_FAILED"],
+        "source_error": f"{type(exc).__name__}: {exc}",
+    }
+
+
+def run_shard(
+    api: object,
+    formal_symbols: list[str],
+    expected_dates: dict[str, list[str]],
+    *,
+    shard_index: int,
+    shard_count: int,
+    inter_symbol_delay: float = 0.5,
+) -> tuple[dict, list[dict]]:
+    if shard_count < 1 or shard_index < 0 or shard_index >= shard_count:
+        raise ValueError("invalid shard coordinates")
+    symbols = [normalize_symbol(symbol) for symbol in formal_symbols]
+    if len(symbols) != len(set(symbols)):
+        raise ValueError("formal symbol list contains duplicates")
+    shard_symbols = [
+        symbol for index, symbol in enumerate(symbols)
+        if index % shard_count == shard_index
+    ]
+    records: list[dict] = []
+    materialized: list[dict] = []
+    for symbol in shard_symbols:
+        dates = expected_dates.get(symbol)
+        if not dates:
+            raise ValueError(f"expected-date axis missing for {symbol}")
+        try:
+            evidence = build_symbol_evidence(api, symbol, dates)
+            audited = evidence["audit"]
+            if audited["symbol_pass"]:
+                materialized.extend(evidence["rows"])
+        except Exception as exc:
+            audited = _source_failure_record(symbol, dates, exc)
+        records.append(audited)
+        if inter_symbol_delay > 0:
+            time.sleep(inter_symbol_delay)
+    failures = [record for record in records if record.get("symbol_pass") is not True]
+    report = {
+        "artifact": ARTIFACT_SHARD,
+        "version": VERSION,
+        "formal_window": [FORMAL_START, FORMAL_END],
+        "shard_index": shard_index,
+        "shard_count": shard_count,
+        "symbol_n": len(records),
+        "pass_n": len(records) - len(failures),
+        "fail_n": len(failures),
+        "expected_trade_rows": sum(int(record["expected_row_n"]) for record in records),
+        "observed_main_net_flow_rows": sum(int(record["row_n"]) for record in records),
+        "materialized_rows": len(materialized),
+        "source": SOURCE,
+        "records": records,
+        "model_freeze_allowed": False,
+        "oos_metrics_allowed": False,
+    }
+    return report, materialized
+
+
 def write_panel_csv(path: pathlib.Path | str, rows: list[dict]) -> pathlib.Path:
     destination = pathlib.Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -277,8 +412,8 @@ def summarize_formal_audit(
         _append_once(blockers, "MAIN_NET_FLOW_TOTAL_ROW_COVERAGE_MISMATCH")
 
     return {
-        "artifact": "GP12_MAIN_NET_FLOW_FULL_AUDIT_V1",
-        "version": "1.0",
+        "artifact": ARTIFACT_FULL,
+        "version": VERSION,
         "formal_window": [FORMAL_START, FORMAL_END],
         "formal_symbol_n": len(records),
         "pass_n": pass_n,
@@ -308,3 +443,25 @@ def aggregate_shard_records(shards: list[list[dict]]) -> dict:
         "records": records,
         "audit": summarize_formal_audit(records),
     }
+
+
+def aggregate_shard_reports(reports: list[dict]) -> dict:
+    if not reports:
+        raise ValueError("shard partition incomplete")
+    shard_counts = {int(report.get("shard_count", -1)) for report in reports}
+    if len(shard_counts) != 1:
+        raise ValueError("shard count mismatch")
+    shard_count = shard_counts.pop()
+    indices = [int(report.get("shard_index", -1)) for report in reports]
+    if sorted(indices) != list(range(shard_count)) or len(indices) != len(set(indices)):
+        raise ValueError("shard partition incomplete")
+    for report in reports:
+        if report.get("artifact") != ARTIFACT_SHARD or report.get("version") != VERSION:
+            raise ValueError("main net flow shard identity mismatch")
+    records = [record for report in reports for record in (report.get("records") or [])]
+    merged = aggregate_shard_records([records])
+    out = merged["audit"]
+    out["records"] = merged["records"]
+    out["shard_count"] = shard_count
+    out["materialized_rows"] = sum(int(report.get("materialized_rows") or 0) for report in reports)
+    return out
