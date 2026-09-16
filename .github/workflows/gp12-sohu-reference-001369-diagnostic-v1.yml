@@ -1,0 +1,57 @@
+name: GP12 Sohu Reference 001369 Diagnostic V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-sohu-reference-001369-diagnostic-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -q pandas pyarrow
+      - uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: raw
+          run-id: 34192233633
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+      - name: Inspect pinned raw axis and direct Sohu payload
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import json, hashlib
+          from pathlib import Path
+          import pandas as pd
+          import gp12_sohu_reference_v1 as ref
+
+          p=next(Path('raw').rglob('SOHU_RAW_FULL_V482.parquet'))
+          sha=hashlib.sha256(p.read_bytes()).hexdigest()
+          assert sha=='bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb',sha
+          df=pd.read_parquet(p)
+          g=df[df['symbol'].astype(str).str.upper().eq('001369.SZ')].copy().sort_values('date')
+          print('PINNED_COLUMNS',list(df.columns))
+          print('PINNED_001369_ROWS',len(g))
+          print('PINNED_001369_FIRST',g.head(10).to_dict('records'))
+          print('PINNED_001369_LAST',g.tail(10).to_dict('records'))
+          assert len(g)>0
+          start=str(g['date'].min())[:10]; end=str(g['date'].max())[:10]
+          print('PINNED_RANGE',start,end)
+          raw=ref._request_bytes('001369.SZ',start,min(end,'2026-01-09'),20,ref.DEFAULT_BASE)
+          text=ref._decode(raw)
+          print('SOHU_PAYLOAD_PREFIX',text[:8000])
+          PY
