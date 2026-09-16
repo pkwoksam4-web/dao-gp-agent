@@ -1,0 +1,95 @@
+{
+  "artifact": "GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1",
+  "version": "V1",
+  "formal_window": ["2020-06-01", "2026-04-17"],
+  "semantics": "Exact symbol-date exceptions where authoritative exchange/company disclosure states that the trading day has no daily price-limit band. These rows override the generic board/ST/IPO percentage rule only for the exact date.",
+  "fail_closed_rule": "No source-backed exact symbol-date evidence means no special override. Suspension/resumption alone is never inferred as no-limit.",
+  "entries": [
+    {
+      "symbol": "000670.SZ",
+      "date": "2022-08-22",
+      "event_type": "RESTORED_LISTING_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "CNINFO company disclosure",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2022-08-22/1214345659.PDF",
+      "evidence": "Company stock resumed listing on 2022-08-22; the first resumed-listing trading day had no price fluctuation limit."
+    },
+    {
+      "symbol": "000792.SZ",
+      "date": "2021-08-10",
+      "event_type": "RESTORED_LISTING_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "Shenzhen Stock Exchange disclosure",
+      "source_url": "https://disc.static.szse.cn/disc/disk02/finalpage/2021-08-03/226f764b-539a-4c13-80b8-a2453ccf49ff.PDF",
+      "evidence": "Company stock resumed listing on 2021-08-10; the first resumed-listing trading day had no price fluctuation limit."
+    },
+    {
+      "symbol": "000995.SZ",
+      "date": "2020-12-16",
+      "event_type": "RESTORED_LISTING_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "CNINFO company disclosure",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2020-12-09/1208871265.PDF",
+      "evidence": "Company stock resumed listing on 2020-12-16; the first resumed-listing trading day had no price fluctuation limit."
+    },
+    {
+      "symbol": "001267.SZ",
+      "date": "2021-11-17",
+      "event_type": "RELISTING_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "CNINFO company disclosure",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2021-11-11/1211553595.PDF",
+      "evidence": "Company stock relisted on 2021-11-17; the relisting first day had no price fluctuation limit."
+    },
+    {
+      "symbol": "001289.SZ",
+      "date": "2022-01-24",
+      "event_type": "ABSORPTION_MERGER_A_SHARE_LISTING_FIRST_DAY",
+      "no_price_limit": true,
+      "source": "Shenzhen Stock Exchange disclosure",
+      "source_url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2022-01-21/a6274d47-d0ce-44c8-8dde-0a047c9a4532.PDF",
+      "evidence": "A-share listing after share-swap absorption merger began on 2022-01-24; the first listing day had no price fluctuation limit."
+    },
+    {
+      "symbol": "600190.SH",
+      "date": "2025-06-30",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "Shanghai Stock Exchange/company disclosure",
+      "source_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2025-07-15/600190_20250715_QCG8.pdf",
+      "evidence": "Delisting-arrangement trading began on 2025-06-30; its first trading day had no price fluctuation limit."
+    },
+    {
+      "symbol": "600387.SH",
+      "date": "2025-06-16",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "Shanghai Stock Exchange/company disclosure",
+      "source_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2025-07-03/600387_20250703_7CTK.pdf",
+      "evidence": "Delisting-arrangement trading began on 2025-06-16; its first trading day had no price fluctuation limit."
+    },
+    {
+      "symbol": "600462.SH",
+      "date": "2025-06-24",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "Shanghai Stock Exchange/company disclosure",
+      "source_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2025-07-09/600462_20250709_ESG4.pdf",
+      "evidence": "Delisting-arrangement trading began on 2025-06-24; its first trading day had no price fluctuation limit."
+    },
+    {
+      "symbol": "600200.SH",
+      "date": "2025-12-09",
+      "event_type": "DELISTING_ARRANGEMENT_FIRST_TRADING_DAY",
+      "no_price_limit": true,
+      "source": "CNINFO company disclosure",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2025-12-02/1224842172.PDF",
+      "evidence": "Delisting-arrangement trading began on 2025-12-09; its first trading day had no price fluctuation limit."
+    }
+  ],
+  "entry_count": 9,
+  "candidate_use": "STATUS_UPPER_LIMIT_SPECIAL_DATE_OVERRIDE_ONLY",
+  "historical_gp_v11_source_recovered": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
