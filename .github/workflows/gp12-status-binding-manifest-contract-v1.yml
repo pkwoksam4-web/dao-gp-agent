@@ -1,0 +1,29 @@
+name: GP12 Status Binding Manifest Contract V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'data/GP12_CANDIDATE_STATUS_BINDING_V1.json'
+      - 'scripts/gp12_status_binding_v1.py'
+      - 'scripts/test_gp12_status_binding_manifest_v1.py'
+      - '.github/workflows/gp12-status-binding-manifest-contract-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate repository status binding manifest
+        env:
+          PYTHONPATH: scripts
+        run: python -m unittest -v scripts/test_gp12_status_binding_manifest_v1.py
