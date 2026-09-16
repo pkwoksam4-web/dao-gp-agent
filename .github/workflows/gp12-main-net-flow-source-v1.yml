@@ -1,0 +1,275 @@
+name: GP12 Main Net Flow Source V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/gp12_main_net_flow_tushare_v1.py'
+      - '.github/workflows/gp12-main-net-flow-source-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet runtime
+        run: pip install -q pandas pyarrow
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Verify exact Formal844 source axis
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from gp12_main_net_flow_tushare_v1 import EXPECTED_TRADE_ROWS, FORMAL_SYMBOL_N, NA_SYMBOLS, load_expected_dates, load_scope
+
+          audit = json.loads(Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json').read_text(encoding='utf-8'))
+          panel = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          scope = Path('data/pit_st_scope_v480.txt')
+          assert audit['artifact'] == 'SOHU_RAW_FULL_V482'
+          assert audit['version'] == 'V4.82'
+          assert audit['status'] == 'PASS_FULL_RAW_V482'
+          assert audit['symbol_n'] == 847
+          assert audit['raw_rows'] == EXPECTED_TRADE_ROWS
+          assert audit['zero_trade_symbols'] == list(NA_SYMBOLS)
+          assert audit['global_reaudit_pass'] is True
+          assert audit['formal_admission'] is False
+          assert audit['oos_metrics_allowed'] is False
+          symbols = load_scope(scope)
+          assert len(symbols) == FORMAL_SYMBOL_N
+          expected = load_expected_dates(panel, symbols)
+          assert sum(len(v) for v in expected.values()) == EXPECTED_TRADE_ROWS
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with Path(path).open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          assert sha256(panel) == 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb'
+          assert sha256(scope) == '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'
+          print(json.dumps({'formal_symbol_n': len(symbols), 'expected_trade_rows': EXPECTED_TRADE_ROWS, 'source_axis_verified': True}, indent=2))
+          PY
+
+  credential:
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.check.outputs.present }}
+    steps:
+      - name: Check Tushare credential without exposing it
+        id: check
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          if [ -n "$TUSHARE_TOKEN" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+            echo 'TUSHARE_CREDENTIAL_STATUS=PRESENT'
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'TUSHARE_CREDENTIAL_STATUS=MISSING'
+            echo 'Source fetch is intentionally skipped; MAIN_NET_FLOW_UNBOUND remains open.'
+          fi
+
+  source-shards:
+    needs: [preflight, credential]
+    if: needs.credential.outputs.present == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install source runtime
+        run: pip install -q tushare pandas pyarrow
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Fetch and audit Tushare moneyflow shard
+        id: fetch
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/shard-${{ matrix.shard }}
+          python - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          import tushare as ts
+          from gp12_main_net_flow_tushare_v1 import load_expected_dates, load_scope, run_shard, write_panel_csv
+
+          token = (os.environ.get('TUSHARE_TOKEN') or '').strip()
+          if not token:
+              raise RuntimeError('TUSHARE_TOKEN unexpectedly missing inside source shard')
+          api = ts.pro_api(token)
+          symbols = load_scope(Path('data/pit_st_scope_v480.txt'))
+          expected = load_expected_dates(Path('upstream/raw/SOHU_RAW_FULL_V482.parquet'), symbols)
+          report, rows = run_shard(
+              api,
+              symbols,
+              expected,
+              shard_index=${{ matrix.shard }},
+              shard_count=4,
+              inter_symbol_delay=0.5,
+          )
+          out = Path('out/shard-${{ matrix.shard }}')
+          (out / 'MAIN_NET_FLOW_SHARD_${{ matrix.shard }}.json').write_text(
+              json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          write_panel_csv(out / 'MAIN_NET_FLOW_SHARD_${{ matrix.shard }}.csv', rows)
+          print(json.dumps({k: report[k] for k in ('shard_index','symbol_n','pass_n','fail_n','expected_trade_rows','observed_main_net_flow_rows','materialized_rows')}, ensure_ascii=False, indent=2))
+          if report['fail_n']:
+              raise SystemExit(2)
+          PY
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-main-net-flow-shard-${{ matrix.shard }}
+          path: out/shard-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    needs: [credential, source-shards]
+    if: always() && needs.credential.outputs.present == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download all main net flow shard evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: gp12-main-net-flow-shard-*
+          path: out/shards
+          merge-multiple: true
+      - name: Aggregate exact Formal844 panel
+        id: aggregate
+        continue-on-error: true
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/full
+          python - <<'PY'
+          import csv, hashlib, json
+          from pathlib import Path
+          from gp12_main_net_flow_tushare_v1 import EXPECTED_TRADE_ROWS, FORMAL_SYMBOL_N, aggregate_shard_reports, write_panel_csv
+
+          reports = [json.loads(p.read_text(encoding='utf-8')) for p in sorted(Path('out/shards').glob('MAIN_NET_FLOW_SHARD_*.json'))]
+          audit = aggregate_shard_reports(reports)
+
+          rows = []
+          for p in sorted(Path('out/shards').glob('MAIN_NET_FLOW_SHARD_*.csv')):
+              with p.open('r', encoding='utf-8', newline='') as f:
+                  rows.extend(dict(row) for row in csv.DictReader(f))
+
+          panel_path = Path('out/full/GP12_MAIN_NET_FLOW_PANEL_V1.csv')
+          write_panel_csv(panel_path, rows)
+          keys = [(row['symbol'], row['date']) for row in rows]
+          panel_blockers = []
+          if len(rows) != EXPECTED_TRADE_ROWS:
+              panel_blockers.append('MAIN_NET_FLOW_PANEL_ROW_COVERAGE_MISMATCH')
+          if len(set(keys)) != len(keys):
+              panel_blockers.append('MAIN_NET_FLOW_PANEL_DUPLICATE_SYMBOL_DATE')
+          if len({row['symbol'] for row in rows}) != FORMAL_SYMBOL_N:
+              panel_blockers.append('MAIN_NET_FLOW_PANEL_SYMBOL_COVERAGE_MISMATCH')
+          for blocker in panel_blockers:
+              if blocker not in audit['blockers']:
+                  audit['blockers'].append(blocker)
+          if panel_blockers:
+              audit['main_net_flow_candidate_pit_verified'] = False
+
+          h = hashlib.sha256()
+          with panel_path.open('rb') as f:
+              for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                  h.update(chunk)
+          audit.update({
+              'panel_row_n': len(rows),
+              'panel_symbol_n': len({row['symbol'] for row in rows}),
+              'panel_sha256': h.hexdigest(),
+              'raw_source_run_id': 34192233633,
+              'raw_source_artifact_id': 10042614517,
+              'raw_source_artifact_zip_sha256': 'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550',
+              'raw_panel_sha256': 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb',
+              'scope_sha256': '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8',
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          })
+          Path('out/full/GP12_MAIN_NET_FLOW_FULL_AUDIT_V1.json').write_text(
+              json.dumps(audit, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          print(json.dumps({k: audit.get(k) for k in ('formal_symbol_n','pass_n','fail_n','expected_trade_rows','observed_main_net_flow_rows','panel_row_n','panel_symbol_n','panel_sha256','main_net_flow_candidate_pit_verified','blockers')}, ensure_ascii=False, indent=2))
+          if audit['blockers'] or audit['main_net_flow_candidate_pit_verified'] is not True:
+              raise SystemExit(2)
+          PY
+      - name: Assert authoritative full gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('out/full/GP12_MAIN_NET_FLOW_FULL_AUDIT_V1.json')
+          assert p.exists(), p
+          x = json.loads(p.read_text(encoding='utf-8'))
+          assert x['artifact'] == 'GP12_MAIN_NET_FLOW_FULL_AUDIT_V1'
+          assert x['version'] == '1.0'
+          assert x['formal_window'] == ['2020-06-01','2026-04-17']
+          assert x['formal_symbol_n'] == 844
+          assert x['pass_n'] == 844
+          assert x['fail_n'] == 0
+          assert x['expected_trade_rows'] == 1011607
+          assert x['observed_main_net_flow_rows'] == 1011607
+          assert x['panel_row_n'] == 1011607
+          assert x['panel_symbol_n'] == 844
+          assert len(x['panel_sha256']) == 64
+          assert x['source'] == 'TUSHARE_MONEYFLOW_LG_ELG_ACTIVE_BUY_MINUS_SELL'
+          assert x['source_amount_unit'] == 'wan_cny'
+          assert x['candidate_unit'] == 'cny'
+          assert x['semantic_definition'] == 'large_plus_extra_large_active_buy_minus_sell'
+          assert x['pit_scope'] == 'SESSION_CLOSE_NO_LOOKAHEAD_POLICY'
+          assert x['same_session_main_net_flow_usable_before_close'] is False
+          assert x['historical_provider_publication_timestamp_proven'] is False
+          assert x['main_net_flow_candidate_pit_verified'] is True
+          assert x['model_freeze_allowed'] is False
+          assert x['oos_metrics_allowed'] is False
+          assert x['blockers'] == []
+          PY
+      - name: Upload authoritative main net flow evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-main-net-flow-full-v1
+          path: out/full/
+          if-no-files-found: warn
+          retention-days: 30
