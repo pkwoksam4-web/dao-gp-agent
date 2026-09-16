@@ -1,0 +1,29 @@
+name: GP12 Status Full Panel Contract V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/gp12_status_full_panel_v1.py'
+      - 'scripts/test_gp12_status_full_panel_v1.py'
+      - '.github/workflows/gp12-status-full-panel-contract-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -q pandas
+      - name: Run full status panel contract tests
+        env:
+          PYTHONPATH: scripts
+        run: python -m unittest -v scripts/test_gp12_status_full_panel_v1.py
