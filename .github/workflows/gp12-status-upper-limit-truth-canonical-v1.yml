@@ -1,0 +1,135 @@
+name: GP12 Status Upper Limit Truth Canonical V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-upper-limit-truth-canonical-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  canonicalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+      - name: Download pinned partial truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-hf-truth-v2
+          path: hf_truth
+          run-id: 35055523109
+          github-token: ${{ github.token }}
+      - name: Canonicalize price truth and classify no-limit sentinel
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+
+          SOURCE_SHA='288c3430a68a64ac1f6e38424105093cdc4bb1c4f17205b1843e946127670360'
+          PRICE_TRUTH_COLS=['code','date','close','prev_close','high_limit','quote_rate','market','exchange','list_date']
+          KEY=['symbol','date']
+          src=list(Path('hf_truth').rglob('HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet'))
+          assert len(src)==1,src
+          src=src[0]
+          assert hashlib.sha256(src.read_bytes()).hexdigest()==SOURCE_SHA
+
+          df=pd.read_parquet(src)
+          df['symbol']=df['code'].astype(str).str.upper()
+          df['date']=df['date'].astype(str).str[:10]
+          df['list_date']=df['list_date'].astype(str).str[:10]
+          assert len(df)==897508
+          assert df['symbol'].nunique()==698
+          assert df['high_limit'].isna().sum()==0
+
+          dup=df[df.duplicated(KEY,keep=False)].copy()
+          conflict_rows=[]
+          metadata_only=[]
+          for (symbol,date),g in dup.groupby(KEY,sort=True,dropna=False):
+              truth=g[PRICE_TRUTH_COLS].astype(object).where(pd.notna(g[PRICE_TRUTH_COLS]),None)
+              first=truth.iloc[0].tolist()
+              truth_conflict=any(row.tolist()!=first for _,row in truth.iloc[1:].iterrows())
+              if truth_conflict:
+                  conflict_rows.append({'symbol':symbol,'date':date,'rows':int(len(g))})
+              elif g['name'].astype(str).nunique(dropna=False)>1:
+                  metadata_only.append({
+                      'symbol':symbol,'date':date,'rows':int(len(g)),
+                      'names':'|'.join(sorted(set(g['name'].astype(str))))})
+          assert len(conflict_rows)==0,conflict_rows[:20]
+          assert len(metadata_only)==1,metadata_only
+          assert metadata_only[0]['symbol']=='001325.SZ'
+          assert metadata_only[0]['date']=='2025-12-18'
+
+          canonical=df.drop_duplicates(KEY,keep='first').copy()
+          assert len(canonical)==896827,len(canonical)
+          assert not canonical.duplicated(KEY).any()
+          assert canonical['symbol'].nunique()==698
+
+          # Dataset convention observed on IPO/no-limit rows.
+          canonical['no_limit_sentinel']=pd.to_numeric(canonical['high_limit'])>=999999.0
+          canonical['days_from_list']=(pd.to_datetime(canonical['date'])-pd.to_datetime(canonical['list_date'])).dt.days
+          canonical['prefix']=canonical['symbol'].str[:3]
+          sentinel=canonical[canonical['no_limit_sentinel']].copy()
+          limited=canonical[~canonical['no_limit_sentinel']].copy()
+          limited['implied_pct']=(pd.to_numeric(limited['high_limit'])/pd.to_numeric(limited['prev_close'])-1.0)*100.0
+          limited['implied_pct_rounded']=limited['implied_pct'].round(2)
+
+          out=Path('artifact_gp12_status_upper_limit_truth_canonical_v1')
+          out.mkdir(exist_ok=True)
+          p=out/'HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet'
+          canonical.drop(columns=['symbol','prefix']).to_parquet(p,index=False,compression='zstd')
+          pd.DataFrame(metadata_only).to_csv(out/'METADATA_ONLY_DUPLICATE_KEYS.csv',index=False)
+          sentinel.sort_values(['symbol','date']).to_csv(out/'NO_LIMIT_SENTINEL_ROWS.csv',index=False)
+
+          summary={
+              'artifact':'GP12_STATUS_UPPER_LIMIT_TRUTH_CANONICAL_V1',
+              'status':'PARTIAL_TRUTH_REFERENCE_ONLY',
+              'source_run_id':35055523109,
+              'source_artifact_id':10429833354,
+              'source_sha256':SOURCE_SHA,
+              'source_rows':int(len(df)),
+              'source_symbols':int(df['symbol'].nunique()),
+              'duplicate_key_n':int(df.duplicated(KEY,keep=False).groupby([df['symbol'],df['date']]).any().sum()),
+              'canonical_rows':int(len(canonical)),
+              'canonical_symbols':int(canonical['symbol'].nunique()),
+              'canonical_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+              'price_truth_conflict_key_n':0,
+              'metadata_only_conflict_key_n':int(len(metadata_only)),
+              'metadata_only_conflicts':metadata_only,
+              'no_limit_sentinel_threshold':999999.0,
+              'no_limit_sentinel_n':int(len(sentinel)),
+              'no_limit_prefix_counts':{str(k):int(v) for k,v in sentinel['prefix'].value_counts().sort_index().items()},
+              'no_limit_market_counts':{str(k):int(v) for k,v in sentinel['market'].astype(str).value_counts().sort_index().items()},
+              'no_limit_exchange_counts':{str(k):int(v) for k,v in sentinel['exchange'].astype(str).value_counts().sort_index().items()},
+              'no_limit_days_from_list_counts':{str(k):int(v) for k,v in sentinel['days_from_list'].value_counts().sort_index().items()},
+              'limited_implied_pct_top_counts':{str(k):int(v) for k,v in limited['implied_pct_rounded'].value_counts().head(40).items()},
+              'truth_first_date':str(canonical['date'].min()),
+              'truth_last_date':str(canonical['date'].max()),
+              'truth_full_formal_coverage':False,
+              'formal_binding_allowed':False,
+              'historical_gp_v11_source_recovered':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+          }
+          (out/'GP12_STATUS_UPPER_LIMIT_TRUTH_CANONICAL_V1.json').write_text(
+              json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload canonical truth
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-canonical-v1
+          path: artifact_gp12_status_upper_limit_truth_canonical_v1/
+          if-no-files-found: error
+          retention-days: 30
