@@ -62,78 +62,64 @@ jobs:
           truth=pd.read_parquet(truth_path)
           truth['symbol']=truth['code'].astype(str).str.upper()
           truth['date']=truth['date'].astype(str).str[:10]
-          truth['close']=pd.to_numeric(truth['close'],errors='raise')
-          truth['prev_close']=pd.to_numeric(truth['prev_close'],errors='raise')
-          truth['high_limit']=pd.to_numeric(truth['high_limit'],errors='raise')
+          for c in ('close','prev_close','high_limit'): truth[c]=pd.to_numeric(truth[c],errors='raise')
           assert len(truth)==896827 and truth['symbol'].nunique()==698
 
           audit=json.loads(unique('pitst','PIT_ST_AUDIT_MERGED_V480.json').read_text(encoding='utf-8'))
           basics={}
           for a in audit['audits']:
               rows=(a.get('basic') or {}).get('rows') or []
-              if len(rows)==1:
-                  basics[str(a['symbol']).upper()]=rows[0]
+              if len(rows)==1: basics[str(a['symbol']).upper()]=rows[0]
           assert len(basics)==847,len(basics)
+          ipo_map={s:str(b.get('ipoDate') or '')[:10] for s,b in basics.items()}
 
           pit=pd.read_csv(unique('pitst','PIT_ST_DAILY_MERGED_V480.csv'),dtype={'symbol':str,'date':str})
           pit['symbol']=pit['symbol'].str.upper(); pit['date']=pit['date'].str[:10]
           pit['tradestatus']=pd.to_numeric(pit['tradestatus'],errors='raise').astype(int)
           pit['isST']=pd.to_numeric(pit['isST'],errors='raise').astype(int)
-          pit_key=pit.set_index(['symbol','date'])[['tradestatus','isST']]
+          assert not pit.duplicated(['symbol','date']).any()
+          pit['ipo_date']=pit['symbol'].map(ipo_map)
+          traded=pit[(pit['tradestatus']==1) & (pit['date']>=pit['ipo_date'])].sort_values(['symbol','date']).copy()
+          traded['listing_trade_rank']=traded.groupby('symbol').cumcount()+1
+          rank=traded[['symbol','date','listing_trade_rank']]
 
-          ranks={}
-          for symbol,g in pit[pit['tradestatus']==1].sort_values(['symbol','date']).groupby('symbol',sort=False):
-              ipo=str(basics[symbol].get('ipoDate') or '')[:10]
-              if not ipo: continue
-              dates=g[g['date']>=ipo]['date'].tolist()
-              for n,d in enumerate(dates,1): ranks[(symbol,d)]=n
+          frame=truth.merge(pit[['symbol','date','tradestatus','isST','ipo_date']],on=['symbol','date'],how='left',validate='one_to-one')
+          frame=frame.merge(rank,on=['symbol','date'],how='left',validate='one-to-one')
+          assert frame['isST'].notna().all(),int(frame['isST'].isna().sum())
+          pcts=[]
+          for r in frame[['symbol','date','isST','ipo_date','listing_trade_rank']].itertuples(index=False):
+              rank_value=None if pd.isna(r.listing_trade_rank) else int(r.listing_trade_rank)
+              pcts.append(rule.limit_percent(r.symbol,r.date,bool(r.isST),ipo_date=r.ipo_date,listing_trade_rank=rank_value))
+          frame['candidate_pct']=pcts
+          frame['truth_no_limit']=frame['high_limit']>=999999.0
+          frame['candidate_no_limit']=frame['candidate_pct'].isna()
+          frame['candidate_limit']=[None if pd.isna(p) else rule.limit_price_cny(ref,p) for ref,p in zip(frame['prev_close'],frame['candidate_pct'])]
+          frame['truth_upper_limit']=(~frame['truth_no_limit']) & ((frame['close']-frame['high_limit']).abs()<0.0051)
+          frame['candidate_upper_limit']=[False if pd.isna(p) else rule.is_upper_limit(c,ref,p) for c,ref,p in zip(frame['close'],frame['prev_close'],frame['candidate_pct'])]
+          finite_candidate=pd.to_numeric(frame['candidate_limit'],errors='coerce')
+          frame['price_match']=(frame['truth_no_limit'] & frame['candidate_no_limit']) | ((~frame['truth_no_limit']) & (~frame['candidate_no_limit']) & ((finite_candidate-frame['high_limit']).abs()<0.0051))
+          frame['boolean_match']=frame['truth_upper_limit']==frame['candidate_upper_limit']
 
-          rows=[]
-          for r in truth[['symbol','date','close','prev_close','high_limit','name','market','exchange','list_date']].itertuples(index=False):
-              key=(r.symbol,r.date)
-              if key not in pit_key.index:
-                  raise RuntimeError(f'missing PIT-ST row: {key}')
-              state=pit_key.loc[key]
-              if isinstance(state,pd.DataFrame): raise RuntimeError(f'duplicate PIT-ST row: {key}')
-              ipo=str(basics[r.symbol].get('ipoDate') or '')[:10]
-              rank=ranks.get(key)
-              pct=rule.limit_percent(r.symbol,r.date,bool(state['isST']),ipo_date=ipo,listing_trade_rank=rank)
-              truth_no_limit=float(r.high_limit)>=999999.0
-              candidate_no_limit=pct is None
-              candidate_limit=None if pct is None else rule.limit_price_cny(r.prev_close,pct)
-              truth_upper=(not truth_no_limit) and abs(float(r.close)-float(r.high_limit))<0.0051
-              candidate_upper=False if pct is None else rule.is_upper_limit(r.close,r.prev_close,pct)
-              price_match=(truth_no_limit and candidate_no_limit) or ((not truth_no_limit) and pct is not None and abs(candidate_limit-float(r.high_limit))<0.0051)
-              rows.append({
-                  'symbol':r.symbol,'date':r.date,'name':r.name,'market':r.market,'exchange':r.exchange,
-                  'ipo_date':ipo,'listing_trade_rank':rank,'is_st':int(state['isST']),
-                  'close':float(r.close),'prev_close':float(r.prev_close),'truth_high_limit':float(r.high_limit),
-                  'truth_no_limit':truth_no_limit,'candidate_no_limit':candidate_no_limit,
-                  'candidate_pct':pct,'candidate_limit':candidate_limit,'price_match':price_match,
-                  'truth_upper_limit':truth_upper,'candidate_upper_limit':candidate_upper,
-                  'boolean_match':truth_upper==candidate_upper,
-              })
-
-          outdf=pd.DataFrame(rows)
-          no_limit_mismatch=outdf[outdf['truth_no_limit']!=outdf['candidate_no_limit']].copy()
-          price_mismatch=outdf[~outdf['price_match']].copy()
-          bool_mismatch=outdf[~outdf['boolean_match']].copy()
+          no_limit_mismatch=frame[frame['truth_no_limit']!=frame['candidate_no_limit']].copy()
+          price_mismatch=frame[~frame['price_match']].copy()
+          bool_mismatch=frame[~frame['boolean_match']].copy()
           summary={
               'artifact':'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1','status':'PROBE_ONLY_NOT_BINDING',
-              'canonical_truth_sha256':CANON_SHA,'rows':int(len(outdf)),'symbols':int(outdf['symbol'].nunique()),
-              'truth_no_limit_n':int(outdf['truth_no_limit'].sum()),'candidate_no_limit_n':int(outdf['candidate_no_limit'].sum()),
+              'canonical_truth_sha256':CANON_SHA,'rows':int(len(frame)),'symbols':int(frame['symbol'].nunique()),
+              'truth_no_limit_n':int(frame['truth_no_limit'].sum()),'candidate_no_limit_n':int(frame['candidate_no_limit'].sum()),
               'no_limit_mismatch_n':int(len(no_limit_mismatch)),
-              'truth_no_limit_candidate_limited_n':int((outdf['truth_no_limit'] & ~outdf['candidate_no_limit']).sum()),
-              'truth_limited_candidate_no_limit_n':int((~outdf['truth_no_limit'] & outdf['candidate_no_limit']).sum()),
-              'price_match_n':int(outdf['price_match'].sum()),'price_mismatch_n':int(len(price_mismatch)),
-              'boolean_match_n':int(outdf['boolean_match'].sum()),'boolean_mismatch_n':int(len(bool_mismatch)),
+              'truth_no_limit_candidate_limited_n':int((frame['truth_no_limit'] & ~frame['candidate_no_limit']).sum()),
+              'truth_limited_candidate_no_limit_n':int((~frame['truth_no_limit'] & frame['candidate_no_limit']).sum()),
+              'price_match_n':int(frame['price_match'].sum()),'price_mismatch_n':int(len(price_mismatch)),
+              'boolean_match_n':int(frame['boolean_match'].sum()),'boolean_mismatch_n':int(len(bool_mismatch)),
               'formal_binding_allowed':False,'historical_gp_v11_source_recovered':False,
               'model_freeze_allowed':False,'oos_metrics_allowed':False,
           }
+          cols=['symbol','date','name','market','exchange','ipo_date','listing_trade_rank','isST','close','prev_close','high_limit','truth_no_limit','candidate_no_limit','candidate_pct','candidate_limit','truth_upper_limit','candidate_upper_limit']
           out=Path('artifact_gp12_upper_limit_truth_crosscheck_v1'); out.mkdir(exist_ok=True)
-          no_limit_mismatch.sort_values(['symbol','date']).to_csv(out/'NO_LIMIT_MISMATCH.csv',index=False)
-          price_mismatch.sort_values(['symbol','date']).head(50000).to_csv(out/'PRICE_MISMATCH.csv',index=False)
-          bool_mismatch.sort_values(['symbol','date']).to_csv(out/'BOOLEAN_MISMATCH.csv',index=False)
+          no_limit_mismatch[cols].sort_values(['symbol','date']).to_csv(out/'NO_LIMIT_MISMATCH.csv',index=False)
+          price_mismatch[cols].sort_values(['symbol','date']).head(50000).to_csv(out/'PRICE_MISMATCH.csv',index=False)
+          bool_mismatch[cols].sort_values(['symbol','date']).to_csv(out/'BOOLEAN_MISMATCH.csv',index=False)
           (out/'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print(json.dumps(summary,ensure_ascii=False,indent=2))
           PY
