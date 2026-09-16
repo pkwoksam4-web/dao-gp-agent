@@ -1,0 +1,137 @@
+name: GP12 Status Upper Limit HF Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-upper-limit-hf-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe ellendan a-share-prices high_limit capability
+        run: |
+          python - <<'PY'
+          import json, urllib.parse, urllib.request
+          from pathlib import Path
+
+          DATASET = 'ellendan/a-share-prices'
+          CONFIG = 'main_data'
+          SPLIT = 'train'
+          headers = {'User-Agent':'GP12-candidate-source-probe/1.0'}
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=40) as r:
+                  return r.status, json.loads(r.read().decode('utf-8'))
+
+          def get_text(url):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=40) as r:
+                  return r.status, r.read().decode('utf-8', errors='replace').strip()
+
+          out = {
+              'artifact':'GP12_STATUS_UPPER_LIMIT_HF_PROBE_V1',
+              'provider':'Hugging Face public dataset',
+              'dataset':DATASET,
+              'formal_window':['2020-06-01','2026-04-17'],
+              'formal_binding_allowed':False,
+              'historical_gp_v11_source_recovered':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+          }
+
+          info_status, info = get_json('https://huggingface.co/api/datasets/' + DATASET)
+          out['dataset_info'] = {
+              'http_status': info_status,
+              'id': info.get('id'),
+              'sha': info.get('sha'),
+              'lastModified': info.get('lastModified'),
+              'private': info.get('private'),
+              'disabled': info.get('disabled'),
+          }
+          try:
+              st, last = get_text('https://huggingface.co/datasets/' + DATASET + '/resolve/main/.last_update_date')
+              out['last_update_date'] = {'http_status':st, 'value':last}
+          except Exception as exc:
+              out['last_update_date'] = {'error':type(exc).__name__ + ': ' + str(exc)}
+
+          parquet_url = 'https://datasets-server.huggingface.co/parquet?' + urllib.parse.urlencode({'dataset':DATASET})
+          try:
+              st, pq = get_json(parquet_url)
+              out['parquet'] = {'http_status':st, 'files':pq.get('parquet_files', [])[:20], 'pending':pq.get('pending', [])}
+          except Exception as exc:
+              out['parquet'] = {'error':type(exc).__name__ + ': ' + str(exc)}
+
+          probes = [
+              ('000001.SZ','2020-06-01'),
+              ('000001.SZ','2024-06-13'),
+              ('000001.SZ','2026-03-03'),
+              ('000001.SZ','2026-04-17'),
+              ('300001.SZ','2020-06-01'),
+              ('300001.SZ','2020-08-24'),
+              ('300001.SZ','2024-06-13'),
+              ('688086.SH','2020-06-01'),
+              ('688086.SH','2024-06-13'),
+              ('688555.SH','2020-06-01'),
+              ('688555.SH','2024-06-13'),
+          ]
+          results = []
+          for code, date in probes:
+              where = f'"code"=\'{code}\' AND "date"=\'{date}\''
+              params = urllib.parse.urlencode({
+                  'dataset': DATASET,
+                  'config': CONFIG,
+                  'split': SPLIT,
+                  'where': where,
+                  'length': 10,
+              })
+              url = 'https://datasets-server.huggingface.co/filter?' + params
+              rec = {'code':code,'date':date}
+              try:
+                  st, data = get_json(url)
+                  rec['http_status'] = st
+                  rec['num_rows_total'] = data.get('num_rows_total')
+                  rows = data.get('rows') or []
+                  rec['rows_n'] = len(rows)
+                  if rows:
+                      row = rows[0].get('row') or {}
+                      rec['row'] = {k:row.get(k) for k in ['code','date','open','high','low','close','prev_close','high_limit','low_limit','market','exchange','list_date']}
+              except Exception as exc:
+                  rec['error'] = type(exc).__name__ + ': ' + str(exc)
+              results.append(rec)
+              print(json.dumps(rec, ensure_ascii=False))
+          out['probes'] = results
+
+          summary = {
+              'probe_n': len(results),
+              'rows_found_n': sum(1 for r in results if r.get('rows_n',0) > 0),
+              'high_limit_present_n': sum(1 for r in results if (r.get('row') or {}).get('high_limit') is not None),
+              'formal_end_found': any(r['date']=='2026-04-17' and r.get('rows_n',0)>0 for r in results),
+              'chinext_found': any(r['code'].startswith('300') and r.get('rows_n',0)>0 for r in results),
+              'star_found': any(r['code'].startswith('688') and r.get('rows_n',0)>0 for r in results),
+          }
+          out['summary'] = summary
+          Path('artifact_gp12_status_upper_limit_hf_probe_v1').mkdir(exist_ok=True)
+          Path('artifact_gp12_status_upper_limit_hf_probe_v1/GP12_STATUS_UPPER_LIMIT_HF_PROBE_V1.json').write_text(
+              json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload probe artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-upper-limit-hf-probe-v1
+          path: artifact_gp12_status_upper_limit_hf_probe_v1/
+          if-no-files-found: error
+          retention-days: 30
