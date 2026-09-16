@@ -28,6 +28,19 @@ class SohuReferenceContractTests(unittest.TestCase):
         self.assertEqual(row["turnover_percent"], 0.78)
         self.assertEqual(row["reference_close_cny"], 5.10)
 
+    def test_parser_allows_dash_turnover_but_keeps_core_reference_strict(self):
+        raw = self._payload([
+            "2025-12-30", "19.60", "19.68", "4.48", "29.47%",
+            "19.60", "25.00", "1459908", "304522.38", "-",
+        ])
+        row = sut.parse_hishq_reference_bytes("001369.SZ", raw)[0]
+        self.assertEqual(row["date"], "2025-12-30")
+        self.assertEqual(row["close"], 19.68)
+        self.assertEqual(row["change_cny"], 4.48)
+        self.assertEqual(row["pct_percent"], 29.47)
+        self.assertIsNone(row["turnover_percent"])
+        self.assertEqual(row["reference_close_cny"], 15.20)
+
     def test_negative_change_recovers_rights_issue_reference(self):
         raw = self._payload([
             "2023-12-08", "29.99", "27.35", "-1.89", "-6.46%",
