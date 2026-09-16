@@ -33,12 +33,12 @@ jobs:
           repository: pkwoksam4-web/dao-gp-agent
           github-token: ${{ github.token }}
 
-      - name: Download pinned PIT-ST lifecycle evidence
+      - name: Download final pinned PIT-ST lifecycle evidence
         uses: actions/download-artifact@v4
         with:
-          name: gp-pit-st-v480-merged
+          name: gp-pit-st-v480-final-audit
           path: pitst
-          run-id: 33971534669
+          run-id: 33977325822
           repository: pkwoksam4-web/dao-gp-agent
           github-token: ${{ github.token }}
 
@@ -51,6 +51,7 @@ jobs:
 
           UPPER_PANEL_SHA='a08a0705621c41bfdc704ff281f6f3a6c01ba17485e3981d55707f18303ad08e'
           UPPER_AUDIT_SHA='44ada4ca0429963ae19f9c4ed4a5ba60e915e31b3677172cfefe63384ba1d6b8'
+          LIFECYCLE_SHA='6ed8ffd09215bccb90f716af26d44f7f590ffd5d455c20841307484a63aaa490'
           LIFECYCLE_ROWS=1021953
           TRADE_ROWS=1011607
           NONTRADE_ROWS=10346
@@ -78,8 +79,9 @@ jobs:
           assert not upper.duplicated(['symbol','date']).any()
           assert int(upper['upper_limit'].sum())==UPPER_LIMIT_ROWS
 
-          lifecycle_path=unique('pitst','PIT_ST_DAILY_MERGED_V480.csv')
+          lifecycle_path=unique('pitst','PIT_ST_FORMAL_OVERLAY_V480.csv')
           lifecycle_sha=hashlib.sha256(lifecycle_path.read_bytes()).hexdigest()
+          assert lifecycle_sha==LIFECYCLE_SHA,lifecycle_sha
           life=pd.read_csv(lifecycle_path,dtype={'symbol':str,'date':str})
           assert {'symbol','date','isST'}.issubset(life.columns),life.columns.tolist()
           life['symbol']=life['symbol'].str.upper(); life['date']=life['date'].str[:10]
@@ -95,7 +97,6 @@ jobs:
           trade_mask=merged['_merge'].eq('both')
           assert int(trade_mask.sum())==TRADE_ROWS,int(trade_mask.sum())
           assert int((~trade_mask).sum())==NONTRADE_ROWS,int((~trade_mask).sum())
-          # Fail closed: every upper-limit row must be a lifecycle row.
           coverage=upper[['symbol','date']].merge(
               life[['symbol','date']],on=['symbol','date'],how='left',indicator=True,validate='one_to_one'
           )
@@ -125,12 +126,14 @@ jobs:
               'nontradable_upper_limit_true_rows':0,
               'duplicate_symbol_dates':0,
               'missing_status_values':0,
+              'pit_st_final_run':33977325822,
+              'pit_st_final_artifact_id':9972698555,
               'pit_st_lifecycle_csv_sha256':lifecycle_sha,
               'upper_limit_source_run':35069676486,
               'upper_limit_source_artifact_id':10435886487,
               'upper_limit_panel_sha256':UPPER_PANEL_SHA,
               'upper_limit_audit_sha256':UPPER_AUDIT_SHA,
-              'tradable_definition':'True iff verified positive-trade upper-limit source has same symbol-date; False otherwise on PIT lifecycle axis',
+              'tradable_definition':'True iff verified positive-trade upper-limit source has same symbol-date; False otherwise on final PIT lifecycle axis',
               'nontradable_upper_limit_semantics':'False because no trading session occurred on that lifecycle symbol-date',
               'pit':{
                   'scope':'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
