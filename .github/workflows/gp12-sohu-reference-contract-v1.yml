@@ -1,0 +1,28 @@
+name: GP12 Sohu Reference Contract V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/test_gp12_sohu_reference_v1.py'
+      - 'scripts/gp12_sohu_reference_v1.py'
+      - '.github/workflows/gp12-sohu-reference-contract-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Sohu reference contract tests
+        env:
+          PYTHONPATH: scripts
+        run: python -m unittest -v scripts/test_gp12_sohu_reference_v1.py
