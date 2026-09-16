@@ -7,7 +7,7 @@ on:
     paths:
       - 'scripts/test_gp12_upper_limit_special_no_limit_v1.py'
       - 'scripts/gp12_upper_limit_special_no_limit_v1.py'
-      - 'data/GP12_UPPER_LIMIT_SPECIAL_NO_LIMIT_V1.json'
+      - 'data/GP12_STATUS_SPECIAL_NO_LIMIT_EVIDENCE_V1.json'
       - '.github/workflows/gp12-upper-limit-special-no-limit-contract-v1.yml'
   workflow_dispatch:
 
