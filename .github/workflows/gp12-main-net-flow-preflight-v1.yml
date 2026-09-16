@@ -1,0 +1,124 @@
+name: GP12 Main Net Flow Preflight V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/gp12_main_net_flow_tushare_v1.py'
+      - '.github/workflows/gp12-main-net-flow-preflight-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parquet runtime
+        run: pip install -q pandas pyarrow
+      - name: Download pinned Sohu RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Verify pinned Formal844 source axis
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out/preflight
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from gp12_main_net_flow_tushare_v1 import (
+              EXPECTED_TRADE_ROWS,
+              FORMAL_END,
+              FORMAL_START,
+              FORMAL_SYMBOL_N,
+              NA_SYMBOLS,
+              load_expected_dates,
+              load_scope,
+          )
+
+          audit_path = Path('upstream/raw/SOHU_RAW_FULL_AUDIT_V482.json')
+          panel_path = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          scope_path = Path('data/pit_st_scope_v480.txt')
+          assert audit_path.exists(), audit_path
+          assert panel_path.exists(), panel_path
+          assert scope_path.exists(), scope_path
+
+          upstream = json.loads(audit_path.read_text(encoding='utf-8'))
+          assert upstream['artifact'] == 'SOHU_RAW_FULL_V482'
+          assert upstream['version'] == 'V4.82'
+          assert upstream['status'] == 'PASS_FULL_RAW_V482'
+          assert upstream['symbol_n'] == 847
+          assert upstream['raw_rows'] == EXPECTED_TRADE_ROWS
+          assert upstream['expected_trade_rows'] == EXPECTED_TRADE_ROWS
+          assert upstream['duplicate_symbol_dates'] == 0
+          assert upstream['missing_trade_dates_n'] == 0
+          assert upstream['extra_trade_dates_n'] == 0
+          assert upstream['bad_amount_rows'] == 0
+          assert upstream['zero_trade_symbols'] == list(NA_SYMBOLS)
+          assert upstream['global_reaudit_pass'] is True
+          assert upstream['formal_admission'] is False
+          assert upstream['oos_metrics_allowed'] is False
+
+          formal_symbols = load_scope(scope_path)
+          assert len(formal_symbols) == FORMAL_SYMBOL_N
+          expected = load_expected_dates(panel_path, formal_symbols)
+          assert set(expected) == set(formal_symbols)
+          total = sum(len(dates) for dates in expected.values())
+          assert total == EXPECTED_TRADE_ROWS, (total, EXPECTED_TRADE_ROWS)
+
+          all_dates = [date for dates in expected.values() for date in dates]
+          assert min(all_dates) == FORMAL_START
+          assert max(all_dates) == FORMAL_END
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with path.open('rb') as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          report = {
+              'artifact': 'GP12_MAIN_NET_FLOW_PREFLIGHT_V1',
+              'version': '1.0',
+              'formal_window': [FORMAL_START, FORMAL_END],
+              'universe_n': 847,
+              'formal_symbol_n': len(formal_symbols),
+              'na_symbols': list(NA_SYMBOLS),
+              'expected_trade_rows': total,
+              'raw_source_run_id': 34192233633,
+              'raw_source_artifact_id': 10042614517,
+              'raw_source_artifact_zip_sha256': 'cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550',
+              'raw_panel_sha256': sha256(panel_path),
+              'scope_sha256': sha256(scope_path),
+              'source_axis_verified': True,
+              'main_net_flow_data_fetched': False,
+              'main_net_flow_candidate_pit_verified': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+              'blockers': ['TUSHARE_CREDENTIAL_REQUIRED', 'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED'],
+          }
+          Path('out/preflight/GP12_MAIN_NET_FLOW_PREFLIGHT_V1.json').write_text(
+              json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-main-net-flow-preflight-v1
+          path: out/preflight/
+          if-no-files-found: error
+          retention-days: 30
