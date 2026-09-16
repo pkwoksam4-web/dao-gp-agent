@@ -1,0 +1,121 @@
+name: GP12 Sohu Change Reference Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-sohu-change-reference-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q requests pandas pyarrow
+      - name: Download canonical high-limit truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-canonical-v1
+          path: truth
+          run-id: 35060927372
+          github-token: ${{ github.token }}
+      - name: Probe exact Sohu hq change fields
+        run: |
+          python - <<'PY'
+          import hashlib, json, re, time
+          from decimal import Decimal
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          CASES=[
+            ('000790.SZ','2023-06-21','suspension_cross_exdiv'),
+            ('000049.SZ','2023-12-08','rights_issue'),
+            ('000962.SZ','2024-11-28','exright_boolean_mismatch_fixed_by_decimal'),
+            ('000001.SZ','2024-01-02','ordinary_control'),
+          ]
+          out=Path('artifact_gp12_sohu_change_reference_probe_v1'); out.mkdir(exist_ok=True)
+          truth_path=list(Path('truth').rglob('HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet'))
+          assert len(truth_path)==1,truth_path
+          truth=pd.read_parquet(truth_path[0])
+          truth['symbol']=truth['code'].astype(str).str.upper()
+          truth['date']=truth['date'].astype(str).str[:10]
+          truth=truth.set_index(['symbol','date'],drop=False)
+
+          s=requests.Session()
+          rows=[]
+          try:
+            for symbol,date,label in CASES:
+              code=symbol[:6]
+              params={
+                'code':f'cn_{code}','start':date.replace('-',''),'end':date.replace('-',''),
+                'stat':'1','order':'A','period':'d','callback':'historySearchHandler','rt':'jsonp'}
+              last=None
+              for attempt in range(1,4):
+                try:
+                  r=s.get('https://q.stock.sohu.com/hisHq',params=params,timeout=20,headers={
+                    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/152 Safari/537.36',
+                    'Referer':f'https://q.stock.sohu.com/cn/{code}/lshq.shtml','Connection':'close','Accept':'*/*'})
+                  r.raise_for_status(); raw=r.content; break
+                except Exception as exc:
+                  last=exc
+                  if attempt==3: raise
+                  time.sleep(attempt)
+              text=None
+              for enc in ('utf-8-sig','gb18030'):
+                try: text=raw.decode(enc); break
+                except UnicodeDecodeError: pass
+              assert text is not None
+              (out/f'{symbol}_{date}.raw.txt').write_text(text,encoding='utf-8')
+              m=re.match(r'^\s*historySearchHandler\((.*)\)\s*;?\s*$',text.strip(),re.S)
+              assert m,(symbol,date,text[:200])
+              obj=json.loads(m.group(1)); assert isinstance(obj,list) and obj and obj[0].get('status')==0,(symbol,date,obj)
+              hq=obj[0].get('hq') or []; assert len(hq)==1,(symbol,date,len(hq),hq[:2])
+              p=hq[0]; assert len(p)>=10,(symbol,date,p)
+              # Sohu columns: date, open, close, chg, pct, low, high, volume lots, amount 10k CNY, turnover.
+              close=Decimal(str(p[2])); chg=Decimal(str(p[3])); prev=close-chg
+              hf=truth.loc[(symbol,date)]
+              if isinstance(hf,pd.DataFrame): hf=hf.iloc[0]
+              hf_prev=Decimal(str(hf['prev_close'])); hf_close=Decimal(str(hf['close']))
+              rows.append({
+                'symbol':symbol,'date':date,'case':label,
+                'sohu_raw_hq':p,
+                'sohu_close':str(close),'sohu_chg':str(chg),'sohu_pct':str(p[4]),
+                'sohu_prev_from_close_minus_chg':str(prev),
+                'hf_close':str(hf_close),'hf_prev_close':str(hf_prev),'hf_high_limit':str(hf['high_limit']),
+                'close_match':close==hf_close,
+                'prev_reference_match':prev==hf_prev,
+                'prev_diff':str(prev-hf_prev),
+              })
+          finally:
+            s.close()
+          summary={
+            'artifact':'GP12_SOHU_CHANGE_REFERENCE_PROBE_V1','status':'PROBE_ONLY_NOT_BINDING',
+            'cases':rows,'case_n':len(rows),
+            'close_match_n':sum(r['close_match'] for r in rows),
+            'prev_reference_match_n':sum(r['prev_reference_match'] for r in rows),
+            'all_prev_reference_match':all(r['prev_reference_match'] for r in rows),
+            'formal_binding_allowed':False,'historical_gp_v11_source_recovered':False,
+            'model_freeze_allowed':False,'oos_metrics_allowed':False}
+          (out/'GP12_SOHU_CHANGE_REFERENCE_PROBE_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-sohu-change-reference-probe-v1
+          path: artifact_gp12_sohu_change_reference_probe_v1/
+          if-no-files-found: error
+          retention-days: 30
