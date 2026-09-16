@@ -221,6 +221,79 @@ def fetch_chunk_reference(
     ) from last_error
 
 
+def _merge_reference_rows_unique(symbol: str, *parts: list[dict]) -> list[dict]:
+    normalized = normalize_symbol(symbol)
+    by_date: dict[str, dict] = {}
+    for rows in parts:
+        for row in rows:
+            if normalize_symbol(row.get("symbol")) != normalized:
+                raise RuntimeError(f"wrong-symbol Sohu reference row for {normalized}: {row!r}")
+            trade_date = str(row.get("date") or "")[:10]
+            if not trade_date:
+                raise RuntimeError(f"missing-date Sohu reference row for {normalized}: {row!r}")
+            if trade_date in by_date and by_date[trade_date] != row:
+                raise RuntimeError(
+                    f"conflicting duplicate Sohu reference row {normalized} {trade_date}"
+                )
+            by_date[trade_date] = row
+    return [by_date[trade_date] for trade_date in sorted(by_date)]
+
+
+def fetch_chunk_reference_resilient(
+    symbol: str,
+    start: str,
+    end: str,
+    *,
+    timeout: int = 20,
+    retries: int = 3,
+    min_calendar_days: int = 1,
+) -> tuple[list[dict], dict]:
+    first = date.fromisoformat(start)
+    last = date.fromisoformat(end)
+    if last < first:
+        raise ValueError("end before start")
+    try:
+        rows = fetch_chunk_reference(
+            symbol, start, end, timeout=timeout, retries=retries
+        )
+        return rows, {
+            "split_recovery_n": 0,
+            "leaf_chunk_n": 1,
+            "leaf_nonempty_n": int(bool(rows)),
+            "max_leaf_rows": len(rows),
+        }
+    except RuntimeError:
+        calendar_days = (last - first).days + 1
+        if calendar_days <= min_calendar_days:
+            raise
+        midpoint = first + timedelta(days=(calendar_days // 2) - 1)
+        right_start = midpoint + timedelta(days=1)
+        time.sleep(0.25)
+        left_rows, left_meta = fetch_chunk_reference_resilient(
+            symbol,
+            first.isoformat(),
+            midpoint.isoformat(),
+            timeout=timeout,
+            retries=retries,
+            min_calendar_days=min_calendar_days,
+        )
+        right_rows, right_meta = fetch_chunk_reference_resilient(
+            symbol,
+            right_start.isoformat(),
+            last.isoformat(),
+            timeout=timeout,
+            retries=retries,
+            min_calendar_days=min_calendar_days,
+        )
+        rows = _merge_reference_rows_unique(symbol, left_rows, right_rows)
+        return rows, {
+            "split_recovery_n": 1 + left_meta["split_recovery_n"] + right_meta["split_recovery_n"],
+            "leaf_chunk_n": left_meta["leaf_chunk_n"] + right_meta["leaf_chunk_n"],
+            "leaf_nonempty_n": left_meta["leaf_nonempty_n"] + right_meta["leaf_nonempty_n"],
+            "max_leaf_rows": max(left_meta["max_leaf_rows"], right_meta["max_leaf_rows"]),
+        }
+
+
 def fetch_symbol_reference(
     symbol: str,
     start: str,
@@ -232,9 +305,9 @@ def fetch_symbol_reference(
     delay: float = 0.05,
 ) -> list[dict]:
     normalized = normalize_symbol(symbol)
-    by_date: dict[str, dict] = {}
+    parts: list[list[dict]] = []
     for chunk_start, chunk_end in plan_chunks(start, end, max_calendar_days):
-        rows = fetch_chunk_reference(
+        rows, _ = fetch_chunk_reference_resilient(
             normalized,
             chunk_start,
             chunk_end,
@@ -245,13 +318,7 @@ def fetch_symbol_reference(
             raise RuntimeError(
                 f"Sohu reference chunk may be truncated ({len(rows)} rows) {normalized} {chunk_start}..{chunk_end}"
             )
-        for row in rows:
-            trade_date = str(row["date"])[:10]
-            if trade_date in by_date and by_date[trade_date] != row:
-                raise RuntimeError(
-                    f"conflicting duplicate Sohu reference row {normalized} {trade_date}"
-                )
-            by_date[trade_date] = row
+        parts.append(rows)
         if delay > 0:
             time.sleep(delay)
-    return [by_date[trade_date] for trade_date in sorted(by_date)]
+    return _merge_reference_rows_unique(normalized, *parts)
