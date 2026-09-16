@@ -1,0 +1,148 @@
+name: GP12 Upper Limit Truth Crosscheck V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/gp12_upper_limit_rule_v1.py'
+      - '.github/workflows/gp12-upper-limit-truth-crosscheck-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  crosscheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -q pandas pyarrow
+
+      - name: Download canonical partial high-limit truth
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-upper-limit-truth-canonical-v1
+          path: truth
+          run-id: 35060927372
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download pinned PIT-ST merged evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-merged
+          path: pitst
+          run-id: 33971534669
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Crosscheck rules without special-date overrides
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          import pandas as pd
+          import gp12_upper_limit_rule_v1 as rule
+
+          CANON_SHA='d11b415b74d44d63d1aa927e8652f395dd039c28f6e1b4c24964e53759405308'
+          def unique(root,name):
+              hits=list(Path(root).rglob(name)); assert len(hits)==1,(root,name,hits); return hits[0]
+
+          truth_path=unique('truth','HF_HIGH_LIMIT_FORMAL844_OVERLAP_CANONICAL.parquet')
+          assert hashlib.sha256(truth_path.read_bytes()).hexdigest()==CANON_SHA
+          truth=pd.read_parquet(truth_path)
+          truth['symbol']=truth['code'].astype(str).str.upper()
+          truth['date']=truth['date'].astype(str).str[:10]
+          truth['close']=pd.to_numeric(truth['close'],errors='raise')
+          truth['prev_close']=pd.to_numeric(truth['prev_close'],errors='raise')
+          truth['high_limit']=pd.to_numeric(truth['high_limit'],errors='raise')
+          assert len(truth)==896827 and truth['symbol'].nunique()==698
+
+          audit=json.loads(unique('pitst','PIT_ST_AUDIT_MERGED_V480.json').read_text(encoding='utf-8'))
+          basics={}
+          for a in audit['audits']:
+              rows=(a.get('basic') or {}).get('rows') or []
+              if len(rows)==1:
+                  basics[str(a['symbol']).upper()]=rows[0]
+          assert len(basics)==847,len(basics)
+
+          pit=pd.read_csv(unique('pitst','PIT_ST_DAILY_MERGED_V480.csv'),dtype={'symbol':str,'date':str})
+          pit['symbol']=pit['symbol'].str.upper(); pit['date']=pit['date'].str[:10]
+          pit['tradestatus']=pd.to_numeric(pit['tradestatus'],errors='raise').astype(int)
+          pit['isST']=pd.to_numeric(pit['isST'],errors='raise').astype(int)
+          pit_key=pit.set_index(['symbol','date'])[['tradestatus','isST']]
+
+          ranks={}
+          for symbol,g in pit[pit['tradestatus']==1].sort_values(['symbol','date']).groupby('symbol',sort=False):
+              ipo=str(basics[symbol].get('ipoDate') or '')[:10]
+              if not ipo: continue
+              dates=g[g['date']>=ipo]['date'].tolist()
+              for n,d in enumerate(dates,1): ranks[(symbol,d)]=n
+
+          rows=[]
+          for r in truth[['symbol','date','close','prev_close','high_limit','name','market','exchange','list_date']].itertuples(index=False):
+              key=(r.symbol,r.date)
+              if key not in pit_key.index:
+                  raise RuntimeError(f'missing PIT-ST row: {key}')
+              state=pit_key.loc[key]
+              if isinstance(state,pd.DataFrame): raise RuntimeError(f'duplicate PIT-ST row: {key}')
+              ipo=str(basics[r.symbol].get('ipoDate') or '')[:10]
+              rank=ranks.get(key)
+              pct=rule.limit_percent(r.symbol,r.date,bool(state['isST']),ipo_date=ipo,listing_trade_rank=rank)
+              truth_no_limit=float(r.high_limit)>=999999.0
+              candidate_no_limit=pct is None
+              candidate_limit=None if pct is None else rule.limit_price_cny(r.prev_close,pct)
+              truth_upper=(not truth_no_limit) and abs(float(r.close)-float(r.high_limit))<0.0051
+              candidate_upper=False if pct is None else rule.is_upper_limit(r.close,r.prev_close,pct)
+              price_match=(truth_no_limit and candidate_no_limit) or ((not truth_no_limit) and pct is not None and abs(candidate_limit-float(r.high_limit))<0.0051)
+              rows.append({
+                  'symbol':r.symbol,'date':r.date,'name':r.name,'market':r.market,'exchange':r.exchange,
+                  'ipo_date':ipo,'listing_trade_rank':rank,'is_st':int(state['isST']),
+                  'close':float(r.close),'prev_close':float(r.prev_close),'truth_high_limit':float(r.high_limit),
+                  'truth_no_limit':truth_no_limit,'candidate_no_limit':candidate_no_limit,
+                  'candidate_pct':pct,'candidate_limit':candidate_limit,'price_match':price_match,
+                  'truth_upper_limit':truth_upper,'candidate_upper_limit':candidate_upper,
+                  'boolean_match':truth_upper==candidate_upper,
+              })
+
+          outdf=pd.DataFrame(rows)
+          no_limit_mismatch=outdf[outdf['truth_no_limit']!=outdf['candidate_no_limit']].copy()
+          price_mismatch=outdf[~outdf['price_match']].copy()
+          bool_mismatch=outdf[~outdf['boolean_match']].copy()
+          summary={
+              'artifact':'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1','status':'PROBE_ONLY_NOT_BINDING',
+              'canonical_truth_sha256':CANON_SHA,'rows':int(len(outdf)),'symbols':int(outdf['symbol'].nunique()),
+              'truth_no_limit_n':int(outdf['truth_no_limit'].sum()),'candidate_no_limit_n':int(outdf['candidate_no_limit'].sum()),
+              'no_limit_mismatch_n':int(len(no_limit_mismatch)),
+              'truth_no_limit_candidate_limited_n':int((outdf['truth_no_limit'] & ~outdf['candidate_no_limit']).sum()),
+              'truth_limited_candidate_no_limit_n':int((~outdf['truth_no_limit'] & outdf['candidate_no_limit']).sum()),
+              'price_match_n':int(outdf['price_match'].sum()),'price_mismatch_n':int(len(price_mismatch)),
+              'boolean_match_n':int(outdf['boolean_match'].sum()),'boolean_mismatch_n':int(len(bool_mismatch)),
+              'formal_binding_allowed':False,'historical_gp_v11_source_recovered':False,
+              'model_freeze_allowed':False,'oos_metrics_allowed':False,
+          }
+          out=Path('artifact_gp12_upper_limit_truth_crosscheck_v1'); out.mkdir(exist_ok=True)
+          no_limit_mismatch.sort_values(['symbol','date']).to_csv(out/'NO_LIMIT_MISMATCH.csv',index=False)
+          price_mismatch.sort_values(['symbol','date']).head(50000).to_csv(out/'PRICE_MISMATCH.csv',index=False)
+          bool_mismatch.sort_values(['symbol','date']).to_csv(out/'BOOLEAN_MISMATCH.csv',index=False)
+          (out/'GP12_UPPER_LIMIT_TRUTH_CROSSCHECK_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload truth crosscheck
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-upper-limit-truth-crosscheck-v1
+          path: artifact_gp12_upper_limit_truth_crosscheck_v1/
+          if-no-files-found: error
+          retention-days: 30
