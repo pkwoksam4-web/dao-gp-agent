@@ -154,3 +154,5 @@ jobs:
           path: artifact_gp12_upper_limit_truth_crosscheck_v1/
           if-no-files-found: error
           retention-days: 30
+
+# verification-trigger: canonical special evidence only
