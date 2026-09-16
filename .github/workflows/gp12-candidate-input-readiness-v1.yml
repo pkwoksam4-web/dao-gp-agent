@@ -6,6 +6,7 @@ on:
       - gp/gp12-turnover-ratio-v1
     paths:
       - 'scripts/gp12_candidate_input_readiness_v1.py'
+      - 'scripts/gp12_candidate_input_readiness_status_v1.py'
       - 'scripts/test_gp12_candidate_input_readiness_v1.py'
       - 'scripts/test_gp12_main_net_flow_readiness_requirement_v1.py'
       - 'scripts/test_gp12_status_partial_binding_v1.py'
@@ -63,7 +64,7 @@ jobs:
           PYTHONPATH: scripts
         run: |
           mkdir -p artifact_gp12_candidate_input_readiness_v1
-          python scripts/gp12_candidate_input_readiness_v1.py \
+          python scripts/gp12_candidate_input_readiness_status_v1.py \
             --parameters data/GP12_CANDIDATE_PARAMETERS_V1.json \
             --factors data/GP12_CANDIDATE_FACTORS_V1.json \
             --base-evidence data/GP12_FORMAL_INPUT_EVIDENCE_V1.json \
