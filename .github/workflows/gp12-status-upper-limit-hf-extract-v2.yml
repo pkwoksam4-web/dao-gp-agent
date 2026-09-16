@@ -38,10 +38,10 @@ jobs:
             stat -c '%n %s' "hf_parquet/$f"
             sleep 3
           done
-      - name: Filter Formal844 overlap locally
+      - name: Filter available Formal844 overlap locally
         run: |
           python - <<'PY'
-          import duckdb, hashlib, json, pathlib
+          import collections, duckdb, hashlib, json, pathlib
           symbols=[x.strip().upper() for x in pathlib.Path('data/pit_st_scope_v480.txt').read_text().splitlines() if x.strip()]
           symbols=[s for s in symbols if s not in {'600074.SH','600485.SH','600677.SH'}]
           assert len(symbols)==844,len(symbols)
@@ -63,27 +63,40 @@ jobs:
           ''')
           p=out_dir/'HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet'
           x=con.execute("SELECT count(*), count(distinct code), min(date), max(date), sum(high_limit IS NULL) FROM read_parquet(?)",[str(p)]).fetchone()
+          present=[r[0] for r in con.execute("SELECT DISTINCT code FROM read_parquet(?) ORDER BY code",[str(p)]).fetchall()]
+          missing=sorted(set(symbols)-set(present))
+          prefix_counts=dict(sorted(collections.Counter(s[:3] for s in missing).items()))
+          exchange_counts=dict(sorted(collections.Counter(s[-2:] for s in missing).items()))
+          (out_dir/'HF_PRESENT_FORMAL_SYMBOLS_V2.txt').write_text('\n'.join(present)+'\n',encoding='utf-8')
+          (out_dir/'HF_MISSING_FORMAL_SYMBOLS_V2.txt').write_text('\n'.join(missing)+'\n',encoding='utf-8')
           summary={
             'artifact':'GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2',
+            'status':'PARTIAL_TRUTH_REFERENCE_ONLY',
             'dataset':'ellendan/a-share-prices',
             'dataset_ref':'refs/convert/parquet',
             'source_file_count':7,
             'formal_symbol_target_n':844,
-            'rows':int(x[0]),'symbols':int(x[1]),'first_date':str(x[2]),'last_date':str(x[3]),
+            'rows':int(x[0]),'symbols':int(x[1]),'missing_symbol_n':len(missing),
+            'missing_prefix_counts':prefix_counts,'missing_exchange_counts':exchange_counts,
+            'first_date':str(x[2]),'last_date':str(x[3]),
             'high_limit_null_n':int(x[4] or 0),
             'extract_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+            'missing_symbols_sha256':hashlib.sha256(('\n'.join(missing)+'\n').encode()).hexdigest(),
             'truth_coverage_end':'2026-03-03',
+            'full_formal_coverage':False,
             'historical_gp_v11_source_recovered':False,
             'formal_binding_allowed':False,
             'model_freeze_allowed':False,
             'oos_metrics_allowed':False,
           }
-          assert summary['rows']>900000,summary
-          assert summary['symbols']>800,summary
+          assert summary['rows']==897508,summary
+          assert summary['symbols']==698,summary
+          assert summary['missing_symbol_n']==146,summary
+          assert summary['high_limit_null_n']==0,summary
           (out_dir/'GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print(json.dumps(summary,ensure_ascii=False,indent=2))
           PY
-      - name: Upload filtered truth only
+      - name: Upload partial truth reference
         uses: actions/upload-artifact@v4
         with:
           name: gp12-status-upper-limit-hf-truth-v2
