@@ -1,0 +1,176 @@
+name: GP12 Status Partial Binding Implement V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-partial-binding-implement-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply minimal status partial-binding implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          script_path = Path('scripts/gp12_candidate_input_readiness_v1.py')
+          text = script_path.read_text(encoding='utf-8')
+
+          def replace_once(old, new, label):
+              global text
+              n = text.count(old)
+              if n != 1:
+                  raise SystemExit(f'{label}: expected one match, got {n}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'MAIN_NET_FLOW_REQUIREMENT_SHA256 = "13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3"\n',
+              'MAIN_NET_FLOW_REQUIREMENT_SHA256 = "13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3"\n'
+              'STATUS_PARTIAL_BINDING_ARTIFACT = "GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1"\n'
+              'STATUS_PARTIAL_BINDING_SHA256 = "e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10"\n'
+              'STATUS_UPPER_LIMIT_BLOCKER = "STATUS_UPPER_LIMIT_UNBOUND"\n',
+              'constants',
+          )
+
+          marker = '\n\ndef _collect_input_blockers(report: dict) -> list[str]:\n'
+          validator = '''\n\ndef validate_status_partial_binding(binding: dict) -> str:\n    """Validate candidate-only partial status evidence without promoting status."""\n    _require(isinstance(binding, dict), "status partial binding must be an object")\n    binding_sha = _canonical_json_sha256(binding)\n    _require(binding_sha == STATUS_PARTIAL_BINDING_SHA256, "STATUS_PARTIAL_BINDING_IDENTITY_MISMATCH")\n    _require(binding.get("artifact") == STATUS_PARTIAL_BINDING_ARTIFACT, "status partial artifact mismatch")\n    _require(binding.get("version") == "1.0", "status partial version mismatch")\n    _require(binding.get("strategy_id") == "GP12_REBUILD_CANDIDATE_V1", "status partial strategy mismatch")\n    _require(binding.get("status") == "CANDIDATE_ONLY_UNAPPROVED", "status partial status mismatch")\n    _require(binding.get("origin") == "NEW_RECONSTRUCTION_CANDIDATE", "status partial origin mismatch")\n    _require(binding.get("formal_window") == [FORMAL_START, FORMAL_END], "status partial formal window mismatch")\n    _require(binding.get("universe_n") == 847, "status partial universe mismatch")\n    _require(binding.get("required_status_fields") == ["is_st", "tradable", "upper_limit"], "status field contract mismatch")\n\n    st = binding.get("is_st_source") or {}\n    _require(st.get("field") == "isST", "is_st field mismatch")\n    _require(st.get("workflow_run") == 33977325822, "is_st run mismatch")\n    _require(st.get("workflow_head") == "a552c5855a96c526178da15837f2d9d488e2d2e6", "is_st head mismatch")\n    _require(st.get("artifact_name") == "gp-pit-st-v480-final-audit", "is_st artifact mismatch")\n    _require(st.get("artifact_id") == 9972698555, "is_st artifact id mismatch")\n    _require(st.get("artifact_zip_sha256") == "a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58", "is_st artifact digest mismatch")\n    _require(st.get("overlay_csv_sha256") == "6ed8ffd09215bccb90f716af26d44f7f590ffd5d455c20841307484a63aaa490", "is_st overlay digest mismatch")\n    _require(st.get("lifecycle_rows") == 1_021_953, "is_st lifecycle rows mismatch")\n    _require(st.get("lifecycle_pass_n") == 847, "is_st lifecycle coverage mismatch")\n    _require(st.get("transition_crosscheck_pass_n") == 6, "is_st transition pass mismatch")\n    _require(st.get("transition_crosscheck_evidence_n") == 6, "is_st transition evidence mismatch")\n\n    tradable = binding.get("tradable_source") or {}\n    _require(tradable.get("workflow_run") == 35052354861, "tradable run mismatch")\n    _require(tradable.get("workflow_head") == "627e5504afa71774437b9ba1c3cc5d95f188d74d", "tradable head mismatch")\n    _require(tradable.get("artifact_name") == "gp12-status-tradable-probe-v1", "tradable artifact mismatch")\n    _require(tradable.get("artifact_id") == 10428808437, "tradable artifact id mismatch")\n    _require(tradable.get("artifact_zip_sha256") == "f9808c65cc953953a9920d730640aa2c1c22225a9de75ceddc1ac55433916ec7", "tradable artifact digest mismatch")\n    _require(tradable.get("probe_json_sha256") == "09559b86e0bf7424789c2c6f196b5ca1d2c941fdedb4d8c757ca335084617574", "tradable probe digest mismatch")\n    _require(tradable.get("positive_trade_rows") == EXPECTED_TRADE_ROWS, "tradable positive rows mismatch")\n    _require(tradable.get("nontrade_lifecycle_rows") == 10_346, "tradable nontrade rows mismatch")\n    _require(tradable.get("provider_status_misflag_n") == 5, "tradable provider-status trace mismatch")\n    _require(tradable.get("status1_but_no_positive_trade_n") == 0, "tradable false-positive status mismatch")\n\n    semantic = binding.get("semantic_state") or {}\n    _require(semantic == {"is_st": "BOUND_PIT_VERIFIED", "tradable": "BOUND_PIT_VERIFIED", "upper_limit": "UNBOUND"}, "status semantic state mismatch")\n    pit_state = binding.get("pit") or {}\n    _require(pit_state.get("scope") == "SESSION_CLOSE_NO_LOOKAHEAD_POLICY", "status PIT scope mismatch")\n    _require(pit_state.get("same_session_status_usable_before_close") is False, "same-session status lookahead allowed")\n    _require(pit_state.get("historical_provider_publication_timestamp_proven") is False, "status provider publication timestamp must remain unproven")\n    _require(binding.get("family_ready") is False, "partial status binding cannot claim family ready")\n    _require(binding.get("historical_gp_v11_source_recovered") is False, "historical GP V1.1 status source recovery cannot be claimed")\n    _require(binding.get("model_freeze_allowed") is False, "partial status binding cannot open model freeze")\n    _require(binding.get("oos_metrics_allowed") is False, "partial status binding cannot open OOS metrics")\n    _require(binding.get("blockers") == [STATUS_UPPER_LIMIT_BLOCKER], "status partial blockers mismatch")\n    return binding_sha\n'''
+          replace_once(marker, validator + marker, 'validator insertion')
+
+          replace_once(
+              '    main_net_flow_requirement: dict | None = None,\n) -> dict:',
+              '    main_net_flow_requirement: dict | None = None,\n    status_partial_binding: dict | None = None,\n) -> dict:',
+              'build signature',
+          )
+          replace_once(
+              '    if main_net_flow_requirement is not None:\n        main_net_flow_requirement_sha = validate_main_net_flow_requirement(\n            main_net_flow_requirement\n        )\n\n    derived_evidence = copy.deepcopy(base_evidence)\n',
+              '    if main_net_flow_requirement is not None:\n        main_net_flow_requirement_sha = validate_main_net_flow_requirement(\n            main_net_flow_requirement\n        )\n    status_partial_binding_sha = None\n    if status_partial_binding is not None:\n        status_partial_binding_sha = validate_status_partial_binding(status_partial_binding)\n\n    derived_evidence = copy.deepcopy(base_evidence)\n',
+              'binding validation',
+          )
+          replace_once(
+              '    derived_evidence["feature_families"]["amount_turnover"] = {\n        "binding_state": "BOUND_VERIFIED_ARTIFACT",\n        "pit_state": "PIT_VERIFIED",\n        "source_artifact": AMOUNT_TURNOVER_BINDING_ARTIFACT,\n        "source_sha256": amount_turnover_sha,\n        "coverage_start": FORMAL_START,\n        "coverage_end": FORMAL_END,\n        "blockers": [],\n    }\n    report = readiness_base.build_readiness_report(parameters, factors, derived_evidence)\n',
+              '    derived_evidence["feature_families"]["amount_turnover"] = {\n        "binding_state": "BOUND_VERIFIED_ARTIFACT",\n        "pit_state": "PIT_VERIFIED",\n        "source_artifact": AMOUNT_TURNOVER_BINDING_ARTIFACT,\n        "source_sha256": amount_turnover_sha,\n        "coverage_start": FORMAL_START,\n        "coverage_end": FORMAL_END,\n        "blockers": [],\n    }\n    if status_partial_binding_sha is not None:\n        derived_evidence["feature_families"]["status"] = {\n            "binding_state": "BOUND_STRUCTURAL_ONLY",\n            "pit_state": "PIT_PARTIAL",\n            "source_artifact": STATUS_PARTIAL_BINDING_ARTIFACT,\n            "source_sha256": status_partial_binding_sha,\n            "coverage_start": FORMAL_START,\n            "coverage_end": FORMAL_END,\n            "blockers": [STATUS_UPPER_LIMIT_BLOCKER],\n        }\n    report = readiness_base.build_readiness_report(parameters, factors, derived_evidence)\n',
+              'status overlay',
+          )
+          replace_once(
+              '        "main_net_flow_requirement_sha256": main_net_flow_requirement_sha,\n        "candidate_benchmark_reference_validated": benchmark_check["valid"],\n',
+              '        "main_net_flow_requirement_sha256": main_net_flow_requirement_sha,\n        "status_partial_binding_artifact": (\n            STATUS_PARTIAL_BINDING_ARTIFACT if status_partial_binding_sha is not None else None\n        ),\n        "status_partial_binding_sha256": status_partial_binding_sha,\n        "status_semantic_state": (\n            copy.deepcopy(status_partial_binding["semantic_state"])\n            if status_partial_binding_sha is not None\n            else None\n        ),\n        "candidate_benchmark_reference_validated": benchmark_check["valid"],\n',
+              'result fields',
+          )
+          replace_once(
+              '    parser.add_argument("--main-net-flow-requirement", required=True)\n    parser.add_argument("--out", required=True)\n',
+              '    parser.add_argument("--main-net-flow-requirement", required=True)\n    parser.add_argument("--status-partial-binding", required=True)\n    parser.add_argument("--out", required=True)\n',
+              'cli arg',
+          )
+          replace_once(
+              '        _load(args.amount_turnover_binding),\n        _load(args.main_net_flow_requirement),\n    )\n',
+              '        _load(args.amount_turnover_binding),\n        _load(args.main_net_flow_requirement),\n        _load(args.status_partial_binding),\n    )\n',
+              'cli build arg',
+          )
+          replace_once(
+              '                "main_net_flow_requirement_sha256": report[\n                    "main_net_flow_requirement_sha256"\n                ],\n                "validated_families": report["validated_families"],\n',
+              '                "main_net_flow_requirement_sha256": report[\n                    "main_net_flow_requirement_sha256"\n                ],\n                "status_partial_binding_sha256": report[\n                    "status_partial_binding_sha256"\n                ],\n                "validated_families": report["validated_families"],\n',
+              'print field',
+          )
+          script_path.write_text(text, encoding='utf-8')
+
+          binding = {
+              "artifact": "GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1",
+              "version": "1.0",
+              "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+              "status": "CANDIDATE_ONLY_UNAPPROVED",
+              "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+              "formal_window": ["2020-06-01", "2026-04-17"],
+              "universe_n": 847,
+              "required_status_fields": ["is_st", "tradable", "upper_limit"],
+              "is_st_source": {
+                  "provider": "BaoStock+CNINFO transition crosscheck",
+                  "field": "isST",
+                  "workflow_run": 33977325822,
+                  "workflow_head": "a552c5855a96c526178da15837f2d9d488e2d2e6",
+                  "artifact_name": "gp-pit-st-v480-final-audit",
+                  "artifact_id": 9972698555,
+                  "artifact_zip_sha256": "a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58",
+                  "overlay_csv_sha256": "6ed8ffd09215bccb90f716af26d44f7f590ffd5d455c20841307484a63aaa490",
+                  "lifecycle_rows": 1021953,
+                  "lifecycle_pass_n": 847,
+                  "transition_crosscheck_pass_n": 6,
+                  "transition_crosscheck_evidence_n": 6
+              },
+              "tradable_source": {
+                  "definition": "True iff pinned Sohu raw has same symbol-date with volume>0 and amount>0; otherwise False for lifecycle-required date",
+                  "workflow_run": 35052354861,
+                  "workflow_head": "627e5504afa71774437b9ba1c3cc5d95f188d74d",
+                  "artifact_name": "gp12-status-tradable-probe-v1",
+                  "artifact_id": 10428808437,
+                  "artifact_zip_sha256": "f9808c65cc953953a9920d730640aa2c1c22225a9de75ceddc1ac55433916ec7",
+                  "probe_json_sha256": "09559b86e0bf7424789c2c6f196b5ca1d2c941fdedb4d8c757ca335084617574",
+                  "positive_trade_rows": 1011607,
+                  "nontrade_lifecycle_rows": 10346,
+                  "provider_status_misflag_n": 5,
+                  "status1_but_no_positive_trade_n": 0
+              },
+              "semantic_state": {
+                  "is_st": "BOUND_PIT_VERIFIED",
+                  "tradable": "BOUND_PIT_VERIFIED",
+                  "upper_limit": "UNBOUND"
+              },
+              "pit": {
+                  "scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
+                  "same_session_status_usable_before_close": False,
+                  "historical_provider_publication_timestamp_proven": False
+              },
+              "family_ready": False,
+              "historical_gp_v11_source_recovered": False,
+              "model_freeze_allowed": False,
+              "oos_metrics_allowed": False,
+              "blockers": ["STATUS_UPPER_LIMIT_UNBOUND"]
+          }
+          data_path = Path('data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json')
+          data_path.write_text(json.dumps(binding, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+
+          workflow_path = Path('.github/workflows/gp12-candidate-input-readiness-v1.yml')
+          wf = workflow_path.read_text(encoding='utf-8')
+          old = '            --main-net-flow-requirement data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json \\\n            --out artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json'
+          new = '            --main-net-flow-requirement data/GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1.json \\\n            --status-partial-binding data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json \\\n            --out artifact_gp12_candidate_input_readiness_v1/GP12_CANDIDATE_INPUT_READINESS_V1.json'
+          if wf.count(old) != 1:
+              raise SystemExit(f'workflow CLI patch expected one match, got {wf.count(old)}')
+          wf = wf.replace(old, new, 1)
+          old_assert = "          assert 'MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED' in x['blockers']\n"
+          new_assert = old_assert + "          assert x['status_partial_binding_sha256']=='e565742e9baaa37de5563aa9c51ff2a4a6b9166c1f1579945b865f69d909cb10'\n          assert x['feature_families']['status']['formal_feature_ready'] is False\n          assert x['feature_families']['status']['binding_state']=='BOUND_STRUCTURAL_ONLY'\n          assert x['feature_families']['status']['pit_state']=='PIT_PARTIAL'\n          assert x['feature_families']['status']['blockers']==['STATUS_UPPER_LIMIT_UNBOUND']\n          assert 'STATUS_SEMANTICS_INCOMPLETE' not in x['blockers']\n          assert 'STATUS_UPPER_LIMIT_UNBOUND' in x['blockers']\n"
+          if wf.count(old_assert) != 1:
+              raise SystemExit(f'workflow assert patch expected one match, got {wf.count(old_assert)}')
+          workflow_path.write_text(wf.replace(old_assert, new_assert, 1), encoding='utf-8')
+          PY
+      - name: Verify local contract suite before commit
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v \
+            test_gp12_candidate_input_readiness_v1.py \
+            test_gp12_main_net_flow_readiness_requirement_v1.py \
+            test_gp12_status_partial_binding_v1.py
+      - name: Commit implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/gp12_candidate_input_readiness_v1.py \
+                  data/GP12_CANDIDATE_STATUS_PARTIAL_BINDING_V1.json \
+                  .github/workflows/gp12-candidate-input-readiness-v1.yml
+          git diff --cached --check
+          git commit -m 'feat: bind verified partial status semantics'
+          git push origin HEAD:gp/gp12-turnover-ratio-v1
