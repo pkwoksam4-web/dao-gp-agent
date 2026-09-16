@@ -18,6 +18,13 @@ PARAMETER_SHA256 = "22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ce
 MARKET_FEATURE_BLOCKER = "MARKET_ADJUSTED_CLOSE_FEATURE_BINDING_UNBOUND"
 AMOUNT_TURNOVER_BINDING_ARTIFACT = "GP12_CANDIDATE_AMOUNT_TURNOVER_BINDING_V1"
 AMOUNT_TURNOVER_BINDING_SHA256 = "47b83c11b7190f4bb8f3bc69900f75fd682362ed5e20d6cbb3b9c4d7bdbe4998"
+MAIN_NET_FLOW_REQUIREMENT_ARTIFACT = "GP12_MAIN_NET_FLOW_SOURCE_REQUIREMENT_V1"
+MAIN_NET_FLOW_REQUIREMENT_SHA256 = "13577a123a506750d1070c91c96bb603aa727fb9f7826a5cb449efe39963fed3"
+MAIN_NET_FLOW_BLOCKERS = [
+    "MAIN_NET_FLOW_UNBOUND",
+    "TUSHARE_CREDENTIAL_REQUIRED",
+    "MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED",
+]
 NEXT_PRIORITY_FAMILY = "main_net_flow"
 NEXT_PRIORITY_BLOCKER = "MAIN_NET_FLOW_UNBOUND"
 FORMAL_START = "2020-06-01"
@@ -142,6 +149,98 @@ def validate_amount_turnover_binding(binding: dict) -> str:
     return binding_sha
 
 
+def validate_main_net_flow_requirement(requirement: dict) -> str:
+    """Validate the exact unresolved main-net-flow source requirement.
+
+    This is blocker evidence, not a data binding. It must remain impossible for
+    this artifact to promote ``main_net_flow`` while the credential and panel
+    are absent.
+    """
+    _require(isinstance(requirement, dict), "main-net-flow requirement must be an object")
+    requirement_sha = _canonical_json_sha256(requirement)
+    _require(
+        requirement_sha == MAIN_NET_FLOW_REQUIREMENT_SHA256,
+        "MAIN_NET_FLOW_REQUIREMENT_IDENTITY_MISMATCH",
+    )
+    _require(requirement.get("artifact") == MAIN_NET_FLOW_REQUIREMENT_ARTIFACT, "main-net-flow requirement artifact mismatch")
+    _require(requirement.get("version") == "1.0", "main-net-flow requirement version mismatch")
+    _require(requirement.get("strategy_id") == "GP12_REBUILD_CANDIDATE_V1", "main-net-flow strategy mismatch")
+    _require(requirement.get("status") == "CANDIDATE_ONLY_UNAPPROVED", "main-net-flow status mismatch")
+    _require(requirement.get("origin") == "NEW_RECONSTRUCTION_CANDIDATE", "main-net-flow origin mismatch")
+    _require(requirement.get("formal_window") == [FORMAL_START, FORMAL_END], "main-net-flow formal window mismatch")
+    _require(requirement.get("universe_n") == 847, "main-net-flow universe mismatch")
+    _require(requirement.get("formal_symbol_n") == 844, "main-net-flow formal-symbol mismatch")
+    _require(requirement.get("na_symbols") == NA_SYMBOLS, "main-net-flow N/A partition mismatch")
+    _require(requirement.get("expected_trade_rows") == EXPECTED_TRADE_ROWS, "main-net-flow expected rows mismatch")
+    _require(requirement.get("semantic_definition") == "large_plus_extra_large_active_buy_minus_sell", "main-net-flow semantic definition mismatch")
+    _require(requirement.get("candidate_field") == "main_net_flow_cny", "main-net-flow field mismatch")
+    _require(requirement.get("source_amount_unit") == "wan_cny", "main-net-flow source unit mismatch")
+    _require(requirement.get("candidate_unit") == "cny", "main-net-flow candidate unit mismatch")
+
+    pit_state = requirement.get("pit") or {}
+    _require(pit_state.get("scope") == "SESSION_CLOSE_NO_LOOKAHEAD_POLICY", "main-net-flow PIT scope mismatch")
+    _require(pit_state.get("same_session_main_net_flow_usable_before_close") is False, "same-session main-net-flow lookahead allowed")
+    _require(pit_state.get("historical_provider_publication_timestamp_proven") is False, "main-net-flow provider publication timestamp must remain unproven")
+
+    axis = requirement.get("expected_date_axis") or {}
+    _require(axis.get("source_provider") == "Sohu", "main-net-flow expected-date provider mismatch")
+    _require(axis.get("source_artifact_name") == "gp-sohu-full-raw-v482-reaudit", "main-net-flow expected-date artifact mismatch")
+    _require(axis.get("workflow_run") == 34192233633, "main-net-flow expected-date run mismatch")
+    _require(axis.get("artifact_id") == 10042614517, "main-net-flow expected-date artifact id mismatch")
+    _require(axis.get("artifact_zip_sha256") == "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550", "main-net-flow expected-date artifact digest mismatch")
+    _require(axis.get("raw_panel_sha256") == "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb", "main-net-flow raw panel digest mismatch")
+    _require(axis.get("scope_sha256") == "9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8", "main-net-flow scope digest mismatch")
+    _require(axis.get("preflight_run") == 35044495123, "main-net-flow preflight run mismatch")
+    _require(axis.get("preflight_artifact_name") == "gp12-main-net-flow-preflight-v1", "main-net-flow preflight artifact mismatch")
+    _require(axis.get("preflight_artifact_id") == 10426418457, "main-net-flow preflight artifact id mismatch")
+    _require(axis.get("preflight_artifact_zip_sha256") == "2ad7b5f9aa682140e745dd2fd1b5f01f3489c0f26dd1910890b4dee9ce472772", "main-net-flow preflight digest mismatch")
+    _require(axis.get("source_axis_verified") is True, "main-net-flow source axis not verified")
+
+    source = requirement.get("selected_source") or {}
+    _require(source.get("provider") == "Tushare Pro", "main-net-flow source provider mismatch")
+    _require(source.get("interface") == "moneyflow", "main-net-flow source interface mismatch")
+    _require(source.get("official_documentation") == "https://tushare.pro/document/2?doc_id=170", "main-net-flow source documentation mismatch")
+    _require(source.get("documented_history_start") == "2010", "main-net-flow source history mismatch")
+    _require(source.get("documented_single_request_max_rows") == 6000, "main-net-flow source request limit mismatch")
+    _require(source.get("documented_total_limit") == "unlimited", "main-net-flow source total-limit mismatch")
+    _require(source.get("documented_minimum_points") == 2000, "main-net-flow source permission mismatch")
+    _require(
+        source.get("required_fields")
+        == ["ts_code", "trade_date", "buy_lg_amount", "sell_lg_amount", "buy_elg_amount", "sell_elg_amount"],
+        "main-net-flow source fields mismatch",
+    )
+    _require(source.get("credential_secret_name") == "TUSHARE_TOKEN", "main-net-flow secret name mismatch")
+
+    credential = requirement.get("credential_probe") or {}
+    _require(credential.get("workflow_run") == 35043809061, "main-net-flow credential probe mismatch")
+    _require(credential.get("status") == "MISSING", "main-net-flow credential must remain missing in requirement artifact")
+    _require(credential.get("real_source_fetch_validated") is False, "main-net-flow real source fetch cannot be claimed")
+
+    source_workflow = requirement.get("source_workflow") or {}
+    _require(source_workflow.get("path") == ".github/workflows/gp12-main-net-flow-source-v1.yml", "main-net-flow workflow path mismatch")
+    _require(source_workflow.get("head_sha") == "8a4db43e174849cafb1e80b3b69da18b24340225", "main-net-flow workflow head mismatch")
+    _require(source_workflow.get("verification_run") == 35044589492, "main-net-flow workflow run mismatch")
+    _require(source_workflow.get("overall_status") == "SUCCESS", "main-net-flow workflow verification mismatch")
+    _require(source_workflow.get("preflight_status") == "SUCCESS", "main-net-flow preflight status mismatch")
+    _require(source_workflow.get("credential_status") == "MISSING", "main-net-flow workflow credential status mismatch")
+    _require(source_workflow.get("source_shards_status") == "SKIPPED", "main-net-flow source shards must remain skipped")
+    _require(source_workflow.get("aggregate_status") == "SKIPPED", "main-net-flow aggregate must remain skipped")
+    _require(source_workflow.get("source_shard_count") == 4, "main-net-flow shard count mismatch")
+    _require(source_workflow.get("max_parallel") == 1, "main-net-flow concurrency mismatch")
+
+    resolution = requirement.get("resolution_state") or {}
+    _require(resolution.get("engineering_ready") is True, "main-net-flow engineering readiness mismatch")
+    _require(resolution.get("source_axis_verified") is True, "main-net-flow source-axis readiness mismatch")
+    _require(resolution.get("credential_available") is False, "main-net-flow credential cannot be claimed available")
+    _require(resolution.get("panel_materialized") is False, "main-net-flow panel cannot be claimed materialized")
+    _require(resolution.get("main_net_flow_candidate_pit_verified") is False, "main-net-flow PIT cannot be claimed verified")
+    _require(requirement.get("historical_gp_v11_source_recovered") is False, "historical GP V1.1 source recovery cannot be claimed")
+    _require(requirement.get("model_freeze_allowed") is False, "main-net-flow requirement cannot open model freeze")
+    _require(requirement.get("oos_metrics_allowed") is False, "main-net-flow requirement cannot open OOS metrics")
+    _require(requirement.get("blockers") == ["TUSHARE_CREDENTIAL_REQUIRED", "MAIN_NET_FLOW_PANEL_NOT_MATERIALIZED"], "main-net-flow requirement blockers mismatch")
+    return requirement_sha
+
+
 def _collect_input_blockers(report: dict) -> list[str]:
     blockers: list[str] = []
     for state in report.get("feature_families", {}).values():
@@ -166,14 +265,16 @@ def build_checkpoint(
     pit_binding: dict,
     benchmark_validation: dict,
     amount_turnover_binding: dict,
+    main_net_flow_requirement: dict | None = None,
 ) -> dict:
     """Compose current verified GP12 candidate input readiness.
 
     Existing PIT/intraday integrations remain authoritative. The verified
     candidate-only amount/turnover binding adds one scorer family without
-    making any historical GP V1.1 recovery claim. CSI All Share / 000985 is
-    still benchmark-reference only and cannot substitute for the frozen
-    ``market_adjusted_close`` feature family.
+    making any historical GP V1.1 recovery claim. The main-net-flow source
+    requirement can add precise blocker detail but can never promote that
+    family. CSI All Share / 000985 is still benchmark-reference only and cannot
+    substitute for the frozen ``market_adjusted_close`` feature family.
     """
     factor_sha = _canonical_json_sha256(factors)
     parameter_sha = _canonical_json_sha256(parameters)
@@ -190,6 +291,11 @@ def build_checkpoint(
         pit_binding,
     )
     amount_turnover_sha = validate_amount_turnover_binding(amount_turnover_binding)
+    main_net_flow_requirement_sha = None
+    if main_net_flow_requirement is not None:
+        main_net_flow_requirement_sha = validate_main_net_flow_requirement(
+            main_net_flow_requirement
+        )
 
     derived_evidence = copy.deepcopy(base_evidence)
     for family in ("intraday_15m", "intraday_60m", "stock_adjusted_close"):
@@ -218,8 +324,19 @@ def build_checkpoint(
         raise ValueError("market_adjusted_close PIT state unexpectedly changed")
     if market.get("source_artifact") is not None or market.get("source_sha256") is not None:
         raise ValueError("market_adjusted_close unexpectedly carries source identity")
-
     market["blockers"] = [MARKET_FEATURE_BLOCKER]
+
+    main_net_flow = report["feature_families"]["main_net_flow"]
+    if main_net_flow.get("formal_feature_ready") is not False:
+        raise ValueError("main_net_flow unexpectedly ready before source binding")
+    if main_net_flow.get("binding_state") != "UNBOUND":
+        raise ValueError("main_net_flow unexpectedly bound before source binding")
+    if main_net_flow.get("pit_state") != "PIT_UNVERIFIED":
+        raise ValueError("main_net_flow PIT state unexpectedly changed")
+    if main_net_flow.get("source_artifact") is not None or main_net_flow.get("source_sha256") is not None:
+        raise ValueError("main_net_flow unexpectedly carries source identity")
+    if main_net_flow_requirement_sha is not None:
+        main_net_flow["blockers"] = list(MAIN_NET_FLOW_BLOCKERS)
 
     input_blockers = _collect_input_blockers(report)
     if not benchmark_check["valid"]:
@@ -251,6 +368,12 @@ def build_checkpoint(
         },
         "amount_turnover_binding_artifact": AMOUNT_TURNOVER_BINDING_ARTIFACT,
         "amount_turnover_binding_sha256": amount_turnover_sha,
+        "main_net_flow_requirement_artifact": (
+            MAIN_NET_FLOW_REQUIREMENT_ARTIFACT
+            if main_net_flow_requirement_sha is not None
+            else None
+        ),
+        "main_net_flow_requirement_sha256": main_net_flow_requirement_sha,
         "candidate_benchmark_reference_validated": benchmark_check["valid"],
         "candidate_benchmark_reference": benchmark_reference,
         "candidate_benchmark_validation_reasons": benchmark_check["reasons"],
@@ -267,6 +390,11 @@ def build_checkpoint(
         "next_priority_family": NEXT_PRIORITY_FAMILY,
         "next_priority_blocker": NEXT_PRIORITY_BLOCKER,
         "next_priority_reason": (
+            "amount_cny and turnover_ratio now have exact full-window candidate-only binding; "
+            "main_net_flow engineering and Formal844 source axis are verified, but the selected "
+            "Tushare route still lacks a credential and no 1,011,607-row panel is materialized"
+            if main_net_flow_requirement_sha is not None
+            else
             "amount_cny and turnover_ratio now have exact full-window candidate-only binding; "
             "F11 remains blocked by the still-unbound main_net_flow input family"
         ),
@@ -285,6 +413,7 @@ def main() -> int:
     parser.add_argument("--pit-binding", required=True)
     parser.add_argument("--benchmark-validation", required=True)
     parser.add_argument("--amount-turnover-binding", required=True)
+    parser.add_argument("--main-net-flow-requirement", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -296,6 +425,7 @@ def main() -> int:
         _load(args.pit_binding),
         _load(args.benchmark_validation),
         _load(args.amount_turnover_binding),
+        _load(args.main_net_flow_requirement),
     )
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -310,6 +440,9 @@ def main() -> int:
                 "asset_hashes": report["asset_hashes"],
                 "amount_turnover_binding_sha256": report[
                     "amount_turnover_binding_sha256"
+                ],
+                "main_net_flow_requirement_sha256": report[
+                    "main_net_flow_requirement_sha256"
                 ],
                 "validated_families": report["validated_families"],
                 "missing_or_unvalidated_families": report[
