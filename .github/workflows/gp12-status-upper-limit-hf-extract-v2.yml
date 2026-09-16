@@ -45,6 +45,8 @@ jobs:
           symbols=[x.strip().upper() for x in pathlib.Path('data/pit_st_scope_v480.txt').read_text().splitlines() if x.strip()]
           symbols=[s for s in symbols if s not in {'600074.SH','600485.SH','600677.SH'}]
           assert len(symbols)==844,len(symbols)
+          out_dir=pathlib.Path('artifact_hf_upper_limit_truth')
+          out_dir.mkdir(exist_ok=True)
           con=duckdb.connect()
           con.execute('PRAGMA threads=2')
           con.execute('CREATE TEMP TABLE formal_symbols(code VARCHAR)')
@@ -59,7 +61,7 @@ jobs:
             ) TO 'artifact_hf_upper_limit_truth/HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet'
             (FORMAT PARQUET, COMPRESSION ZSTD)
           ''')
-          p=pathlib.Path('artifact_hf_upper_limit_truth/HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet')
+          p=out_dir/'HF_HIGH_LIMIT_FORMAL844_OVERLAP.parquet'
           x=con.execute("SELECT count(*), count(distinct code), min(date), max(date), sum(high_limit IS NULL) FROM read_parquet(?)",[str(p)]).fetchone()
           summary={
             'artifact':'GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2',
@@ -78,7 +80,7 @@ jobs:
           }
           assert summary['rows']>900000,summary
           assert summary['symbols']>800,summary
-          pathlib.Path('artifact_hf_upper_limit_truth/GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          (out_dir/'GP12_STATUS_UPPER_LIMIT_HF_TRUTH_V2.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print(json.dumps(summary,ensure_ascii=False,indent=2))
           PY
       - name: Upload filtered truth only
