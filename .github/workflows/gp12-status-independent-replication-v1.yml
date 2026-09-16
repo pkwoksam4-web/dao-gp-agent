@@ -1,0 +1,119 @@
+name: GP12 Status Independent Replication V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-status-independent-replication-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  replicate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -q pandas pyarrow
+
+      - name: Download independent upper-limit source
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-upper-limit-full-source-v1
+          path: old_source
+          run-id: 35069676486
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Download independently materialized lifecycle status panel
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-status-full-panel-v1
+          path: new_panel
+          run-id: 35072552789
+          repository: pkwoksam4-web/dao-gp-agent
+          github-token: ${{ github.token }}
+
+      - name: Compare all trading symbol-dates
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+
+          OLD_ZIP_SHA='ef9692c9feef8bda9d55b7d96f124925d6beb02b33123424725c8caf7f9ef8bf'
+          NEW_PANEL_SHA='00c9427caeee05bd2130177c6aee7ef22bada204e8014bd5693a2107e7e513e7'
+          old_path=next(Path('old_source').rglob('GP12_UPPER_LIMIT_FULL_V1.parquet'))
+          new_path=next(Path('new_panel').rglob('GP12_STATUS_FULL_PANEL_V1.parquet'))
+          assert hashlib.sha256(new_path.read_bytes()).hexdigest()==NEW_PANEL_SHA
+
+          old=pd.read_parquet(old_path)
+          new=pd.read_parquet(new_path)
+          for frame in (old,new):
+              frame['symbol']=frame['symbol'].astype(str).str.upper()
+              frame['date']=frame['date'].astype(str).str[:10]
+              assert not frame.duplicated(['symbol','date']).any()
+          assert len(old)==1_011_607 and old['symbol'].nunique()==844
+          assert len(new)==1_021_953 and new['symbol'].nunique()==847
+          assert int(new['tradable'].astype(bool).sum())==1_011_607
+          assert int((~new['tradable'].astype(bool)).sum())==10_346
+          assert int(old['upper_limit'].astype(bool).sum())==25_742
+          assert int(new['upper_limit'].astype(bool).sum())==25_742
+
+          trade=new[new['tradable'].astype(bool)][['symbol','date','upper_limit']].copy()
+          cmp=old[['symbol','date','upper_limit']].merge(
+              trade,on=['symbol','date'],how='outer',suffixes=('_old','_new'),indicator=True,validate='one_to_one'
+          )
+          missing_old=int((cmp['_merge']=='right_only').sum())
+          missing_new=int((cmp['_merge']=='left_only').sum())
+          both=cmp[cmp['_merge']=='both'].copy()
+          mismatch=both[both['upper_limit_old'].astype(bool)!=both['upper_limit_new'].astype(bool)].copy()
+          assert missing_old==0,missing_old
+          assert missing_new==0,missing_new
+          assert len(both)==1_011_607,len(both)
+          assert len(mismatch)==0,len(mismatch)
+          assert not new.loc[~new['tradable'].astype(bool),'upper_limit'].astype(bool).any()
+
+          summary={
+              'artifact':'GP12_STATUS_INDEPENDENT_REPLICATION_V1',
+              'status':'PASS_INDEPENDENT_REPLICATION',
+              'old_source_run_id':35069676486,
+              'old_source_artifact_id':10435886487,
+              'old_source_artifact_digest_sha256':OLD_ZIP_SHA,
+              'new_panel_run_id':35072552789,
+              'new_panel_artifact_id':10436379317,
+              'new_panel_sha256':NEW_PANEL_SHA,
+              'old_trade_rows':int(len(old)),
+              'new_lifecycle_rows':int(len(new)),
+              'new_trade_rows':int(len(trade)),
+              'new_nontrade_rows':int((~new['tradable'].astype(bool)).sum()),
+              'upper_limit_true_old':int(old['upper_limit'].astype(bool).sum()),
+              'upper_limit_true_new':int(new['upper_limit'].astype(bool).sum()),
+              'missing_in_old_n':missing_old,
+              'missing_in_new_n':missing_new,
+              'upper_limit_boolean_mismatch_n':int(len(mismatch)),
+              'nontrade_upper_limit_true_n':int(new.loc[~new['tradable'].astype(bool),'upper_limit'].astype(bool).sum()),
+              'historical_gp_v11_source_recovered':False,
+              'model_freeze_allowed':False,
+              'oos_metrics_allowed':False,
+          }
+          out=Path('artifact_gp12_status_independent_replication_v1'); out.mkdir(exist_ok=True)
+          mismatch.to_csv(out/'UPPER_LIMIT_BOOLEAN_MISMATCH.csv',index=False)
+          (out/'GP12_STATUS_INDEPENDENT_REPLICATION_V1.json').write_text(json.dumps(summary,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Upload independent replication
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-status-independent-replication-v1
+          path: artifact_gp12_status_independent_replication_v1/
+          if-no-files-found: error
+          retention-days: 90
