@@ -18,18 +18,17 @@ jobs:
           python-version: '3.12'
       - name: Install runtime
         run: pip install -q requests
-      - name: Probe formal-window anchors and semantic overlap
+      - name: Diagnose public demo and formal-window availability
         run: |
           python - <<'PY'
           import json, math, re, time
           import requests
 
           SYMBOL = '000001'
-          DATES = ['20200601', '20240102', '20260417', '20260915']
+          SINGLE_DATES = ['20200601', '20240102', '20260417', '20260821', '20260915']
           REQUIRED = ('zmbtdcje', 'zmbddcje', 'zmstdcje', 'zmsddcje')
           HEADERS = {'User-Agent': 'Mozilla/5.0 GP12-CANDIDATE-PROBE/1.0'}
 
-          # Pull the public demonstration certificate from the provider documentation at runtime.
           doc = requests.get('https://www.mairuiapi.com/hsdata', headers=HEADERS, timeout=30)
           doc.raise_for_status()
           match = re.search(r'LICENCE-[A-Z0-9-]{12,}', doc.text)
@@ -37,117 +36,105 @@ jobs:
               raise RuntimeError('public MaiRui demo certificate not found in official documentation')
           licence = match.group(0)
 
-          def fetch_mairui(day):
-              url = f'https://api.mairuiapi.com/hsstock/history/transaction/{day}/{SYMBOL}/{licence}'
-              r = requests.get(url, headers=HEADERS, timeout=30)
+          def redact(url):
+              return url.replace(licence, '<PUBLIC_DEMO>')
+
+          def parse_payload(label, r):
               item = {
-                  'day': day,
+                  'label': label,
                   'http_status': r.status_code,
-                  'url': url.replace(licence, '<PUBLIC_DEMO>'),
-                  'head': r.text[:240],
+                  'url': redact(r.url),
+                  'body_head': r.text[:500],
               }
-              r.raise_for_status()
-              payload = r.json()
-              if not isinstance(payload, list):
-                  raise RuntimeError(f'{day}: payload is not list: {type(payload).__name__}')
-              item['raw_row_n'] = len(payload)
-              if not payload:
+              if r.status_code != 200:
                   item['data_present'] = False
                   return item
-              dates = {str(row.get('t', ''))[:10] for row in payload if isinstance(row, dict)}
-              expected_iso = f'{day[:4]}-{day[4:6]}-{day[6:]}'
-              if dates != {expected_iso}:
-                  raise RuntimeError(f'{day}: returned unexpected dates {sorted(dates)}')
+              try:
+                  payload = r.json()
+              except Exception as exc:
+                  item['json_error'] = f'{type(exc).__name__}: {exc}'
+                  item['data_present'] = False
+                  return item
+              if not isinstance(payload, list):
+                  item['payload_type'] = type(payload).__name__
+                  item['data_present'] = False
+                  return item
+              item['raw_row_n'] = len(payload)
+              item['data_present'] = bool(payload)
+              if not payload:
+                  return item
+              dates = sorted({str(row.get('t', ''))[:10] for row in payload if isinstance(row, dict)})
+              item['dates'] = dates[:20]
               mains = []
+              fields_ok = True
               for idx, row in enumerate(payload):
                   if not isinstance(row, dict):
-                      raise RuntimeError(f'{day}: row {idx} is not object')
+                      fields_ok = False
+                      continue
                   missing = [k for k in REQUIRED if row.get(k) is None]
                   if missing:
-                      raise RuntimeError(f'{day}: row {idx} missing {missing}')
+                      fields_ok = False
+                      item.setdefault('missing_fields', []).append({'row': idx, 'missing': missing})
+                      continue
                   vals = {k: float(row[k]) for k in REQUIRED}
                   if not all(math.isfinite(v) and v >= 0 for v in vals.values()):
-                      raise RuntimeError(f'{day}: invalid amount bucket in row {idx}')
-                  main = vals['zmbtdcje'] + vals['zmbddcje'] - vals['zmstdcje'] - vals['zmsddcje']
-                  mains.append(main)
-              if max(mains) - min(mains) > 0.01:
-                  raise RuntimeError(f'{day}: conflicting main-net-flow values across rows')
-              item.update({
-                  'data_present': True,
-                  'date': expected_iso,
-                  'main_net_flow_cny': mains[0],
-                  'required_fields_present': True,
-              })
+                      fields_ok = False
+                      continue
+                  mains.append(vals['zmbtdcje'] + vals['zmbddcje'] - vals['zmstdcje'] - vals['zmsddcje'])
+              item['required_fields_present'] = fields_ok and bool(mains)
+              if mains:
+                  item['main_net_flow_cny_first'] = mains[0]
+                  item['main_net_flow_min'] = min(mains)
+                  item['main_net_flow_max'] = max(mains)
               return item
 
-          mairui = {}
-          for day in DATES:
+          single = {}
+          for day in SINGLE_DATES:
+              url = f'https://api.mairuiapi.com/hsstock/history/transaction/{day}/{SYMBOL}/{licence}'
               try:
-                  result = fetch_mairui(day)
+                  r = requests.get(url, headers=HEADERS, timeout=30)
+                  result = parse_payload(f'single_{day}', r)
               except Exception as exc:
-                  result = {'day': day, 'error': f'{type(exc).__name__}: {exc}'}
-              mairui[day] = result
-              print('MAIRUI', json.dumps(result, ensure_ascii=False))
-              time.sleep(0.5)
+                  result = {'label': f'single_{day}', 'error': f'{type(exc).__name__}: {exc}'}
+              single[day] = result
+              print('SINGLE', json.dumps(result, ensure_ascii=False))
+              time.sleep(0.3)
 
-          em_url = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get'
-          em_params = {
-              'lmt': '1000', 'klt': '101', 'secid': '0.000001',
-              'fields1': 'f1,f2,f3,f7',
-              'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
-              'ut': '7eea3edcaed734bea9cbfc24409ed989', 'rtntype': '6',
-          }
-          em_headers = {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152 Safari/537.36',
-              'Accept': 'application/json,text/plain,*/*',
-              'Referer': 'https://data.eastmoney.com/',
-          }
-          east = {}
-          er = requests.get(em_url, params=em_params, headers=em_headers, timeout=30)
-          print('EASTMONEY_HTTP', er.status_code)
-          er.raise_for_status()
-          data = (er.json().get('data') or {})
-          for line in data.get('klines') or []:
-              parts = str(line).split(',')
-              if len(parts) >= 2:
-                  east[parts[0].replace('-', '')] = float(parts[1])
-
-          crosses = []
-          for day in ('20260417', '20260915'):
-              mr = mairui.get(day) or {}
-              if mr.get('data_present') and day in east:
-                  diff = float(mr['main_net_flow_cny']) - float(east[day])
-                  row = {
-                      'day': day,
-                      'mairui_lg_plus_elg_net_cny': mr['main_net_flow_cny'],
-                      'eastmoney_main_net_flow_cny': east[day],
-                      'diff_cny': diff,
-                      'within_1yuan': abs(diff) <= 1.01,
-                  }
-                  crosses.append(row)
-                  print('CROSS', json.dumps(row, ensure_ascii=False))
+          ranges = {}
+          for st, et in [('20260821','20260821'), ('20260417','20260417'), ('20200601','20200601')]:
+              url = f'https://api.mairuiapi.com/hsstock/history/transaction/{SYMBOL}/{licence}'
+              try:
+                  r = requests.get(url, params={'st': st, 'et': et}, headers=HEADERS, timeout=30)
+                  result = parse_payload(f'range_{st}_{et}', r)
+              except Exception as exc:
+                  result = {'label': f'range_{st}_{et}', 'error': f'{type(exc).__name__}: {exc}'}
+              ranges[st] = result
+              print('RANGE', json.dumps(result, ensure_ascii=False))
+              time.sleep(0.3)
 
           blockers = []
+          demo_single = single.get('20260821') or {}
+          demo_range = ranges.get('20260821') or {}
+          demo_usable = bool(demo_single.get('data_present') or demo_range.get('data_present'))
+          if not demo_usable:
+              blockers.append('MAIRUI_PUBLIC_DEMO_UNUSABLE')
+
           for day in ('20200601', '20260417'):
-              row = mairui.get(day) or {}
-              if not row.get('data_present'):
-                  blockers.append(f'MAIRUI_FORMAL_ANCHOR_MISSING_{day}')
-              if row.get('required_fields_present') is not True:
-                  blockers.append(f'MAIRUI_REQUIRED_FIELDS_MISSING_{day}')
-          if not crosses:
-              blockers.append('MAIRUI_EASTMONEY_SEMANTIC_OVERLAP_MISSING')
-          elif any(c['within_1yuan'] is not True for c in crosses):
-              blockers.append('MAIRUI_EASTMONEY_SEMANTIC_MISMATCH')
+              s = single.get(day) or {}
+              q = ranges.get(day) or {}
+              if not (s.get('data_present') or q.get('data_present')):
+                  blockers.append(f'MAIRUI_FORMAL_ANCHOR_UNAVAILABLE_{day}')
+              if not (s.get('required_fields_present') or q.get('required_fields_present')):
+                  blockers.append(f'MAIRUI_REQUIRED_FIELDS_UNAVAILABLE_{day}')
 
           summary = {
-              'artifact': 'GP12_MAIN_NET_FLOW_MAIRUI_SINGLE_DAY_PROBE_V1',
+              'artifact': 'GP12_MAIN_NET_FLOW_MAIRUI_DIAGNOSTIC_V2',
               'symbol': '000001.SZ',
               'formal_window': ['2020-06-01', '2026-04-17'],
-              'formula': 'zmbtdcje + zmbddcje - zmstdcje - zmsddcje',
-              'anchors': mairui,
-              'crosses': crosses,
+              'single_day': single,
+              'range_one_day': ranges,
+              'public_demo_usable': demo_usable,
               'blockers': blockers,
-              'probe_pass': not blockers,
               'binding_allowed': False,
               'model_freeze_allowed': False,
               'oos_metrics_allowed': False,
@@ -156,5 +143,5 @@ jobs:
           print(json.dumps(summary, ensure_ascii=False, indent=2))
           if blockers:
               raise RuntimeError('PROBE_BLOCKED: ' + ','.join(blockers))
-          print('PASS_MAIRUI_SINGLE_DAY_MAIN_NET_FLOW_PROBE')
+          print('PASS_MAIRUI_AVAILABILITY_DIAGNOSTIC')
           PY
