@@ -39,34 +39,44 @@ jobs:
           def redact(url):
               return url.replace(licence, '<PUBLIC_DEMO>')
 
-          def parse_payload(label, r):
+          def parse_payload(label, r, requested_day):
+              requested_iso = f'{requested_day[:4]}-{requested_day[4:6]}-{requested_day[6:]}'
               item = {
                   'label': label,
+                  'requested_day': requested_iso,
                   'http_status': r.status_code,
                   'url': redact(r.url),
                   'body_head': r.text[:500],
               }
               if r.status_code != 200:
                   item['data_present'] = False
+                  item['requested_date_present'] = False
                   return item
               try:
                   payload = r.json()
               except Exception as exc:
                   item['json_error'] = f'{type(exc).__name__}: {exc}'
                   item['data_present'] = False
+                  item['requested_date_present'] = False
                   return item
               if not isinstance(payload, list):
                   item['payload_type'] = type(payload).__name__
                   item['data_present'] = False
+                  item['requested_date_present'] = False
                   return item
               item['raw_row_n'] = len(payload)
               item['data_present'] = bool(payload)
               if not payload:
+                  item['requested_date_present'] = False
                   return item
               dates = sorted({str(row.get('t', ''))[:10] for row in payload if isinstance(row, dict)})
-              item['dates'] = dates[:20]
+              item['date_n'] = len(dates)
+              item['first_date'] = dates[0] if dates else None
+              item['last_date'] = dates[-1] if dates else None
+              item['requested_date_present'] = requested_iso in set(dates)
               mains = []
               fields_ok = True
+              requested_main_values = []
               for idx, row in enumerate(payload):
                   if not isinstance(row, dict):
                       fields_ok = False
@@ -80,10 +90,14 @@ jobs:
                   if not all(math.isfinite(v) and v >= 0 for v in vals.values()):
                       fields_ok = False
                       continue
-                  mains.append(vals['zmbtdcje'] + vals['zmbddcje'] - vals['zmstdcje'] - vals['zmsddcje'])
+                  main = vals['zmbtdcje'] + vals['zmbddcje'] - vals['zmstdcje'] - vals['zmsddcje']
+                  mains.append(main)
+                  if str(row.get('t', ''))[:10] == requested_iso:
+                      requested_main_values.append(main)
               item['required_fields_present'] = fields_ok and bool(mains)
+              if requested_main_values:
+                  item['requested_main_net_flow_cny'] = requested_main_values[0]
               if mains:
-                  item['main_net_flow_cny_first'] = mains[0]
                   item['main_net_flow_min'] = min(mains)
                   item['main_net_flow_max'] = max(mains)
               return item
@@ -93,9 +107,9 @@ jobs:
               url = f'https://api.mairuiapi.com/hsstock/history/transaction/{day}/{SYMBOL}/{licence}'
               try:
                   r = requests.get(url, headers=HEADERS, timeout=30)
-                  result = parse_payload(f'single_{day}', r)
+                  result = parse_payload(f'single_{day}', r, day)
               except Exception as exc:
-                  result = {'label': f'single_{day}', 'error': f'{type(exc).__name__}: {exc}'}
+                  result = {'label': f'single_{day}', 'error': f'{type(exc).__name__}: {exc}', 'requested_date_present': False}
               single[day] = result
               print('SINGLE', json.dumps(result, ensure_ascii=False))
               time.sleep(0.3)
@@ -105,9 +119,9 @@ jobs:
               url = f'https://api.mairuiapi.com/hsstock/history/transaction/{SYMBOL}/{licence}'
               try:
                   r = requests.get(url, params={'st': st, 'et': et}, headers=HEADERS, timeout=30)
-                  result = parse_payload(f'range_{st}_{et}', r)
+                  result = parse_payload(f'range_{st}_{et}', r, st)
               except Exception as exc:
-                  result = {'label': f'range_{st}_{et}', 'error': f'{type(exc).__name__}: {exc}'}
+                  result = {'label': f'range_{st}_{et}', 'error': f'{type(exc).__name__}: {exc}', 'requested_date_present': False}
               ranges[st] = result
               print('RANGE', json.dumps(result, ensure_ascii=False))
               time.sleep(0.3)
@@ -115,25 +129,26 @@ jobs:
           blockers = []
           demo_single = single.get('20260821') or {}
           demo_range = ranges.get('20260821') or {}
-          demo_usable = bool(demo_single.get('data_present') or demo_range.get('data_present'))
+          demo_usable = bool(demo_single.get('requested_date_present') or demo_range.get('requested_date_present'))
           if not demo_usable:
-              blockers.append('MAIRUI_PUBLIC_DEMO_UNUSABLE')
+              blockers.append('MAIRUI_PUBLIC_DEMO_REQUEST_DATE_NOT_HONORED')
 
           for day in ('20200601', '20260417'):
               s = single.get(day) or {}
               q = ranges.get(day) or {}
-              if not (s.get('data_present') or q.get('data_present')):
-                  blockers.append(f'MAIRUI_FORMAL_ANCHOR_UNAVAILABLE_{day}')
-              if not (s.get('required_fields_present') or q.get('required_fields_present')):
+              requested_present = bool(s.get('requested_date_present') or q.get('requested_date_present'))
+              if not requested_present:
+                  blockers.append(f'MAIRUI_FORMAL_ANCHOR_DATE_NOT_HONORED_{day}')
+              if requested_present and not (s.get('required_fields_present') or q.get('required_fields_present')):
                   blockers.append(f'MAIRUI_REQUIRED_FIELDS_UNAVAILABLE_{day}')
 
           summary = {
-              'artifact': 'GP12_MAIN_NET_FLOW_MAIRUI_DIAGNOSTIC_V2',
+              'artifact': 'GP12_MAIN_NET_FLOW_MAIRUI_DIAGNOSTIC_V3',
               'symbol': '000001.SZ',
               'formal_window': ['2020-06-01', '2026-04-17'],
               'single_day': single,
               'range_one_day': ranges,
-              'public_demo_usable': demo_usable,
+              'public_demo_requested_date_honored': demo_usable,
               'blockers': blockers,
               'binding_allowed': False,
               'model_freeze_allowed': False,
