@@ -1,0 +1,103 @@
+name: gp12-main-net-flow-stockapi-calibration-probe-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - .github/workflows/gp12-main-net-flow-stockapi-calibration-probe-v1.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe StockApi anonymous historical fund-flow and exact calibration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import urllib.parse
+          import urllib.request
+          import urllib.error
+
+          BASE = "https://www.stockapi.com.cn/v1/base/codeFlowHistory"
+
+          def fetch(code, date):
+              params = urllib.parse.urlencode({
+                  "code": code,
+                  "startDate": date,
+                  "endDate": date,
+                  "pageNo": 1,
+                  "pageSize": 100,
+              })
+              url = BASE + "?" + params
+              req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 gp12-calibration-probe"})
+              try:
+                  with urllib.request.urlopen(req, timeout=25) as r:
+                      body = r.read().decode("utf-8", errors="replace")
+                      print(f"HTTP {code} {date} status={r.status} bytes={len(body)}")
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode("utf-8", errors="replace")
+                  print(f"HTTP {code} {date} status={e.code} bytes={len(body)}")
+              except Exception as e:
+                  print(f"FETCH_ERROR {code} {date}: {type(e).__name__}: {e}")
+                  return None
+              print(body[:4000])
+              try:
+                  return json.loads(body)
+              except Exception:
+                  return None
+
+          # Known independent Tushare calibration row already pinned in GP12 evidence:
+          # 000001.SZ / 2026-05-21 main_net_flow = -66,707,700 CNY.
+          known = fetch("000001", "2026-05-21")
+          unresolved = fetch("000157", "2021-09-24")
+
+          def rows(obj):
+              if not isinstance(obj, dict):
+                  return []
+              data = obj.get("data")
+              if isinstance(data, dict):
+                  rec = data.get("records")
+                  return rec if isinstance(rec, list) else []
+              if isinstance(data, list):
+                  return data
+              return []
+
+          krows = rows(known)
+          urows = rows(unresolved)
+          print("KNOWN_ROWS", len(krows))
+          print("UNRESOLVED_ROWS", len(urows))
+
+          if not krows:
+              raise SystemExit("FAIL_STOCKAPI_NO_ANONYMOUS_KNOWN_ROW")
+
+          kr = next((x for x in krows if str(x.get("time"))[:10] == "2026-05-21"), krows[0])
+          super_net = float(kr["superNetTurnover"])
+          large_net = float(kr["largeNetTurnover"])
+          main_net = float(kr["mainNetTurnover"])
+          composite = super_net + large_net
+          expected = -66707700.0
+          print("CALIBRATION", json.dumps({
+              "superNetTurnover": super_net,
+              "largeNetTurnover": large_net,
+              "mainNetTurnover": main_net,
+              "super_plus_large": composite,
+              "expected_tushare_lg_elg_cny": expected,
+              "main_abs_diff": abs(main_net - expected),
+              "composite_abs_diff": abs(composite - expected),
+          }, ensure_ascii=False, sort_keys=True))
+
+          if abs(main_net - composite) > 1.0:
+              raise SystemExit("FAIL_STOCKAPI_MAIN_NOT_SUPER_PLUS_LARGE")
+          if abs(composite - expected) > 1.0:
+              raise SystemExit("FAIL_STOCKAPI_NOT_EXACT_TUSHARE_CALIBRATION")
+          if not urows:
+              raise SystemExit("FAIL_STOCKAPI_NO_UNRESOLVED_HISTORICAL_ROW")
+
+          print("PASS_STOCKAPI_EXACT_CALIBRATION_AND_OLD_HISTORY")
+          print("UNRESOLVED_SAMPLE", json.dumps(urows[0], ensure_ascii=False, sort_keys=True))
+          PY
