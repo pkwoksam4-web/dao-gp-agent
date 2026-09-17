@@ -1,0 +1,73 @@
+{
+  "artifact": "GP12_MAIN_NET_FLOW_SOURCE_OMISSION_EVIDENCE_V1",
+  "version": "1.0",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "family": "main_net_flow",
+  "status": "EVIDENCE_ONLY_BLOCKER_REMAINS",
+  "public_archive": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "pinned_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "moneyflow_tree_sha": "e0bac7332aeb2a948bdb47c04f70c3ff5213485b",
+    "raw_data_bulk_import_commit": "b31acf1ddce9e4f49753b21d4a53d21d71187160",
+    "raw_data_bulk_import_message": "Add A-share raw market data under data/",
+    "course_data_note": "Repository documentation states data/ is course data supplied by TA git push or equivalent Tushare daily downloads. Representative residual-date moneyflow files have only the single bulk-import commit and no later file history."
+  },
+  "audit": {
+    "workflow": "gp12-main-net-flow-source-omission-audit-v1",
+    "run_id": 35198717473,
+    "job_id": 105128019526,
+    "result": "PASS_GP12_MAIN_NET_FLOW_SOURCE_OMISSION_AUDIT_V1",
+    "artifact_id": 10486679412,
+    "artifact_zip_sha256": "bfc42610e28b10b266cff25b9bf4c96f38bfd4c0cc4670d2bceb33d701537b7f",
+    "residual_dates": 11,
+    "residual_keys": 18,
+    "target_missing_verified": 18,
+    "date_level_daily_minus_moneyflow_active_rows": 1385,
+    "neighbor_both_present": 15,
+    "neighbor_either_missing": 3
+  },
+  "neighbor_exceptions": [
+    {
+      "ts_code": "600306.SH",
+      "trade_date": "2020-06-08",
+      "previous_trade_date": "2020-06-05",
+      "previous_moneyflow_present": false,
+      "next_trade_date": "2020-06-09",
+      "next_moneyflow_present": false,
+      "classification": "SHORT_CLUSTER_NOT_ISOLATED_SINGLE_DAY"
+    },
+    {
+      "ts_code": "600145.SH",
+      "trade_date": "2020-07-06",
+      "previous_trade_date": "2020-07-03",
+      "previous_moneyflow_present": false,
+      "next_trade_date": "2020-07-07",
+      "next_moneyflow_present": true,
+      "classification": "SHORT_CLUSTER_LEFT_NEIGHBOR_MISSING"
+    },
+    {
+      "ts_code": "002503.SZ",
+      "trade_date": "2023-05-22",
+      "previous_trade_date": "2023-05-19",
+      "previous_moneyflow_present": true,
+      "next_trade_date": "2023-05-23",
+      "next_moneyflow_present": false,
+      "classification": "SHORT_CLUSTER_RIGHT_NEIGHBOR_MISSING"
+    }
+  ],
+  "diagnostic_conclusions": {
+    "permanent_symbol_exclusion_rejected": true,
+    "isolated_git_file_corruption_after_import_rejected": true,
+    "single_day_hole_pattern_for_15_of_18": true,
+    "source_snapshot_contains_broader_active_omissions_on_same_dates": true,
+    "can_distinguish_course_snapshot_omission_from_upstream_tushare_omission": false,
+    "exact_missing_values_recovered": false,
+    "zero_imputation_allowed": false,
+    "cross_provider_generic_main_flow_substitution_allowed": false
+  },
+  "remaining_question": "Determine whether exact Tushare large+extra-large active buy/sell rows can be recovered from an independent same-schema snapshot, authenticated original course source, or authenticated Tushare source for the 18 exact symbol-date keys.",
+  "family_ready": false,
+  "blockers": [
+    "RECOVER_EXACT_TUSHARE_SEMANTIC_VALUES_FOR_18_SYMBOL_DATE_KEYS"
+  ]
+}
