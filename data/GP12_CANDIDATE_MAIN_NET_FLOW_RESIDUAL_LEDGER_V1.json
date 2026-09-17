@@ -1,6 +1,6 @@
 {
   "artifact": "GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1",
-  "version": "1.0",
+  "version": "1.1",
   "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
   "family": "main_net_flow",
   "status": "CANDIDATE_ONLY_UNAPPROVED",
@@ -15,11 +15,11 @@
   },
   "formal_expected_rows": 1011607,
   "direct_public_archive_rows": 1011565,
-  "zero_proof_rows": 24,
-  "resolved_rows": 1011589,
-  "unresolved_rows": 18,
-  "resolved_fraction": 0.99998220652882,
-  "unresolved_fraction": 0.00001779347118001358,
+  "zero_proof_rows": 26,
+  "resolved_rows": 1011591,
+  "unresolved_rows": 16,
+  "resolved_fraction": 0.9999841835811734,
+  "unresolved_fraction": 0.00001581641882667874,
   "source_extra_rows": 1,
   "formal_projection_policy": "PROJECT_TO_PINNED_SOHU_FORMAL_RAW_SYMBOL_DATE_AXIS",
   "source_extra_policy": "EXCLUDE_SOURCE_ONLY_ROWS_NOT_PRESENT_ON_FORMAL_RAW_AXIS",
@@ -50,6 +50,35 @@
     "zero_proof_artifact_id": 10479217231,
     "zero_proof_artifact_zip_sha256": "bb698c6ad4886192127643ec517c8cefbd12d8750ff244ab55fea1d5abb6d922",
     "zero_proof_result": "PASS_RESIDUAL_ZERO_PROOF_24_OF_42",
+    "baostock_5m_zero_proof_run_id": 35197394746,
+    "baostock_5m_zero_proof_job_id": 105123765092,
+    "baostock_5m_zero_proof_additional_rows": 2,
+    "baostock_5m_zero_proof_rationale": "For each proof key BaoStock returned a complete 48-bar 5-minute session whose summed amount equals BaoStock daily amount; every 5-minute aggregate is below the Tushare 200,000 CNY large-order threshold, therefore every constituent trade is necessarily below 200,000 CNY and large+extra-large active buy/sell amounts are exactly zero.",
+    "baostock_5m_zero_proof_keys": [
+      {
+        "ts_code": "600145.SH",
+        "trade_date": "2020-07-06",
+        "formal_amount_cny": 300500,
+        "daily_amount_cny": 300520,
+        "sum_5m_amount_cny": 300520,
+        "max_5m_amount_cny": 115720,
+        "minute_bars": 48,
+        "main_net_flow_cny": 0
+      },
+      {
+        "ts_code": "600145.SH",
+        "trade_date": "2020-07-16",
+        "formal_amount_cny": 209100,
+        "daily_amount_cny": 209072,
+        "sum_5m_amount_cny": 209072,
+        "max_5m_amount_cny": 70956,
+        "minute_bars": 48,
+        "main_net_flow_cny": 0
+      }
+    ],
+    "source_omission_audit_run_id": 35198717473,
+    "source_omission_audit_artifact_id": 10486679412,
+    "source_omission_audit_result": "PASS_GP12_MAIN_NET_FLOW_SOURCE_OMISSION_AUDIT_V1",
     "known_semantic_calibration": {
       "ts_code": "000001.SZ",
       "trade_date": "2026-05-21",
@@ -65,12 +94,11 @@
     "stockapi_anonymous": "RECENT_ONLY; 2026-05-21 and 2021-09-24 returned empty while 2026-07-31 control returned data",
     "akshare_eastmoney": "SHORT_HISTORY_APPROX_100_TRADING_DAYS",
     "ths_quant": "REJECTED_SEMANTIC_BUCKET_THRESHOLDS_DIFFER_FROM_TUSHARE",
-    "ustc_pan": "FULL_SOURCE_EXISTS_BUT_REQUIRES_AUTHENTICATED_GROUP_ACCESS"
+    "ustc_pan": "FULL_SOURCE_EXISTS_BUT_REQUIRES_AUTHENTICATED_GROUP_ACCESS",
+    "sina_historical_ticks": "LEGACY_DOWNLOAD_OFFLINE_AND_HISTORY_TABLE_EMPTY_FOR_OLD_DATES"
   },
   "unresolved_keys": [
     {"ts_code": "600306.SH", "trade_date": "2020-06-08", "formal_amount_cny": 314500},
-    {"ts_code": "600145.SH", "trade_date": "2020-07-06", "formal_amount_cny": 300500},
-    {"ts_code": "600145.SH", "trade_date": "2020-07-16", "formal_amount_cny": 209100},
     {"ts_code": "600898.SH", "trade_date": "2020-11-04", "formal_amount_cny": 587900},
     {"ts_code": "603996.SH", "trade_date": "2021-02-24", "formal_amount_cny": 534300},
     {"ts_code": "002618.SZ", "trade_date": "2021-09-23", "formal_amount_cny": 12846700},
@@ -89,7 +117,7 @@
   ],
   "family_ready": false,
   "blockers": [
-    "RECOVER_EXACT_TUSHARE_SEMANTIC_VALUES_FOR_18_SYMBOL_DATE_KEYS"
+    "RECOVER_EXACT_TUSHARE_SEMANTIC_VALUES_FOR_16_SYMBOL_DATE_KEYS"
   ],
   "historical_gp_v11_source_recovered": false,
   "model_freeze_allowed": false,
