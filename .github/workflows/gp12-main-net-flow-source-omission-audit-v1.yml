@@ -1,0 +1,155 @@
+name: gp12-main-net-flow-source-omission-audit-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - .github/workflows/gp12-main-net-flow-source-omission-audit-v1.yml
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Audit daily vs moneyflow omissions on residual dates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv, io, json, urllib.request
+          from collections import defaultdict
+          from datetime import datetime
+
+          REPO='Jessica-Zhangyj/dlquant'
+          COMMIT='6b245fa09cb628f3bcb812f0662bfef520e65fb4'
+          RAW=f'https://raw.githubusercontent.com/{REPO}/{COMMIT}/data'
+
+          residuals = [
+            ('600306.SH','20200608'),
+            ('600145.SH','20200706'),
+            ('600145.SH','20200716'),
+            ('600898.SH','20201104'),
+            ('603996.SH','20210224'),
+            ('002618.SZ','20210923'),
+            ('000020.SZ','20210924'),
+            ('000157.SZ','20210924'),
+            ('000592.SZ','20210924'),
+            ('000753.SZ','20210924'),
+            ('002684.SZ','20211125'),
+            ('600112.SH','20220506'),
+            ('000564.SZ','20230320'),
+            ('001337.SZ','20230320'),
+            ('002118.SZ','20230522'),
+            ('002157.SZ','20230522'),
+            ('002503.SZ','20230522'),
+            ('002504.SZ','20230522'),
+          ]
+          target_by_date=defaultdict(set)
+          for s,d in residuals: target_by_date[d].add(s)
+          dates=sorted(target_by_date)
+
+          def fetch(kind, day):
+              url=f'{RAW}/{kind}/{day}.csv'
+              req=urllib.request.Request(url,headers={'User-Agent':'gp12-source-omission-audit'})
+              with urllib.request.urlopen(req,timeout=30) as r:
+                  text=r.read().decode('utf-8-sig')
+              return list(csv.DictReader(io.StringIO(text)))
+
+          def fnum(v):
+              try: return float(v)
+              except Exception: return None
+
+          report={'repository':REPO,'commit':COMMIT,'dates':{},'residual_neighbor_presence':[]}
+          all_missing=[]
+          for day in dates:
+              daily=fetch('daily',day)
+              mf=fetch('moneyflow',day)
+              dmap={r['ts_code']:r for r in daily}
+              mmap={r['ts_code']:r for r in mf}
+              dset=set(dmap); mset=set(mmap)
+              missing=sorted(dset-mset)
+              extra=sorted(mset-dset)
+              active_missing=[]
+              for s in missing:
+                  r=dmap[s]
+                  amount=fnum(r.get('amount'))
+                  vol=fnum(r.get('vol'))
+                  if (amount or 0)>0 or (vol or 0)>0:
+                      active_missing.append({'ts_code':s,'amount':amount,'vol':vol})
+              targets=sorted(target_by_date[day])
+              target_status=[]
+              for s in targets:
+                  target_status.append({
+                      'ts_code':s,
+                      'daily_present':s in dset,
+                      'moneyflow_present':s in mset,
+                      'daily_amount':fnum(dmap.get(s,{}).get('amount')),
+                      'daily_vol':fnum(dmap.get(s,{}).get('vol')),
+                  })
+              rec={
+                  'daily_rows':len(daily),'moneyflow_rows':len(mf),
+                  'daily_minus_moneyflow_n':len(missing),
+                  'moneyflow_minus_daily_n':len(extra),
+                  'active_daily_minus_moneyflow_n':len(active_missing),
+                  'daily_minus_moneyflow':missing,
+                  'moneyflow_minus_daily':extra,
+                  'active_daily_minus_moneyflow':active_missing,
+                  'targets':target_status,
+              }
+              report['dates'][day]=rec
+              print('DATE_AUDIT',day,json.dumps(rec,ensure_ascii=False,sort_keys=True))
+              all_missing.extend((day,s) for s in missing)
+
+          # Build date inventory once, then inspect immediate prior/next archive trading dates
+          # for each residual symbol. This tests whether omissions are isolated single-day holes.
+          tree_url=f'https://api.github.com/repos/{REPO}/git/trees/{COMMIT}?recursive=1'
+          req=urllib.request.Request(tree_url,headers={'User-Agent':'gp12-source-omission-audit'})
+          with urllib.request.urlopen(req,timeout=60) as r:
+              tree=json.loads(r.read().decode())['tree']
+          archive_dates=sorted(
+              p['path'].split('/')[-1][:-4]
+              for p in tree
+              if p.get('path','').startswith('data/moneyflow/') and p.get('path','').endswith('.csv')
+          )
+          idx={d:i for i,d in enumerate(archive_dates)}
+          mf_cache={}
+          for symbol,day in residuals:
+              i=idx[day]
+              neighbors=[x for x in (archive_dates[i-1] if i>0 else None, archive_dates[i+1] if i+1<len(archive_dates) else None) if x]
+              nrec={'ts_code':symbol,'trade_date':day,'neighbors':[]}
+              for nd in neighbors:
+                  if nd not in mf_cache:
+                      mf_cache[nd]={r['ts_code'] for r in fetch('moneyflow',nd)}
+                  nrec['neighbors'].append({'trade_date':nd,'moneyflow_present':symbol in mf_cache[nd]})
+              report['residual_neighbor_presence'].append(nrec)
+              print('NEIGHBOR',json.dumps(nrec,ensure_ascii=False,sort_keys=True))
+
+          expected=set(residuals)
+          observed_target_missing=set()
+          for day,rec in report['dates'].items():
+              for t in rec['targets']:
+                  if t['daily_present'] and not t['moneyflow_present']:
+                      observed_target_missing.add((t['ts_code'],day))
+          assert expected == observed_target_missing, (expected-observed_target_missing, observed_target_missing-expected)
+
+          summary={
+              'residual_dates':len(dates),
+              'residual_keys':len(residuals),
+              'target_missing_verified':len(observed_target_missing),
+              'date_level_missing_total':sum(x['daily_minus_moneyflow_n'] for x in report['dates'].values()),
+              'date_level_active_missing_total':sum(x['active_daily_minus_moneyflow_n'] for x in report['dates'].values()),
+              'neighbor_both_present':sum(1 for x in report['residual_neighbor_presence'] if len(x['neighbors'])==2 and all(y['moneyflow_present'] for y in x['neighbors'])),
+          }
+          report['summary']=summary
+          print('SUMMARY',json.dumps(summary,ensure_ascii=False,sort_keys=True))
+          with open('source_omission_audit.json','w',encoding='utf-8') as f:
+              json.dump(report,f,ensure_ascii=False,indent=2,sort_keys=True)
+          print('PASS_GP12_MAIN_NET_FLOW_SOURCE_OMISSION_AUDIT_V1')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-main-net-flow-source-omission-audit-v1
+          path: source_omission_audit.json
+          if-no-files-found: error
