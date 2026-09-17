@@ -1,0 +1,75 @@
+name: gp12-main-net-flow-source-omission-evidence-validate-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - data/GP12_MAIN_NET_FLOW_SOURCE_OMISSION_EVIDENCE_V1.json
+      - .github/workflows/gp12-main-net-flow-source-omission-evidence-validate-v1.yml
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate omission evidence invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          d=json.loads(Path('data/GP12_MAIN_NET_FLOW_SOURCE_OMISSION_EVIDENCE_V1.json').read_text())
+          assert d['artifact']=='GP12_MAIN_NET_FLOW_SOURCE_OMISSION_EVIDENCE_V1'
+          assert d['family']=='main_net_flow'
+          assert d['status']=='EVIDENCE_ONLY_BLOCKER_REMAINS'
+
+          p=d['public_archive']
+          assert p['repository']=='Jessica-Zhangyj/dlquant'
+          assert p['pinned_commit']=='6b245fa09cb628f3bcb812f0662bfef520e65fb4'
+          assert p['moneyflow_tree_sha']=='e0bac7332aeb2a948bdb47c04f70c3ff5213485b'
+          assert p['raw_data_bulk_import_commit']=='b31acf1ddce9e4f49753b21d4a53d21d71187160'
+
+          a=d['audit']
+          assert a['run_id']==35198717473
+          assert a['job_id']==105128019526
+          assert a['result']=='PASS_GP12_MAIN_NET_FLOW_SOURCE_OMISSION_AUDIT_V1'
+          assert a['artifact_id']==10486679412
+          assert a['residual_dates']==11
+          assert a['residual_keys']==18
+          assert a['target_missing_verified']==18
+          assert a['date_level_daily_minus_moneyflow_active_rows']==1385
+          assert a['neighbor_both_present']==15
+          assert a['neighbor_either_missing']==3
+          assert a['neighbor_both_present'] + a['neighbor_either_missing'] == a['residual_keys']
+
+          ex=d['neighbor_exceptions']
+          assert len(ex)==3
+          assert {(x['ts_code'],x['trade_date']) for x in ex} == {
+              ('600306.SH','2020-06-08'),
+              ('600145.SH','2020-07-06'),
+              ('002503.SZ','2023-05-22'),
+          }
+
+          c=d['diagnostic_conclusions']
+          assert c['permanent_symbol_exclusion_rejected'] is True
+          assert c['isolated_git_file_corruption_after_import_rejected'] is True
+          assert c['single_day_hole_pattern_for_15_of_18'] is True
+          assert c['source_snapshot_contains_broader_active_omissions_on_same_dates'] is True
+          assert c['can_distinguish_course_snapshot_omission_from_upstream_tushare_omission'] is False
+          assert c['exact_missing_values_recovered'] is False
+          assert c['zero_imputation_allowed'] is False
+          assert c['cross_provider_generic_main_flow_substitution_allowed'] is False
+
+          assert d['family_ready'] is False
+          assert d['blockers']==['RECOVER_EXACT_TUSHARE_SEMANTIC_VALUES_FOR_18_SYMBOL_DATE_KEYS']
+          print('AUDIT_RUN',a['run_id'])
+          print('TARGET_MISSING_VERIFIED',a['target_missing_verified'])
+          print('NEIGHBOR_BOTH_PRESENT',a['neighbor_both_present'])
+          print('NEIGHBOR_EITHER_MISSING',a['neighbor_either_missing'])
+          print('PASS_GP12_MAIN_NET_FLOW_SOURCE_OMISSION_EVIDENCE_V1')
+          PY
