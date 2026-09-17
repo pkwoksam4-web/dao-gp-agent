@@ -1,0 +1,160 @@
+name: GP12 Main Net Flow MaiRui Single-Day Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-mairui-single-day-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -q requests
+      - name: Probe formal-window anchors and semantic overlap
+        run: |
+          python - <<'PY'
+          import json, math, re, time
+          import requests
+
+          SYMBOL = '000001'
+          DATES = ['20200601', '20240102', '20260417', '20260915']
+          REQUIRED = ('zmbtdcje', 'zmbddcje', 'zmstdcje', 'zmsddcje')
+          HEADERS = {'User-Agent': 'Mozilla/5.0 GP12-CANDIDATE-PROBE/1.0'}
+
+          # Pull the public demonstration certificate from the provider documentation at runtime.
+          doc = requests.get('https://www.mairuiapi.com/hsdata', headers=HEADERS, timeout=30)
+          doc.raise_for_status()
+          match = re.search(r'LICENCE-[A-Z0-9-]{12,}', doc.text)
+          if not match:
+              raise RuntimeError('public MaiRui demo certificate not found in official documentation')
+          licence = match.group(0)
+
+          def fetch_mairui(day):
+              url = f'https://api.mairuiapi.com/hsstock/history/transaction/{day}/{SYMBOL}/{licence}'
+              r = requests.get(url, headers=HEADERS, timeout=30)
+              item = {
+                  'day': day,
+                  'http_status': r.status_code,
+                  'url': url.replace(licence, '<PUBLIC_DEMO>'),
+                  'head': r.text[:240],
+              }
+              r.raise_for_status()
+              payload = r.json()
+              if not isinstance(payload, list):
+                  raise RuntimeError(f'{day}: payload is not list: {type(payload).__name__}')
+              item['raw_row_n'] = len(payload)
+              if not payload:
+                  item['data_present'] = False
+                  return item
+              dates = {str(row.get('t', ''))[:10] for row in payload if isinstance(row, dict)}
+              expected_iso = f'{day[:4]}-{day[4:6]}-{day[6:]}'
+              if dates != {expected_iso}:
+                  raise RuntimeError(f'{day}: returned unexpected dates {sorted(dates)}')
+              mains = []
+              for idx, row in enumerate(payload):
+                  if not isinstance(row, dict):
+                      raise RuntimeError(f'{day}: row {idx} is not object')
+                  missing = [k for k in REQUIRED if row.get(k) is None]
+                  if missing:
+                      raise RuntimeError(f'{day}: row {idx} missing {missing}')
+                  vals = {k: float(row[k]) for k in REQUIRED}
+                  if not all(math.isfinite(v) and v >= 0 for v in vals.values()):
+                      raise RuntimeError(f'{day}: invalid amount bucket in row {idx}')
+                  main = vals['zmbtdcje'] + vals['zmbddcje'] - vals['zmstdcje'] - vals['zmsddcje']
+                  mains.append(main)
+              if max(mains) - min(mains) > 0.01:
+                  raise RuntimeError(f'{day}: conflicting main-net-flow values across rows')
+              item.update({
+                  'data_present': True,
+                  'date': expected_iso,
+                  'main_net_flow_cny': mains[0],
+                  'required_fields_present': True,
+              })
+              return item
+
+          mairui = {}
+          for day in DATES:
+              try:
+                  result = fetch_mairui(day)
+              except Exception as exc:
+                  result = {'day': day, 'error': f'{type(exc).__name__}: {exc}'}
+              mairui[day] = result
+              print('MAIRUI', json.dumps(result, ensure_ascii=False))
+              time.sleep(0.5)
+
+          em_url = 'https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get'
+          em_params = {
+              'lmt': '1000', 'klt': '101', 'secid': '0.000001',
+              'fields1': 'f1,f2,f3,f7',
+              'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
+              'ut': '7eea3edcaed734bea9cbfc24409ed989', 'rtntype': '6',
+          }
+          em_headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/152 Safari/537.36',
+              'Accept': 'application/json,text/plain,*/*',
+              'Referer': 'https://data.eastmoney.com/',
+          }
+          east = {}
+          er = requests.get(em_url, params=em_params, headers=em_headers, timeout=30)
+          print('EASTMONEY_HTTP', er.status_code)
+          er.raise_for_status()
+          data = (er.json().get('data') or {})
+          for line in data.get('klines') or []:
+              parts = str(line).split(',')
+              if len(parts) >= 2:
+                  east[parts[0].replace('-', '')] = float(parts[1])
+
+          crosses = []
+          for day in ('20260417', '20260915'):
+              mr = mairui.get(day) or {}
+              if mr.get('data_present') and day in east:
+                  diff = float(mr['main_net_flow_cny']) - float(east[day])
+                  row = {
+                      'day': day,
+                      'mairui_lg_plus_elg_net_cny': mr['main_net_flow_cny'],
+                      'eastmoney_main_net_flow_cny': east[day],
+                      'diff_cny': diff,
+                      'within_1yuan': abs(diff) <= 1.01,
+                  }
+                  crosses.append(row)
+                  print('CROSS', json.dumps(row, ensure_ascii=False))
+
+          blockers = []
+          for day in ('20200601', '20260417'):
+              row = mairui.get(day) or {}
+              if not row.get('data_present'):
+                  blockers.append(f'MAIRUI_FORMAL_ANCHOR_MISSING_{day}')
+              if row.get('required_fields_present') is not True:
+                  blockers.append(f'MAIRUI_REQUIRED_FIELDS_MISSING_{day}')
+          if not crosses:
+              blockers.append('MAIRUI_EASTMONEY_SEMANTIC_OVERLAP_MISSING')
+          elif any(c['within_1yuan'] is not True for c in crosses):
+              blockers.append('MAIRUI_EASTMONEY_SEMANTIC_MISMATCH')
+
+          summary = {
+              'artifact': 'GP12_MAIN_NET_FLOW_MAIRUI_SINGLE_DAY_PROBE_V1',
+              'symbol': '000001.SZ',
+              'formal_window': ['2020-06-01', '2026-04-17'],
+              'formula': 'zmbtdcje + zmbddcje - zmstdcje - zmsddcje',
+              'anchors': mairui,
+              'crosses': crosses,
+              'blockers': blockers,
+              'probe_pass': not blockers,
+              'binding_allowed': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          print('===SUMMARY===')
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          if blockers:
+              raise RuntimeError('PROBE_BLOCKED: ' + ','.join(blockers))
+          print('PASS_MAIRUI_SINGLE_DAY_MAIN_NET_FLOW_PROBE')
+          PY
