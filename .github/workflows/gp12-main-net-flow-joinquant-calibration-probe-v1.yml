@@ -1,0 +1,86 @@
+name: GP12 main-net-flow JoinQuant calibration probe v1
+
+on:
+  push:
+    branches: [gp/gp12-turnover-ratio-v1]
+    paths:
+      - '.github/workflows/gp12-main-net-flow-joinquant-calibration-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe public documented JoinQuant example token and exact calibration
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv, io, json, re, urllib.request
+
+          DOC='https://raw.githubusercontent.com/hzgzh/JqData.jl/master/src/JqData.jl'
+          API='https://dataapi.joinquant.com/apis'
+          JESSICA='https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/data/moneyflow/{day}.csv'
+
+          # Parse the example token at runtime; no credential-like value is stored in this repo.
+          text=urllib.request.urlopen(DOC, timeout=30).read().decode('utf-8')
+          m=re.search(r'get_query_count\(token\).*?"token"\s*=>\s*"([0-9a-zA-Z]{20,})"', text, re.S)
+          if not m:
+              m=re.search(r'"token"\s*:\s*"([0-9a-zA-Z]{20,})"', text)
+          assert m, 'PUBLIC_EXAMPLE_TOKEN_NOT_FOUND_IN_DOC'
+          token=m.group(1)
+
+          def post(body):
+              req=urllib.request.Request(API, data=json.dumps(body).encode(), headers={'Content-Type':'application/json'})
+              try:
+                  return urllib.request.urlopen(req, timeout=30).read().decode('utf-8', 'replace')
+              except Exception as e:
+                  payload=''
+                  if hasattr(e, 'read'):
+                      try: payload=e.read().decode('utf-8','replace')
+                      except Exception: pass
+                  raise RuntimeError(f'JOINQUANT_HTTP_FAILED:{type(e).__name__}:{e}:{payload[:500]}')
+
+          q=post({'method':'get_query_count','token':token})
+          print('JQ_QUERY_COUNT_RESPONSE=', q[:500])
+          if not re.fullmatch(r'\s*\d+\s*', q):
+              raise RuntimeError('JOINQUANT_PUBLIC_EXAMPLE_TOKEN_UNUSABLE:'+q[:500])
+
+          calibrations=[
+              ('000001.SZ','000001.XSHE','20210924'),
+              ('000001.SZ','000001.XSHE','20230522'),
+              ('000001.SZ','000001.XSHE','20260521'),
+          ]
+          rows=[]
+          for ts_code,jq_code,day in calibrations:
+              raw=urllib.request.urlopen(JESSICA.format(day=day), timeout=45).read().decode('utf-8-sig')
+              hits=[r for r in csv.DictReader(io.StringIO(raw)) if r['ts_code']==ts_code]
+              assert len(hits)==1, (day,ts_code,len(hits))
+              r=hits[0]
+              tushare_cny=(float(r['buy_lg_amount'])+float(r['buy_elg_amount'])-float(r['sell_lg_amount'])-float(r['sell_elg_amount']))*10000.0
+              d=f'{day[:4]}-{day[4:6]}-{day[6:]}'
+              out=post({'method':'get_money_flow','token':token,'code':jq_code,'date':d,'end_date':d})
+              print('JQ_MONEY_FLOW_RAW', day, out[:1000].replace('\n',' | '))
+              lines=[x for x in out.strip().splitlines() if x.strip()]
+              if len(lines)<2:
+                  raise RuntimeError(f'JOINQUANT_NO_ROW:{day}:{out[:500]}')
+              jr=list(csv.DictReader(io.StringIO(out)))
+              if len(jr)!=1:
+                  raise RuntimeError(f'JOINQUANT_ROW_N:{day}:{len(jr)}')
+              jq_cny=float(jr[0]['net_amount_main'])*10000.0
+              diff=jq_cny-tushare_cny
+              rows.append({'day':day,'tushare_cny':tushare_cny,'joinquant_cny':jq_cny,'diff_cny':diff})
+
+          print(json.dumps({'calibrations':rows}, ensure_ascii=False, indent=2))
+          exact=all(abs(x['diff_cny'])<=1.0 for x in rows)
+          if not exact:
+              raise RuntimeError('JOINQUANT_NOT_EXACT_TUSHARE_CONTRACT')
+          print('PASS_JOINQUANT_EXACT_TUSHARE_CALIBRATION_3_OF_3')
+          PY
