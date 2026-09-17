@@ -1,0 +1,184 @@
+name: GP12 Main Net Flow Public Archive Date Coverage Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-public-archive-date-coverage-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -q pandas pyarrow requests
+      - name: Download pinned Formal RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Compare exact Formal date axis with public moneyflow archive
+        env:
+          PYTHONPATH: scripts
+        run: |
+          mkdir -p out
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+          import requests
+          from gp12_main_net_flow_tushare_v1 import (
+              EXPECTED_TRADE_ROWS,
+              FORMAL_END,
+              FORMAL_START,
+              FORMAL_SYMBOL_N,
+              load_expected_dates,
+              load_scope,
+          )
+
+          SOURCE_REPO = 'Jessica-Zhangyj/dlquant'
+          SOURCE_COMMIT = '6b245fa09cb628f3bcb812f0662bfef520e65fb4'
+          MONEYFLOW_TREE_SHA = 'e0bac7332aeb2a948bdb47c04f70c3ff5213485b'
+          RAW_SHA256 = 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb'
+          SCOPE_SHA256 = '9e64e111c5eeff1f43fcce6e920d7e5590aa5bb14268c482bbdfe1a936affef8'
+          REQUIRED_COLUMNS = [
+              'ts_code','trade_date',
+              'buy_sm_vol','buy_sm_amount','sell_sm_vol','sell_sm_amount',
+              'buy_md_vol','buy_md_amount','sell_md_vol','sell_md_amount',
+              'buy_lg_vol','buy_lg_amount','sell_lg_vol','sell_lg_amount',
+              'buy_elg_vol','buy_elg_amount','sell_elg_vol','sell_elg_amount',
+              'net_mf_vol','net_mf_amount',
+          ]
+
+          def sha256(path):
+              h = hashlib.sha256()
+              with Path(path).open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          raw_path = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          scope_path = Path('data/pit_st_scope_v480.txt')
+          assert sha256(raw_path) == RAW_SHA256
+          assert sha256(scope_path) == SCOPE_SHA256
+          symbols = load_scope(scope_path)
+          assert len(symbols) == FORMAL_SYMBOL_N
+          expected_by_symbol = load_expected_dates(raw_path, symbols)
+          assert sum(len(v) for v in expected_by_symbol.values()) == EXPECTED_TRADE_ROWS
+          expected_dates = sorted({d for dates in expected_by_symbol.values() for d in dates})
+          assert expected_dates[0] == FORMAL_START
+          assert expected_dates[-1] == FORMAL_END
+
+          tree_url = f'https://api.github.com/repos/{SOURCE_REPO}/git/trees/{MONEYFLOW_TREE_SHA}'
+          tr = requests.get(tree_url, timeout=60, headers={'Accept':'application/vnd.github+json'})
+          tr.raise_for_status()
+          tree_payload = tr.json()
+          if tree_payload.get('truncated') is True:
+              raise RuntimeError('PUBLIC_MONEYFLOW_TREE_TRUNCATED')
+          entries = tree_payload.get('tree') or []
+          file_re = re.compile(r'^(\d{8})\.csv$')
+          archive_dates = []
+          for entry in entries:
+              if entry.get('type') != 'blob':
+                  continue
+              match = file_re.match(str(entry.get('path','')))
+              if not match:
+                  continue
+              raw = match.group(1)
+              archive_dates.append(f'{raw[:4]}-{raw[4:6]}-{raw[6:]}')
+          archive_dates = sorted(set(archive_dates))
+          archive_formal_dates = [d for d in archive_dates if FORMAL_START <= d <= FORMAL_END]
+          expected_set = set(expected_dates)
+          archive_set = set(archive_formal_dates)
+          missing = sorted(expected_set - archive_set)
+          extra = sorted(archive_set - expected_set)
+
+          sample_dates = [
+              '2020-06-01','2021-01-04','2022-01-04','2023-01-03',
+              '2024-01-02','2025-01-02','2026-04-17',
+          ]
+          sample_reports = []
+          schema_failures = []
+          for day in sample_dates:
+              compact = day.replace('-','')
+              url = f'https://raw.githubusercontent.com/{SOURCE_REPO}/{SOURCE_COMMIT}/data/moneyflow/{compact}.csv'
+              r = requests.get(url, timeout=60)
+              item = {'date': day, 'http_status': r.status_code, 'bytes': len(r.content)}
+              if r.status_code != 200:
+                  schema_failures.append(f'{day}:HTTP_{r.status_code}')
+                  sample_reports.append(item)
+                  continue
+              header = r.text.splitlines()[0].lstrip('\ufeff').strip().split(',') if r.text else []
+              item['columns'] = header
+              item['schema_exact'] = header == REQUIRED_COLUMNS
+              if not item['schema_exact']:
+                  schema_failures.append(f'{day}:SCHEMA_MISMATCH')
+              sample_reports.append(item)
+
+          blockers = []
+          if missing:
+              blockers.append('PUBLIC_ARCHIVE_FORMAL_DATE_FILES_MISSING')
+          if schema_failures:
+              blockers.append('PUBLIC_ARCHIVE_SCHEMA_SAMPLE_FAILURE')
+          if len(expected_dates) != len(archive_formal_dates) or extra:
+              blockers.append('PUBLIC_ARCHIVE_FORMAL_DATE_SET_MISMATCH')
+
+          report = {
+              'artifact': 'GP12_MAIN_NET_FLOW_PUBLIC_ARCHIVE_DATE_COVERAGE_PROBE_V1',
+              'formal_window': [FORMAL_START, FORMAL_END],
+              'formal_symbol_n': len(symbols),
+              'expected_trade_rows': EXPECTED_TRADE_ROWS,
+              'expected_unique_trade_date_n': len(expected_dates),
+              'expected_first_date': expected_dates[0],
+              'expected_last_date': expected_dates[-1],
+              'source_repo': SOURCE_REPO,
+              'source_commit': SOURCE_COMMIT,
+              'source_moneyflow_tree_sha': MONEYFLOW_TREE_SHA,
+              'archive_all_date_file_n': len(archive_dates),
+              'archive_formal_date_file_n': len(archive_formal_dates),
+              'archive_formal_first_date': archive_formal_dates[0] if archive_formal_dates else None,
+              'archive_formal_last_date': archive_formal_dates[-1] if archive_formal_dates else None,
+              'missing_date_file_n': len(missing),
+              'missing_date_file_sample': missing[:50],
+              'extra_date_file_n': len(extra),
+              'extra_date_file_sample': extra[:50],
+              'schema_sample_reports': sample_reports,
+              'schema_failures': schema_failures,
+              'raw_source_run_id': 34192233633,
+              'raw_panel_sha256': RAW_SHA256,
+              'scope_sha256': SCOPE_SHA256,
+              'date_axis_exact': not missing and not extra and len(expected_dates) == len(archive_formal_dates),
+              'probe_pass': not blockers,
+              'blockers': blockers,
+              'binding_allowed': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          Path('out/GP12_MAIN_NET_FLOW_PUBLIC_ARCHIVE_DATE_COVERAGE_PROBE_V1.json').write_text(
+              json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          if blockers:
+              raise RuntimeError('PROBE_BLOCKED: ' + ','.join(blockers))
+          print('PASS_PUBLIC_ARCHIVE_EXACT_FORMAL_DATE_AXIS')
+          PY
+      - name: Upload probe report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gp12-main-net-flow-public-archive-date-coverage-probe-v1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
