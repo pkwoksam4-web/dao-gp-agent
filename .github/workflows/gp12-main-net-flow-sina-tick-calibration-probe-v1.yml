@@ -1,0 +1,131 @@
+name: gp12-main-net-flow-sina-tick-calibration-probe-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - .github/workflows/gp12-main-net-flow-sina-tick-calibration-probe-v1.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Sina historical ticks against pinned Tushare moneyflow truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv, io, re, sys, urllib.parse, urllib.request, urllib.error
+          from html import unescape
+
+          symbol='sh600421'
+          day='2020-06-04'
+          expected=-839500.0  # CNY; pinned Jessica/Tushare lg+elg truth
+
+          headers={'User-Agent':'Mozilla/5.0','Referer':'https://finance.sina.com.cn/'}
+
+          def get(url):
+              req=urllib.request.Request(url,headers=headers)
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as r:
+                      b=r.read()
+                      print('HTTP',r.status,'bytes',len(b),'url',url)
+                      return b
+              except Exception as e:
+                  print('FETCH_ERROR',type(e).__name__,str(e),'url',url)
+                  return b''
+
+          rows=[]
+          # Prefer Sina's historical transaction download endpoint: one response for the whole day.
+          u='https://market.finance.sina.com.cn/downxls.php?'+urllib.parse.urlencode({'date':day,'symbol':symbol})
+          b=get(u)
+          text=''
+          for enc in ('gb18030','gbk','utf-8'):
+              try:
+                  text=b.decode(enc)
+                  break
+              except Exception:
+                  pass
+          print('DOWNXLS_HEAD',repr(text[:500]))
+          for line in text.splitlines():
+              parts=[x.strip() for x in line.split('\t')]
+              if len(parts) < 6 or not re.match(r'^\d\d:\d\d:\d\d$',parts[0]):
+                  continue
+              try:
+                  amount=float(parts[4].replace(',',''))
+              except Exception:
+                  continue
+              rows.append((parts[0],amount,parts[5]))
+
+          # Fallback to historical HTML pages if download endpoint is disabled.
+          if not rows:
+              for page in range(1,201):
+                  u='https://market.finance.sina.com.cn/transHis.php?'+urllib.parse.urlencode({'symbol':symbol,'date':day,'page':page})
+                  raw=get(u)
+                  if not raw:
+                      break
+                  s=''
+                  for enc in ('gb18030','gbk','utf-8'):
+                      try:
+                          s=raw.decode(enc)
+                          break
+                      except Exception:
+                          pass
+                  # Strip tags into tab-like cells.
+                  trs=re.findall(r'<tr[^>]*>(.*?)</tr>',s,flags=re.I|re.S)
+                  page_rows=0
+                  for tr in trs:
+                      cells=[]
+                      for td in re.findall(r'<td[^>]*>(.*?)</td>',tr,flags=re.I|re.S):
+                          v=re.sub(r'<[^>]+>','',td)
+                          v=unescape(v).replace('&nbsp;',' ').strip()
+                          cells.append(v)
+                      if len(cells) < 6 or not re.match(r'^\d\d:\d\d:\d\d$',cells[0]):
+                          continue
+                      try:
+                          amount=float(cells[4].replace(',',''))
+                      except Exception:
+                          continue
+                      rows.append((cells[0],amount,cells[5]))
+                      page_rows += 1
+                  print('PAGE',page,'parsed',page_rows)
+                  if page_rows == 0:
+                      break
+
+          print('TICK_ROWS',len(rows))
+          if not rows:
+              raise SystemExit('FAIL_SINA_NO_HISTORICAL_TICKS')
+
+          buy=0.0; sell=0.0; neutral=0.0
+          bucket_counts={'buy_lg':0,'buy_elg':0,'sell_lg':0,'sell_elg':0,'neutral_ge200k':0}
+          for tm,amount,nature in rows:
+              if amount < 200000:
+                  continue
+              is_elg=amount >= 1000000
+              if '买' in nature:
+                  buy += amount
+                  bucket_counts['buy_elg' if is_elg else 'buy_lg'] += 1
+              elif '卖' in nature:
+                  sell += amount
+                  bucket_counts['sell_elg' if is_elg else 'sell_lg'] += 1
+              else:
+                  neutral += amount
+                  bucket_counts['neutral_ge200k'] += 1
+
+          reconstructed=buy-sell
+          print('BUCKET_COUNTS',bucket_counts)
+          print('BUY_GE200K_CNY',buy)
+          print('SELL_GE200K_CNY',sell)
+          print('NEUTRAL_GE200K_CNY',neutral)
+          print('RECONSTRUCTED_CNY',reconstructed)
+          print('EXPECTED_TUSHARE_CNY',expected)
+          print('ABS_DIFF_CNY',abs(reconstructed-expected))
+
+          # Tushare amount fields are published to 0.01 wan = 100 CNY.
+          if round(reconstructed/100.0)*100 != expected:
+              raise SystemExit('FAIL_SINA_TICK_NOT_EXACT_TUSHARE_BUCKET_SEMANTICS')
+          print('PASS_SINA_TICK_EXACT_TUSHARE_BUCKET_SEMANTICS')
+          PY
