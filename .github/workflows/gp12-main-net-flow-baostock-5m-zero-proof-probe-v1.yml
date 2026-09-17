@@ -1,0 +1,113 @@
+name: gp12-main-net-flow-baostock-5m-zero-proof-probe-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - .github/workflows/gp12-main-net-flow-baostock-5m-zero-proof-probe-v1.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install BaoStock
+        run: python -m pip install --quiet baostock pandas
+      - name: Probe 5m completeness and zero-proof upper bounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, math
+          import baostock as bs
+
+          targets = [
+            ("sh.600306","2020-06-08",314500),
+            ("sh.600145","2020-07-06",300500),
+            ("sh.600145","2020-07-16",209100),
+            ("sh.600898","2020-11-04",587900),
+            ("sh.603996","2021-02-24",534300),
+            ("sz.002618","2021-09-23",12846700),
+            ("sz.000020","2021-09-24",4760300),
+            ("sz.000157","2021-09-24",737075800),
+            ("sz.000592","2021-09-24",315622900),
+            ("sz.000753","2021-09-24",13478500),
+            ("sz.002684","2021-11-25",10405500),
+            ("sh.600112","2022-05-06",2238500),
+            ("sz.000564","2023-03-20",61512300),
+            ("sz.001337","2023-03-20",18323400),
+            ("sz.002118","2023-05-22",1401500),
+            ("sz.002157","2023-05-22",51511600),
+            ("sz.002503","2023-05-22",3658700),
+            ("sz.002504","2023-05-22",1610300),
+          ]
+
+          lg = bs.login()
+          print('LOGIN', lg.error_code, lg.error_msg)
+          if lg.error_code != '0':
+              raise SystemExit('FAIL_BAOSTOCK_LOGIN')
+
+          def collect(rs):
+              out=[]
+              if rs.error_code != '0':
+                  return out, rs.error_code, rs.error_msg
+              while rs.next():
+                  out.append(dict(zip(rs.fields, rs.get_row_data())))
+              return out, rs.error_code, rs.error_msg
+
+          proof=[]
+          results=[]
+          for code, day, formal_amount in targets:
+              drs=bs.query_history_k_data_plus(
+                  code, 'date,code,volume,amount,tradestatus',
+                  start_date=day, end_date=day, frequency='d', adjustflag='3')
+              daily, dec, dem = collect(drs)
+
+              mrs=bs.query_history_k_data_plus(
+                  code, 'date,time,code,volume,amount,adjustflag',
+                  start_date=day, end_date=day, frequency='5', adjustflag='3')
+              mins, mec, mem = collect(mrs)
+
+              daily_amount = None
+              if daily:
+                  try: daily_amount=float(daily[0]['amount'])
+                  except Exception: pass
+              amts=[]
+              for r in mins:
+                  try: amts.append(float(r['amount']))
+                  except Exception: pass
+              sum5=sum(amts) if amts else None
+              max5=max(amts) if amts else None
+              complete=False
+              if daily_amount is not None and sum5 is not None:
+                  complete = abs(sum5-daily_amount) <= max(1.0, abs(daily_amount)*1e-8)
+              formal_match=False
+              if daily_amount is not None:
+                  formal_match = abs(daily_amount-formal_amount) <= max(100.0, abs(formal_amount)*0.005)
+              provable_zero = bool(complete and max5 is not None and max5 < 200000.0)
+              rec={
+                  'code':code,'trade_date':day,'formal_amount_cny':formal_amount,
+                  'daily_rows':len(daily),'minute_rows':len(mins),
+                  'daily_error_code':dec,'minute_error_code':mec,
+                  'daily_amount_cny':daily_amount,'sum_5m_amount_cny':sum5,
+                  'max_5m_amount_cny':max5,'complete_5m_vs_daily':complete,
+                  'daily_amount_matches_formal_0p5pct':formal_match,
+                  'provable_zero_by_5m_upper_bound':provable_zero,
+              }
+              results.append(rec)
+              print('RESULT', json.dumps(rec, ensure_ascii=False, sort_keys=True))
+              if provable_zero:
+                  proof.append(rec)
+
+          print('SUMMARY', json.dumps({
+              'targets':len(targets),
+              'with_daily':sum(1 for x in results if x['daily_rows']>0),
+              'with_5m':sum(1 for x in results if x['minute_rows']>0),
+              'complete_5m_vs_daily':sum(1 for x in results if x['complete_5m_vs_daily']),
+              'provable_zero_count':len(proof),
+              'provable_zero_keys':[[x['code'],x['trade_date']] for x in proof],
+          }, ensure_ascii=False, sort_keys=True))
+          bs.logout()
+          PY
