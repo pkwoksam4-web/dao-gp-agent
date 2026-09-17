@@ -1,0 +1,39 @@
+name: GP12 Main Net Flow Mirawind Archive Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-mirawind-archive-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download and inspect public submission archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://raw.githubusercontent.com/mirawind/fdl2026-stock/main/dist/fdl2026_stock_prediction_submission_core.tar.gz'
+          curl -L --fail --retry 3 --connect-timeout 15 "$URL" -o /tmp/pkg.tar.gz
+          echo "ARCHIVE_BYTES $(stat -c%s /tmp/pkg.tar.gz)"
+          echo "ARCHIVE_SHA256 $(sha256sum /tmp/pkg.tar.gz | awk '{print $1}')"
+          mkdir -p /tmp/pkg
+          tar -xzf /tmp/pkg.tar.gz -C /tmp/pkg
+          find /tmp/pkg -type f -printf '%P\n' | sort > /tmp/files.txt
+          echo "FILE_N $(wc -l < /tmp/files.txt)"
+          echo '--- RELEVANT_PATHS ---'
+          grep -Ei 'moneyflow|money_flow|fund.?flow|20200608|20210224|20210924|20230522|\.parquet$|\.csv$|\.sqlite$|\.db$|\.zip$|\.tar(\.gz)?$' /tmp/files.txt || true
+          echo '--- EXACT_KEY_TEXT_HITS ---'
+          for needle in \
+            '600306.SH,20200608' '603996.SH,20210224' \
+            '000020.SZ,20210924' '000157.SZ,20210924' '000592.SZ,20210924' '000753.SZ,20210924' \
+            '002118.SZ,20230522' '002157.SZ,20230522' '002503.SZ,20230522' '002504.SZ,20230522'; do
+            echo "NEEDLE $needle"
+            grep -RInaF --binary-files=without-match "$needle" /tmp/pkg 2>/dev/null | head -20 || true
+          done
+          echo '--- ALL_FILES ---'
+          cat /tmp/files.txt
