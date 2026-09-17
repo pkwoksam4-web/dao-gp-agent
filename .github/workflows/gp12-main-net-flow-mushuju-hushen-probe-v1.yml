@@ -1,0 +1,180 @@
+name: GP12 Main Net Flow Mushuju Hushen Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-mushuju-hushen-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: pip install -q requests pandas pyarrow
+      - name: Probe history and Tushare semantic calibration
+        run: |
+          python - <<'PY'
+          import io, json, math, re
+          import pandas as pd
+          import requests
+
+          DOC_URL = 'https://www.mushuju.com/zlzj_http.html'
+          API_URLS = [
+              'http://funds.mushuju.com/api/hushen/flow/single',
+              'https://funds.mushuju.com/api/hushen/flow/single',
+          ]
+          SYMBOL = '000001'
+          DAYS = ['20200601', '20260417', '20260521', '20260915']
+          HEADERS = {'User-Agent': 'Mozilla/5.0 GP12-CANDIDATE-PROBE/1.0'}
+
+          # Resolve the provider's public demo token from its own live documentation.
+          doc = requests.get(DOC_URL, headers=HEADERS, timeout=30)
+          doc.raise_for_status()
+          token_match = re.search(r'Authorization:\s*Bearer\s+([A-Za-z0-9._-]+)', doc.text)
+          if not token_match:
+              token_match = re.search(r'Bearer\s+([A-Za-z0-9._-]+)', doc.text)
+          if not token_match:
+              raise RuntimeError('public Hushen demo token not found in provider documentation')
+          token = token_match.group(1)
+          api_headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept-Encoding': 'gzip',
+              'User-Agent': HEADERS['User-Agent'],
+          }
+
+          def parse_rows(day, payload):
+              if not isinstance(payload, dict):
+                  raise RuntimeError(f'{day}: payload is not object')
+              if payload.get('code') != 'HUS-200':
+                  raise RuntimeError(f"{day}: provider code={payload.get('code')} message={payload.get('message')}")
+              raw = payload.get('data')
+              if not isinstance(raw, list) or not raw:
+                  raise RuntimeError(f'{day}: no data rows')
+              parsed = []
+              for line in raw:
+                  cols = str(line).split(',')
+                  if len(cols) < 58:
+                      raise RuntimeError(f'{day}: short CSV row len={len(cols)}')
+                  row = {
+                      'symbol': cols[0],
+                      'trading_date': cols[1],
+                      'trading_time': int(float(cols[2])),
+                      'main_net': float(cols[19]),
+                      'main_active_net': float(cols[22]),
+                      'super_net': float(cols[36]),
+                      'super_active_net': float(cols[39]),
+                      'large_net': float(cols[53]),
+                      'large_active_net': float(cols[56]),
+                  }
+                  if row['symbol'] != SYMBOL or row['trading_date'] != day:
+                      raise RuntimeError(f'{day}: identity mismatch {row}')
+                  if not all(math.isfinite(float(v)) for k, v in row.items() if k not in {'symbol','trading_date'}):
+                      raise RuntimeError(f'{day}: non-finite row')
+                  parsed.append(row)
+              parsed.sort(key=lambda x: x['trading_time'])
+              last = parsed[-1]
+              last['standard_lg_elg_net_cny'] = last['super_net'] + last['large_net']
+              last['active_lg_elg_net_cny'] = last['super_active_net'] + last['large_active_net']
+              return {
+                  'row_n': len(parsed),
+                  'first_time': parsed[0]['trading_time'],
+                  'last_time': last['trading_time'],
+                  'last': last,
+              }
+
+          results = {}
+          working_api = None
+          for day in DAYS:
+              attempts = []
+              parsed = None
+              for base in API_URLS:
+                  try:
+                      r = requests.get(
+                          base,
+                          params={'symbol': SYMBOL, 'tradingDate': day, 'sort': 'asc', 'pageNum': 1, 'pageSize': 1000},
+                          headers=api_headers,
+                          timeout=25,
+                          allow_redirects=True,
+                      )
+                      item = {
+                          'base': base.replace('http://','http://').replace('https://','https://'),
+                          'http_status': r.status_code,
+                          'final_url': r.url.split('?')[0],
+                          'content_type': r.headers.get('content-type'),
+                          'body_head': r.text[:240],
+                      }
+                      attempts.append(item)
+                      if r.status_code == 200:
+                          payload = r.json()
+                          parsed = parse_rows(day, payload)
+                          working_api = base
+                          break
+                  except Exception as exc:
+                      attempts.append({'base': base, 'error': f'{type(exc).__name__}: {exc}'})
+              results[day] = {'attempts': attempts, 'parsed': parsed}
+              print('DAY', json.dumps({'day': day, **results[day]}, ensure_ascii=False))
+
+          # Public one-day Tushare-derived parquet used as an independent semantic calibration.
+          snap_url = 'https://raw.githubusercontent.com/henrylin99/screener-offline-data/main/data.parquet'
+          sr = requests.get(snap_url, timeout=60)
+          sr.raise_for_status()
+          frame = pd.read_parquet(io.BytesIO(sr.content), columns=[
+              'ts_code','trade_date','buy_lg_amount','sell_lg_amount','buy_elg_amount','sell_elg_amount'
+          ])
+          match = frame[(frame['ts_code'].astype(str) == '000001.SZ') & (frame['trade_date'].astype(str) == '20260521')]
+          if len(match) != 1:
+              raise RuntimeError(f'Tushare snapshot calibration row count={len(match)}')
+          tr = match.iloc[0]
+          tushare_target = (
+              float(tr['buy_lg_amount']) + float(tr['buy_elg_amount'])
+              - float(tr['sell_lg_amount']) - float(tr['sell_elg_amount'])
+          ) * 10000.0
+          semantic = {'tushare_lg_elg_net_cny': tushare_target}
+          mush = (results.get('20260521') or {}).get('parsed')
+          if mush:
+              last = mush['last']
+              semantic.update({
+                  'mushuju_standard_lg_elg_net_cny': last['standard_lg_elg_net_cny'],
+                  'mushuju_active_lg_elg_net_cny': last['active_lg_elg_net_cny'],
+                  'standard_diff_cny': last['standard_lg_elg_net_cny'] - tushare_target,
+                  'active_diff_cny': last['active_lg_elg_net_cny'] - tushare_target,
+                  'standard_within_1yuan': abs(last['standard_lg_elg_net_cny'] - tushare_target) <= 1.01,
+                  'active_within_1yuan': abs(last['active_lg_elg_net_cny'] - tushare_target) <= 1.01,
+              })
+          print('SEMANTIC', json.dumps(semantic, ensure_ascii=False))
+
+          blockers = []
+          for day in ('20200601','20260417'):
+              if not (results.get(day) or {}).get('parsed'):
+                  blockers.append(f'MUSHUJU_FORMAL_ANCHOR_MISSING_{day}')
+          if not mush:
+              blockers.append('MUSHUJU_TUSHARE_CALIBRATION_DATE_MISSING')
+          elif not (semantic.get('standard_within_1yuan') or semantic.get('active_within_1yuan')):
+              blockers.append('MUSHUJU_TUSHARE_SEMANTIC_MISMATCH')
+
+          summary = {
+              'artifact': 'GP12_MAIN_NET_FLOW_MUSHUJU_HUSHEN_PROBE_V1',
+              'symbol': '000001.SZ',
+              'formal_window': ['2020-06-01','2026-04-17'],
+              'working_api': working_api,
+              'days': results,
+              'semantic_calibration': semantic,
+              'blockers': blockers,
+              'probe_pass': not blockers,
+              'binding_allowed': False,
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          print('===SUMMARY===')
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          if blockers:
+              raise RuntimeError('PROBE_BLOCKED: ' + ','.join(blockers))
+          print('PASS_MUSHUJU_HUSHEN_MAIN_NET_FLOW_PROBE')
+          PY
