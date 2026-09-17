@@ -1,0 +1,119 @@
+name: GP12 Main Net Flow ApocData Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-apocdata-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Probe public ApocData moneyflow history and residual coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.request, urllib.parse, urllib.error
+
+          BASE='https://www.apocdata.com/api/blade-dataplatform/open/data'
+
+          def get(path, params=None):
+              url=BASE+path
+              if params:
+                  url += '?' + urllib.parse.urlencode(params)
+              req=urllib.request.Request(url, headers={'User-Agent':'GP12-audit/1.0'})
+              try:
+                  with urllib.request.urlopen(req, timeout=25) as r:
+                      body=r.read().decode('utf-8','replace')
+                      headers={k.lower():v for k,v in r.headers.items()}
+                      return r.status,headers,json.loads(body)
+              except urllib.error.HTTPError as e:
+                  body=e.read().decode('utf-8','replace')
+                  try: js=json.loads(body)
+                  except Exception: js={'raw':body[:1000]}
+                  return e.code,{k.lower():v for k,v in e.headers.items()},js
+
+          # OpenAPI contract for moneyflow, if public.
+          try:
+              with urllib.request.urlopen(BASE+'/openapi.json', timeout=25) as r:
+                  spec=json.loads(r.read().decode('utf-8','replace'))
+              op=spec.get('paths',{}).get('/moneyflow',{}).get('get',{})
+              print('OPENAPI_MONEYFLOW', json.dumps({
+                  'parameters': op.get('parameters',[]),
+                  'summary':op.get('summary'),
+              }, ensure_ascii=False)[:12000])
+          except Exception as e:
+              print('OPENAPI_ERROR',type(e).__name__,str(e)[:500])
+
+          status,h,js=get('/moneyflow',{'symbol':'000001','limit':999})
+          print('BASE_STATUS',status)
+          print('BASE_HEADERS',json.dumps({k:v for k,v in h.items() if k.startswith('x-tdc') or k.startswith('x-ratelimit')},ensure_ascii=False,sort_keys=True))
+          print('BASE_TOP',json.dumps(js,ensure_ascii=False)[:3000])
+          data=js.get('data') if isinstance(js,dict) else None
+          if isinstance(data,dict) and 'records' in data: rows=data['records']
+          elif isinstance(data,list): rows=data
+          else: rows=[]
+          dates=[]
+          for r in rows:
+              if isinstance(r,dict):
+                  d=str(r.get('trade_date') or r.get('tradeDate') or '')
+                  if d: dates.append(d.replace('-',''))
+          print('BASE_ROW_N',len(rows),'MIN_DATE',min(dates) if dates else None,'MAX_DATE',max(dates) if dates else None)
+
+          residual={
+            '600306':['20200608'],'600898':['20201104'],'603996':['20210224'],'002618':['20210923'],
+            '000020':['20210924'],'000157':['20210924'],'000592':['20210924'],'000753':['20210924'],
+            '002684':['20211125'],'600112':['20220506'],'000564':['20230320'],'001337':['20230320'],
+            '002118':['20230522'],'002157':['20230522'],'002503':['20230522'],'002504':['20230522'],
+          }
+          hits=[]
+          for sym,target_dates in residual.items():
+              s,hh,j=get('/moneyflow',{'symbol':sym,'limit':999})
+              dd=j.get('data') if isinstance(j,dict) else None
+              if isinstance(dd,dict) and 'records' in dd: rr=dd['records']
+              elif isinstance(dd,list): rr=dd
+              else: rr=[]
+              rdates=[]
+              for x in rr:
+                  if not isinstance(x,dict): continue
+                  d=str(x.get('trade_date') or x.get('tradeDate') or '').replace('-','')
+                  if d: rdates.append(d)
+                  if d in target_dates:
+                      rec=dict(x)
+                      rec['_symbol']=sym
+                      hits.append(rec)
+              print('SYMBOL',sym,'status',s,'rows',len(rr),'min',min(rdates) if rdates else None,'max',max(rdates) if rdates else None,
+                    'limit_applied',hh.get('x-tdc-limit-applied'),'limit_max',hh.get('x-tdc-limit-max'),'truncated',hh.get('x-tdc-limit-truncated'))
+          print('RESIDUAL_HIT_N',len(hits))
+          for x in hits:
+              print('RESIDUAL_HIT',json.dumps(x,ensure_ascii=False,sort_keys=True))
+
+          # Known semantic calibration from the pinned Jessica snapshot ledger.
+          # 000001.SZ / 2026-05-21 main_net_flow_cny = -66,707,700.
+          s,hh,j=get('/moneyflow',{'symbol':'000001','limit':999})
+          dd=j.get('data') if isinstance(j,dict) else None
+          rr=dd.get('records',[]) if isinstance(dd,dict) else (dd if isinstance(dd,list) else [])
+          cal=[]
+          for x in rr:
+              if not isinstance(x,dict): continue
+              d=str(x.get('trade_date') or x.get('tradeDate') or '').replace('-','')
+              if d=='20260521':
+                  def num(k):
+                      v=x.get(k)
+                      try:return float(v)
+                      except:return None
+                  vals={k:num(k) for k in ['buy_lg_amount','sell_lg_amount','buy_elg_amount','sell_elg_amount']}
+                  if all(v is not None for v in vals.values()):
+                      # infer whether source is 10k CNY or CNY from magnitude; report both candidates, do not assume.
+                      raw=vals['buy_lg_amount']+vals['buy_elg_amount']-vals['sell_lg_amount']-vals['sell_elg_amount']
+                      cal.append({'row':x,'raw_net':raw,'candidate_cny_if_10k':raw*10000,'candidate_cny_if_cny':raw})
+          print('CALIBRATION_20260521',json.dumps(cal,ensure_ascii=False,sort_keys=True))
+          PY
