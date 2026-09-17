@@ -11,167 +11,81 @@ on:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 3
     steps:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install runtime
-        run: pip install -q requests pandas pyarrow
-      - name: Probe historical daily money-flow fields and semantic calibration
+        run: pip install -q requests
+      - name: Diagnose exact getDailyMarket request contract for 2020 anchor
         run: |
           python - <<'PY'
-          import io, json, math, time
-          import pandas as pd
+          import json
           import requests
+          from urllib.parse import quote
 
-          URLS = [
-              'http://api.chagubang.com:3388/data',
-              'http://api1.chagubang.com:3388/data',
-          ]
+          BASE = 'http://api.chagubang.com:3388/data'
           TEST_KEY = 'mushuju.com'  # provider-published public test key
+          DAY = '2020-06-01'
           SYMBOL = '000001'
-          DAYS = ['2020-06-01', '2026-04-17', '2026-05-21', '2026-09-15']
           FIELDS = 'code,tdate,zljlr,cddlr,cddlc,cddjlr,ddlr,ddlc,ddjlr'
-          HEADERS = {'User-Agent': 'Mozilla/5.0 GP12-CANDIDATE-PROBE/1.0'}
-
-          def finite(value, label):
-              out = float(value)
-              if not math.isfinite(out):
-                  raise RuntimeError(f'{label}: non-finite value {value!r}')
-              return out
-
-          def fetch_day(base, day):
-              params = {
-                  'key': TEST_KEY,
-                  'from': 'getDailyMarket?type=1',
-                  'code': SYMBOL,
-                  'startDate': day,
-                  'endDate': day,
-                  'fields': FIELDS,
-              }
-              r = requests.get(base, params=params, headers=HEADERS, timeout=30)
-              item = {
-                  'base': base,
-                  'http_status': r.status_code,
-                  'url': r.url.replace(TEST_KEY, '<PUBLIC_TEST_KEY>'),
-                  'body_head': r.text[:400],
-              }
-              r.raise_for_status()
+          # Preserve the gateway's documented nested-query syntax literally:
+          # from=getDailyMarket?type=1&code=... rather than encoding '?' into %3F.
+          raw_url = (
+              f'{BASE}?key={TEST_KEY}'
+              f'&from=getDailyMarket?type=1'
+              f'&code={SYMBOL}'
+              f'&startDate={DAY}'
+              f'&endDate={DAY}'
+              f'&fields={quote(FIELDS, safe=",")}'
+          )
+          r = requests.get(
+              raw_url,
+              headers={'User-Agent': 'Mozilla/5.0 GP12-CANDIDATE-PROBE/1.0'},
+              timeout=30,
+          )
+          print('HTTP_STATUS', r.status_code)
+          print('REQUEST_URL', r.request.url.replace(TEST_KEY, '<PUBLIC_TEST_KEY>'))
+          print('CONTENT_TYPE', r.headers.get('content-type'))
+          print('RETRY_AFTER', r.headers.get('retry-after'))
+          print('BODY_HEAD', r.text[:2000])
+          if r.status_code == 429:
+              raise RuntimeError('TEST_KEY_RATE_LIMITED')
+          r.raise_for_status()
+          try:
               payload = r.json()
-              if isinstance(payload, dict):
-                  for key in ('data','result','rows'):
-                      if isinstance(payload.get(key), list):
-                          payload = payload[key]
-                          break
-              if not isinstance(payload, list):
-                  raise RuntimeError(f'{day}: unexpected payload type {type(payload).__name__}')
-              candidates = []
-              for row in payload:
-                  if not isinstance(row, dict):
-                      continue
-                  code = str(row.get('code','')).strip()
-                  tdate = str(row.get('tdate',''))[:10]
-                  if code == SYMBOL and tdate == day:
-                      candidates.append(row)
-              item['payload_row_n'] = len(payload)
-              item['requested_row_n'] = len(candidates)
-              if len(candidates) != 1:
-                  return item, None
-              row = candidates[0]
-              required = ('cddlr','cddlc','cddjlr','ddlr','ddlc','ddjlr')
-              missing = [k for k in required if row.get(k) is None]
-              if missing:
-                  raise RuntimeError(f'{day}: missing fields {missing}')
-              vals = {k: finite(row[k], f'{day}:{k}') for k in required}
-              bucket_from_net = vals['cddjlr'] + vals['ddjlr']
-              bucket_from_io = (vals['cddlr'] - vals['cddlc']) + (vals['ddlr'] - vals['ddlc'])
-              parsed = {
-                  'code': SYMBOL,
-                  'date': day,
-                  **vals,
-                  'lg_elg_net_cny': bucket_from_net,
-                  'lg_elg_io_cny': bucket_from_io,
-                  'internal_diff_cny': bucket_from_net - bucket_from_io,
-                  'internal_consistent_1yuan': abs(bucket_from_net - bucket_from_io) <= 1.01,
-                  'zljlr': finite(row['zljlr'], f'{day}:zljlr') if row.get('zljlr') is not None else None,
-              }
-              return item, parsed
-
-          results = {}
-          for idx, day in enumerate(DAYS):
-              attempts = []
-              parsed = None
-              for base in URLS:
-                  try:
-                      meta, candidate = fetch_day(base, day)
-                      attempts.append(meta)
-                      if candidate is not None:
-                          parsed = candidate
-                          break
-                  except Exception as exc:
-                      attempts.append({'base': base, 'error': f'{type(exc).__name__}: {exc}'})
-              results[day] = {'attempts': attempts, 'parsed': parsed}
-              print('DAY', json.dumps({'day': day, **results[day]}, ensure_ascii=False))
-              if idx != len(DAYS) - 1:
-                  time.sleep(11)
-
-          # Independent Tushare-derived one-day snapshot for exact field semantics.
-          snap_url = 'https://raw.githubusercontent.com/henrylin99/screener-offline-data/main/data.parquet'
-          sr = requests.get(snap_url, timeout=60)
-          sr.raise_for_status()
-          frame = pd.read_parquet(io.BytesIO(sr.content), columns=[
-              'ts_code','trade_date','buy_lg_amount','sell_lg_amount','buy_elg_amount','sell_elg_amount'
-          ])
-          match = frame[(frame['ts_code'].astype(str) == '000001.SZ') & (frame['trade_date'].astype(str) == '20260521')]
-          if len(match) != 1:
-              raise RuntimeError(f'Tushare snapshot calibration row count={len(match)}')
-          tr = match.iloc[0]
-          target = (
-              float(tr['buy_lg_amount']) + float(tr['buy_elg_amount'])
-              - float(tr['sell_lg_amount']) - float(tr['sell_elg_amount'])
-          ) * 10000.0
-          semantic = {'tushare_lg_elg_net_cny': target}
-          calibration = (results.get('2026-05-21') or {}).get('parsed')
-          if calibration:
-              semantic.update({
-                  'chagubang_lg_elg_net_cny': calibration['lg_elg_net_cny'],
-                  'diff_cny': calibration['lg_elg_net_cny'] - target,
-                  'within_1yuan': abs(calibration['lg_elg_net_cny'] - target) <= 1.01,
-                  'internal_consistent_1yuan': calibration['internal_consistent_1yuan'],
-              })
-          print('SEMANTIC', json.dumps(semantic, ensure_ascii=False))
-
-          blockers = []
-          for day in ('2020-06-01','2026-04-17'):
-              if not (results.get(day) or {}).get('parsed'):
-                  blockers.append('CHAGUBANG_FORMAL_ANCHOR_MISSING_' + day.replace('-',''))
-          if not calibration:
-              blockers.append('CHAGUBANG_TUSHARE_CALIBRATION_DATE_MISSING')
-          else:
-              if calibration.get('internal_consistent_1yuan') is not True:
-                  blockers.append('CHAGUBANG_INTERNAL_BUCKET_MISMATCH')
-              if semantic.get('within_1yuan') is not True:
-                  blockers.append('CHAGUBANG_TUSHARE_SEMANTIC_MISMATCH')
-
-          summary = {
-              'artifact': 'GP12_MAIN_NET_FLOW_CHAGUBANG_DAILY_PROBE_V1',
-              'symbol': '000001.SZ',
-              'formal_window': ['2020-06-01','2026-04-17'],
-              'source_function': 'getDailyMarket',
-              'source_update_time_claim': 'approximately 20:00 Asia/Shanghai each trading day',
-              'same_session_usable_before_close': False,
-              'days': results,
-              'semantic_calibration': semantic,
-              'blockers': blockers,
-              'probe_pass': not blockers,
-              'binding_allowed': False,
-              'model_freeze_allowed': False,
-              'oos_metrics_allowed': False,
-          }
-          print('===SUMMARY===')
-          print(json.dumps(summary, ensure_ascii=False, indent=2))
-          if blockers:
-              raise RuntimeError('PROBE_BLOCKED: ' + ','.join(blockers))
-          print('PASS_CHAGUBANG_DAILY_MAIN_NET_FLOW_PROBE')
+          except Exception as exc:
+              raise RuntimeError(f'NON_JSON_RESPONSE: {type(exc).__name__}: {exc}') from exc
+          print('PAYLOAD_TYPE', type(payload).__name__)
+          if isinstance(payload, dict):
+              print('DICT_KEYS', json.dumps(sorted(payload.keys()), ensure_ascii=False))
+              print('DICT_JSON', json.dumps(payload, ensure_ascii=False)[:4000])
+              for key in ('data', 'result', 'rows'):
+                  if isinstance(payload.get(key), list):
+                      payload = payload[key]
+                      print('UNWRAPPED_KEY', key)
+                      break
+          if not isinstance(payload, list):
+              raise RuntimeError(f'PAYLOAD_NOT_LIST_AFTER_UNWRAP:{type(payload).__name__}')
+          print('ROW_N', len(payload))
+          candidates = []
+          for row in payload:
+              if not isinstance(row, dict):
+                  continue
+              code = str(row.get('code', '')).strip()
+              date = str(row.get('tdate', ''))[:10]
+              if code == SYMBOL and date == DAY:
+                  candidates.append(row)
+          print('REQUESTED_ROW_N', len(candidates))
+          if candidates:
+              print('REQUESTED_ROW', json.dumps(candidates[0], ensure_ascii=False)[:4000])
+          if len(candidates) != 1:
+              raise RuntimeError('FORMAL_20200601_ROW_NOT_EXACTLY_ONE')
+          required = ('cddlr','cddlc','cddjlr','ddlr','ddlc','ddjlr')
+          missing = [key for key in required if candidates[0].get(key) is None]
+          print('MISSING_FIELDS', json.dumps(missing, ensure_ascii=False))
+          if missing:
+              raise RuntimeError('REQUIRED_MONEYFLOW_FIELDS_MISSING')
+          print('PASS_CHAGUBANG_20200601_EXACT_REQUEST_CONTRACT')
           PY
