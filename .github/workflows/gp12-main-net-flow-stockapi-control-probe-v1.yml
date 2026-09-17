@@ -1,0 +1,40 @@
+name: gp12-main-net-flow-stockapi-control-probe-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - .github/workflows/gp12-main-net-flow-stockapi-control-probe-v1.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe documented StockApi control row
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.parse, urllib.request
+          base = 'https://www.stockapi.com.cn/v1/base/codeFlowHistory'
+          def get(code, day):
+              q=urllib.parse.urlencode({'code':code,'startDate':day,'endDate':day,'pageNo':1,'pageSize':100})
+              req=urllib.request.Request(base+'?'+q,headers={'User-Agent':'Mozilla/5.0 gp12-control-probe'})
+              with urllib.request.urlopen(req,timeout=25) as r:
+                  body=r.read().decode('utf-8','replace')
+              print(code,day,body[:4000])
+              obj=json.loads(body)
+              data=obj.get('data') or {}
+              return data.get('records') or []
+          # Exact row/date shown in the provider's own public documentation.
+          doc_rows=get('002384','2026-08-01')
+          recent_rows=get('002384','2026-07-31')
+          print('DOC_SAMPLE_ROWS',len(doc_rows))
+          print('RECENT_ROWS',len(recent_rows))
+          if not doc_rows and not recent_rows:
+              raise SystemExit('FAIL_STOCKAPI_ANON_LAYER_RETURNS_NO_HISTORY_EVEN_CONTROL')
+          print('PASS_STOCKAPI_ANON_CONTROL_HAS_DATA')
+          PY
