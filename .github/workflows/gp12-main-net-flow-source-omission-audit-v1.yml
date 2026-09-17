@@ -20,10 +20,10 @@ jobs:
           python - <<'PY'
           import csv, io, json, urllib.request
           from collections import defaultdict
-          from datetime import datetime
 
           REPO='Jessica-Zhangyj/dlquant'
           COMMIT='6b245fa09cb628f3bcb812f0662bfef520e65fb4'
+          MONEYFLOW_TREE_SHA='e0bac7332aeb2a948bdb47c04f70c3ff5213485b'
           RAW=f'https://raw.githubusercontent.com/{REPO}/{COMMIT}/data'
 
           residuals = [
@@ -61,8 +61,7 @@ jobs:
               try: return float(v)
               except Exception: return None
 
-          report={'repository':REPO,'commit':COMMIT,'dates':{},'residual_neighbor_presence':[]}
-          all_missing=[]
+          report={'repository':REPO,'commit':COMMIT,'moneyflow_tree_sha':MONEYFLOW_TREE_SHA,'dates':{},'residual_neighbor_presence':[]}
           for day in dates:
               daily=fetch('daily',day)
               mf=fetch('moneyflow',day)
@@ -100,20 +99,24 @@ jobs:
               }
               report['dates'][day]=rec
               print('DATE_AUDIT',day,json.dumps(rec,ensure_ascii=False,sort_keys=True))
-              all_missing.extend((day,s) for s in missing)
 
-          # Build date inventory once, then inspect immediate prior/next archive trading dates
-          # for each residual symbol. This tests whether omissions are isolated single-day holes.
-          tree_url=f'https://api.github.com/repos/{REPO}/git/trees/{COMMIT}?recursive=1'
+          # Enumerate the pinned moneyflow subtree directly. The previous full-repository
+          # recursive-tree request intermittently returned GitHub HTTP 500; the subtree
+          # contains only the daily CSV blobs and is sufficient for neighbor discovery.
+          tree_url=f'https://api.github.com/repos/{REPO}/git/trees/{MONEYFLOW_TREE_SHA}'
           req=urllib.request.Request(tree_url,headers={'User-Agent':'gp12-source-omission-audit'})
           with urllib.request.urlopen(req,timeout=60) as r:
-              tree=json.loads(r.read().decode())['tree']
+              tree_obj=json.loads(r.read().decode())
+          assert tree_obj.get('truncated') is False, tree_obj.get('truncated')
           archive_dates=sorted(
-              p['path'].split('/')[-1][:-4]
-              for p in tree
-              if p.get('path','').startswith('data/moneyflow/') and p.get('path','').endswith('.csv')
+              p['path'][:-4]
+              for p in tree_obj['tree']
+              if p.get('type')=='blob' and p.get('path','').endswith('.csv')
           )
+          print('MONEYFLOW_ARCHIVE_DATE_FILES',len(archive_dates))
           idx={d:i for i,d in enumerate(archive_dates)}
+          assert all(d in idx for d in dates), sorted(d for d in dates if d not in idx)
+
           mf_cache={}
           for symbol,day in residuals:
               i=idx[day]
@@ -141,6 +144,7 @@ jobs:
               'date_level_missing_total':sum(x['daily_minus_moneyflow_n'] for x in report['dates'].values()),
               'date_level_active_missing_total':sum(x['active_daily_minus_moneyflow_n'] for x in report['dates'].values()),
               'neighbor_both_present':sum(1 for x in report['residual_neighbor_presence'] if len(x['neighbors'])==2 and all(y['moneyflow_present'] for y in x['neighbors'])),
+              'neighbor_either_missing':sum(1 for x in report['residual_neighbor_presence'] if any(not y['moneyflow_present'] for y in x['neighbors'])),
           }
           report['summary']=summary
           print('SUMMARY',json.dumps(summary,ensure_ascii=False,sort_keys=True))
