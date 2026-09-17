@@ -1,0 +1,99 @@
+name: GP12 Main Net Flow Residual Classify V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-residual-classify-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas pyarrow
+      - name: Download pinned Formal RAW evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: upstream/raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Inspect exact residual turnover evidence
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          import pandas as pd
+
+          RAW = Path('upstream/raw/SOHU_RAW_FULL_V482.parquet')
+          EXPECTED_SHA = 'bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb'
+          h = hashlib.sha256(RAW.read_bytes()).hexdigest()
+          assert h == EXPECTED_SHA, (h, EXPECTED_SHA)
+
+          residuals = [
+            ('600306.SH','2020-06-08'),('600306.SH','2020-06-09'),('600306.SH','2020-06-10'),
+            ('600145.SH','2020-07-02'),('600145.SH','2020-07-03'),('600145.SH','2020-07-06'),
+            ('600069.SH','2020-07-10'),('600069.SH','2020-07-14'),('600069.SH','2020-07-15'),
+            ('600145.SH','2020-07-16'),('600069.SH','2020-07-20'),('600069.SH','2020-07-21'),('600069.SH','2020-07-22'),
+            ('600898.SH','2020-11-04'),
+            ('600086.SH','2021-01-25'),('600086.SH','2021-01-27'),('600086.SH','2021-01-28'),('600086.SH','2021-01-29'),
+            ('600086.SH','2021-02-04'),('600247.SH','2021-02-22'),('603996.SH','2021-02-24'),
+            ('600701.SH','2021-03-15'),('600701.SH','2021-03-16'),('600701.SH','2021-03-19'),
+            ('600891.SH','2021-03-23'),('600701.SH','2021-03-24'),('600891.SH','2021-03-24'),('600891.SH','2021-03-25'),('600701.SH','2021-03-26'),
+            ('002618.SZ','2021-09-23'),('000020.SZ','2021-09-24'),('000157.SZ','2021-09-24'),('000592.SZ','2021-09-24'),('000753.SZ','2021-09-24'),
+            ('002684.SZ','2021-11-25'),('600112.SH','2022-05-06'),
+            ('000564.SZ','2023-03-20'),('001337.SZ','2023-03-20'),
+            ('002118.SZ','2023-05-22'),('002157.SZ','2023-05-22'),('002503.SZ','2023-05-22'),('002504.SZ','2023-05-22'),
+          ]
+          assert len(residuals) == 42 and len(set(residuals)) == 42
+
+          df = pd.read_parquet(RAW)
+          print('RAW_COLUMNS=' + json.dumps(list(df.columns), ensure_ascii=False))
+          print('RAW_DTYPES=' + json.dumps({c:str(t) for c,t in df.dtypes.items()}, ensure_ascii=False, sort_keys=True))
+          df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+          wanted = set(residuals)
+          got = df[df.apply(lambda r: (str(r['symbol']), str(r['date'])) in wanted, axis=1)].copy()
+          assert len(got) == 42, (len(got), sorted(wanted - set(zip(got.symbol.astype(str), got.date.astype(str)))))
+
+          records = []
+          for _, row in got.sort_values(['date','symbol']).iterrows():
+              rec = {}
+              for col in df.columns:
+                  v = row[col]
+                  if pd.isna(v):
+                      rec[col] = None
+                  elif hasattr(v, 'item'):
+                      rec[col] = v.item()
+                  else:
+                      rec[col] = v
+              records.append(rec)
+          report = {
+            'artifact':'GP12_MAIN_NET_FLOW_RESIDUAL_RAW_CLASSIFY_V1',
+            'raw_sha256':h,
+            'residual_n':42,
+            'columns':list(df.columns),
+            'rows':records,
+            'binding_allowed':False,
+            'model_freeze_allowed':False,
+            'oos_metrics_allowed':False,
+          }
+          Path('residual_raw_classify.json').write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str)+'\n', encoding='utf-8')
+          print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gp12-main-net-flow-residual-raw-classify-v1
+          path: residual_raw_classify.json
+          if-no-files-found: error
+          retention-days: 30
