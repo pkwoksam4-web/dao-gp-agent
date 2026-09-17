@@ -1,0 +1,81 @@
+name: gp12-main-net-flow-baostock-1m-zero-proof-probe-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - .github/workflows/gp12-main-net-flow-baostock-1m-zero-proof-probe-v1.yml
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Install BaoStock
+        run: python -m pip install --quiet baostock
+      - name: Probe 1m historical availability and strict upper-bound proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import baostock as bs
+
+          targets=[
+            ('sh.600306','2020-06-08',314500),
+            ('sh.603996','2021-02-24',534300),
+            ('sh.600898','2020-11-04',587900),
+            ('sz.002118','2023-05-22',1401500),
+            ('sz.002504','2023-05-22',1610300),
+          ]
+
+          lg=bs.login()
+          print('LOGIN',lg.error_code,lg.error_msg)
+          if lg.error_code!='0':
+              raise SystemExit('FAIL_BAOSTOCK_LOGIN')
+
+          def collect(rs):
+              out=[]
+              if rs.error_code!='0':
+                  return out,rs.error_code,rs.error_msg
+              while rs.next():
+                  out.append(dict(zip(rs.fields,rs.get_row_data())))
+              return out,rs.error_code,rs.error_msg
+
+          any_1m=False
+          proofs=[]
+          for code,day,formal_amount in targets:
+              drs=bs.query_history_k_data_plus(code,'date,code,amount',start_date=day,end_date=day,frequency='d',adjustflag='3')
+              daily,dec,dem=collect(drs)
+              daily_amount=float(daily[0]['amount']) if daily and daily[0].get('amount') else None
+
+              rs=bs.query_history_k_data_plus(code,'date,time,code,volume,amount,adjustflag',start_date=day,end_date=day,frequency='1',adjustflag='3')
+              rows,ec,em=collect(rs)
+              print('QUERY',json.dumps({'code':code,'date':day,'error_code':ec,'error_msg':em,'rows':len(rows)},ensure_ascii=False,sort_keys=True))
+              if rows:
+                  any_1m=True
+              amts=[]
+              for r in rows:
+                  try: amts.append(float(r['amount']))
+                  except Exception: pass
+              s=sum(amts) if amts else None
+              mx=max(amts) if amts else None
+              complete=bool(daily_amount is not None and s is not None and abs(s-daily_amount)<=max(1.0,abs(daily_amount)*1e-8))
+              provable=bool(complete and mx is not None and mx<200000.0)
+              rec={
+                'code':code,'trade_date':day,'formal_amount_cny':formal_amount,
+                'daily_amount_cny':daily_amount,'minute_rows':len(rows),
+                'sum_1m_amount_cny':s,'max_1m_amount_cny':mx,
+                'complete_1m_vs_daily':complete,'provable_zero_by_1m_upper_bound':provable,
+                'minute_error_code':ec,'minute_error_msg':em,
+              }
+              print('RESULT',json.dumps(rec,ensure_ascii=False,sort_keys=True))
+              if provable: proofs.append(rec)
+
+          bs.logout()
+          print('SUMMARY',json.dumps({'any_1m_rows':any_1m,'provable_zero_count':len(proofs),'provable_zero_keys':[[x['code'],x['trade_date']] for x in proofs]},ensure_ascii=False,sort_keys=True))
+          if not any_1m:
+              raise SystemExit('FAIL_BAOSTOCK_NO_1M_HISTORICAL_DATA')
+          PY
