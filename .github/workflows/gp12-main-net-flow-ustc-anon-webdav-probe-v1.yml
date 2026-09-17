@@ -1,0 +1,48 @@
+name: GP12 Main Net Flow USTC Anonymous WebDAV Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-ustc-anon-webdav-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe anonymous read-only WebDAV access
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='https://pan.ustc.edu.cn/seafdav/'
+          BODY="<?xml version='1.0' encoding='UTF-8'?><d:propfind xmlns:d='DAV:'><d:prop><d:resourcetype/><d:getcontentlength/><d:getetag/></d:prop></d:propfind>"
+          echo '--- OPTIONS ROOT ---'
+          curl -sS -o /tmp/options.body -D /tmp/options.hdr -X OPTIONS --connect-timeout 15 --max-time 30 "$ROOT" || true
+          sed -n '1,25p' /tmp/options.hdr || true
+          echo "BODY_BYTES $(wc -c < /tmp/options.body 2>/dev/null || echo 0)"
+
+          echo '--- PROPFIND ROOT ---'
+          curl -sS -o /tmp/prop.body -D /tmp/prop.hdr -X PROPFIND \
+            -H 'Depth: 1' -H 'Content-Type: application/xml; charset=utf-8' \
+            --data-binary "$BODY" --connect-timeout 15 --max-time 30 "$ROOT" || true
+          sed -n '1,25p' /tmp/prop.hdr || true
+          echo "BODY_BYTES $(wc -c < /tmp/prop.body 2>/dev/null || echo 0)"
+          head -c 1000 /tmp/prop.body 2>/dev/null | tr '\n' ' ' || true
+          echo
+
+          echo '--- DIRECT GUESSED FILE ---'
+          URL='https://pan.ustc.edu.cn/seafdav/A%E8%82%A1%E6%95%B0%E6%8D%AE/moneyflow/20210924.csv'
+          curl -sS -o /tmp/file.body -D /tmp/file.hdr -I --connect-timeout 15 --max-time 30 "$URL" || true
+          sed -n '1,25p' /tmp/file.hdr || true
+
+          ROOT_STATUS=$(awk 'toupper($1) ~ /^HTTP\// {s=$2} END{print s}' /tmp/prop.hdr)
+          FILE_STATUS=$(awk 'toupper($1) ~ /^HTTP\// {s=$2} END{print s}' /tmp/file.hdr)
+          echo "SUMMARY root_propfind_status=${ROOT_STATUS:-none} direct_file_status=${FILE_STATUS:-none}"
+          if [[ "${ROOT_STATUS:-}" == '207' ]]; then
+            echo 'PASS_ANONYMOUS_WEBDAV_LISTING_AVAILABLE'
+          else
+            echo 'CLOSED_ANONYMOUS_WEBDAV_LISTING_NOT_AVAILABLE'
+          fi
