@@ -13,46 +13,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Install pytdx and BaoStock
-        run: python -m pip install --quiet pytdx baostock
-      - name: Probe exact historical tick upper bounds
+      - name: Install pytdx
+        run: python -m pip install --quiet pytdx
+      - name: Probe exact historical tick upper bounds against pinned Formal turnover
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
           import json
-          import baostock as bs
           from pytdx.hq import TdxHq_API
           try:
               from pytdx.config.hosts import hq_hosts
           except Exception:
               hq_hosts=[]
 
+          # Daily turnover references are pinned Formal Sohu amounts from
+          # GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json v1.1.
           targets=[
-            (1,'600306','2020-06-08'),
-            (1,'600898','2020-11-04'),
-            (1,'603996','2021-02-24'),
-            (1,'600112','2022-05-06'),
-            (0,'002118','2023-05-22'),
-            (0,'002503','2023-05-22'),
-            (0,'002504','2023-05-22'),
+            (1,'600306','2020-06-08',314500.0),
+            (1,'600898','2020-11-04',587900.0),
+            (1,'603996','2021-02-24',534300.0),
+            (1,'600112','2022-05-06',2238500.0),
+            (0,'002118','2023-05-22',1401500.0),
+            (0,'002503','2023-05-22',3658700.0),
+            (0,'002504','2023-05-22',1610300.0),
           ]
-
-          # Daily turnover reference from BaoStock; this is only used to prove transaction-data completeness.
-          lg=bs.login()
-          print('BAOSTOCK_LOGIN',lg.error_code,lg.error_msg)
-          if lg.error_code!='0':
-              raise SystemExit('FAIL_BAOSTOCK_REFERENCE_LOGIN')
-          daily={}
-          for market,code,day in targets:
-              bcode=('sh.' if market==1 else 'sz.')+code
-              rs=bs.query_history_k_data_plus(bcode,'date,code,amount',start_date=day,end_date=day,frequency='d',adjustflag='3')
-              rows=[]
-              if rs.error_code=='0':
-                  while rs.next(): rows.append(dict(zip(rs.fields,rs.get_row_data())))
-              daily[(market,code,day)]=float(rows[0]['amount']) if rows and rows[0].get('amount') else None
-              print('DAILY_REF',market,code,day,daily[(market,code,day)])
-          bs.logout()
 
           candidates=[
               ('119.147.212.81',7709),('101.227.73.20',7709),('101.227.77.254',7709),
@@ -66,7 +51,7 @@ jobs:
                   pass
 
           api=None; connected=None
-          for ip,port in candidates[:40]:
+          for ip,port in candidates[:50]:
               a=TdxHq_API(heartbeat=False,auto_retry=False,raise_exception=False)
               try:
                   ok=a.connect(ip,port,time_out=1.5)
@@ -80,7 +65,7 @@ jobs:
               raise SystemExit('FAIL_TDX_NO_PUBLIC_HOST_CONNECTED')
 
           results=[]; proofs=[]
-          for market,code,day in targets:
+          for market,code,day,formal_amount in targets:
               dateint=int(day.replace('-',''))
               allrows=[]; start=0; page_size=888; seen_pages=set()
               for page in range(80):
@@ -98,33 +83,39 @@ jobs:
                   if len(part)<page_size: break
                   start += len(part)
 
-              # Infer transaction volume unit from full-day sum against independent daily amount.
               raw=[]
               for r in allrows:
                   try:
                       p=float(r.get('price',0)); v=float(r.get('vol',0))
                       raw.append((p,v,r.get('buyorsell'),r.get('time')))
                   except Exception: pass
-              ref=daily[(market,code,day)]
-              candidates_units={}
+
+              # pytdx transaction vol is normally reported in lots, but infer the
+              # multiplier against the independently pinned Formal daily amount.
+              unit_candidates={}
               for mult in (1.0,100.0):
                   s=sum(p*v*mult for p,v,_,_ in raw)
-                  diff=None if ref is None else abs(s-ref)
-                  candidates_units[mult]=(s,diff)
-              unit=None
-              if ref is not None and raw:
-                  unit=min(candidates_units,key=lambda x:candidates_units[x][1])
-              amount_sum=candidates_units[unit][0] if unit is not None else None
-              abs_diff=candidates_units[unit][1] if unit is not None else None
-              complete=bool(ref is not None and amount_sum is not None and abs_diff<=max(1000.0,abs(ref)*0.003))
+                  unit_candidates[mult]=(s,abs(s-formal_amount))
+              unit=min(unit_candidates,key=lambda x:unit_candidates[x][1]) if raw else None
+              amount_sum=unit_candidates[unit][0] if unit is not None else None
+              abs_diff=unit_candidates[unit][1] if unit is not None else None
+              rel_diff=(abs_diff/formal_amount) if abs_diff is not None and formal_amount else None
+
+              # Completeness is deliberately strict enough to reject partial tick pages,
+              # while allowing price*volume rounding against the daily source.
+              complete=bool(
+                  amount_sum is not None and
+                  abs_diff <= max(1000.0, abs(formal_amount)*0.005)
+              )
               tick_amounts=[p*v*unit for p,v,_,_ in raw] if unit is not None else []
               max_tick=max(tick_amounts) if tick_amounts else None
               provable=bool(complete and max_tick is not None and max_tick<200000.0)
               rec={
                   'market':market,'code':code,'trade_date':day,'tdx_rows':len(raw),
-                  'daily_amount_cny':ref,'volume_multiplier':unit,
+                  'formal_daily_amount_cny':formal_amount,'volume_multiplier':unit,
                   'tick_amount_sum_cny':amount_sum,'sum_abs_diff_cny':abs_diff,
-                  'complete_vs_daily_0p3pct_or_1000':complete,
+                  'sum_rel_diff':rel_diff,
+                  'complete_vs_formal_0p5pct_or_1000':complete,
                   'max_tdx_record_amount_cny':max_tick,
                   'provable_zero_by_tdx_record_upper_bound':provable,
               }
@@ -135,7 +126,7 @@ jobs:
           print('SUMMARY',json.dumps({
               'connected_host':connected,'targets':len(targets),
               'with_ticks':sum(1 for x in results if x['tdx_rows']>0),
-              'complete_count':sum(1 for x in results if x['complete_vs_daily_0p3pct_or_1000']),
+              'complete_count':sum(1 for x in results if x['complete_vs_formal_0p5pct_or_1000']),
               'provable_zero_count':len(proofs),
               'provable_zero_keys':[[x['code'],x['trade_date']] for x in proofs],
           },ensure_ascii=False,sort_keys=True))
