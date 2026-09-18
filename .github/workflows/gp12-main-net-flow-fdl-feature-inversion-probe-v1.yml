@@ -1,0 +1,138 @@
+name: GP12 Main Net Flow FDL Feature Inversion Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-fdl-feature-inversion-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install readers
+        run: pip install -q pandas pyarrow
+      - name: Probe submission archive for invertible raw moneyflow features
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://raw.githubusercontent.com/mirawind/fdl2026-stock/main/dist/fdl2026_stock_prediction_submission_core.tar.gz'
+          curl -L --fail --retry 3 --connect-timeout 15 -o /tmp/fdl.tar.gz "$URL"
+          mkdir -p /tmp/fdl
+          tar -xzf /tmp/fdl.tar.gz -C /tmp/fdl
+          python - <<'PY'
+          from pathlib import Path
+          import csv, json, math
+          import pandas as pd
+          import pyarrow.parquet as pq
+
+          root=Path('/tmp/fdl')
+          targets={
+            ('600306.SH','20200608'),('600898.SH','20201104'),('603996.SH','20210224'),
+            ('002618.SZ','20210923'),('000020.SZ','20210924'),('000157.SZ','20210924'),
+            ('000592.SZ','20210924'),('000753.SZ','20210924'),('002684.SZ','20211125'),
+            ('600112.SH','20220506'),('000564.SZ','20230320'),('001337.SZ','20230320'),
+            ('002118.SZ','20230522'),('002157.SZ','20230522'),('002503.SZ','20230522'),
+            ('002504.SZ','20230522')
+          }
+          exact_col='large_net_amount_ratio'
+          schema_hits=[]
+          row_hits=[]
+
+          def norm_date(v):
+              if pd.isna(v): return ''
+              s=str(v).strip()
+              if s.endswith('.0'): s=s[:-2]
+              return s.replace('-','').replace('/','')[:8]
+
+          def norm_code(v):
+              return str(v).strip().upper()
+
+          for p in root.rglob('*'):
+              if not p.is_file():
+                  continue
+              suf=p.suffix.lower()
+              cols=[]
+              kind=None
+              try:
+                  if suf=='.parquet':
+                      cols=list(pq.read_schema(p).names)
+                      kind='parquet'
+                  elif suf=='.csv':
+                      with p.open('r',encoding='utf-8-sig',errors='ignore',newline='') as fh:
+                          first=next(csv.reader(fh),[])
+                      cols=[str(x).strip() for x in first]
+                      kind='csv'
+                  else:
+                      continue
+              except Exception as exc:
+                  continue
+
+              if exact_col not in cols:
+                  continue
+              rec={'path':str(p.relative_to(root)),'kind':kind,'columns':cols}
+              schema_hits.append(rec)
+              print('INVERTIBLE_SCHEMA_HIT',json.dumps(rec,ensure_ascii=False))
+
+              code_col=next((c for c in ['ts_code','stock_code','symbol','code'] if c in cols),None)
+              date_col=next((c for c in ['trade_date','date','datetime'] if c in cols),None)
+              if not code_col or not date_col:
+                  print('NO_KEY_COLUMNS',str(p.relative_to(root)),code_col,date_col)
+                  continue
+
+              use=[code_col,date_col,exact_col]
+              for c in ['amount','daily_amount','turnover_amount','net_mf_amount_ratio',
+                        'buy_lg_amount_ratio','buy_elg_amount_ratio']:
+                  if c in cols and c not in use: use.append(c)
+              try:
+                  if kind=='parquet':
+                      df=pd.read_parquet(p,columns=use)
+                  else:
+                      df=pd.read_csv(p,usecols=use,low_memory=False)
+              except Exception as exc:
+                  print('READ_ERROR',str(p.relative_to(root)),type(exc).__name__,str(exc)[:300])
+                  continue
+
+              codes=df[code_col].map(norm_code)
+              dates=df[date_col].map(norm_date)
+              mask=[(c,d) in targets for c,d in zip(codes,dates)]
+              if not any(mask):
+                  print('NO_TARGET_ROWS',str(p.relative_to(root)),'rows',len(df))
+                  continue
+              sub=df.loc[mask].copy()
+              for _,row in sub.iterrows():
+                  code=norm_code(row[code_col]); date=norm_date(row[date_col])
+                  out={'path':str(p.relative_to(root)),'ts_code':code,'trade_date':date}
+                  for c in use:
+                      v=row[c]
+                      if pd.isna(v): out[c]=None
+                      elif hasattr(v,'item'):
+                          try: out[c]=v.item()
+                          except: out[c]=str(v)
+                      else: out[c]=v
+                  if 'amount' in out and out.get('amount') is not None and out.get(exact_col) is not None:
+                      try:
+                          out['recovered_source_units']=float(out[exact_col])*float(out['amount'])
+                          out['recovered_cny_if_source_is_10k']=out['recovered_source_units']*10000.0
+                      except Exception:
+                          pass
+                  row_hits.append(out)
+                  print('TARGET_ROW',json.dumps(out,ensure_ascii=False,sort_keys=True))
+
+          print('SUMMARY_SCHEMA_HITS',len(schema_hits))
+          print('SUMMARY_TARGET_ROW_HITS',len(row_hits))
+          hit_keys=sorted({(x['ts_code'],x['trade_date']) for x in row_hits})
+          print('SUMMARY_TARGET_KEYS',json.dumps(hit_keys,ensure_ascii=False))
+          missing=sorted(targets-set(hit_keys))
+          print('SUMMARY_MISSING_KEYS',json.dumps(missing,ensure_ascii=False))
+          if not schema_hits:
+              raise SystemExit('NO_INVERTIBLE_LARGE_NET_AMOUNT_RATIO_ASSET_IN_ARCHIVE')
+          if not row_hits:
+              raise SystemExit('INVERTIBLE_FEATURE_SCHEMA_EXISTS_BUT_NO_RESIDUAL_ROWS')
+          PY
