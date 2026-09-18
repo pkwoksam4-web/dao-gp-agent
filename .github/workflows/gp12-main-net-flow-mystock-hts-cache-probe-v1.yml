@@ -1,0 +1,38 @@
+name: GP12 Main Net Flow MyStock HTS Cache Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-mystock-hts-cache-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Inspect committed HTS cache archive for moneyflow assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://raw.githubusercontent.com/zxhbloomer/my_stock/0ea18840e107d820272e75d463c1f67ccf604dce/docs/tushare/hts-cache/new.zip'
+          curl -L --fail --retry 3 --connect-timeout 15 "$URL" -o /tmp/new.zip
+          echo "ARCHIVE_BYTES $(stat -c%s /tmp/new.zip)"
+          echo "ARCHIVE_SHA256 $(sha256sum /tmp/new.zip | awk '{print $1}')"
+          mkdir -p /tmp/hts
+          unzip -q /tmp/new.zip -d /tmp/hts
+          find /tmp/hts -type f -printf '%P\n' | sort > /tmp/files.txt
+          echo "FILE_N $(wc -l < /tmp/files.txt)"
+          echo '--- RELEVANT_PATHS ---'
+          grep -Ei 'moneyflow|money_flow|fund.?flow|\.parquet$|\.csv$|\.sqlite3?$|\.db$|\.sql(\.gz)?$|20210924|20230522' /tmp/files.txt || true
+          echo '--- EXACT_KEY_TEXT_HITS ---'
+          for needle in             '600306.SH,20200608' '600898.SH,20201104' '603996.SH,20210224' '002618.SZ,20210923'             '000020.SZ,20210924' '000157.SZ,20210924' '000592.SZ,20210924' '000753.SZ,20210924'             '002684.SZ,20211125' '600112.SH,20220506' '000564.SZ,20230320' '001337.SZ,20230320'             '002118.SZ,20230522' '002157.SZ,20230522' '002503.SZ,20230522' '002504.SZ,20230522'; do
+            echo "NEEDLE $needle"
+            grep -RInaF --binary-files=without-match "$needle" /tmp/hts 2>/dev/null | head -10 || true
+          done
+          echo '--- FIELD_HITS ---'
+          grep -RIl --binary-files=without-match 'buy_lg_amount' /tmp/hts 2>/dev/null | head -50 || true
+          echo '--- TOP_FILES ---'
+          head -200 /tmp/files.txt
