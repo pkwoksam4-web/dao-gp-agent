@@ -1,0 +1,62 @@
+name: GP12 Main Net Flow ApocData Pagination Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-apocdata-pagination-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test undocumented pagination and historical filters
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.parse, urllib.request, urllib.error
+          BASE='https://www.apocdata.com/api/blade-dataplatform/open/data/moneyflow'
+          cases=[
+            ('base', {'symbol':'000157','limit':30}),
+            ('offset30', {'symbol':'000157','limit':30,'offset':30}),
+            ('offset300', {'symbol':'000157','limit':30,'offset':300}),
+            ('page2', {'symbol':'000157','limit':30,'page':2}),
+            ('current2', {'symbol':'000157','limit':30,'current':2}),
+            ('pageNo2', {'symbol':'000157','limit':30,'pageNo':2}),
+            ('start_end', {'symbol':'000157','limit':30,'start_date':'20210924','end_date':'20210924'}),
+            ('trade_date', {'symbol':'000157','limit':30,'trade_date':'20210924'}),
+            ('date_dash', {'symbol':'000157','limit':30,'date':'2021-09-24'}),
+          ]
+          def call(params):
+            url=BASE+'?'+urllib.parse.urlencode(params)
+            req=urllib.request.Request(url,headers={'User-Agent':'GP12-audit/1.0'})
+            try:
+              with urllib.request.urlopen(req,timeout=25) as r:
+                body=r.read().decode('utf-8','replace')
+                js=json.loads(body)
+                h={k.lower():v for k,v in r.headers.items()}
+                return r.status,h,js
+            except urllib.error.HTTPError as e:
+              body=e.read().decode('utf-8','replace')
+              try:js=json.loads(body)
+              except:js={'raw':body[:1000]}
+              return e.code,{k.lower():v for k,v in e.headers.items()},js
+          for name,params in cases:
+            st,h,js=call(params)
+            d=js.get('data') if isinstance(js,dict) else None
+            rows=d.get('records',[]) if isinstance(d,dict) else (d if isinstance(d,list) else [])
+            dates=[str(x.get('trade_date') or x.get('tradeDate') or '').replace('-','') for x in rows if isinstance(x,dict)]
+            dates=[x for x in dates if x]
+            hit=[x for x in rows if str(x.get('trade_date') or x.get('tradeDate') or '').replace('-','')=='20210924'] if rows else []
+            print('CASE',name,'STATUS',st,'ROWS',len(rows),'MIN',min(dates) if dates else None,'MAX',max(dates) if dates else None,
+                  'APPLIED',h.get('x-tdc-limit-applied'),'TRUNCATED',h.get('x-tdc-limit-truncated'),'HIT',len(hit))
+            if hit:
+              print('HIT_ROW',json.dumps(hit[0],ensure_ascii=False,sort_keys=True))
+          PY
