@@ -1,0 +1,73 @@
+name: GP12 Main Net Flow FDL2026 Archive Probe V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - '.github/workflows/gp12-main-net-flow-fdl2026-archive-probe-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download and inspect public FDL2026 submission archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://raw.githubusercontent.com/mirawind/fdl2026-stock/main/dist/fdl2026_stock_prediction_submission_core.tar.gz'
+          curl -L --fail --retry 3 --connect-timeout 15 -o /tmp/fdl.tar.gz "$URL"
+          echo "ARCHIVE_BYTES=$(stat -c%s /tmp/fdl.tar.gz)"
+          echo '=== TAR CONTENTS ==='
+          tar -tzf /tmp/fdl.tar.gz | tee /tmp/tar_contents.txt
+          mkdir -p /tmp/fdl
+          tar -xzf /tmp/fdl.tar.gz -C /tmp/fdl
+          echo '=== DATA-LIKE FILES ==='
+          find /tmp/fdl -type f | grep -Ei '\.(csv|parquet|pq|npz|pkl|pickle|db|sqlite|sql|json|jsonl)(\.gz)?$' || true
+          echo '=== MONEYFLOW PATH/TEXT HITS ==='
+          grep -RIlE 'buy_lg_amount|sell_lg_amount|buy_elg_amount|sell_elg_amount|moneyflow|money_flow' /tmp/fdl | head -200 || true
+          echo '=== RESIDUAL KEY HITS ==='
+          python - <<'PY'
+          from pathlib import Path
+          keys=[
+            ('600306.SH','20200608'),('600898.SH','20201104'),('603996.SH','20210224'),
+            ('002618.SZ','20210923'),('000020.SZ','20210924'),('000157.SZ','20210924'),
+            ('000592.SZ','20210924'),('000753.SZ','20210924'),('002684.SZ','20211125'),
+            ('600112.SH','20220506'),('000564.SZ','20230320'),('001337.SZ','20230320'),
+            ('002118.SZ','20230522'),('002157.SZ','20230522'),('002503.SZ','20230522'),
+            ('002504.SZ','20230522')
+          ]
+          root=Path('/tmp/fdl')
+          text_ext={'.csv','.txt','.md','.json','.jsonl','.sql','.py','.yaml','.yml','.toml'}
+          hits=[]
+          for p in root.rglob('*'):
+              if not p.is_file() or p.suffix.lower() not in text_ext:
+                  continue
+              try:
+                  s=p.read_text(errors='ignore')
+              except Exception:
+                  continue
+              if any((a in s and b in s) for a,b in keys):
+                  found=[f'{a}/{b}' for a,b in keys if a in s and b in s]
+                  hits.append((str(p),found))
+          print('RESIDUAL_TEXT_FILE_HITS', len(hits))
+          for p,ks in hits[:100]:
+              print('HIT',p,','.join(ks))
+          schema_hits=[]
+          for p in root.rglob('*'):
+              if not p.is_file():
+                  continue
+              try:
+                  if p.stat().st_size > 50_000_000: continue
+                  b=p.read_bytes()
+              except Exception:
+                  continue
+              if all(x in b for x in [b'buy_lg_amount',b'sell_lg_amount',b'buy_elg_amount',b'sell_elg_amount']):
+                  schema_hits.append(str(p))
+          print('EXACT_SCHEMA_FILE_HITS',len(schema_hits))
+          for p in schema_hits[:100]: print('SCHEMA_HIT',p)
+          if not hits and not schema_hits:
+              raise SystemExit('NO_RECOVERABLE_MONEYFLOW_DATA_IN_ARCHIVE')
+          PY
