@@ -1,0 +1,36 @@
+{
+  "artifact": "DAO2_MODULE_E_GP12_ACCEPTANCE_STATE_V1",
+  "version": "1.0",
+  "module_id": "E",
+  "module_name": "GP12_ACCEPTANCE",
+  "branch": "gp/dao2-e-gp12-acceptance",
+  "status": "WAITING_ON_A_TO_D",
+  "depends_on": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "owned_blockers": [],
+  "objective": "Integrate only verified checkpoints from A-D, verify F1-F12 real inputs and strategy identity, then run candidate acceptance.",
+  "inputs": [
+    "A checkpoint",
+    "B checkpoint",
+    "C checkpoint",
+    "D checkpoint",
+    "data/GP12_CANDIDATE_FACTORS_V1.json",
+    "data/GP12_CANDIDATE_PARAMETERS_V1.json"
+  ],
+  "expected_outputs": [
+    "data/DAO2_MODULE_E_GP12_ACCEPTANCE_STATE_V1.json",
+    "artifact/E_GP12_ACCEPTANCE_CHECKPOINT_V1.json"
+  ],
+  "checkpoint": null,
+  "governance": {
+    "fail_closed": true,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
