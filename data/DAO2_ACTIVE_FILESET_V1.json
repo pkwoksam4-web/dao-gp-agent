@@ -1,32 +1,35 @@
 {
   "artifact": "DAO2_ACTIVE_FILESET_V1",
   "source_commit": "175de3c17c0c792ee8dcaed39bf544af41184236",
+  "inherited_verified_extensions": [
+    {
+      "family": "amount_turnover",
+      "source_commit": "21dd11633daf04379afecb2ff4af00b7e6b54ab1",
+      "readiness_run": 34938907264
+    }
+  ],
   "active": [
     "data/GP12_CANDIDATE_FACTORS_V1.json",
     "data/GP12_CANDIDATE_PARAMETERS_V1.json",
     "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json",
     "data/GP12_INTRADAY_FORMAL847_BINDING_V1.json",
     "data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json",
+    "data/GP12_AMOUNT_TURNOVER_BINDING_V1.json",
     "scripts/gp12_candidate_v1.py",
     "scripts/gp12_formal_input_readiness_v1.py",
     "scripts/gp12_intraday_readiness_integration_v482.py",
     "scripts/gp12_pit_readiness_integration_v482.py",
+    "scripts/gp12_turnover_readiness_integration_v482.py",
+    "scripts/test_gp12_turnover_readiness_integration_v482.py",
     "scripts/gp12_source_router_v1.py",
     "scripts/gp12_sohu_qfq_adapter_v1.py",
     "scripts/gp12_eastmoney_adapter_v1.py",
+    ".github/workflows/gp12-readiness-turnover-v482.yml",
     "scripts/formal_readiness_v482.py",
     "scripts/formal_readiness_finalize_v482.py",
     "scripts/strategy_asset_recovery_v482.py",
     "scripts/model_freeze_recovery_v482.py",
-    "scripts/oos_admission_v482.py",
-    "docs/gp12-candidate-review.md",
-    "docs/gp12-formal-input-readiness-v1.md",
-    ".github/workflows/gp12-candidate-v1.yml",
-    ".github/workflows/gp12-formal-input-readiness-v1.yml",
-    ".github/workflows/gp12-readiness-intraday-integration-v482.yml",
-    ".github/workflows/gp12-readiness-pit-adjusted-close-v482.yml",
-    ".github/workflows/formal-readiness-v482.yml",
-    ".github/workflows/formal-readiness-finalize-v482.yml"
+    "scripts/oos_admission_v482.py"
   ],
   "migration_control": [
     "docs/dao2/MIGRATION_BASELINE.md",
