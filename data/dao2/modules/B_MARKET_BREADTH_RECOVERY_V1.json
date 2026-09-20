@@ -1,15 +1,18 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_RECOVERY_V1",
-  "version": "1.0",
+  "version": "1.1",
   "module_id": "B",
-  "status": "PARTIAL_HISTORICAL_RECOVERY",
+  "status": "HISTORICAL_IDENTITY_RECOVERY_ACTIVE",
+  "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
   "historical_source": {
     "archive_name": "v11_offline_backtest_v3_10.zip",
     "library_path": "/倒/v11_offline_backtest_v3_10.zip",
     "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
     "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
-    "recovered_matrix": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
+    "source_file": "src/run_panel_backtest.py",
+    "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
     "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "historically_materialized_and_archive_hash_verified": true,
     "raw_bytes_currently_materializable": false
   },
   "recovered_behavior": {
@@ -24,12 +27,15 @@
     "regime_rule": "HOT if adv_all>3000; NEUTRAL if adv_all>=1000; otherwise COLD"
   },
   "unrecovered": [
-    "exact breadth aggregation used by final 4% GP V1.0 factor",
-    "normalization and clipping",
-    "proof that GP12 candidate market_breadth_ratio is byte-identical to historical adv_ratio_all",
-    "currently materializable historical source bytes"
+    "historical market breadth function source text",
+    "exact aggregation of all-versus-eligible breadth inputs",
+    "exact breadth normalization",
+    "exact breadth clipping",
+    "exact conversion to final 4% GP V1.0 factor score",
+    "proof candidate market_breadth_ratio is historical adv_ratio_all identity"
   ],
-  "candidate_binding_allowed": false,
+  "candidate_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1.json",
+  "candidate_binding_allowed_to_close_historical_blocker": false,
   "blocker_closed": false,
   "blocker": "MARKET_BREADTH_UNBOUND"
 }
