@@ -1,0 +1,123 @@
+name: DAO2 C Sector Backing Materialize V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'scripts/dao2_c_sector_materialize_v1.py'
+      - '.github/workflows/dao2-c-sector-materialize-v1.yml'
+      - 'data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install sector data dependencies
+        run: pip install -q pandas pyarrow requests akshare tushare
+      - name: Download frozen Formal calendar
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Pin upstream generator and manifests
+        run: |
+          set -euo pipefail
+          mkdir -p upstream work membership_out series_out
+          curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py' -o upstream/download_tushare_data.py
+          echo 'f00fed00a969a39a73a71152fb3031e1631c3476  upstream/download_tushare_data.py' | sha256sum -c -
+          curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/03_desktop_quant_results_light/b1_tft_download/data_provenance/industry_taxonomy_manifest.json' -o upstream/industry_taxonomy_manifest.json
+          echo '4e00b89478581e85bf37938a8b935bdbb21a0875  upstream/industry_taxonomy_manifest.json' | sha1sum -c -
+      - name: Prepare exact Formal root
+        run: |
+          python scripts/dao2_c_sector_materialize_v1.py prepare             --taxonomy upstream/industry_taxonomy_manifest.json             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --root work
+      - name: Probe Tushare membership capability
+        id: tushare
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          out={"token_present":bool(os.environ.get("TUSHARE_TOKEN")),"probe_ok":False,"error":None}
+          if out["token_present"]:
+              try:
+                  import tushare as ts
+                  pro=ts.pro_api(os.environ["TUSHARE_TOKEN"])
+                  c=pro.index_classify(level="L1",src="SW2021")
+                  if c is None or c.empty:
+                      raise RuntimeError("index_classify returned empty")
+                  code=str(c.iloc[0]["index_code"])
+                  m=pro.index_member_all(l1_code=code,is_new="Y")
+                  out["probe_ok"]=True
+                  out["probe_code"]=code
+                  out["probe_rows"]=0 if m is None else int(len(m))
+              except Exception as exc:
+                  out["error"]=repr(exc)
+          Path("membership_out/tushare_capability.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          with open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8") as f:
+              f.write("probe_ok="+("true" if out["probe_ok"] else "false")+"\n")
+          PY
+      - name: Materialize membership backing bytes from pinned generator
+        if: steps.tushare.outputs.probe_ok == 'true'
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          set -o pipefail
+          python upstream/download_tushare_data.py --root work --part membership 2>&1 | tee membership_out/generator_membership.log
+      - name: Audit exact switch and export unresolved rows
+        if: always()
+        run: |
+          python scripts/dao2_c_sector_materialize_v1.py membership             --root work             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --out membership_out
+      - name: Materialize 801xxx series with AKShare
+        if: always()
+        run: |
+          set -o pipefail
+          python upstream/download_tushare_data.py --root work --part industry --industry-provider akshare 2>&1 | tee series_out/generator_akshare.log
+      - name: Patch only exact same-date gaps with Tushare when available
+        if: always()
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/dao2_c_sector_materialize_v1.py patch-series             --root work             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --out-json series_out/tushare_gap_patch.json
+      - name: Audit Formal required sector keys
+        if: always()
+        run: |
+          python scripts/dao2_c_sector_materialize_v1.py series             --root work             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --membership-out membership_out             --out series_out
+      - name: Freeze raw parquet hashes and run summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          files=[]
+          for p in sorted(Path("work").rglob("*.parquet")):
+              h=hashlib.sha256(p.read_bytes()).hexdigest()
+              files.append({"path":str(p),"size_bytes":p.stat().st_size,"sha256":h})
+          out={"artifact":"DAO2_C_SECTOR_BACKING_MATERIALIZATION_V1","files":files,"file_count":len(files)}
+          Path("series_out/backing_file_hashes.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-sector-backing-materialize-v1
+          path: |
+            membership_out/
+            series_out/
+            work/industry_membership*.parquet
+            work/industry_source_manifest.json
+            work/industry_taxonomy_manifest.json
+            work/industry_by_code/*.parquet
+          if-no-files-found: warn
+          retention-days: 30
