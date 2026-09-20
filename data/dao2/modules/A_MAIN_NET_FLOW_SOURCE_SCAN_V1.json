@@ -1,0 +1,51 @@
+{
+  "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
+  "version": "1.0",
+  "as_of": "2026-09-20",
+  "target": {
+    "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
+    "source_unit": "10k CNY",
+    "output_unit": "CNY",
+    "exact_tushare_semantics_required": true,
+    "generic_main_flow_proxy_allowed": false,
+    "formal_expected_rows": 1011607,
+    "resolved_rows": 1011591,
+    "unresolved_rows": 16
+  },
+  "primary_archive": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "moneyflow_tree_sha": "e0bac7332aeb2a948bdb47c04f70c3ff5213485b",
+    "status": "PRIMARY_PARTIAL_ARCHIVE",
+    "residual_exact_rows_missing": 16,
+    "alternate_moneyflow_duplicates_for_residual_dates_found": 0
+  },
+  "same_course_repository_scan": [
+    {
+      "repository": "que3sui/A_stock",
+      "commit": "68976b0cbc830d8abd0338c0771ba77e1ca69937",
+      "finding": "README confirms same USTC 2026 course data layout including moneyflow, but repository tree contains no committed raw moneyflow files; data is documented as downloaded from USTC PAN."
+    },
+    {
+      "repository": "licunchun/dl",
+      "finding": "No raw per-date moneyflow archive found; only report/output paths mentioning moneyflow."
+    },
+    {
+      "repository": "Voyage-for-the-ideal/DL_object",
+      "finding": "No raw per-date moneyflow archive found; only moneyflow feature code."
+    }
+  ],
+  "closed_or_nonadmissible_routes": [
+    "generic Eastmoney/THS/vendor main-flow proxy: semantic mismatch",
+    "5m exact-zero proof for current 16 keys: disproven by >=200k CNY aggregate bars",
+    "FDL feature inversion: no invertible stored large_net_amount_ratio asset",
+    "same Jessica repository history rollback: date files have only the bulk-import commit",
+    "recent-only historical API routes: do not reach residual dates"
+  ],
+  "next_route": [
+    "find another USTC 2026 course repository or mirror containing the TA-pushed raw data snapshot",
+    "recover exact same-schema date CSV rows for the 16 keys",
+    "cross-check overlapping non-residual rows against the pinned Jessica archive before admission"
+  ],
+  "blocker_closed": false
+}
