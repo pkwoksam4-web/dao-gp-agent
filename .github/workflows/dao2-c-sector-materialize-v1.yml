@@ -34,9 +34,20 @@ jobs:
           set -euo pipefail
           mkdir -p upstream work membership_out series_out
           curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py' -o upstream/download_tushare_data.py
-          echo 'f00fed00a969a39a73a71152fb3031e1631c3476  upstream/download_tushare_data.py' | sha256sum -c -
           curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/03_desktop_quant_results_light/b1_tft_download/data_provenance/industry_taxonomy_manifest.json' -o upstream/industry_taxonomy_manifest.json
-          echo '4e00b89478581e85bf37938a8b935bdbb21a0875  upstream/industry_taxonomy_manifest.json' | sha1sum -c -
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          expected={
+              "upstream/download_tushare_data.py":"f00fed00a969a39a73a71152fb3031e1631c3476",
+              "upstream/industry_taxonomy_manifest.json":"4e00b89478581e85bf37938a8b935bdbb21a0875",
+          }
+          for name,want in expected.items():
+              data=Path(name).read_bytes()
+              got=hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()
+              assert got==want,(name,got,want)
+              print(name,got)
+          PY
       - name: Prepare exact Formal root
         run: |
           python scripts/dao2_c_sector_materialize_v1.py prepare             --taxonomy upstream/industry_taxonomy_manifest.json             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --root work
