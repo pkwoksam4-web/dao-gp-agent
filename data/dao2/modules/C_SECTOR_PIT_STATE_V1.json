@@ -4,7 +4,7 @@
   "module_id": "C",
   "module_name": "SECTOR_PIT",
   "branch": "gp/dao2-c-sector-pit",
-  "status": "READY_TO_START",
+  "status": "MATERIALIZING",
   "depends_on": [],
   "owned_blockers": [
     "SECTOR_SERIES_UNBOUND",
@@ -28,5 +28,13 @@
     "silent_proxy_substitution": false,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
+  },
+  "progress": {
+    "discovery": "data/dao2/modules/C_SECTOR_PIT_DISCOVERY_V1.json",
+    "source_manifest_found": true,
+    "taxonomy_manifest_found": true,
+    "backing_membership_entity_found": false,
+    "backing_sector_series_entity_found": false,
+    "sector_breadth_derivation_allowed": false
   }
 }
