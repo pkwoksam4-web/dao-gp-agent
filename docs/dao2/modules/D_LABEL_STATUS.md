@@ -1,16 +1,21 @@
 # Module D — LABEL_STATUS
 
-Status: **VERIFYING**
+Status: **PASS**
 
-## Objective
+Verified checkpoint: `artifact/D_LABEL_STATUS_CHECKPOINT_V1.json`.
 
-Close `LABEL_PROVENANCE_UNBOUND` and `STATUS_SEMANTICS_INCOMPLETE` without changing A/B/C/E/F state, inventing a new historical label, or converting execution diagnostics into fill mechanics.
+## Closed blockers
+
+- `LABEL_PROVENANCE_UNBOUND` — **CLOSED**
+- `STATUS_SEMANTICS_INCOMPLETE` — **CLOSED**
+
+The verification commit `0310fe64ab1418fa5fcc7c0df5094d8bbf82a81e` passed workflow `DAO2 D LABEL_STATUS Guard V1`, run `35499004601`, job `106047258340`. Contract tests were 4/4 PASS and the static validator returned `label_provenance=BOUND` and `status_semantics=COMPLETE`.
 
 ## Status audit correction
 
 The course-repository `stock_st` set is **supplementary evidence only**. Its 12 missing Formal dates are not a V4.80 PIT-ST production gap.
 
-The formal V4.80 PIT-ST audit remains the base:
+The formal V4.80 PIT-ST audit is the status base:
 
 - lifecycle: 847/847 PASS
 - calendar: 1426/1426 exact
@@ -36,7 +41,7 @@ The candidate snapshot requires exactly `known_at + is_st + tradable + upper_lim
 - **PIT timestamp**: this after-close status package is available no earlier than 15:00 Asia/Shanghai and must satisfy `known_at <= as_of`.
 - **future horizon**: T+1/T+2/T+3 future suspension/limit/delist states are outcome/diagnostic fields only. They cannot enter the T signal, cannot shift the label date to the next stock bar, and do not define actual fills.
 
-For `upper_limit`, the pinned course repository supplies only candidate source/semantic provenance, not historical GP source identity: commit `6b245fa09cb628f3bcb812f0662bfef520e65fb4` downloads Tushare `stk_limit` for every SSE-open date. Its pinned calendar has 2,516 open dates for 2016-01-04..2026-05-18, the manifest records 2,516 limit files, and the Formal subwindow contains 1,426 open dates. The raw limit rows are not committed in that public repository, so this evidence binds source semantics and date-level collection provenance rather than pretending immutable row bytes exist in this branch.
+For `upper_limit`, the pinned course repository supplies candidate source/semantic provenance, not historical GP source identity: commit `6b245fa09cb628f3bcb812f0662bfef520e65fb4` downloads Tushare `stk_limit` for every SSE-open date. Its pinned calendar has 2,516 open dates for 2016-01-04..2026-05-18, the manifest records 2,516 limit files, and the Formal subwindow contains 1,426 open dates. Raw limit rows are not committed in that public repository, so this evidence binds source semantics/date-level collection provenance rather than pretending immutable row bytes exist here.
 
 ## Historical label provenance
 
@@ -49,16 +54,14 @@ Historical GP V1.1 Daily Base labels are bound to recovered `v11_offline_backtes
 
 Recovered scope includes T+1/T+2/T+3, MFE/MAE, fixed-hit thresholds and ATR-adaptive three-day first-touch UP/DOWN/FLAT/AMBIG. The six panel targets are `up_close_1`, `up_close_2`, `up_close_3`, `hit_up2_3d`, `hit_up4_3d`, `hit_dn2_3d`, with target-specific purge. Their clock advances by **market trading days**, not “next available stock K-line.”
 
-The exact historical formulas remain authoritative in the byte-identified V3.10 source. Module D deliberately does not re-author missing formula text and does not substitute the course repository's newer label code.
+The exact historical formulas remain authoritative in the byte-identified V3.10 source. Module D does not re-author missing formula text and does not substitute the course repository's newer label code.
 
 ## Boundary
 
-This module closes provenance/semantics only. It does **not**:
+This PASS closes Module D's two blockers only. It does **not**:
 
 - adopt `GP12_REBUILD_CANDIDATE_V1` as historical GP V1.1;
 - recover the historical final entry/exit/fill policy;
 - turn future execution diagnostics into actual fill mechanics;
 - authorize Model Freeze or OOS;
 - modify A/B/C/E/F module state.
-
-Verification is performed by `scripts/dao2_label_status_contract_v1.py`, its unit tests, and the Module D guard workflow. PASS is written only after a verified checkpoint exists.
