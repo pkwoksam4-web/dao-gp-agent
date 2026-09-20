@@ -4,7 +4,7 @@
   "module_id": "D",
   "module_name": "LABEL_STATUS",
   "branch": "gp/dao2-d-label-status",
-  "status": "READY_TO_START",
+  "status": "MATERIALIZING",
   "depends_on": [],
   "owned_blockers": [
     "LABEL_PROVENANCE_UNBOUND",
@@ -27,5 +27,13 @@
     "silent_proxy_substitution": false,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
+  },
+  "progress": {
+    "discovery": "data/dao2/modules/D_LABEL_STATUS_DISCOVERY_V1.json",
+    "stock_st_formal_dates": 1414,
+    "formal_open_dates": 1426,
+    "stock_st_missing_dates": 12,
+    "historical_label_provenance_bound": false,
+    "status_semantics_complete": false
   }
 }
