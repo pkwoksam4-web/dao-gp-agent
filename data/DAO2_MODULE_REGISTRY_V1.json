@@ -1,0 +1,78 @@
+{
+  "artifact": "DAO2_MODULE_REGISTRY_V1",
+  "version": "1.0",
+  "execution_mode": "SEGMENTED_FAIL_CLOSED",
+  "integration_branch": "gp/dao2-migration-20260920",
+  "modules": [
+    {
+      "id": "A",
+      "name": "MAIN_NET_FLOW",
+      "branch": "gp/dao2-a-main-net-flow",
+      "status": "ACTIVE",
+      "parallel_group": 1,
+      "depends_on": [],
+      "acceptance": "MAIN_NET_FLOW_UNBOUND closed; exact semantics preserved; F11 input ready"
+    },
+    {
+      "id": "B",
+      "name": "MARKET_PACKAGE",
+      "branch": "gp/dao2-b-market-package",
+      "status": "READY_TO_START",
+      "parallel_group": 1,
+      "depends_on": [],
+      "acceptance": "MARKET_BENCHMARK_UNBOUND and MARKET_BREADTH_UNBOUND closed"
+    },
+    {
+      "id": "C",
+      "name": "SECTOR_PIT",
+      "branch": "gp/dao2-c-sector-pit",
+      "status": "READY_TO_START",
+      "parallel_group": 1,
+      "depends_on": [],
+      "acceptance": "SECTOR_SERIES, SECTOR_MEMBERSHIP_PIT, SECTOR_BREADTH closed"
+    },
+    {
+      "id": "D",
+      "name": "LABEL_STATUS",
+      "branch": "gp/dao2-d-label-status",
+      "status": "READY_TO_START",
+      "parallel_group": 1,
+      "depends_on": [],
+      "acceptance": "LABEL_PROVENANCE_UNBOUND and STATUS_SEMANTICS_INCOMPLETE closed"
+    },
+    {
+      "id": "E",
+      "name": "GP12_ACCEPTANCE",
+      "branch": "gp/dao2-e-gp12-acceptance",
+      "status": "WAITING_ON_A_TO_D",
+      "parallel_group": 2,
+      "depends_on": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "acceptance": "F1-F12 real inputs ready; strategy identity path decided; candidate review passes"
+    },
+    {
+      "id": "F",
+      "name": "MODEL_AGENT",
+      "branch": "gp/dao2-f-model-agent",
+      "status": "WAITING_ON_E",
+      "parallel_group": 3,
+      "depends_on": [
+        "E"
+      ],
+      "acceptance": "Model Freeze gate passes; V2.0 source reproducible; V2.1 replay contracts ready before OOS"
+    }
+  ],
+  "governance": {
+    "fail_closed": true,
+    "no_forward_fill": true,
+    "no_silent_proxy_substitution": true,
+    "no_cross_module_status_mutation": true,
+    "frozen_evidence_immutable": true,
+    "integration_requires_module_checkpoint": true,
+    "oos_requires_module_e_and_f_pass": true
+  }
+}
