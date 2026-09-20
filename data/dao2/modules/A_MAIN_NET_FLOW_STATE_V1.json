@@ -32,6 +32,10 @@
     "resolved_rows": 1011591,
     "unresolved_rows": 16,
     "exact_semantics_required": true,
-    "generic_main_flow_proxy_allowed": false
+    "generic_main_flow_proxy_allowed": false,
+    "source_scan": "data/dao2/modules/A_MAIN_NET_FLOW_SOURCE_SCAN_V1.json",
+    "source_discovery_status": "ACTIVE_EXACT_SOURCE_RECOVERY",
+    "same_course_repositories_scanned": 4,
+    "admissible_new_exact_rows": 0
   }
 }
