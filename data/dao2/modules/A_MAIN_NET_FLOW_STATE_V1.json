@@ -4,7 +4,7 @@
   "module_id": "A",
   "module_name": "MAIN_NET_FLOW",
   "branch": "gp/dao2-a-main-net-flow",
-  "status": "ACTIVE",
+  "status": "BLOCKED",
   "depends_on": [],
   "owned_blockers": [
     "MAIN_NET_FLOW_UNBOUND"
@@ -34,8 +34,26 @@
     "exact_semantics_required": true,
     "generic_main_flow_proxy_allowed": false,
     "source_scan": "data/dao2/modules/A_MAIN_NET_FLOW_SOURCE_SCAN_V1.json",
-    "source_discovery_status": "ACTIVE_EXACT_SOURCE_RECOVERY",
-    "same_course_repositories_scanned": 4,
-    "admissible_new_exact_rows": 0
+    "source_discovery_status": "BLOCKED_NO_TUSHARE_TOKEN_SECRET",
+    "same_course_repositories_scanned": 6,
+    "admissible_new_exact_rows": 0,
+    "latest_exact_probe": {
+      "workflow": "DAO2 A Tushare Exact Probe V1",
+      "workflow_path": ".github/workflows/dao2-a-tushare-exact-probe-v1.yml",
+      "run_id": 35498618517,
+      "run_url": "https://github.com/pkwoksam4-web/dao-gp-agent/actions/runs/35498618517",
+      "run_conclusion": "success",
+      "head_sha": "6efd0e8d0dfa041d7e9b198cf03358fb6e21aa74",
+      "artifact_id": 10601488487,
+      "artifact_name": "dao2-a-tushare-exact-probe-v1",
+      "artifact_digest": "sha256:a1e3c6a279b78665d28f21543f9eb99734dcc1d20259fdab2f9c28c5e32b22d0",
+      "result_status": "NO_TUSHARE_TOKEN_SECRET",
+      "secret_present": false,
+      "resolved_target_count": 0,
+      "semantic_overlap_pass": false,
+      "all_targets_resolved": false,
+      "result_sha256": "66ef859a4a18b8800abe8512a74970ec3b5cd4ed8e458b018e064769d8cde7b6"
+    },
+    "blocking_environment_requirement": "Configure repository Actions secret TUSHARE_TOKEN with permission to query Tushare moneyflow history for 2020-2023, then rerun the exact probe."
   }
 }
