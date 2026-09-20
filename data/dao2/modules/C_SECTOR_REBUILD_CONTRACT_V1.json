@@ -1,0 +1,45 @@
+{
+  "artifact": "DAO2_C_SECTOR_REBUILD_CONTRACT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "status": "REBUILD_PATH_IDENTIFIED_NOT_ADMITTED",
+  "source": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "generator_path": "xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py",
+    "generator_blob_sha": "f00fed00a969a39a73a71152fb3031e1631c3476"
+  },
+  "membership": {
+    "endpoints": [
+      "Tushare index_classify(level=L1, src=SW2014/SW2021)",
+      "Tushare index_member_all(l1_code, is_new=Y/N)"
+    ],
+    "raw_output": "industry_membership_sw2021.parquet",
+    "effective_output": "industry_membership.parquet",
+    "unresolved_output": "industry_membership_unresolved.parquet",
+    "switch": {
+      "sw2014_last": "20211210",
+      "sw2021_first": "20211213"
+    },
+    "pre_switch_method": "project SW2021 member intervals to SW2014 L1 via explicit L3 bridge",
+    "historical_authority_caveat": "not direct retrieval of official historical SW2014 member records",
+    "manifest_effective_rows": 12162,
+    "manifest_unresolved_pre_switch_rows": 7
+  },
+  "series": {
+    "providers": [
+      "Tushare sw_daily",
+      "AKShare index_hist_sw fallback"
+    ],
+    "local_cache": "industry_by_code/{industry_code}.parquet",
+    "materialized_daily": "industry/{trade_date}.csv",
+    "no_forward_fill_required": true
+  },
+  "blockers": [
+    "materialized membership parquet bytes absent from repository",
+    "materialized industry series bytes absent from repository",
+    "pre-switch projected taxonomy is not direct official SW2014 historical membership",
+    "series date gaps recorded in provenance manifest"
+  ],
+  "admitted": false
+}
