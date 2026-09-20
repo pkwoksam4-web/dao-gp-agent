@@ -1,0 +1,55 @@
+name: DAO2 C SW Classification History Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-sw-classification-history-probe-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas openpyxl xlrd akshare
+      - name: Fetch official SW stock classification history
+        run: |
+          mkdir -p artifact_sw_history
+          python - <<'PY'
+          import json, hashlib
+          from pathlib import Path
+          import akshare as ak
+          import pandas as pd
+          out={"artifact":"DAO2_C_SW_CLASSIFICATION_HISTORY_PROBE_V1"}
+          try:
+              f=ak.stock_industry_clf_hist_sw()
+              out["ok"]=True
+              out["rows"]=int(len(f))
+              out["columns"]=list(f.columns)
+              out["start_min"]=str(f["start_date"].min()) if "start_date" in f else None
+              out["start_max"]=str(f["start_date"].max()) if "start_date" in f else None
+              out["industry_code_unique"]=int(f["industry_code"].astype(str).nunique()) if "industry_code" in f else None
+              seven=["300157","002554","300164","300191","600339","600583","603727"]
+              sub=f[f["symbol"].astype(str).str.zfill(6).isin(seven)].copy() if "symbol" in f else pd.DataFrame()
+              out["seven_rows"]=sub.astype(str).to_dict("records")
+              f.to_csv("artifact_sw_history/sw_stock_classification_history.csv.gz",index=False,compression="gzip")
+              sub.to_csv("artifact_sw_history/seven_859622_candidates.csv",index=False)
+          except Exception as exc:
+              out["ok"]=False
+              out["error"]=repr(exc)
+          Path("artifact_sw_history/probe.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-sw-classification-history-probe-v1
+          path: artifact_sw_history/
+          if-no-files-found: warn
+          retention-days: 30
