@@ -10,7 +10,14 @@
     "MARKET_BENCHMARK_UNBOUND",
     "MARKET_BREADTH_UNBOUND"
   ],
-  "objective": "Bind PIT-valid market benchmark and market breadth inputs for F1/F2 and shared F3 dependencies.",
+  "closed_blockers": [
+    "MARKET_BENCHMARK_UNBOUND"
+  ],
+  "active_blockers": [
+    "MARKET_BREADTH_UNBOUND"
+  ],
+  "primary_task": "MARKET_BREADTH_UNBOUND",
+  "objective": "Keep the verified 000985 candidate benchmark fixed and recover authoritative historical GP V1.1 market breadth executable identity without substituting candidate mathematics.",
   "inputs": [
     "data/GP12_CANDIDATE_FACTORS_V1.json",
     "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json"
@@ -25,20 +32,28 @@
     "fail_closed": true,
     "forward_fill": false,
     "silent_proxy_substitution": false,
+    "candidate_breadth_cannot_close_historical_blocker": true,
+    "historical_breadth_close_requires_exact_executable_identity_or_exact_aggregation_normalization_clipping_final_4pct_mapping": true,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
   },
   "progress": {
-    "discovery": "data/dao2/modules/B_MARKET_PACKAGE_DISCOVERY_V1.json",
     "benchmark": {
-      "status": "VERIFYING_REPLAY",
+      "status": "PASS_SUBCOMPONENT",
       "code": "000985",
       "candidate_only": true,
-      "inherited_exact_blobs": true
+      "checkpoint": "data/dao2/modules/B_MARKET_BENCHMARK_CHECKPOINT_V1.json",
+      "workflow_run": 35493957183,
+      "artifact_id": 10599722775,
+      "artifact_zip_sha256": "9cbfccb5a35aec7b84394897574a9a08db70ddea32863b7e69ca9624f1b4f77e",
+      "replay_again": false
     },
     "market_breadth": {
-      "status": "TODO",
-      "blocker": "MARKET_BREADTH_UNBOUND"
+      "status": "HISTORICAL_IDENTITY_RECOVERY_ACTIVE",
+      "blocker": "MARKET_BREADTH_UNBOUND",
+      "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
+      "candidate_replay_isolated": true,
+      "historical_blocker_closed": false
     }
   }
 }
