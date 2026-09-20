@@ -1,0 +1,89 @@
+{
+  "artifact": "DAO2_D_LABEL_STATUS_DISCOVERY_V1",
+  "version": "1.0",
+  "as_of": "2026-09-20",
+  "source_repo": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "trade_calendar_blob_sha": "48cea045a6d348a2dc91bc077e34e1d9cae48120"
+  },
+  "stock_st": {
+    "schema": [
+      "ts_code",
+      "name",
+      "trade_date",
+      "type",
+      "type_name"
+    ],
+    "semantics_observed": "ST risk-warning list by trade_date",
+    "total_date_files": 2360,
+    "formal_open_dates": 1426,
+    "formal_date_files": 1414,
+    "formal_missing_date_count": 12,
+    "formal_missing_dates": [
+      "20200618",
+      "20200708",
+      "20200710",
+      "20200720",
+      "20200803",
+      "20200804",
+      "20200824",
+      "20201120",
+      "20210104",
+      "20210129",
+      "20210316",
+      "20230202"
+    ],
+    "extra_formal_dates": [],
+    "first_formal_file": "20200601",
+    "last_formal_file": "20260417",
+    "sample_blob_sha_20260417": "0e93fab361876aa93467cf58e0bfe2e9189df658",
+    "complete": false
+  },
+  "existing_v482_trade_status": {
+    "status": "PIT_PARTIAL",
+    "correction_doc": "docs/v482-pitst-tradestatus-corrections.md",
+    "exact_point_corrections": [
+      [
+        "002087.SZ",
+        "2024-06-13"
+      ],
+      [
+        "600647.SH",
+        "2024-06-13"
+      ],
+      [
+        "600766.SH",
+        "2024-06-13"
+      ],
+      [
+        "603133.SH",
+        "2024-06-13"
+      ]
+    ],
+    "note": "These corrections change tradestatus only; isST is explicitly unchanged."
+  },
+  "status_semantics_work_breakdown": {
+    "st_flag": {
+      "status": "PARTIAL_12_DATE_GAPS"
+    },
+    "suspension_or_trade_status": {
+      "status": "PARTIAL_EXISTING_V482"
+    },
+    "price_limit_state": {
+      "status": "UNBOUND_SEMANTICS"
+    },
+    "final_tradability_rule": {
+      "status": "UNBOUND_COMPOSITION"
+    }
+  },
+  "historical_label_provenance": {
+    "status": "UNBOUND",
+    "note": "Same-course repositories contain newly authored label code, but that is not admissible evidence for historical GP label identity."
+  },
+  "blockers": [
+    "LABEL_PROVENANCE_UNBOUND",
+    "STATUS_SEMANTICS_INCOMPLETE"
+  ],
+  "label_status_ready": false
+}
