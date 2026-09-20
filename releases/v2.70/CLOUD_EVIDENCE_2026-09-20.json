@@ -46,23 +46,42 @@
     "verification_status": "VERIFIED"
   },
   "managed_recovery": {
-    "snapshot_id": "snap-square-surf-b5zppaqf",
-    "snapshot_name": "pre-v264-schema",
-    "restored_branch_id": "br-twilight-grass-b5afh9ks",
+    "snapshot_id": "snap-long-unit-b5u1e3ow",
+    "snapshot_name": "v2.70-current-release-recovery-2026-09-20",
+    "restored_branch_id": "br-falling-glade-b5ez1bho",
+    "restored_branch_name": "v270-recovery-evidence",
     "restore_mechanism_observed": true,
-    "restored_public_table_count": 0,
-    "restored_pgvector": false,
-    "current_release_recovery": false,
-    "status": "STALE_SNAPSHOT"
+    "restored_public_table_count": 185,
+    "restored_pgvector": true,
+    "current_release_recovery": true,
+    "restore_mode": "finalized_primary_restore",
+    "evidence_id": "MRV-1cabc21fe55df00b",
+    "evidence_hash": "1cabc21fe55df00b0a1a4be59f6858710d4e7dca7c926d8e8d8f3b7474549bba",
+    "status": "PASS"
   },
   "infrastructure_gate": {
-    "status": "DEVELOPING",
+    "status": "INFRASTRUCTURE_VERIFIED",
+    "evidence_id": "IVG-V270-RECOVERY-20260920",
     "checks": {
       "cloud_database": "PASS",
       "object_storage_roundtrip": "PASS",
       "hosted_runtime": "VERIFIED",
-      "current_release_managed_recovery": "STALE_SNAPSHOT"
+      "current_release_managed_recovery": "PASS"
     }
+  },
+  "shadow_baseline": {
+    "watchlist_id": "WAT-5e5f4c3d2b1a9076",
+    "watchlist_count": 1,
+    "watchlist_item_count": 10,
+    "market_bars": 0,
+    "forecast_items": 0,
+    "five_day_accrual": "EMPTY",
+    "twenty_day_accrual": "EMPTY",
+    "cohort_acquisition": "NO_OBSERVATIONS",
+    "evidence_readiness": "DEVELOPING",
+    "live_shadow_executed": false,
+    "settlement_observed": false,
+    "synthetic_samples_created": false
   },
   "truth_guards": {
     "cloud_verified_claimed": false,
