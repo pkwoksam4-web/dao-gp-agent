@@ -212,17 +212,11 @@ def patch_series_with_tushare(root: Path, formal_calendar: Path) -> dict[str, An
             day = pd.DataFrame()
         if not day.empty and "ts_code" in day.columns:
             day = day.rename(columns={"ts_code":"industry_code"})
+        # One Tushare request per missing trade date only. Never fall back to one
+        # request per code: that creates rate-limit pressure without improving
+        # provenance. Any code absent from the same-day payload remains a gap.
         for code in sorted(need):
             row = day.loc[day.get("industry_code", pd.Series(dtype=str)).astype(str).eq(code)] if not day.empty else pd.DataFrame()
-            if row.empty:
-                attempts += 1
-                try:
-                    row = pro.sw_daily(ts_code=code, start_date=d, end_date=d)
-                    if not row.empty:
-                        row = row.rename(columns={"ts_code":"industry_code"})
-                except Exception as exc:
-                    errors.append(f"{d}:{code}:{exc}")
-                    continue
             if row.empty:
                 continue
             keep = ["industry_code","trade_date","open","high","low","close","vol","amount"]
