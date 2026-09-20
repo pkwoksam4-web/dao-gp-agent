@@ -49,11 +49,18 @@
       "replay_again": false
     },
     "market_breadth": {
-      "status": "HISTORICAL_IDENTITY_RECOVERY_ACTIVE",
+      "status": "RAW_HISTORICAL_EXECUTABLE_RECOVERED_FINAL_MAPPING_MISSING",
       "blocker": "MARKET_BREADTH_UNBOUND",
       "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
       "candidate_replay_isolated": true,
-      "historical_blocker_closed": false
+      "historical_blocker_closed": false,
+      "raw_historical_identity": "PASS_SUBCOMPONENT",
+      "historical_source_artifact": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json",
+      "remaining_identity": [
+        "normalization",
+        "clipping",
+        "final_4pct_mapping_or_authoritative_equivalent_executable"
+      ]
     }
   }
 }
