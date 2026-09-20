@@ -2,8 +2,9 @@
   "artifact": "DAO2_B_MARKET_PACKAGE_DISCOVERY_V1",
   "version": "1.0",
   "as_of": "2026-09-20",
+  "primary_task": "MARKET_BREADTH_UNBOUND",
   "benchmark": {
-    "status": "VERIFYING_REPLAY",
+    "status": "PASS_SUBCOMPONENT",
     "candidate_only": true,
     "historical_gp_v11_recovery": false,
     "definition": {
@@ -11,35 +12,34 @@
       "local_name": "中证全指",
       "code": "000985",
       "source": "Eastmoney historical daily kline endpoint",
-      "formal_window": [
-        "2020-06-01",
-        "2026-04-17"
-      ],
+      "formal_window": ["2020-06-01", "2026-04-17"],
       "expected_calendar_n": 1426,
       "same_session_close_usable_before_1500": false
     },
-    "inherited_from_branch": "gp/gp12-candidate-benchmark-000985-v1",
-    "inherited_source_head": "abd63c54d4525802d48ce1750ec60c96d67eef30",
-    "inherited_blobs": {
-      "data/GP12_CANDIDATE_BENCHMARK_V1.json": "0875b38f70ea6c133473527ca3e5e789359e3f36",
-      "scripts/gp12_candidate_benchmark_v1.py": "63e528ac24d1ce9ed29b2f7d3599d8b1e609ffc1",
-      "scripts/test_gp12_candidate_benchmark_v1.py": "1b4ef6ef8cc31857d26d7cc3574e26a2732c0c7f"
-    },
-    "prior_success_reference": {
-      "workflow_run_id": 34941635611,
-      "workflow_name": "GP12 Candidate Benchmark 000985 V1",
-      "conclusion": "success"
-    },
-    "replay_required_on_module_branch": true
+    "verified_checkpoint": "data/dao2/modules/B_MARKET_BENCHMARK_CHECKPOINT_V1.json",
+    "workflow_run_id": 35493957183,
+    "artifact_id": 10599722775,
+    "artifact_zip_sha256": "9cbfccb5a35aec7b84394897574a9a08db70ddea32863b7e69ca9624f1b4f77e",
+    "replay_required_on_module_branch": false
   },
   "breadth": {
-    "status": "TODO",
+    "status": "HISTORICAL_IDENTITY_RECOVERY_ACTIVE",
     "blocker": "MARKET_BREADTH_UNBOUND",
-    "required_semantics": "daily breadth ratio in [0,1], PIT-known by snapshot as_of, exact Formal calendar alignment"
+    "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
+    "historical_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "historical_source_file": "src/run_panel_backtest.py",
+    "known_historical_outputs": [
+      "adv_all",
+      "dec_all",
+      "flat_all",
+      "adv_ratio_all",
+      "eligible-universe analogues",
+      "median cross-sectional return"
+    ],
+    "candidate_breadth_status": "SEPARATE_VERIFIED_CANDIDATE_NOT_HISTORICAL_IDENTITY",
+    "close_condition": "Recover exact aggregation + normalization + clipping + final 4% mapping, or sufficiently authoritative historical executable identity."
   },
   "market_package_ready": false,
-  "blockers": [
-    "MARKET_BENCHMARK_UNBOUND",
-    "MARKET_BREADTH_UNBOUND"
-  ]
+  "closed_blockers": ["MARKET_BENCHMARK_UNBOUND"],
+  "blockers": ["MARKET_BREADTH_UNBOUND"]
 }
