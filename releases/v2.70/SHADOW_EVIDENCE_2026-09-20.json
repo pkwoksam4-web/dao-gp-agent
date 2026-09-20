@@ -1,0 +1,60 @@
+{
+  "snapshot_date": "2026-09-20",
+  "release": "2.70",
+  "status": "WAITING_FOR_REAL_PROVIDER_DATA",
+  "source": "production_postgres",
+  "watchlist": {
+    "id": "WAT-5e5f4c3d2b1a9076",
+    "name": "核心十股跟踪",
+    "item_count": 10
+  },
+  "observed_counts": {
+    "market_bars": 0,
+    "forecast_runs": 0,
+    "forecast_items": 0,
+    "production_orchestration_runs": 0,
+    "settlement_integrity_snapshots": 0,
+    "live_shadow_run_attestations": 0
+  },
+  "shadow_accrual": [
+    {
+      "horizon_days": 5,
+      "total_count": 0,
+      "pending_count": 0,
+      "settled_count": 0,
+      "status": "EMPTY"
+    },
+    {
+      "horizon_days": 20,
+      "total_count": 0,
+      "pending_count": 0,
+      "settled_count": 0,
+      "status": "EMPTY"
+    }
+  ],
+  "cohort": {
+    "acquisition_plan_status": "NO_OBSERVATIONS",
+    "observed_cohorts": 0,
+    "total_sample_deficit": 0,
+    "maturity_status": "NOT_RUN"
+  },
+  "evidence_readiness": {
+    "status": "DEVELOPING",
+    "long_run_baseline": "EARLY",
+    "statistical_validation": "INSUFFICIENT_DATA"
+  },
+  "controls": {
+    "real_data_only": true,
+    "synthetic_samples_created": false,
+    "no_execution": true,
+    "automatic_model_promotion": false
+  },
+  "next_required_evidence": [
+    "provider credential and scheduled sync",
+    "real shadow forecast rows for 5D and 20D",
+    "daily settlement integrity snapshots",
+    "cohort maturity coverage",
+    "production verification gate",
+    "release closure only after all strict gates pass"
+  ]
+}
