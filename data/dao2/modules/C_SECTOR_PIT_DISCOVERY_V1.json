@@ -1,0 +1,53 @@
+{
+  "artifact": "DAO2_C_SECTOR_PIT_DISCOVERY_V1",
+  "version": "1.0",
+  "as_of": "2026-09-20",
+  "source_repo": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+  },
+  "discovered_manifests": {
+    "industry_source_manifest": "xst/xst_quant_experiments_20260613/03_desktop_quant_results_light/b1_tft_download/data_provenance/industry_source_manifest.json",
+    "industry_taxonomy_manifest": "xst/xst_quant_experiments_20260613/03_desktop_quant_results_light/b1_tft_download/data_provenance/industry_taxonomy_manifest.json",
+    "source_window": [
+      "2016-01-04",
+      "2026-05-18"
+    ],
+    "required_industry_code_n": 32,
+    "providers": [
+      "akshare",
+      "tushare"
+    ],
+    "sw2014_last_trade_date": "2021-12-10",
+    "sw2021_first_trade_date": "2021-12-13"
+  },
+  "important_caveats": [
+    "taxonomy manifest states pre-switch membership is projected from SW2021 member intervals to SW2014 L1 using an explicit L3 migration bridge",
+    "manifest explicitly says this is not direct retrieval of official historical SW2014 member records",
+    "taxonomy manifest reports 12162 effective rows and 7 unresolved pre-switch rows",
+    "repository tree contains no industry_membership*.parquet backing file",
+    "repository tree contains no committed 801xxx.SI industry-series files matching the manifest's materialized outputs",
+    "industry source manifest records missing expected dates for multiple series"
+  ],
+  "subcomponents": {
+    "sector_series": {
+      "status": "BLOCKED_EVIDENCE_ENTITY_MISSING",
+      "blocker": "SECTOR_SERIES_UNBOUND"
+    },
+    "sector_membership_pit": {
+      "status": "BLOCKED_BACKING_ENTITY_MISSING",
+      "blocker": "SECTOR_MEMBERSHIP_PIT_UNBOUND"
+    },
+    "sector_breadth": {
+      "status": "WAITING_ON_SERIES_AND_MEMBERSHIP",
+      "blocker": "SECTOR_BREADTH_UNBOUND"
+    }
+  },
+  "next_actions": [
+    "recover the actual materialized sector-series and membership assets or deterministically rebuild them from pinned providers",
+    "close all Formal-window date gaps without forward fill",
+    "verify date-effective membership at each snapshot date",
+    "derive sector breadth only after membership and member stock state are PIT-valid"
+  ],
+  "sector_package_ready": false
+}
