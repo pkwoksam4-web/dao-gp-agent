@@ -54,9 +54,10 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "configure repository Actions secret TUSHARE_TOKEN with access to Tushare moneyflow historical dates 2020-2023",
+    "replace repository Actions secret TUSHARE_TOKEN with a valid Tushare token",
     "rerun .github/workflows/dao2-a-tushare-exact-probe-v1.yml",
-    "accept rows only if all 16 target keys resolve and overlapping non-residual Jessica rows match the four amount fields exactly",
+    "accept rows only if all 16 target keys resolve and overlapping non-residual Jessica rows match buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount exactly",
+    "if the valid token then hits historical entitlement/points/API errors, preserve exact code/message and remain fail-closed",
     "only after Data PASS materialize GP12_MAIN_NET_FLOW_BINDING_V1 and A_MAIN_NET_FLOW_CHECKPOINT_V1"
   ],
   "blocker_closed": false,
@@ -64,27 +65,47 @@
     "workflow": "DAO2 A Tushare Exact Probe V1",
     "workflow_path": ".github/workflows/dao2-a-tushare-exact-probe-v1.yml",
     "run_id": 35498618517,
+    "run_attempt": 3,
+    "event": "push",
     "run_conclusion": "success",
+    "run_updated_at": "2026-09-20T09:24:45Z",
     "head_sha": "6efd0e8d0dfa041d7e9b198cf03358fb6e21aa74",
     "artifact": {
-      "id": 10601488487,
+      "id": 10602906631,
       "name": "dao2-a-tushare-exact-probe-v1",
-      "digest": "sha256:a1e3c6a279b78665d28f21543f9eb99734dcc1d20259fdab2f9c28c5e32b22d0",
-      "expires_at": "2026-10-20T08:05:48Z"
+      "digest": "sha256:aafda03743cf50e8eb69a79e4b430c090d53d2a397c7798c0095e10324fe02c9",
+      "expires_at": "2026-10-20T09:24:43Z"
     },
     "result": {
-      "status": "NO_TUSHARE_TOKEN_SECRET",
-      "secret_present": false,
+      "status": "INCOMPLETE",
+      "secret_present": true,
       "resolved_target_count": 0,
       "semantic_overlap_pass": false,
       "all_targets_resolved": false,
-      "result_sha256": "66ef859a4a18b8800abe8512a74970ec3b5cd4ed8e458b018e064769d8cde7b6"
+      "result_sha256": "fa9cfb4c2fdccd9a4861f6c0d4660e3a1c52347d64d48143096042de22a21f71"
     },
-    "interpretation": "Workflow infrastructure executed successfully, but the repository Actions environment supplied an empty TUSHARE_TOKEN. No official API requests or Jessica overlap comparisons were performed. CI success is not Data PASS."
+    "api_error": {
+      "code": 40101,
+      "message": "您的token不对，请确认。",
+      "repeated_on_all_query_dates": [
+        "20200608",
+        "20201104",
+        "20210224",
+        "20210923",
+        "20210924",
+        "20211125",
+        "20220506",
+        "20230320",
+        "20230522"
+      ]
+    },
+    "interpretation": "The Actions secret is now present, but Tushare rejected every moneyflow request with code 40101 (invalid token). No target row resolved and no Jessica overlap comparison could execute. CI success is not Data PASS."
   },
   "environment_blocker": {
-    "code": "NO_TUSHARE_TOKEN_SECRET",
+    "code": "TUSHARE_TOKEN_INVALID",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Repository Actions secret TUSHARE_TOKEN must be configured; token must have moneyflow historical query entitlement."
+    "api_error_code": 40101,
+    "api_error_message": "您的token不对，请确认。",
+    "actionable_requirement": "Replace repository Actions secret TUSHARE_TOKEN with a valid Tushare token, then rerun the exact probe. Do not switch to a generic main-flow proxy."
   }
 }
