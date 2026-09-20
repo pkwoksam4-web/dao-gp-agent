@@ -1,0 +1,75 @@
+{
+  "snapshot_date": "2026-09-20",
+  "provider": "neon",
+  "project": {
+    "id": "red-term-29407678",
+    "name": "investment-intelligence-prod",
+    "region": "aws-us-east-2",
+    "pg_version": 17
+  },
+  "production_branch": {
+    "id": "br-raspy-breeze-b5clzass",
+    "name": "production",
+    "protected": false,
+    "protection_note": "Free-plan protected-branch limit prevented enabling protection."
+  },
+  "database": {
+    "name": "investment_intel",
+    "server_version": "17.11 (8a81ecb)",
+    "pgvector_version": "0.8.0",
+    "public_table_count": 185,
+    "write_read_smoke": "PASS",
+    "smoke_row_id": "CDS-3c243ea3ed46d50d"
+  },
+  "object_storage": {
+    "bucket": "investment-intelligence-artifacts",
+    "access_level": "private",
+    "region": "us-east-2",
+    "roundtrip_status": "PASS",
+    "probe_key": "verification/v2.70/runtime-storage-probe.txt",
+    "probe_bytes": 54,
+    "sha256": "cfd3db1d91cecca3db2f6fa156ee56833f028a4e04b7ac690608ba1065d66df2"
+  },
+  "hosted_runtime": {
+    "provider": "neon-functions",
+    "service_id": "intelcanary",
+    "deployment_id": "3",
+    "deployment_status": "completed",
+    "runtime": "nodejs24",
+    "region": "us-east-2",
+    "health_cron": "*/15 * * * *",
+    "invocation_observed": true,
+    "database_bound": true,
+    "database_unpooled_bound": true,
+    "object_storage_bound": true,
+    "no_execution": true,
+    "verification_status": "VERIFIED"
+  },
+  "managed_recovery": {
+    "snapshot_id": "snap-square-surf-b5zppaqf",
+    "snapshot_name": "pre-v264-schema",
+    "restored_branch_id": "br-twilight-grass-b5afh9ks",
+    "restore_mechanism_observed": true,
+    "restored_public_table_count": 0,
+    "restored_pgvector": false,
+    "current_release_recovery": false,
+    "status": "STALE_SNAPSHOT"
+  },
+  "infrastructure_gate": {
+    "status": "DEVELOPING",
+    "checks": {
+      "cloud_database": "PASS",
+      "object_storage_roundtrip": "PASS",
+      "hosted_runtime": "VERIFIED",
+      "current_release_managed_recovery": "STALE_SNAPSHOT"
+    }
+  },
+  "truth_guards": {
+    "cloud_verified_claimed": false,
+    "production_verified_claimed": false,
+    "release_closed_claimed": false,
+    "automatic_deployment": false,
+    "automatic_model_promotion": false,
+    "brokerage_execution": false
+  }
+}
