@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
   actions: read
+concurrency:
+  group: dao2-c-sector-backing-materialize-v1
+  cancel-in-progress: true
 jobs:
   materialize:
     runs-on: ubuntu-latest
