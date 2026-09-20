@@ -1,0 +1,71 @@
+{
+  "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "B",
+  "status": "PARTIAL_FILE_BACKED_NOT_IDENTITY_COMPLETE",
+  "historical_gp_v11": {
+    "factor_name": "Market Breadth/Diffusion",
+    "weight_pct": 4,
+    "recovery_status": "PARTIAL_FILE_BACKED",
+    "source_archive": {
+      "name": "v11_offline_backtest_v3_10.zip",
+      "library_path": "/倒/v11_offline_backtest_v3_10.zip",
+      "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
+      "library_file_size_bytes": 1301865,
+      "recorded_archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "current_session_raw_byte_materialization": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "archive_sha256_reverified_from_current_raw_bytes": false
+    },
+    "git_evidence": {
+      "repository": "pkwoksam4-web/dao-gp-agent",
+      "commit": "29c04309e64995b27898db8c1f621c0e31fbd0a7",
+      "matrix_path": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
+      "matrix_blob_sha": "c604125ea09c77135c011fbb9401605ff5aebe10",
+      "test_path": "scripts/test_strategy_factor_recovery_matrix_v482.py",
+      "test_blob_sha": "4898f222acc85181289f600a7c4158a1c01b069b",
+      "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+      "run_backtest_sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+      "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+      "run_formal_pipeline_sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"
+    },
+    "recovered_strategy_artifact": {
+      "artifact_id": 10134222317,
+      "downloaded_zip_sha256_current_session": "b972d9a794b4c0be7b82cc3bb2ec029b30e0e7714917858f8952413cafc3467c",
+      "contains_factor_recovery_matrix": true,
+      "contains_original_v3_10_source_archive": false,
+      "contains_original_market_breadth_function_source_text": false
+    }
+  },
+  "recovered_behavior": {
+    "outputs": [
+      "adv_all",
+      "dec_all",
+      "flat_all",
+      "adv_ratio_all",
+      "eligible-universe analogues",
+      "median cross-sectional return"
+    ],
+    "market_regime_use": "HOT if adv_all>3000; NEUTRAL if adv_all>=1000; otherwise COLD"
+  },
+  "historical_identity_boundary": {
+    "market_breadth_function_hash_recovered": true,
+    "market_breadth_function_source_text_recovered": false,
+    "exact_final_4pct_aggregation_recovered": false,
+    "normalization_recovered": false,
+    "clipping_recovered": false,
+    "proof_candidate_ratio_equals_historical_adv_ratio_all": false,
+    "silent_proxy_substitution_allowed": false,
+    "forward_fill_allowed": false
+  },
+  "candidate_boundary": {
+    "candidate_origin": "NEW_RECONSTRUCTION_CANDIDATE",
+    "candidate_series_is_historical_identity": false,
+    "candidate_can_be_verified_separately": true,
+    "candidate_verification_cannot_promote_historical_identity": true
+  },
+  "blocker": "MARKET_BREADTH_UNBOUND",
+  "blocker_closed": false,
+  "module_b_pass_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
