@@ -15,6 +15,7 @@ FORMAL_END = "20260417"
 SW2014_LAST = "20211210"
 SW2021_FIRST = "20211213"
 NEW_SW2021_L1 = {"801950.SI","801960.SI","801970.SI","801980.SI"}
+SW2014_ONLY_L1 = {"801020.SI"}
 
 
 def read_calendar(path: Path) -> list[str]:
@@ -193,8 +194,10 @@ def patch_series_with_tushare(root: Path, formal_calendar: Path) -> dict[str, An
             f = pd.read_parquet(p)
             present = set(f["trade_date"].astype(str))
         for d in dates - present:
-            # Do not request impossible taxonomy-era dates for the four new L1s.
+            # Do not request impossible taxonomy-era dates.
             if code in NEW_SW2021_L1 and d < SW2021_FIRST:
+                continue
+            if code in SW2014_ONLY_L1 and d > SW2014_LAST:
                 continue
             missing_by_date.setdefault(d,set()).add(code)
 
