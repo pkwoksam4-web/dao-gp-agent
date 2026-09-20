@@ -4,7 +4,7 @@
   "module_id": "B",
   "module_name": "MARKET_PACKAGE",
   "branch": "gp/dao2-b-market-package",
-  "status": "READY_TO_START",
+  "status": "MATERIALIZING",
   "depends_on": [],
   "owned_blockers": [
     "MARKET_BENCHMARK_UNBOUND",
@@ -27,5 +27,18 @@
     "silent_proxy_substitution": false,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
+  },
+  "progress": {
+    "discovery": "data/dao2/modules/B_MARKET_PACKAGE_DISCOVERY_V1.json",
+    "benchmark": {
+      "status": "VERIFYING_REPLAY",
+      "code": "000985",
+      "candidate_only": true,
+      "inherited_exact_blobs": true
+    },
+    "market_breadth": {
+      "status": "TODO",
+      "blocker": "MARKET_BREADTH_UNBOUND"
+    }
   }
 }
