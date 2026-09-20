@@ -1,0 +1,28 @@
+name: DAO2 C SECTOR_PIT Guard V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'data/dao2/modules/C_SECTOR_PIT_STATE_V1.json'
+      - 'docs/dao2/modules/C_SECTOR_PIT.md'
+      - 'scripts/dao2_module_state_guard_v1.py'
+      - '.github/workflows/dao2-c-sector-pit-guard-v1.yml'
+  pull_request:
+    paths:
+      - 'data/dao2/modules/C_SECTOR_PIT_STATE_V1.json'
+      - 'scripts/dao2_module_state_guard_v1.py'
+permissions:
+  contents: read
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate module state
+        env:
+          PYTHONPATH: scripts
+        run: python scripts/dao2_module_state_guard_v1.py data/dao2/modules/C_SECTOR_PIT_STATE_V1.json
