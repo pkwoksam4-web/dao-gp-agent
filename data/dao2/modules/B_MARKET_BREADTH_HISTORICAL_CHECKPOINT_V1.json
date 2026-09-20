@@ -1,15 +1,15 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
-  "version": "1.1",
+  "version": "1.2",
   "module_id": "B",
-  "status": "PARTIAL_FILE_BACKED_NOT_IDENTITY_COMPLETE",
+  "status": "RAW_HISTORICAL_EXECUTABLE_IDENTITY_RECOVERED_FINAL_MAPPING_MISSING",
   "blocker": "MARKET_BREADTH_UNBOUND",
   "blocker_closed": false,
   "close_condition": "Recover exact aggregation + normalization + clipping + final 4% mapping, or sufficiently authoritative historical executable identity.",
   "historical_gp_v11": {
     "factor_name": "Market Breadth/Diffusion",
     "weight_pct": 4,
-    "recovery_status": "PARTIAL_FILE_BACKED",
+    "recovery_status": "RAW_EXECUTABLE_IDENTITY_RECOVERED",
     "historical_source_file": "src/run_panel_backtest.py",
     "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
     "source_archive": {
@@ -20,9 +20,11 @@
       "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
       "historical_exact_bytes_materialized_on_2026_09_10": true,
       "historical_exact_bytes_evidence": "GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482 records AUTHORITATIVE_FILE surface file_library_v3_10_exact_bytes: V3.10 ZIP was materialized and archive SHA verified; current-session rematerialization denial does not negate that historical verification.",
-      "current_session_raw_byte_materialization": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "current_session_raw_byte_materialization": "RECOVERED_VIA_EXACT_LIBRARY_COPY",
       "current_session_files_read": "NO_READABLE_CONTENT_FOR_ZIP",
-      "current_session_archive_sha256_reverified_from_raw_bytes": false
+      "current_session_archive_sha256_reverified_from_raw_bytes": true,
+      "package_manifest_sha256": "fa7fe8d4856a1a9140d7c3171c315cd0f2ec0a90ac4946b8c18940507f19aad8",
+      "authorized_recovery_copy_file_id": "file_00000000fd208206b76b9cd1e1dd43ba"
     },
     "daily_base_files": {
       "src/run_backtest.py": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
@@ -41,7 +43,19 @@
     ],
     "source_localization": "Initial factor recovery matrix commit 55b4730b7351ea8121fc29637bbfca693a006365 explicitly states V3.10 file-backed panel code computes these outputs; Market Regime uses the same daily panel component.",
     "market_regime_partial_mapping": "HOT if adv_all > 3000; NEUTRAL if adv_all >= 1000; otherwise COLD",
-    "daily_base_scope_note": "Historical V3.10 README is recorded as Daily structure layer only; complete Market/Sector/Fund/15m/60m final strategy layers are not merged."
+    "daily_base_scope_note": "Historical V3.10 README is recorded as Daily structure layer only; complete Market/Sector/Fund/15m/60m final strategy layers are not merged.",
+    "exact_raw_aggregation": {
+      "active_universe": "ex_suspended == false",
+      "observed_universe": "active rows with ret_d1 not null",
+      "eligible_universe": "observed rows with eligible == true",
+      "adv_ratio_all": "adv_all/max(1, adv_all+dec_all); flat excluded",
+      "adv_ratio_eligible": "adv_eligible/max(1, adv_eligible+dec_eligible)",
+      "median_ret_all": "median(ret_d1) over observed active universe"
+    },
+    "function_source_lines": "617..634",
+    "function_source_bytes_without_final_lf": 1150,
+    "function_source_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "behavior_reverse_check": "PASS_HISTORICAL_STREAMING_EQUIVALENCE_PLUS_CURRENT_CUSTOM_CASE"
   },
   "git_recovery_evidence": {
     "initial_factor_matrix_commit": "55b4730b7351ea8121fc29637bbfca693a006365",
@@ -88,7 +102,13 @@
   },
   "source_text_search": {
     "pr8_full_patch_search": {
-      "searched_terms": ["adv_all", "dec_all", "flat_all", "adv_ratio_all", "market_breadth_function_sha256"],
+      "searched_terms": [
+        "adv_all",
+        "dec_all",
+        "flat_all",
+        "adv_ratio_all",
+        "market_breadth_function_sha256"
+      ],
       "result": "ONLY_RECOVERY_MATRIX_AND_TEST_REFERENCES",
       "historical_function_source_text_found": false
     },
@@ -109,18 +129,37 @@
       "v3_6": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
       "v3_4": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH"
     },
-    "current_runtime_filesystem_scan": "NO_V3_10_ZIP_OR_RUN_PANEL_BACKTEST_PY_FOUND"
+    "current_runtime_filesystem_scan": "NO_V3_10_ZIP_OR_RUN_PANEL_BACKTEST_PY_FOUND",
+    "library_exact_copy_recovery": {
+      "original_file_id": "file_0000000027d4820683c9a38a9886d045",
+      "copied_file_id": "file_00000000fd208206b76b9cd1e1dd43ba",
+      "raw_materialization": "PASS",
+      "archive_sha256_exact_match": true,
+      "source_file_sha256_exact_match": true,
+      "function_sha256_exact_match": true
+    },
+    "historical_function_source_text_found": true,
+    "historical_function_source_path": "src/run_panel_backtest.py"
   },
   "historical_identity_boundary": {
     "market_breadth_function_hash_recovered": true,
-    "market_breadth_function_source_text_recovered": false,
-    "exact_all_vs_eligible_aggregation_recovered": false,
+    "market_breadth_function_source_text_recovered": true,
+    "exact_all_vs_eligible_aggregation_recovered": true,
     "normalization_recovered": false,
     "clipping_recovered": false,
     "final_4pct_mapping_recovered": false,
     "proof_candidate_ratio_equals_historical_adv_ratio_all": false,
     "silent_proxy_substitution_allowed": false,
-    "forward_fill_allowed": false
+    "forward_fill_allowed": false,
+    "v310_package_contains_final_4pct_mapping": false,
+    "raw_executable_identity_status": "PASS",
+    "final_factor_identity_status": "BLOCKED",
+    "scope_evidence": {
+      "readme_cn_sha256": "195e8e126437cdd4a9ed1f68e7d503d07ba2470cfbef124c17504d21ede42b6a",
+      "readme_panel_cn_sha256": "21d47ec268115f036a89bb99517b73dfc6eff5d5a73ced8e0d8cc37aa70f4395",
+      "data_source_validation_sha256": "089bf7a29e123591d90749b0f00d20f9b95304882d1fc212c9527afbd0439892",
+      "finding": "V3.10 explicitly declares Daily Base only; Market Regime and Sector RS/Breadth are not merged into the final score layer."
+    }
   },
   "candidate_boundary": {
     "checkpoint": "data/dao2/modules/B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1.json",
@@ -130,12 +169,13 @@
     "candidate_verification_cannot_promote_historical_identity": true
   },
   "next_search_order": [
-    "Recover historical source text for the SHA-bound breadth function from any surviving historical artifact/carrier.",
-    "Search for an authoritative executable artifact whose input/output identity proves the exact V3.10 breadth function without source text.",
-    "Only after exact executable identity is established, reconstruct Formal 1426-day historical breadth panel under no-lookahead rules.",
-    "Do not close MARKET_BREADTH_UNBOUND from candidate breadth."
+    "Search historical carriers outside V3.10 Daily Base for the final Market Breadth/Diffusion normalization, clipping and 4% score mapping.",
+    "Search for an authoritative historical executable whose output proves the final 4% mapping even if source text is absent.",
+    "Do not infer the final 4% mapping from raw adv_ratio_all/adv_ratio_eligible.",
+    "Candidate breadth remains isolated and cannot close MARKET_BREADTH_UNBOUND."
   ],
   "module_b_pass_allowed": false,
   "model_freeze_allowed": false,
-  "oos_metrics_allowed": false
+  "oos_metrics_allowed": false,
+  "historical_source_artifact": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json"
 }
