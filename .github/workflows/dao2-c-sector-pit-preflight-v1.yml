@@ -8,6 +8,12 @@ on:
       - 'scripts/dao2_sector_pit_verify_v1.py'
       - 'scripts/test_dao2_sector_pit_verify_v1.py'
       - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
+  pull_request:
+    paths:
+      - 'data/dao2/modules/C_SECTOR_*_V1.json'
+      - 'scripts/dao2_sector_pit_verify_v1.py'
+      - 'scripts/test_dao2_sector_pit_verify_v1.py'
+      - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
   workflow_dispatch:
 permissions:
   contents: read
