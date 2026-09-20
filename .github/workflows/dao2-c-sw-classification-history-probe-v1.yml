@@ -28,7 +28,25 @@ jobs:
           import pandas as pd
           out={"artifact":"DAO2_C_SW_CLASSIFICATION_HISTORY_PROBE_V1"}
           try:
-              f=ak.stock_industry_clf_hist_sw()
+              try:
+                  f=ak.stock_industry_clf_hist_sw()
+                  out["transport"]="akshare_default_tls"
+              except Exception as first_exc:
+                  import io, requests, urllib3
+                  urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                  url="https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls"
+                  resp=requests.get(url,timeout=30,verify=False)
+                  resp.raise_for_status()
+                  raw=resp.content
+                  Path("artifact_sw_history/StockClassifyUse_stock.xls").write_bytes(raw)
+                  out["raw_xls_sha256"]=hashlib.sha256(raw).hexdigest()
+                  out["raw_xls_bytes"]=len(raw)
+                  out["transport"]="direct_https_verify_false_after_tls_failure"
+                  out["initial_error"]=repr(first_exc)
+                  f=pd.read_excel(__import__("io").BytesIO(raw),dtype={"股票代码":"str","行业代码":"str"})
+                  f=f.rename(columns={"股票代码":"symbol","计入日期":"start_date","行业代码":"industry_code","更新日期":"update_time"})
+                  if "start_date" in f: f["start_date"]=pd.to_datetime(f["start_date"],errors="coerce").dt.date
+                  if "update_time" in f: f["update_time"]=pd.to_datetime(f["update_time"],errors="coerce").dt.date
               out["ok"]=True
               out["rows"]=int(len(f))
               out["columns"]=list(f.columns)
