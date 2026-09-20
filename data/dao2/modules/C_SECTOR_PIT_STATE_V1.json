@@ -4,7 +4,7 @@
   "module_id": "C",
   "module_name": "SECTOR_PIT",
   "branch": "gp/dao2-c-sector-pit",
-  "status": "VERIFYING",
+  "status": "BLOCKED",
   "depends_on": [],
   "owned_blockers": [
     "SECTOR_SERIES_UNBOUND",
@@ -23,7 +23,14 @@
     "data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json",
     "artifact/C_SECTOR_PIT_CHECKPOINT_V1.json"
   ],
-  "checkpoint": null,
+  "checkpoint": {
+    "verified": true,
+    "kind": "PREFLIGHT_BLOCKED_STATE",
+    "path": "data/dao2/modules/C_SECTOR_PIT_PREFLIGHT_CHECKPOINT_V1.json",
+    "workflow_run_id": 35498836988,
+    "artifact_id": 10600914594,
+    "note": "Preflight verified the frozen calendar and fail-closed contracts; it does not close any of the three sector blockers."
+  },
   "governance": {
     "fail_closed": true,
     "forward_fill": false,
@@ -61,7 +68,14 @@
       "path": "scripts/dao2_sector_pit_verify_v1.py",
       "tests": "scripts/test_dao2_sector_pit_verify_v1.py",
       "workflow": ".github/workflows/dao2-c-sector-pit-preflight-v1.yml",
-      "status": "PENDING_CI_PREFLIGHT"
+      "status": "PASS_PREFLIGHT_BLOCKERS_PRESERVED",
+      "workflow_run_id": 35498836988,
+      "artifact_id": 10600914594
+    },
+    "candidate_materialization": {
+      "tushare_token_available_in_pr_actions": false,
+      "status": "BLOCKED_CI_CREDENTIAL_ABSENT",
+      "note": "Do not infer global source unavailability from this CI credential state."
     }
   }
 }
