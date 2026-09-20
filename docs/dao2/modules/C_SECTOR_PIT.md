@@ -1,6 +1,6 @@
 # Module C — SECTOR_PIT
 
-Status: VERIFYING
+Status: BLOCKED
 
 ## Objective
 Build a reproducible, PIT-valid sector package for F3/F4/F5 without claiming reconstructed inputs are historical GP V1.1 inputs.
@@ -39,7 +39,7 @@ Pre-switch membership is a projection of SW2021 intervals back to SW2014 L1 thro
 - PIT membership: data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json
 - Sector breadth: data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json
 
-No component is currently PASS.
+No component is currently PASS. Preflight run `35498836988` verified the frozen 1,426-day Formal calendar and the fail-closed verifier contract; artifact `10600914594` records that all three data blockers remain open.
 
 ## Verifier
 `scripts/dao2_sector_pit_verify_v1.py` enforces:
@@ -65,3 +65,14 @@ The verifier intentionally does **not** invent the sector-breadth ratio definiti
 TODO -> MATERIALIZING -> VERIFYING -> PASS/BLOCKED -> FROZEN
 
 A PASS/FROZEN state must carry a verified checkpoint. CI success alone does not establish sector data/model success.
+
+
+## Verified preflight
+- Workflow run: 35498836988
+- Artifact: 10600914594 (`dao2-c-sector-pit-preflight-v1`)
+- Artifact ZIP SHA256: `d7163a7f7b8b5a70a9af292a31c18bbba05e8db9e7bf5d96ae56dc1306e37b76`
+- Contract tests: PASS
+- Frozen Formal calendar replay: 1,426 / 1,426
+- PR Actions `TUSHARE_TOKEN`: absent at this run
+
+The missing token is an environment limitation, not a claim that the provider data is globally unavailable.
