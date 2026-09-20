@@ -1,0 +1,41 @@
+{
+  "artifact": "DAO2_ACTIVE_FILESET_V1",
+  "source_commit": "175de3c17c0c792ee8dcaed39bf544af41184236",
+  "active": [
+    "data/GP12_CANDIDATE_FACTORS_V1.json",
+    "data/GP12_CANDIDATE_PARAMETERS_V1.json",
+    "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json",
+    "data/GP12_INTRADAY_FORMAL847_BINDING_V1.json",
+    "data/GP12_PIT_ADJUSTED_CLOSE_BINDING_V1.json",
+    "scripts/gp12_candidate_v1.py",
+    "scripts/gp12_formal_input_readiness_v1.py",
+    "scripts/gp12_intraday_readiness_integration_v482.py",
+    "scripts/gp12_pit_readiness_integration_v482.py",
+    "scripts/gp12_source_router_v1.py",
+    "scripts/gp12_sohu_qfq_adapter_v1.py",
+    "scripts/gp12_eastmoney_adapter_v1.py",
+    "scripts/formal_readiness_v482.py",
+    "scripts/formal_readiness_finalize_v482.py",
+    "scripts/strategy_asset_recovery_v482.py",
+    "scripts/model_freeze_recovery_v482.py",
+    "scripts/oos_admission_v482.py",
+    "docs/gp12-candidate-review.md",
+    "docs/gp12-formal-input-readiness-v1.md",
+    ".github/workflows/gp12-candidate-v1.yml",
+    ".github/workflows/gp12-formal-input-readiness-v1.yml",
+    ".github/workflows/gp12-readiness-intraday-integration-v482.yml",
+    ".github/workflows/gp12-readiness-pit-adjusted-close-v482.yml",
+    ".github/workflows/formal-readiness-v482.yml",
+    ".github/workflows/formal-readiness-finalize-v482.yml"
+  ],
+  "migration_control": [
+    "docs/dao2/MIGRATION_BASELINE.md",
+    "data/DAO2_MIGRATION_STATE_V1.json",
+    "data/DAO2_ACTIVE_FILESET_V1.json",
+    "docs/dao2/NEXT_EXECUTION_ORDER.md",
+    "docs/dao2/PROVENANCE_AND_MEMORY_RULES.md",
+    "scripts/dao2_migration_guard_v1.py",
+    "scripts/test_dao2_migration_guard_v1.py",
+    ".github/workflows/dao2-migration-guard-v1.yml"
+  ]
+}
