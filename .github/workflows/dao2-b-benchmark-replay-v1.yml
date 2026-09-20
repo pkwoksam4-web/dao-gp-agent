@@ -7,7 +7,7 @@ on:
       - 'data/GP12_CANDIDATE_BENCHMARK_V1.json'
       - 'data/GP12_CANDIDATE_FACTORS_V1.json'
       - 'data/GP12_CANDIDATE_PARAMETERS_V1.json'
-      - 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64'
+      - 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex'
       - 'scripts/gp12_candidate_benchmark_v1.py'
       - 'scripts/test_gp12_candidate_benchmark_v1.py'
       - '.github/workflows/dao2-b-benchmark-replay-v1.yml'
@@ -41,7 +41,7 @@ jobs:
       - run: pip install -q requests
       - name: Materialize frozen 1426-date calendar
         run: |
-          base64 -d data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.b64 > /tmp/calendar.csv.gz
+          xxd -r -p data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex > /tmp/calendar.csv.gz
           gzip -dc /tmp/calendar.csv.gz > /tmp/calendar.csv
       - name: Replay 000985 benchmark validation
         env:
