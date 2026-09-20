@@ -1,0 +1,10 @@
+{
+  "release": "2.70",
+  "date": "2026-09-20",
+  "zip_sha256": "c49568d32b72a27f07048f43cd8b26c0330db9bcae76ba68dbbcb80cdcc55422",
+  "manifest_sha256": "9e4cf4fec4c0c6b87cd4d5c36ddf317ebdec636ba343d4b2044af067b8d3d700",
+  "tests": {"passed": 193, "failed": 0},
+  "postgres_tables": 185,
+  "infrastructure_gate": "DEVELOPING",
+  "release_closed": false
+}
