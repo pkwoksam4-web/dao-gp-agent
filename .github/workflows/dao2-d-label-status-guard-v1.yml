@@ -5,12 +5,25 @@ on:
       - gp/dao2-d-label-status
     paths:
       - 'data/dao2/modules/D_LABEL_STATUS_STATE_V1.json'
+      - 'data/dao2/modules/D_LABEL_STATUS_DISCOVERY_V1.json'
+      - 'data/GP12_LABEL_STATUS_BINDING_V1.json'
+      - 'data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json'
+      - 'data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json'
+      - 'data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json'
+      - 'artifact/D_LABEL_STATUS_CHECKPOINT_V1.json'
       - 'docs/dao2/modules/D_LABEL_STATUS.md'
+      - 'scripts/dao2_label_status_contract_v1.py'
+      - 'scripts/test_dao2_label_status_contract_v1.py'
       - 'scripts/dao2_module_state_guard_v1.py'
       - '.github/workflows/dao2-d-label-status-guard-v1.yml'
   pull_request:
     paths:
       - 'data/dao2/modules/D_LABEL_STATUS_STATE_V1.json'
+      - 'data/dao2/modules/D_LABEL_STATUS_DISCOVERY_V1.json'
+      - 'data/GP12_LABEL_STATUS_BINDING_V1.json'
+      - 'artifact/D_LABEL_STATUS_CHECKPOINT_V1.json'
+      - 'scripts/dao2_label_status_contract_v1.py'
+      - 'scripts/test_dao2_label_status_contract_v1.py'
       - 'scripts/dao2_module_state_guard_v1.py'
 permissions:
   contents: read
@@ -22,6 +35,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify label/status contract
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python -m unittest -v scripts/test_dao2_label_status_contract_v1.py
+          python scripts/dao2_label_status_contract_v1.py
       - name: Validate module state
         env:
           PYTHONPATH: scripts

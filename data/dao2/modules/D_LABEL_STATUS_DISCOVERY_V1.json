@@ -1,47 +1,26 @@
 {
   "artifact": "DAO2_D_LABEL_STATUS_DISCOVERY_V1",
-  "version": "1.0",
+  "version": "1.1",
   "as_of": "2026-09-20",
-  "source_repo": {
-    "repository": "Jessica-Zhangyj/dlquant",
-    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
-    "trade_calendar_blob_sha": "48cea045a6d348a2dc91bc077e34e1d9cae48120"
+  "correction_to_v1": "The 12 missing course-repository stock_st dates are supplementary-source gaps, not gaps in the formal V4.80 PIT-ST base.",
+  "formal_pit_st": {
+    "status": "FORMAL_BASE_COMPLETE",
+    "workflow_artifact": "gp-pit-st-v480-final-audit",
+    "artifact_id": 9972698555,
+    "artifact_digest": "sha256:a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58",
+    "independently_redownloaded_digest_match": true,
+    "lifecycle_pass": "847/847",
+    "calendar_pass": "1426/1426",
+    "missing_required_dates_total": 0,
+    "duplicate_daily_keys": 0,
+    "invalid_daily_rows": 0,
+    "outside_calendar_rows": 0,
+    "transition_crosscheck": "6/6 PASS",
+    "formal_overlay_rows": 1021953,
+    "transition_evidence": "data/PIT_ST_TRANSITION_EVIDENCE_V480.json",
+    "source_semantics": "BaoStock daily tradestatus + isST, fail-closed on UNKNOWN/FAILED, with lifecycle/calendar audit."
   },
-  "stock_st": {
-    "schema": [
-      "ts_code",
-      "name",
-      "trade_date",
-      "type",
-      "type_name"
-    ],
-    "semantics_observed": "ST risk-warning list by trade_date",
-    "total_date_files": 2360,
-    "formal_open_dates": 1426,
-    "formal_date_files": 1414,
-    "formal_missing_date_count": 12,
-    "formal_missing_dates": [
-      "20200618",
-      "20200708",
-      "20200710",
-      "20200720",
-      "20200803",
-      "20200804",
-      "20200824",
-      "20201120",
-      "20210104",
-      "20210129",
-      "20210316",
-      "20230202"
-    ],
-    "extra_formal_dates": [],
-    "first_formal_file": "20200601",
-    "last_formal_file": "20260417",
-    "sample_blob_sha_20260417": "0e93fab361876aa93467cf58e0bfe2e9189df658",
-    "complete": false
-  },
-  "existing_v482_trade_status": {
-    "status": "PIT_PARTIAL",
+  "v482_tradestatus_corrections": {
     "correction_doc": "docs/v482-pitst-tradestatus-corrections.md",
     "exact_point_corrections": [
       [
@@ -61,29 +40,141 @@
         "2024-06-13"
       ]
     ],
-    "note": "These corrections change tradestatus only; isST is explicitly unchanged."
+    "correction_count": 4,
+    "isST_changed": false
+  },
+  "course_stock_st_supplement": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "total_date_files": 2360,
+    "formal_open_dates": 1426,
+    "formal_date_files": 1414,
+    "formal_missing_date_count": 12,
+    "formal_missing_dates": [
+      "20200618",
+      "20200708",
+      "20200710",
+      "20200720",
+      "20200803",
+      "20200804",
+      "20200824",
+      "20201120",
+      "20210104",
+      "20210129",
+      "20210316",
+      "20230202"
+    ],
+    "role": "SUPPLEMENTARY_CROSSCHECK_ONLY",
+    "blocks_formal_pit_st": false
+  },
+  "course_price_limit_source": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "downloader_path": "xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py",
+    "downloader_blob_sha": "f00fed00a969a39a73a71152fb3031e1631c3476",
+    "trade_calendar_blob_sha": "48cea045a6d348a2dc91bc077e34e1d9cae48120",
+    "raw_source_manifest_blob_sha": "9ab3ffe23c56e2237bb66852f1cbdbe1f2794cf9",
+    "data_audit_blob_sha": "31da42ec4f5a6ab761b635be2f35622f4382ab30",
+    "provider": "Tushare",
+    "endpoint": "stk_limit(trade_date=date)",
+    "columns": [
+      "ts_code",
+      "trade_date",
+      "up_limit",
+      "down_limit"
+    ],
+    "open_dates_20160104_20260518": 2516,
+    "limit_date_files": 2516,
+    "formal_open_dates_20200601_20260417": 1426,
+    "data_audit_status": "ok",
+    "raw_rows_committed_in_course_repo": false,
+    "role": "PINNED_SOURCE_AND_SEMANTIC_PROVENANCE_FOR_CANDIDATE_PRICE_LIMIT_STATUS"
   },
   "status_semantics_work_breakdown": {
-    "st_flag": {
-      "status": "PARTIAL_12_DATE_GAPS"
+    "is_st": {
+      "status": "BOUND_FORMAL_PIT",
+      "source": "V4.80 PIT-ST + V4.82 correction invariant"
     },
     "suspension_or_trade_status": {
-      "status": "PARTIAL_EXISTING_V482"
+      "status": "BOUND_FORMAL_PIT",
+      "source": "V4.80 tradestatus + exactly four V4.82 point corrections"
     },
     "price_limit_state": {
-      "status": "UNBOUND_SEMANTICS"
+      "status": "BOUND_CANDIDATE_CONTRACT",
+      "source": "Tushare stk_limit official up_limit; current-session close event"
     },
     "final_tradability_rule": {
-      "status": "UNBOUND_COMPOSITION"
+      "status": "BOUND_CANDIDATE_CONTRACT",
+      "source": "exact composition in data/GP12_LABEL_STATUS_BINDING_V1.json"
+    },
+    "pit_timestamp": {
+      "status": "BOUND",
+      "source": "current-session status available at/after 15:00 Asia/Shanghai for after-close snapshots"
+    },
+    "future_horizon_status": {
+      "status": "BOUND_DIAGNOSTIC_ONLY",
+      "source": "V3.10 exact-horizon diagnostics; never signal input or fill mechanics"
     }
   },
   "historical_label_provenance": {
-    "status": "UNBOUND",
-    "note": "Same-course repositories contain newly authored label code, but that is not admissible evidence for historical GP label identity."
+    "status": "BOUND_FILE_BACKED",
+    "identity": "GP_V11_DAILY_BASE_V3_10",
+    "source_archive": {
+      "library_source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip",
+      "filename": "v11_offline_backtest_v3_10.zip",
+      "sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d"
+    },
+    "source_files": [
+      {
+        "path": "src/run_backtest.py",
+        "sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+        "role": "Daily Base features and label construction"
+      },
+      {
+        "path": "src/run_panel_backtest.py",
+        "sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+        "role": "panel walk-forward target calibration and target-specific purge"
+      },
+      {
+        "path": "src/run_formal_pipeline.py",
+        "sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c",
+        "role": "historical Formal pipeline carrier"
+      }
+    ],
+    "definition_authority": "Exact historical formulas remain the byte-identified V3.10 source above; this module does not re-author or substitute course-repository label code.",
+    "label_clock": "T+1/T+2/T+3 advance on the market trading calendar, never to the next stock bar after suspension.",
+    "label_families": [
+      "T+1",
+      "T+2",
+      "T+3",
+      "MFE",
+      "MAE",
+      "fixed-hit thresholds",
+      "ATR-adaptive 3-day first-touch UP/DOWN/FLAT/AMBIG"
+    ],
+    "probability_targets": [
+      "up_close_1",
+      "up_close_2",
+      "up_close_3",
+      "hit_up2_3d",
+      "hit_up4_3d",
+      "hit_dn2_3d"
+    ],
+    "target_horizons_market_days": {
+      "up_close_1": 1,
+      "up_close_2": 2,
+      "up_close_3": 3,
+      "hit_up2_3d": 3,
+      "hit_up4_3d": 3,
+      "hit_dn2_3d": 3
+    },
+    "target_specific_purge": true,
+    "leakage_rule": "Future label values and future status observations are validation outcomes only and cannot construct or tune the signal at T.",
+    "execution_diagnostics_boundary": "Future suspension/limit/delist fields may be used only by exact-horizon executable/event-clean diagnostics. They do not move the label clock and are not fill-price mechanics."
   },
-  "blockers": [
-    "LABEL_PROVENANCE_UNBOUND",
-    "STATUS_SEMANTICS_INCOMPLETE"
-  ],
+  "blocker_assessment": {
+    "LABEL_PROVENANCE_UNBOUND": "READY_TO_CLOSE_AFTER_CONTRACT_CI",
+    "STATUS_SEMANTICS_INCOMPLETE": "READY_TO_CLOSE_AFTER_CONTRACT_CI"
+  },
   "label_status_ready": false
 }

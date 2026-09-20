@@ -1,0 +1,108 @@
+{
+  "artifact": "GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482",
+  "version": "V4.82",
+  "strategy_id": "GP_V11",
+  "scope": "RECOVERED_DECISION_AND_POLICY_COMPONENTS_WITHOUT_PROMOTING_DAILY_BASE_TO_FULL_GP12",
+  "daily_base_probability_source": {
+    "source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip:src/run_panel_backtest.py",
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+    "make_edges_sha256": "e0202d76f5a4aae98bf6c4877316dfba3a4313187e3bf2cc6fbb55be268ce8a4",
+    "calibrate_fold_sha256": "fc989c4de8b792bcb97644342f17ca770f3edef737a0f969b9709186bac5f1ef",
+    "walk_forward_panel_sha256": "80a2af8f9a4ceb95691b52bd58f409b24f768c70ba4f66ba28b1acabe67e3a48",
+    "minimum_train_market_days": 720,
+    "step_market_days": 63,
+    "default_quantile_bins": 10,
+    "shrinkage_equivalent_rows": 20,
+    "target_specific_purge": true,
+    "calibration_semantics": "Training-only quantile edges are built from remaining_inertia; each test fold receives its training-bin rate shrunk toward the training global rate as (train_rate*train_n + global_rate*20)/(train_n+20); missing mapped bins fall back to the training global rate.",
+    "targets": [
+      "up_close_1",
+      "up_close_2",
+      "up_close_3",
+      "hit_up2_3d",
+      "hit_up4_3d",
+      "hit_dn2_3d"
+    ],
+    "target_horizons_market_days": {
+      "up_close_1": 1,
+      "up_close_2": 2,
+      "up_close_3": 3,
+      "hit_up2_3d": 3,
+      "hit_up4_3d": 3,
+      "hit_dn2_3d": 3
+    },
+    "reported_metrics": ["Brier", "LogLoss", "AUC", "train_base_rate", "test_base_rate"],
+    "full_gp12_probability_mapping_recovered": false
+  },
+  "components": [
+    {
+      "component": "output_framework",
+      "recovery_status": "USER_CONFIRMED_DEFINITION_ONLY",
+      "known": "Historical accepted framework exposes Structure, Inertia and Execution views plus P-up/P-range/P-down style probability outputs and key validation levels.",
+      "missing": "Exact full-strategy layer aggregation and exact mapping from the final 12-factor score/state to the three-way probability output remain unrecovered."
+    },
+    {
+      "component": "probability_mapping",
+      "recovery_status": "PARTIAL_FILE_BACKED",
+      "known": "V3.10 has executable training-only walk-forward calibration that converts frozen Daily Base remaining_inertia buckets into binary target probabilities for six exact targets, with default 720-day minimum training history, 63-day steps, ten training quantile bins, target-specific purge/embargo and 20-row-equivalent shrinkage toward the training base rate.",
+      "missing": "The recovered calibration is Daily Base only and does not recover the final GP12 P-up/P-range/P-down three-way probability mapping, its final score inputs, or any post-Daily incremental-layer recalibration contract."
+    },
+    {
+      "component": "execution_diagnostics",
+      "recovery_status": "PARTIAL_FILE_BACKED",
+      "known": "V3.10 uses exact-horizon executable masks and future suspension/limit/delist diagnostics to separate label existence from execution friction; EVENT_CLEAN folds also exclude event-contaminated exact horizons.",
+      "missing": "The recovered source explicitly says these are diagnostics rather than actual fill-price mechanics; limit-up/down fill rules, intraday/order-book execution, slippage and final entry/exit fills remain separate."
+    },
+    {
+      "component": "ranking_topn",
+      "recovery_status": "MISSING",
+      "known": "Cross-sectional panel outputs and score buckets exist in Daily Base, but no authoritative historical final Top-N selection rule is recovered.",
+      "missing": "Exact historical rank key, tie-break rule, Top-N count, rebalance interaction and eligibility ordering are missing. Candidate Top-N=10 is a 2026-09-09 proposal and is not historical authority."
+    },
+    {
+      "component": "entry_exit_thresholds",
+      "recovery_status": "MISSING",
+      "known": "Recovered packages contain forecast labels and execution-risk diagnostics but no authoritative full-strategy entry/exit score thresholds.",
+      "missing": "Exact historical entry threshold, exit threshold, stop/invalidity semantics and interaction with Structure/Inertia/Execution are missing. Candidate entry>=60 and exit<45 are rejected as historical parameters."
+    },
+    {
+      "component": "holding_rebalance_policy",
+      "recovery_status": "MISSING",
+      "known": "Historical Daily Base evaluates T+1/T+2/T+3 forecast targets and exact market-day horizons.",
+      "missing": "T+1/T+2/T+3 forecast horizons are not a holding policy. Exact maximum/minimum holding time, rebalance cadence, early exit, carry-forward and suspended-name handling for the strategy remain unrecovered; candidate max holding=3 is proposal-only."
+    },
+    {
+      "component": "position_sizing_risk",
+      "recovery_status": "MISSING",
+      "known": "The accepted framework treats market environment and execution as risk-control context, but no complete position-sizing implementation is recovered from the historical packages.",
+      "missing": "Per-name cap, sector cap, capital-at-risk rule, portfolio gross/net exposure, drawdown response and adverse-move action are missing. Candidate 10% name cap, 20% sector cap, 1% capital risk and 8% adverse-move rule are proposal-only."
+    }
+  ],
+  "rejected_candidate_policy_values": {
+    "source": "GP12_REBUILD_CANDIDATE_V1 / PR #9",
+    "historical_status": "REJECT_AS_HISTORICAL_PARAMETERS",
+    "entry_score_min": 60,
+    "exit_score_below": 45,
+    "top_n": 10,
+    "max_holding_market_sessions": 3,
+    "one_way_basis_points": 10,
+    "per_symbol_max_weight": 0.1,
+    "per_sector_max_weight": 0.2,
+    "per_name_capital_risk": 0.01,
+    "adverse_price_move_threshold": 0.08,
+    "freeze_eligible": false
+  },
+  "full_parameter_set_recovered": false,
+  "full_strategy_probability_mapping_recovered": false,
+  "remaining_policy_gaps": [
+    "full_gp12_three_way_probability_mapping",
+    "ranking_topn_semantics",
+    "entry_exit_thresholds",
+    "holding_and_rebalance_policy",
+    "position_sizing_and_risk_rules",
+    "actual_fill_price_and_intraday_execution_rules"
+  ],
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
