@@ -1,39 +1,33 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
-  "version": "1.0",
+  "version": "1.1",
   "module_id": "B",
   "status": "PARTIAL_FILE_BACKED_NOT_IDENTITY_COMPLETE",
+  "blocker": "MARKET_BREADTH_UNBOUND",
+  "blocker_closed": false,
+  "close_condition": "Recover exact aggregation + normalization + clipping + final 4% mapping, or sufficiently authoritative historical executable identity.",
   "historical_gp_v11": {
     "factor_name": "Market Breadth/Diffusion",
     "weight_pct": 4,
     "recovery_status": "PARTIAL_FILE_BACKED",
+    "historical_source_file": "src/run_panel_backtest.py",
+    "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
     "source_archive": {
       "name": "v11_offline_backtest_v3_10.zip",
       "library_path": "/倒/v11_offline_backtest_v3_10.zip",
       "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
       "library_file_size_bytes": 1301865,
-      "recorded_archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "historical_exact_bytes_materialized_on_2026_09_10": true,
+      "historical_exact_bytes_evidence": "GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482 records AUTHORITATIVE_FILE surface file_library_v3_10_exact_bytes: V3.10 ZIP was materialized and archive SHA verified; current-session rematerialization denial does not negate that historical verification.",
       "current_session_raw_byte_materialization": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
-      "archive_sha256_reverified_from_current_raw_bytes": false
+      "current_session_files_read": "NO_READABLE_CONTENT_FOR_ZIP",
+      "current_session_archive_sha256_reverified_from_raw_bytes": false
     },
-    "git_evidence": {
-      "repository": "pkwoksam4-web/dao-gp-agent",
-      "commit": "29c04309e64995b27898db8c1f621c0e31fbd0a7",
-      "matrix_path": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
-      "matrix_blob_sha": "c604125ea09c77135c011fbb9401605ff5aebe10",
-      "test_path": "scripts/test_strategy_factor_recovery_matrix_v482.py",
-      "test_blob_sha": "4898f222acc85181289f600a7c4158a1c01b069b",
-      "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
-      "run_backtest_sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
-      "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
-      "run_formal_pipeline_sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"
-    },
-    "recovered_strategy_artifact": {
-      "artifact_id": 10134222317,
-      "downloaded_zip_sha256_current_session": "b972d9a794b4c0be7b82cc3bb2ec029b30e0e7714917858f8952413cafc3467c",
-      "contains_factor_recovery_matrix": true,
-      "contains_original_v3_10_source_archive": false,
-      "contains_original_market_breadth_function_source_text": false
+    "daily_base_files": {
+      "src/run_backtest.py": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+      "src/run_panel_backtest.py": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+      "src/run_formal_pipeline.py": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"
     }
   },
   "recovered_behavior": {
@@ -45,26 +39,102 @@
       "eligible-universe analogues",
       "median cross-sectional return"
     ],
-    "market_regime_use": "HOT if adv_all>3000; NEUTRAL if adv_all>=1000; otherwise COLD"
+    "source_localization": "Initial factor recovery matrix commit 55b4730b7351ea8121fc29637bbfca693a006365 explicitly states V3.10 file-backed panel code computes these outputs; Market Regime uses the same daily panel component.",
+    "market_regime_partial_mapping": "HOT if adv_all > 3000; NEUTRAL if adv_all >= 1000; otherwise COLD",
+    "daily_base_scope_note": "Historical V3.10 README is recorded as Daily structure layer only; complete Market/Sector/Fund/15m/60m final strategy layers are not merged."
+  },
+  "git_recovery_evidence": {
+    "initial_factor_matrix_commit": "55b4730b7351ea8121fc29637bbfca693a006365",
+    "initial_factor_matrix_blob_sha": "2aa1c853ba022bec28d49d05e668ee6b41361b30",
+    "initial_matrix_claims": {
+      "breadth_recovery_status": "PARTIAL_FILE_BACKED",
+      "known": [
+        "V3.10 file-backed panel code computes adv_all, dec_all, flat_all, adv_ratio_all and eligible-universe analogues.",
+        "The same daily panel component computes median cross-sectional return."
+      ],
+      "missing": [
+        "Exact breadth/diffusion factor normalization and clipping.",
+        "Exact aggregation of all-versus-eligible breadth inputs.",
+        "Exact conversion to the final 4-percent weighted factor score."
+      ]
+    },
+    "recovery_test_commit_path": "scripts/test_strategy_factor_recovery_matrix_v482.py",
+    "recovery_test_asserts_function_sha": true,
+    "later_matrix_commit": "29c04309e64995b27898db8c1f621c0e31fbd0a7",
+    "later_matrix_blob_sha": "c604125ea09c77135c011fbb9401605ff5aebe10"
+  },
+  "strategy_recovery_artifacts": {
+    "archive_binding_run": {
+      "workflow_run": 34425611321,
+      "artifact_id": 10132524563,
+      "artifact_name": "gp-strategy-asset-recovery-v482",
+      "artifact_zip_sha256": "75af9f0029cca59e137e1ee9b5d3683c739ab447cefa6a6bc272f9d9112b313b",
+      "contains_original_v3_10_source_bytes": false
+    },
+    "factor_matrix_run": {
+      "workflow_run": 34426367814,
+      "artifact_id": 10132820877,
+      "artifact_name": "gp-strategy-asset-recovery-v482",
+      "artifact_zip_sha256": "804dbdaf7d3ca5beb933a25d58ca598083da18faacbfccba2b688dc30d69f192",
+      "contains_original_v3_10_source_bytes": false
+    },
+    "later_downloaded_recovery_artifact": {
+      "artifact_id": 10134222317,
+      "downloaded_zip_sha256_current_session": "b972d9a794b4c0be7b82cc3bb2ec029b30e0e7714917858f8952413cafc3467c",
+      "factor_matrix_file_sha256": "8f66c1e2719a575a08ec4f8b6c04be955002c05b9a267451de6595fc1cfac55a",
+      "contains_original_v3_10_source_archive": false,
+      "contains_original_market_breadth_function_source_text": false
+    }
+  },
+  "source_text_search": {
+    "pr8_full_patch_search": {
+      "searched_terms": ["adv_all", "dec_all", "flat_all", "adv_ratio_all", "market_breadth_function_sha256"],
+      "result": "ONLY_RECOVERY_MATRIX_AND_TEST_REFERENCES",
+      "historical_function_source_text_found": false
+    },
+    "library_standalone_source_search": {
+      "searched_targets": [
+        "run_backtest.py",
+        "run_panel_backtest.py",
+        "run_formal_pipeline.py",
+        "market_breadth_function_sha256",
+        "adv_ratio_all"
+      ],
+      "result": "NO_STANDALONE_HISTORICAL_SOURCE_OR_FUNCTION_EXCERPT_FOUND",
+      "historical_function_source_text_found": false
+    },
+    "historical_package_lineage_current_materialize_attempts": {
+      "v3_10": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "v3_9": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "v3_6": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "v3_4": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH"
+    },
+    "current_runtime_filesystem_scan": "NO_V3_10_ZIP_OR_RUN_PANEL_BACKTEST_PY_FOUND"
   },
   "historical_identity_boundary": {
     "market_breadth_function_hash_recovered": true,
     "market_breadth_function_source_text_recovered": false,
-    "exact_final_4pct_aggregation_recovered": false,
+    "exact_all_vs_eligible_aggregation_recovered": false,
     "normalization_recovered": false,
     "clipping_recovered": false,
+    "final_4pct_mapping_recovered": false,
     "proof_candidate_ratio_equals_historical_adv_ratio_all": false,
     "silent_proxy_substitution_allowed": false,
     "forward_fill_allowed": false
   },
   "candidate_boundary": {
+    "checkpoint": "data/dao2/modules/B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1.json",
     "candidate_origin": "NEW_RECONSTRUCTION_CANDIDATE",
     "candidate_series_is_historical_identity": false,
     "candidate_can_be_verified_separately": true,
     "candidate_verification_cannot_promote_historical_identity": true
   },
-  "blocker": "MARKET_BREADTH_UNBOUND",
-  "blocker_closed": false,
+  "next_search_order": [
+    "Recover historical source text for the SHA-bound breadth function from any surviving historical artifact/carrier.",
+    "Search for an authoritative executable artifact whose input/output identity proves the exact V3.10 breadth function without source text.",
+    "Only after exact executable identity is established, reconstruct Formal 1426-day historical breadth panel under no-lookahead rules.",
+    "Do not close MARKET_BREADTH_UNBOUND from candidate breadth."
+  ],
   "module_b_pass_allowed": false,
   "model_freeze_allowed": false,
   "oos_metrics_allowed": false
