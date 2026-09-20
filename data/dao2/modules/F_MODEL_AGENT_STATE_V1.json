@@ -1,0 +1,29 @@
+{
+  "artifact": "DAO2_MODULE_F_MODEL_AGENT_STATE_V1",
+  "version": "1.0",
+  "module_id": "F",
+  "module_name": "MODEL_AGENT",
+  "branch": "gp/dao2-f-model-agent",
+  "status": "WAITING_ON_E",
+  "depends_on": [
+    "E"
+  ],
+  "owned_blockers": [],
+  "objective": "After E passes, recover Multi-Agent V2.0 reproducibly, build V2.1 replay/context contracts, then evaluate Model Freeze and finally OOS admission.",
+  "inputs": [
+    "E checkpoint",
+    "V2.0 source snapshot or reconstructed equivalent evidence"
+  ],
+  "expected_outputs": [
+    "data/DAO2_MODULE_F_MODEL_AGENT_STATE_V1.json",
+    "artifact/F_MODEL_AGENT_CHECKPOINT_V1.json"
+  ],
+  "checkpoint": null,
+  "governance": {
+    "fail_closed": true,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
