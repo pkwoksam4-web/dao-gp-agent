@@ -1,0 +1,51 @@
+{
+  "artifact": "DAO2_C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_membership_pit",
+  "blocker": "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+  "status": "BLOCKED",
+  "blocker_closed_within_module": false,
+  "historical_gp_v11_membership_recovered": false,
+  "candidate_rebuild": {
+    "source_repository": "Jessica-Zhangyj/dlquant",
+    "source_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "generator_blob_sha": "f00fed00a969a39a73a71152fb3031e1631c3476",
+    "taxonomy_manifest_blob_sha": "4e00b89478581e85bf37938a8b935bdbb21a0875",
+    "endpoints": [
+      "Tushare index_classify(level=L1, src=SW2014/SW2021)",
+      "Tushare index_member_all(l1_code, is_new=Y/N)"
+    ],
+    "sw2014_last_trade_date": "2021-12-10",
+    "sw2021_first_trade_date": "2021-12-13",
+    "pre_switch_semantics": "SW2021 member intervals projected to SW2014 L1 through an explicit L3 migration bridge.",
+    "pre_switch_historical_authority": false,
+    "effective_rows_in_published_manifest": 12162,
+    "unresolved_pre_switch_rows_in_published_manifest": 7,
+    "unresolved_l3_codes": [
+      "859622.SI"
+    ],
+    "backing_membership_bytes_in_source_repository": false
+  },
+  "validation": {
+    "taxonomy_switch_verified": true,
+    "date_effective_interval_contract_verified_from_generator": true,
+    "unresolved_rows_fail_closed": true,
+    "formal_overlap_of_unresolved_rows_verifiable": false,
+    "full_formal_symbol_date_membership_coverage_proven": false,
+    "pit_valid": false
+  },
+  "blockers": [
+    "historical GP V1.1 PIT membership bytes are not recovered",
+    "published candidate pre-switch rows are projected, not direct official SW2014 membership",
+    "7 unresolved pre-switch rows exist and their exact affected symbol-date keys cannot be audited without backing membership bytes",
+    "materialized candidate membership parquet bytes are absent from the pinned public repository"
+  ],
+  "safety": {
+    "candidate_only": true,
+    "silent_proxy_substitution": false,
+    "forward_fill": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
