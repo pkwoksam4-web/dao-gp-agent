@@ -2,11 +2,9 @@
 
 As of: 2026-09-20
 
-This branch is the durable handoff point from the old “倒/GP” project into “倒2”.
-It is intentionally based on commit `175de3c17c0c792ee8dcaed39bf544af41184236`, not on `main`.
+This branch is the durable handoff from the old 倒/GP project into 倒2. The active baseline is V4.82; do not restart from V4.76 and do not treat main as the source of truth.
 
 ## Quant baseline
-- Version: V4.82
 - Formal window: 2020-06-01 through 2026-04-17
 - Official open dates: 1426
 - Frozen universe: 847
@@ -18,34 +16,18 @@ It is intentionally based on commit `175de3c17c0c792ee8dcaed39bf544af41184236`, 
 - Model freeze: CLOSED
 - OOS metrics: CLOSED
 
-## GP12 status
-Strategy ID: `GP12_REBUILD_CANDIDATE_V1`
-
-This is a newly authored reconstruction candidate. It is NOT recovered historical GP V1.1.
-
-Validated feature families:
-- market_calendar
+## Validated GP12 feature families
+- amount_turnover
 - intraday_15m
 - intraday_60m
+- market_calendar
 - stock_adjusted_close
 
-Ready factors:
-- F6
-- F7
-- F8
-- F9
-- F10
-- F12
+Ready factors: F6, F7, F8, F9, F10, F12.
+Blocked factors: F1, F2, F3, F4, F5, F11.
+F11 now lacks only main_net_flow.
 
-Blocked factors:
-- F1
-- F2
-- F3
-- F4
-- F5
-- F11
-
-Remaining hard blockers:
+## Remaining hard blockers: 8
 1. LABEL_PROVENANCE_UNBOUND
 2. MAIN_NET_FLOW_UNBOUND
 3. MARKET_BENCHMARK_UNBOUND
@@ -54,24 +36,33 @@ Remaining hard blockers:
 6. SECTOR_MEMBERSHIP_PIT_UNBOUND
 7. SECTOR_SERIES_UNBOUND
 8. STATUS_SEMANTICS_INCOMPLETE
-9. TURNOVER_RATIO_UNBOUND
 
-Safety flags remain:
-- candidate_scoring_ready=false
-- real_feature_inputs_validated=false
-- candidate_adoption_status=UNAPPROVED
-- candidate_freeze_ready=false
-- model_freeze_allowed=false
-- oos_metrics_allowed=false
+## Newly inherited verified closure: amount_turnover
+- BaoStock full Formal panel run: 34937058721
+- Artifact: 10383758045
+- 844 symbols / 1,011,607 turnover rows
+- missing=0, extra=0, duplicate=0, bad_turnover=0, unresolved_symbol=0
+- source semantics verified
+- turnover_ratio_pit_verified=true
+- downstream readiness run: 34938907264
+- readiness artifact: 10383992824
+- TURNOVER_RATIO_UNBOUND is closed
+- candidate/model/OOS gates remain closed
 
-## Verified downstream closures
-- Formal847 15m/60m coverage verified through fixed 1-minute source plus exact BaoStock fallback for 000638.SZ on 2026-04-13.
-- Stock adjusted-close PIT audit: 844 PASS / 0 FAIL.
-- 2,732 nominal events.
-- 270 standard overrides + 11 special overrides.
-- Maximum constant-scale difference 4.874600172237731 bp under 5 bp threshold.
-- Special previous-close audit 11/11 PASS.
+## Main-net-flow residual state
+The family is NOT closed yet, but it is no longer a broad source-discovery problem:
+- expected rows: 1,011,607
+- resolved: 1,011,591
+- unresolved: 16
+- resolved fraction: 0.9999841835811734
+- remaining task: recover exact Tushare-semantic values for 16 symbol-date keys
+- no generic main-flow proxy is admissible
 
-## Operating rule
-Fail closed. No forward fill. No silent proxy substitution. CI success is not data/model success.
-A completion claim requires forward reasoning plus reverse verification.
+## Safety
+GP12_REBUILD_CANDIDATE_V1 remains UNAPPROVED.
+Historical GP V1.1 is not recovered.
+candidate_scoring_ready=false
+model_freeze_allowed=false
+oos_metrics_allowed=false
+
+Fail closed. No forward fill. No silent proxy substitution. CI success is not data/model success. Completion claims require forward reasoning plus reverse verification.
