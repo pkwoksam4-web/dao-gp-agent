@@ -645,6 +645,25 @@ def official_membership(
     )
     pd.DataFrame(seven_evidence).to_csv(out / "seven_859622_resolution.csv", index=False)
 
+    expected_preclassification_gaps = {
+        "001211.SZ": {"count": 1, "min_date": "20210805", "max_date": "20210805", "first_official_start": "20210806"},
+        "001289.SZ": {"count": 14, "min_date": "20220124", "max_date": "20220217", "first_official_start": "20220218"},
+    }
+    observed_preclassification_gaps: dict[str, dict[str, Any]] = {}
+    for symbol_full, gap_rows in explicit_no_membership.groupby("symbol_full", sort=True):
+        short = str(symbol_full)[:6]
+        observed_preclassification_gaps[str(symbol_full)] = {
+            "count": int(len(gap_rows)),
+            "min_date": str(gap_rows["trade_date"].min()),
+            "max_date": str(gap_rows["trade_date"].max()),
+            "first_official_start": first_official_start.get(short),
+            "all_before_first_official_start": bool(
+                first_official_start.get(short)
+                and gap_rows["trade_date"].astype(str).lt(str(first_official_start.get(short))).all()
+            ),
+        }
+    exact_preclassification_gap_inventory = observed_preclassification_gaps == expected_preclassification_gaps
+
     standards = {
         "sw2014_hierarchy": {"path": str(sw2014_hierarchy), "sha256": sha256(sw2014_hierarchy)},
         "sw2014_index_map": {"path": str(sw2014_index_map), "sha256": sha256(sw2014_index_map)},
@@ -669,15 +688,7 @@ def official_membership(
         "weekend_switch_gap_rows_zero": forbidden_gap_rows == 0,
         "seven_bridge_rows_exact": len(special_bad) == 0,
         "required_sector_key_duplicates_zero": req_dup == 0,
-        "explicit_no_membership_is_officially_bounded": (
-            explicit_no_membership.empty
-            or (
-                set(explicit_no_membership["symbol_full"].unique()) == {"001289.SZ"}
-                and str(explicit_no_membership["trade_date"].min()) == "20220124"
-                and str(explicit_no_membership["trade_date"].max()) == "20220217"
-                and first_official_start.get("001289") == "20220218"
-            )
-        ),
+        "explicit_no_membership_is_officially_bounded": exact_preclassification_gap_inventory,
     }
     passed = all(checks.values())
     audit = {
@@ -720,6 +731,8 @@ def official_membership(
                 sym + (".SZ" if sym.startswith(("0","3")) else ".SH"): first_official_start.get(sym)
                 for sym in sorted(explicit_no_membership["symbol"].dropna().unique().tolist())
             },
+            "expected_preclassification_gaps": expected_preclassification_gaps,
+            "observed_preclassification_gaps": observed_preclassification_gaps,
         },
         "taxonomy_switch": {
             "sw2014_last_trade_date": SW2014_LAST,
