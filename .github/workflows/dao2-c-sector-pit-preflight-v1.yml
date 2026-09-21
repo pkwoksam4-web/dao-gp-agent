@@ -83,7 +83,8 @@ jobs:
           assert membership["validation"]["unresolved_rows_zero"] is True, membership
           assert membership["validation"]["full_formal_symbol_date_coverage_proven"] is True, membership
           assert series["blocker_closed_within_module"] is False, series
-          assert series["validation"]["forward_fill_allowed"] is False, series
+          series_forward_fill = series["validation"].get("forward_fill", series["validation"].get("forward_fill_allowed"))
+          assert series_forward_fill is False, series
           assert breadth["blocker_closed_within_module"] is False, breadth
           assert breadth["derivation_allowed"] is False, breadth
           assert historical["historical_recovery_claim_allowed"] is False, historical
