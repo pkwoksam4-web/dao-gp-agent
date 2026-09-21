@@ -1,0 +1,51 @@
+name: DAO2 C Infoway Sector Exact-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'scripts/dao2_c_infoway_sector_gap_probe_v1.py'
+      - '.github/workflows/dao2-c-infoway-sector-gap-probe-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      INFOWAY_API_KEY: ${{ secrets.INFOWAY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download PASS Membership exact required keys
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-backing-materialize-v1
+          path: membership-pass
+          run-id: 35575433267
+          github-token: ${{ github.token }}
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Run targeted Infoway exact-gap capability and overlap probe
+        run: |
+          python scripts/dao2_c_infoway_sector_gap_probe_v1.py \
+            --required-keys membership-pass/membership_out/formal_required_sector_keys.csv.gz \
+            --base-panel series-base/sector_close_formal.csv.gz \
+            --out artifact_infoway_sector_probe
+      - name: Upload complete raw + audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-infoway-sector-exact-gap-probe-v1
+          path: artifact_infoway_sector_probe/
+          if-no-files-found: error
+          retention-days: 30
