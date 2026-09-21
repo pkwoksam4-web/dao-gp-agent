@@ -54,11 +54,12 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "do not purchase or rely on a standard Infoway plan for Module A; the published maximum 3-year history excludes all 16 residual dates as of 2026-09-21",
-    "request Infoway Custom Plan confirmation for A-share historical tick/order or direct moneyflow archive covering 2020-06-08 through 2023-05-22",
-    "require original-order identity/aggregation plus active buy/sell direction sufficient to reproduce 200k-1m and >=1m Tushare buckets, or direct exact-equivalent four amount fields",
-    "obtain auditable raw/API provenance and perform Jessica pinned overlap exact-match before admitting any residual row",
-    "only after 16/16 exact recovery and overlap PASS materialize GP12_MAIN_NET_FLOW_BINDING_V1 and A_MAIN_NET_FLOW_CHECKPOINT_V1"
+    "use docs/dao2/modules/A_INFOWAY_CUSTOM_PLAN_DATA_REQUEST.md as the sole technical requirements baseline",
+    "obtain explicit Infoway Custom Plan evidence for 2020-06-08 through 2023-05-22 A-share history and exact L2/order or direct four-field moneyflow semantics",
+    "require 1-2 residual symbol-date samples/schema/endpoint documentation before any purchase",
+    "run Jessica pinned archive field-level exact-match on overlapping non-residual rows before admitting residual keys",
+    "only after overlap PASS retrieve 16/16 residual keys and rebuild the 1,011,607-row binding",
+    "if Infoway explicitly cannot provide original-order semantics or direct exact-equivalent fields, close the Infoway route"
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -102,11 +103,11 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "INFOWAY_EXACT_RECONSTRUCTION_NOT_PROVEN",
+    "code": "AWAITING_INFOWAY_CUSTOM_PLAN_EVIDENCE",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Only an Infoway Custom Plan or custom endpoint with auditable A-share history covering 2020-06-08 through 2023-05-22 and exact L2 active-order semantics can continue. Standard plans are insufficient; public trade/depth/candle schemas are not admissible substitutes."
+    "actionable_requirement": "Obtain explicit Infoway written confirmation plus at least 1-2 residual symbol-date sample responses/schema/endpoint documentation satisfying docs/dao2/modules/A_INFOWAY_CUSTOM_PLAN_DATA_REQUEST.md. No rows may be admitted before Jessica overlap exact-match."
   },
-  "current_source_strategy": "INFOWAY",
+  "current_source_strategy": "INFOWAY_CUSTOM_PLAN_ONLY",
   "infoway_probe": {
     "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
     "workflow_path": ".github/workflows/dao2-a-infoway-semantic-probe-v1.yml",
@@ -233,5 +234,12 @@
     "residual_latest": "2023-05-22",
     "residual_keys_outside_professional_window": "16/16",
     "standard_upgrade_sufficient_for_module_a": false
+  },
+  "infoway_custom_plan_public_evidence": {
+    "official_docs_tailored_solutions": true,
+    "official_support_contact": "hi@infoway.io",
+    "public_exact_moneyflow_capability_proven": false,
+    "public_2020_2023_l2_history_proven": false,
+    "interpretation": "Infoway publicly offers tailored/customized solutions, but public documentation does not prove the exact historical L2/order or direct moneyflow capability required by Module A. Written vendor confirmation and sample/schema evidence remain mandatory."
   }
 }
