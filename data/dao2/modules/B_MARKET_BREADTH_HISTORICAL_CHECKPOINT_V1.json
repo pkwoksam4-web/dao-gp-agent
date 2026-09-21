@@ -1,6 +1,6 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
-  "version": "1.4",
+  "version": "1.5",
   "module_id": "B",
   "status": "RAW_HISTORICAL_EXECUTABLE_IDENTITY_RECOVERED_FINAL_MAPPING_MISSING",
   "blocker": "MARKET_BREADTH_UNBOUND",
@@ -169,10 +169,10 @@
     "candidate_verification_cannot_promote_historical_identity": true
   },
   "next_search_order": [
-    "Search historical carriers by internal output fields and behavior rows, not by already-exhausted filenames or Daily Base source lineage.",
-    "Prioritize artifacts/logs that contain same-date raw breadth plus component/factor score plus total/final score.",
-    "If authoritative input/output pairs are recovered, enumerate only a finite predeclared transform family and require a unique exact mapping across all pairs.",
-    "Do not start transform fitting without authoritative pairs; remain fail-closed."
+    "Do not enumerate or fit scorer transforms while authoritative_pair_count remains zero.",
+    "Only resume formula identification if a new authoritative historical carrier yields same-date raw breadth and breadth component/final score outputs, or exact final scorer executable/source bytes.",
+    "Candidate breadth and prior-assistant output descriptions remain non-authoritative.",
+    "Remain fail-closed: MARKET_BREADTH_UNBOUND stays OPEN."
   ],
   "module_b_pass_allowed": false,
   "model_freeze_allowed": false,
@@ -346,7 +346,7 @@
       "authoritative_pair_count": 0,
       "finite_transform_enumeration_allowed": false,
       "uniqueness_test_allowed": false,
-      "reason": "No authoritative historical input/output pair links raw breadth input to normalized/clipped breadth component score and final score. Enumerating transforms now would be unconstrained curve fitting."
+      "reason": "Across repository artifacts, Library, Gmail, Drive, Replit and prior-conversation recovery, no authoritative historical input/output pair links raw breadth input to normalized/clipped component score and final score. Any transform enumeration would be underdetermined."
     },
     "blocker_effect": {
       "MARKET_BREADTH_UNBOUND": "OPEN",
@@ -356,6 +356,52 @@
       "final_4pct_mapping_recovered": false,
       "final_binding_allowed": false,
       "final_checkpoint_allowed": false
+    },
+    "gmail_drive_content_field_search": {
+      "time_scope": "Gmail 2026-08-20..2026-09-10; current authorized Google Drive scope",
+      "terms": [
+        "adv_ratio_all",
+        "adv_ratio_eligible",
+        "Market Breadth",
+        "Diffusion",
+        "score_total"
+      ],
+      "gmail_hits": 0,
+      "google_drive_hits": 0,
+      "result": "NO_INTERNAL_FIELD_CARRIER_FOUND"
+    },
+    "replit_historical_carriers": {
+      "apps": [
+        {
+          "title": "FruitfulStormySign",
+          "last_updated": "2026-08-29T13:37:40.513Z",
+          "status": "UNINSPECTABLE_FOR_EVIDENCE"
+        },
+        {
+          "title": "AgedCapitalDeclaration",
+          "last_updated": "2026-08-30T13:41:54.437Z",
+          "status": "UNINSPECTABLE_FOR_EVIDENCE"
+        }
+      ],
+      "current_attempt": "Read-only final-scorer field inspection timed out; follow-up on FruitfulStormySign returned Replit Agent busy and AgedCapitalDeclaration timed out.",
+      "evidentiary_effect": "NO_POSITIVE_EVIDENCE; cannot satisfy behavior identity or reduce blocker."
+    },
+    "prior_conversation_output_recovery": {
+      "result": "NO_AUTHORITATIVE_ROW_LEVEL_SCORER_OUTPUT_RECOVERED",
+      "recovered_clue_only": [
+        "summary",
+        "bucket_stats",
+        "walk_forward",
+        "daily_replay"
+      ],
+      "authority": "PRIOR_ASSISTANT_DESCRIPTION_ONLY",
+      "explicit_absence": [
+        "no user-provided/uploaded final scorer table",
+        "no same-date adv_ratio_all/adv_ratio_eligible -> normalized/clipped breadth score pair",
+        "no same-date breadth component -> total/final score pair",
+        "no historical Structure/Inertia/Execution numeric row usable as executable identity"
+      ],
+      "disposition": "CLUE_ONLY_NOT_BEHAVIOR_EVIDENCE"
     }
   }
 }
