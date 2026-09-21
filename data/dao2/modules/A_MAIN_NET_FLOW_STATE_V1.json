@@ -42,15 +42,15 @@
       "workflow_path": ".github/workflows/dao2-a-tushare-exact-probe-v1.yml",
       "run_id": 35498618517,
       "run_url": "https://github.com/pkwoksam4-web/dao-gp-agent/actions/runs/35498618517",
-      "run_attempt": 3,
+      "run_attempt": 7,
       "event": "push",
       "run_conclusion": "success",
-      "run_updated_at": "2026-09-20T09:24:45Z",
+      "run_updated_at": "2026-09-21T06:46:38Z",
       "head_sha": "6efd0e8d0dfa041d7e9b198cf03358fb6e21aa74",
-      "artifact_id": 10602906631,
+      "artifact_id": 10624963301,
       "artifact_name": "dao2-a-tushare-exact-probe-v1",
-      "artifact_digest": "sha256:aafda03743cf50e8eb69a79e4b430c090d53d2a397c7798c0095e10324fe02c9",
-      "artifact_expires_at": "2026-10-20T09:24:43Z",
+      "artifact_digest": "sha256:a1f4a173e4c46de12f02c3937f42dc6a674318cd95d93ff005d7c45880e27744",
+      "artifact_expires_at": "2026-10-21T06:46:36Z",
       "result_status": "INCOMPLETE",
       "secret_present": true,
       "resolved_target_count": 0,
@@ -72,6 +72,6 @@
       ],
       "overlap_execution": "NOT_EXECUTED_API_REJECTED_ALL_DATES"
     },
-    "blocking_environment_requirement": "Replace repository Actions secret TUSHARE_TOKEN with a valid Tushare token, then rerun the same exact probe. Current API error is code=40101: 您的token不对，请确认。 No proxy substitution is permitted."
+    "blocking_environment_requirement": "Replace repository Actions secret TUSHARE_TOKEN with the exact valid token value from Tushare (no quotes/prefix/suffix), then rerun the same exact probe. Current API error remains code=40101: 您的token不对，请确认。 No proxy substitution is permitted."
   }
 }
