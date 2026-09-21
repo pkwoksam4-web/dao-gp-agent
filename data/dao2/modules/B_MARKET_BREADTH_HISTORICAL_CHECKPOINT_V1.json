@@ -1,11 +1,11 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
-  "version": "1.5",
+  "version": "1.6",
   "module_id": "B",
-  "status": "RAW_HISTORICAL_EXECUTABLE_IDENTITY_RECOVERED_FINAL_MAPPING_MISSING",
+  "status": "EVIDENCE_EXHAUSTED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING",
   "blocker": "MARKET_BREADTH_UNBOUND",
   "blocker_closed": false,
-  "close_condition": "Recover exact aggregation + normalization + clipping + final 4% mapping, or sufficiently authoritative historical executable identity.",
+  "close_condition": "Recover a new authoritative historical final-scorer carrier that proves exact executable identity or authoritative historical I/O sufficient to uniquely identify normalization, clipping, any all-vs-eligible final combination, and final 4% mapping.",
   "historical_gp_v11": {
     "factor_name": "Market Breadth/Diffusion",
     "weight_pct": 4,
@@ -169,10 +169,10 @@
     "candidate_verification_cannot_promote_historical_identity": true
   },
   "next_search_order": [
-    "Do not enumerate or fit scorer transforms while authoritative_pair_count remains zero.",
-    "Only resume formula identification if a new authoritative historical carrier yields same-date raw breadth and breadth component/final score outputs, or exact final scorer executable/source bytes.",
-    "Candidate breadth and prior-assistant output descriptions remain non-authoritative.",
-    "Remain fail-closed: MARKET_BREADTH_UNBOUND stays OPEN."
+    "Current authoritative search surfaces are exhausted. Do not continue unconstrained search or transform enumeration.",
+    "Reopen final-scorer identity recovery only when a genuinely new authoritative carrier appears.",
+    "For a new carrier: establish provenance/hash first, recover behavior identity second, run finite candidate uniqueness tests only if authoritative I/O permits, and generate final B binding/checkpoint only after unique identity is proven.",
+    "Until then remain fail-closed: MARKET_BREADTH_UNBOUND stays OPEN."
   ],
   "module_b_pass_allowed": false,
   "model_freeze_allowed": false,
@@ -403,5 +403,53 @@
       ],
       "disposition": "CLUE_ONLY_NOT_BEHAVIOR_EVIDENCE"
     }
+  },
+  "evidence_exhaustion_checkpoint_20260921": {
+    "status": "PASS_EVIDENCE_EXHAUSTION_BOUNDARY",
+    "search_scope_status": "CURRENT_AUTHORITATIVE_SURFACES_EXHAUSTED",
+    "authoritative_surfaces_searched": [
+      "GitHub repository final-scorer/internal-field code and output surfaces",
+      "Library historical packages and output-like artifacts",
+      "GitHub Actions strategy/model recovery artifacts",
+      "Sample50 factor artifacts (excluded as non-scorer)",
+      "Recovered external asset/account/relation/GH-archive packages",
+      "Gmail content field search in the authorized historical window",
+      "Google Drive content field search in current authorized scope",
+      "Replit historical carrier inspection attempts",
+      "Prior-conversation recovery, treated as clue-only unless backed by original user-provided artifact"
+    ],
+    "authoritative_pair_count": 0,
+    "final_identity": {
+      "normalization": "UNKNOWN",
+      "clipping": "UNKNOWN",
+      "all_vs_eligible_final_combination": "UNKNOWN",
+      "final_4pct_mapping": "UNKNOWN"
+    },
+    "blocker": "MARKET_BREADTH_UNBOUND",
+    "blocker_state": "OPEN",
+    "module_b_pass_allowed": false,
+    "final_binding_allowed": false,
+    "final_checkpoint_allowed": false,
+    "reopen_requires_new_authoritative_carrier": true,
+    "valid_new_authoritative_carrier_types": [
+      "exact historical final-scorer source or executable",
+      "same-date raw breadth -> breadth component score authoritative historical row(s)",
+      "breadth component score -> final/total score authoritative historical row(s)",
+      "multiple authoritative historical I/O rows sufficient to uniquely determine the mapping"
+    ],
+    "recovery_order_after_reopen": [
+      "provenance_and_hash",
+      "behavior_identity",
+      "finite_candidate_uniqueness_test_if_identifiable",
+      "final_binding_and_checkpoint"
+    ],
+    "prohibited_without_new_carrier": [
+      "normalization formula enumeration",
+      "clipping guesses",
+      "candidate breadth fitting to historical scorer",
+      "repeat of already-completed GitHub/Library/Gmail/Drive field searches",
+      "repeat of V3.2-V3.10 Daily Base lineage",
+      "use of prior assistant descriptions as historical evidence"
+    ]
   }
 }
