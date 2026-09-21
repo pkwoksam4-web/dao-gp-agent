@@ -81,6 +81,59 @@ def fetch_sw_analysis_day(trade_date: str) -> pd.DataFrame:
         raise RuntimeError(f"analysis endpoint returned non-request dates for {trade_date}: {wrong_dates[:10]}")
     return g[["industry_code","trade_date","close"]]
 
+
+def fetch_eastmoney_sw_history(code: str) -> pd.DataFrame:
+    """Fetch Eastmoney's mirror of the Shenwan index daily series for one 801xxx code."""
+    bare=code.removesuffix(".SI")
+    url="https://push2his.eastmoney.com/api/qt/stock/kline/get"
+    params={
+        "secid":f"90.{bare}",
+        "fields1":"f1,f2,f3,f4,f5,f6",
+        "fields2":"f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+        "klt":"101",
+        "fqt":"0",
+        "beg":FORMAL_START,
+        "end":FORMAL_END,
+        "lmt":"5000",
+    }
+    headers={
+        "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+        "Referer":"https://quote.eastmoney.com/",
+    }
+    last=None
+    for attempt in range(4):
+        try:
+            resp=requests.get(url,params=params,headers=headers,timeout=30)
+            resp.raise_for_status()
+            payload=resp.json()
+            data=payload.get("data") or {}
+            klines=data.get("klines") or []
+            rows=[]
+            for line in klines:
+                parts=str(line).split(",")
+                if len(parts)<3:
+                    continue
+                td=pd.to_datetime(parts[0],errors="coerce")
+                close=pd.to_numeric(parts[2],errors="coerce")
+                if pd.isna(td) or pd.isna(close):
+                    continue
+                rows.append({
+                    "industry_code":code,
+                    "trade_date":td.strftime("%Y%m%d"),
+                    "close":float(close),
+                })
+            out=pd.DataFrame(rows,columns=["industry_code","trade_date","close"])
+            if not out.empty:
+                out=out.drop_duplicates(["industry_code","trade_date"],keep=False).sort_values("trade_date").reset_index(drop=True)
+            return out
+        except Exception as exc:
+            last=exc
+            if attempt==3:
+                break
+            import time
+            time.sleep(2*(attempt+1))
+    raise RuntimeError(f"{code}: Eastmoney SW history failed after retries: {last!r}")
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--calendar",type=Path,required=True)
@@ -191,6 +244,85 @@ def main():
                 patch.append({"industry_code":code,"trade_date":td,"close":float(close),"source_provider":"swsresearch:index_analysis_report","source_trade_date":td,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
         print(f"daily {pos}/{len(gap_dates)} {d} rows={len(g)}",flush=True)
 
+    # Same-index mirror fallback: Eastmoney secid=90.801xxx.
+    # A code is eligible for patching only after its close levels match the official SW/AKShare
+    # base exactly on a substantial same-date overlap; otherwise it is rejected fail-closed.
+    patched_keys={(str(r["industry_code"]),str(r["trade_date"])) for r in patch}
+    remaining_for_eastmoney=set(missing)-patched_keys
+    eastmoney_patch_rows=0
+    eastmoney_errors=[]
+    eastmoney_overlap=[]
+    eastmoney_code_validation={}
+    eastmoney_raw_dir=args.out/"raw_eastmoney_sw_mirror"
+    eastmoney_raw_dir.mkdir(exist_ok=True)
+    for code in sorted({c for c,_ in remaining_for_eastmoney}):
+        try:
+            em=fetch_eastmoney_sw_history(code)
+        except Exception as exc:
+            eastmoney_errors.append({"industry_code":code,"error":repr(exc)})
+            eastmoney_code_validation[code]={"eligible":False,"reason":"FETCH_ERROR"}
+            continue
+        if em.empty:
+            eastmoney_errors.append({"industry_code":code,"error":"EMPTY"})
+            eastmoney_code_validation[code]={"eligible":False,"reason":"EMPTY"}
+            continue
+        em.to_parquet(eastmoney_raw_dir/f"{code}.parquet",index=False,compression="zstd")
+        dup=int(em.duplicated(["industry_code","trade_date"],keep=False).sum())
+        if dup:
+            eastmoney_errors.append({"industry_code":code,"error":f"duplicate_rows:{dup}"})
+            eastmoney_code_validation[code]={"eligible":False,"reason":"DUPLICATE"}
+            continue
+        overlaps=[]
+        for _,r in em.iterrows():
+            k=(code,str(r["trade_date"]))
+            if k in base:
+                diff=abs(float(base[k])-float(r["close"]))
+                overlaps.append(diff)
+                eastmoney_overlap.append({
+                    "industry_code":code,
+                    "trade_date":str(r["trade_date"]),
+                    "official_close":float(base[k]),
+                    "eastmoney_close":float(r["close"]),
+                    "abs_diff":diff,
+                })
+        overlap_rows=len(overlaps)
+        overlap_max=max(overlaps) if overlaps else None
+        eligible=bool(overlap_rows>=100 and overlap_max is not None and overlap_max<=1e-8)
+        eastmoney_code_validation[code]={
+            "eligible":eligible,
+            "overlap_rows":overlap_rows,
+            "max_abs_close_diff":overlap_max,
+            "required_min_overlap_rows":100,
+            "required_max_abs_close_diff":1e-8,
+            "secid":f"90.{code.removesuffix('.SI')}",
+            "fqt":0,
+        }
+        if not eligible:
+            eastmoney_errors.append({
+                "industry_code":code,
+                "error":"OVERLAP_VALIDATION_FAILED",
+                "overlap_rows":overlap_rows,
+                "max_abs_close_diff":overlap_max,
+            })
+            continue
+        em_map={(code,str(td)):float(close) for td,close in em[["trade_date","close"]].itertuples(index=False,name=None)}
+        for k in sorted(remaining_for_eastmoney):
+            if k[0]!=code or k not in em_map:
+                continue
+            patch.append({
+                "industry_code":code,
+                "trade_date":k[1],
+                "close":em_map[k],
+                "source_provider":"eastmoney:push2his:sw_index_mirror",
+                "source_trade_date":k[1],
+                "fill_method":"NONE",
+                "price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL",
+            })
+            eastmoney_patch_rows+=1
+
+    if eastmoney_overlap:
+        pd.DataFrame(eastmoney_overlap).to_csv(args.out/"eastmoney_official_same_day_overlap.csv",index=False)
+
     # Existing approved fallback: Tushare SW daily, exact same trade date only.
     patched_keys={(str(r["industry_code"]),str(r["trade_date"])) for r in patch}
     remaining_for_tushare=set(missing)-patched_keys
@@ -286,7 +418,20 @@ def main():
 
     audit={
       "artifact":"DAO2_C_SECTOR_SERIES_EXACT_AUDIT_V1",
-      "status":"PASS_SUBCOMPONENT" if not final_missing and duplicate_required_rows==0 and same_date and no_fill and finite else "BLOCKED",
+      "status":"PASS_SUBCOMPONENT" if (
+          not final_missing
+          and duplicate_required_rows==0
+          and same_date
+          and no_fill
+          and finite
+          and (
+              eastmoney_patch_rows==0
+              or all(
+                  eastmoney_code_validation.get(str(r["industry_code"]),{}).get("eligible") is True
+                  for r in patch if r.get("source_provider")=="eastmoney:push2his:sw_index_mirror"
+              )
+          )
+      ) else "BLOCKED",
       "formal":{"start":FORMAL_START,"end":FORMAL_END,"trading_days":len(dates)},
       "taxonomy_switch":{"sw2014_last":SW2014_LAST,"sw2021_first":SW2021_FIRST,"sw2014_only":sorted(SW2014_ONLY),"sw2021_new":sorted(SW2021_NEW)},
       "required_key_source":"PASS membership artifact: membership_out/formal_required_sector_keys.csv.gz",
@@ -303,6 +448,17 @@ def main():
       "gap_dates":gap_dates,
       "same_day_patch_rows":0 if patch_df.empty else int(len(patch_df)),
       "same_day_patch_duplicate_rows":patch_duplicate_rows,
+      "eastmoney_patch_rows":eastmoney_patch_rows,
+      "eastmoney_errors":eastmoney_errors,
+      "eastmoney_code_validation":eastmoney_code_validation,
+      "eastmoney_overlap_rows":len(eastmoney_overlap),
+      "eastmoney_patch_rows_all_overlap_validated":bool(
+          eastmoney_patch_rows==0
+          or all(
+              eastmoney_code_validation.get(str(r["industry_code"]),{}).get("eligible") is True
+              for r in patch if r.get("source_provider")=="eastmoney:push2his:sw_index_mirror"
+          )
+      ),
       "tushare_token_present":tushare_token_present,
       "tushare_patch_rows":tushare_patch_rows,
       "tushare_errors":tushare_errors,
