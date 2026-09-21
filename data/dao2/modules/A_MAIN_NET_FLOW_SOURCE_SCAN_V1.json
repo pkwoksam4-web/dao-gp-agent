@@ -54,10 +54,10 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "keep Infoway as the active source strategy",
-    "obtain/probe an Infoway endpoint or plan with 2020-2023 historical coverage for the residual dates",
-    "require exact equivalent semantics for buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount; generic money-flow or latest-trade fields are not admissible",
-    "cross-check overlapping non-residual Jessica rows field-by-field",
+    "do not purchase or rely on a standard Infoway plan for Module A; the published maximum 3-year history excludes all 16 residual dates as of 2026-09-21",
+    "request Infoway Custom Plan confirmation for A-share historical tick/order or direct moneyflow archive covering 2020-06-08 through 2023-05-22",
+    "require original-order identity/aggregation plus active buy/sell direction sufficient to reproduce 200k-1m and >=1m Tushare buckets, or direct exact-equivalent four amount fields",
+    "obtain auditable raw/API provenance and perform Jessica pinned overlap exact-match before admitting any residual row",
     "only after 16/16 exact recovery and overlap PASS materialize GP12_MAIN_NET_FLOW_BINDING_V1 and A_MAIN_NET_FLOW_CHECKPOINT_V1"
   ],
   "blocker_closed": false,
@@ -102,9 +102,9 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "INFOWAY_SEMANTIC_AND_HISTORY_INSUFFICIENT",
+    "code": "INFOWAY_EXACT_RECONSTRUCTION_NOT_PROVEN",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Use an Infoway endpoint/plan that exposes auditable 2020-2023 historical data with exact equivalent large/extra-large active buy/sell semantics; then exact-match overlapping Jessica rows before admitting any residual row."
+    "actionable_requirement": "Only an Infoway Custom Plan or custom endpoint with auditable A-share history covering 2020-06-08 through 2023-05-22 and exact L2 active-order semantics can continue. Standard plans are insufficient; public trade/depth/candle schemas are not admissible substitutes."
   },
   "current_source_strategy": "INFOWAY",
   "infoway_probe": {
@@ -190,5 +190,48 @@
       "result_sha256": "550301e28d6b65b911e82c160990f330cd4c346a291b907622e52a3284f5cb06"
     },
     "interpretation": "Infoway authentication is valid, but the documented/probed public A-share schemas do not expose Tushare-equivalent buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount, and the current plan cannot reach a 2021 residual date in the historical-minute probe. Infoway therefore cannot yet be admitted as an exact replacement source for Module A."
+  },
+  "infoway_reconstruction_audit": "data/dao2/modules/A_MAIN_NET_FLOW_INFOWAY_RECONSTRUCTION_AUDIT_V1.json",
+  "infoway_public_semantic_evidence": {
+    "tushare_moneyflow_doc": "https://tushare.pro/document/2?doc_id=170",
+    "tushare_rules": {
+      "small": "<50,000 CNY",
+      "medium": "50,000-200,000 CNY",
+      "large": "200,000-1,000,000 CNY",
+      "extra_large": ">=1,000,000 CNY",
+      "basis": "active buy/sell orders; Tushare states data are based on L2 orders"
+    },
+    "infoway_rest_index": "https://docs.infoway.io/en-docs/rest-api",
+    "infoway_a_share_overview": "https://docs.infoway.io/en-docs/readme/china-a-shares-data-api",
+    "infoway_latest_trade_doc": "https://docs.infoway.io/en-docs/rest-api/market-data/get-latest-trade",
+    "infoway_ws_trade_doc": "https://docs.infoway.io/en-docs/websocket/websocket-subscribe-method/latest-trade-subscription",
+    "infoway_ws_depth_doc": "https://docs.infoway.io/en-docs/websocket/websocket-subscribe-method/depth-subscription",
+    "infoway_trade_fields": [
+      "s",
+      "t",
+      "p",
+      "v",
+      "vw",
+      "td"
+    ],
+    "infoway_trade_direction": "td 0=default, 1=Buy, 2=Sell",
+    "original_order_id_exposed": false,
+    "original_order_aggregate_exposed": false,
+    "direct_moneyflow_endpoint_documented": false,
+    "historical_tick_rest_endpoint_documented": false,
+    "conclusion": "Public Infoway trade/depth feeds cannot prove exact reconstruction of Tushare L2 active-order large/extra-large buckets."
+  },
+  "infoway_standard_plan_history": {
+    "source": "https://infoway.io/en/stock-api",
+    "free": "last 6 months",
+    "basic": "last 1 year",
+    "premium": "last 2 years",
+    "professional": "last 3 years",
+    "as_of": "2026-09-21",
+    "professional_approx_earliest": "2023-09-21",
+    "residual_earliest": "2020-06-08",
+    "residual_latest": "2023-05-22",
+    "residual_keys_outside_professional_window": "16/16",
+    "standard_upgrade_sufficient_for_module_a": false
   }
 }
