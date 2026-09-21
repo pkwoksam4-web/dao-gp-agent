@@ -4,7 +4,7 @@
   "module_id": "B",
   "module_name": "MARKET_PACKAGE",
   "branch": "gp/dao2-b-market-package",
-  "status": "BLOCKED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING",
+  "status": "BLOCKED",
   "depends_on": [],
   "owned_blockers": [
     "MARKET_BENCHMARK_UNBOUND",
@@ -87,5 +87,7 @@
         "final_binding_and_checkpoint"
       ]
     }
-  }
+  },
+  "status_detail": "BLOCKED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING",
+  "block_reason": "External authoritative historical final-scorer carrier is missing; current authoritative search surfaces are exhausted and MARKET_BREADTH_UNBOUND remains open."
 }
