@@ -48,10 +48,21 @@
       "historical_sector_package_recovered": false
     },
     "sector_series": {
-      "status": "BLOCKED_PENDING_EXACT_SERIES_CLOSURE",
+      "status": "BLOCKED_EXACT_DATA_GAPS",
       "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
       "full_formal_coverage_proven": false,
-      "no_forward_fill_required": true
+      "required_sector_date_keys": 43084,
+      "observed_required_keys": 42783,
+      "missing_required_keys": 301,
+      "duplicate_required_keys": 0,
+      "same_date_provenance": true,
+      "fill_method": "NONE",
+      "forward_fill": false,
+      "synthetic": false,
+      "finite_positive_close": true,
+      "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
+      "workflow_run_id": 35575797301,
+      "manual_blocker": "GitHub Actions TUSHARE_TOKEN is invalid for sw_daily exact-gap recovery"
     },
     "sector_membership_pit": {
       "status": "PASS_SUBCOMPONENT",
@@ -65,9 +76,11 @@
       "artifact_id": 10628585296
     },
     "sector_breadth": {
-      "status": "BLOCKED_DEPENDENCIES_AND_FORMULA",
+      "status": "BLOCKED_PENDING_SERIES_PASS",
       "checkpoint": "data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json",
-      "derivation_allowed": false
+      "derivation_allowed": false,
+      "membership_dependency_closed": true,
+      "series_dependency_closed": false
     },
     "verifier": {
       "path": "scripts/dao2_sector_pit_verify_v1.py",

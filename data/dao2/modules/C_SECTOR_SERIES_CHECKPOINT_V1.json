@@ -7,71 +7,69 @@
   "status": "BLOCKED",
   "blocker_closed_within_module": false,
   "historical_gp_v11_sector_series_recovered": false,
-  "formal_window": {
-    "start": "2020-06-01",
-    "end": "2026-04-17",
-    "trading_days_expected": 1426,
-    "calendar_sha256": "5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7"
-  },
-  "candidate_rebuild": {
-    "source_repository": "Jessica-Zhangyj/dlquant",
-    "source_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
-    "source_manifest_blob_sha": "3828eb381e60cbcc0af725b538235e041c4485ca",
-    "required_industry_code_count": 32,
-    "providers": [
-      "Tushare sw_daily",
-      "AKShare index_hist_sw"
+  "candidate_only": true,
+  "exact_audit": {
+    "workflow_run_id": 35575797301,
+    "workflow_job_id": 106257284111,
+    "head_sha": "8b002379793ab4a7652fbcce2ec5c98e5633e84c",
+    "status": "BLOCKED",
+    "membership_source_run_id": 35575433267,
+    "membership_artifact_id": 10628585296,
+    "required_sector_date_keys": 43084,
+    "observed_required_keys": 42783,
+    "missing_required_keys": 301,
+    "duplicate_required_keys": 0,
+    "gap_dates": [
+      "20210806",
+      "20211008",
+      "20211022",
+      "20220303",
+      "20220323",
+      "20220331",
+      "20220414",
+      "20220505",
+      "20220509",
+      "20230908"
     ],
-    "backing_series_bytes_in_source_repository": false,
-    "source_manifest_records_missing_expected_dates": true,
-    "examples": [
-      {
-        "industry_code": "801010.SI",
-        "provider": "tushare",
-        "rows": 2516,
-        "missing_expected_date_count": 0
-      },
-      {
-        "industry_code": "801020.SI",
-        "provider": "akshare",
-        "rows": 1438,
-        "last_trade_date": "2021-12-10",
-        "missing_expected_date_count": 8
-      },
-      {
-        "pattern": "multiple AKShare series",
-        "missing_expected_date_count": 15,
-        "example_missing_dates": [
-          "2022-03-03",
-          "2022-03-23",
-          "2022-03-31",
-          "2022-04-14",
-          "2022-05-05",
-          "2022-05-09",
-          "2023-09-08"
-        ]
-      }
-    ]
+    "base_provider": "AKShare index_hist_sw / official SW trend",
+    "base_missing_keys": 301,
+    "official_analysis_patch_rows": 0,
+    "tushare_patch_rows": 0,
+    "tushare_token_present": true,
+    "tushare_error": "您的token不对，请确认。"
   },
   "validation": {
-    "exact_required_keys_must_be_derived_from_date_effective_membership": true,
-    "full_formal_coverage_proven": false,
-    "forward_fill_allowed": false,
-    "same_date_source_provenance_required": true,
-    "synthetic_rows_allowed": false,
-    "price_basis_binding": "UNRESOLVED",
-    "price_basis_note": "Pinned provider outputs expose an industry index close level, while GP12 candidate input family is named sector_adjusted_close. No historical authority currently proves those identities equivalent."
+    "exact_required_keys_from_pass_membership": true,
+    "required_key_count": 43084,
+    "exact_required_key_coverage": "42783/43084",
+    "missing_required_keys": 301,
+    "duplicate_required_keys": 0,
+    "same_date_provenance": true,
+    "fill_method": "NONE",
+    "forward_fill": false,
+    "synthetic": false,
+    "finite_positive_close": true,
+    "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
+    "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
+    "price_basis_unresolved": false,
+    "full_formal_coverage_proven": false
   },
   "blockers": [
-    "historical GP V1.1 sector-series bytes are not recovered",
-    "pinned public repository has no committed materialized 801xxx.SI series bytes",
-    "published source manifest contains nonzero required-date gaps",
-    "sector index close -> GP12 sector_adjusted_close price-basis binding is not yet proven"
+    "301 exact Membership-required sector-date close rows remain missing across 10 Formal trading dates.",
+    "Current GitHub Actions TUSHARE_TOKEN is present but invalid, so the existing Tushare sw_daily same-date recovery route cannot execute."
   ],
+  "evidence_boundary": {
+    "akshare_and_official_sw_trend_same_gap_pattern": true,
+    "no_forward_fill": true,
+    "no_synthetic_rows": true,
+    "no_required_key_deletion": true,
+    "no_historical_gp_v11_identity_claim": true
+  },
   "safety": {
     "candidate_only": true,
     "silent_proxy_substitution": false,
     "forward_fill": false,
+    "synthetic_rows": false,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
   }
