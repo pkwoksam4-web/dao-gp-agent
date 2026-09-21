@@ -646,8 +646,8 @@ def official_membership(
     pd.DataFrame(seven_evidence).to_csv(out / "seven_859622_resolution.csv", index=False)
 
     expected_preclassification_gaps = {
-        "001211.SZ": {"count": 1, "min_date": "20210805", "max_date": "20210805", "first_official_start": "20210806"},
-        "001289.SZ": {"count": 14, "min_date": "20220124", "max_date": "20220217", "first_official_start": "20220218"},
+        "001211.SZ": {"count": 1, "min_date": "20210805", "max_date": "20210805", "first_official_start": "20210806", "all_before_first_official_start": True},
+        "001289.SZ": {"count": 14, "min_date": "20220124", "max_date": "20220217", "first_official_start": "20220218", "all_before_first_official_start": True},
     }
     observed_preclassification_gaps: dict[str, dict[str, Any]] = {}
     for symbol_full, gap_rows in explicit_no_membership.groupby("symbol_full", sort=True):
