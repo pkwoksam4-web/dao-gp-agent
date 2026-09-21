@@ -93,7 +93,8 @@ jobs:
           x=json.load(open("membership_out/membership_audit.json",encoding="utf-8"))
           assert x["status"]=="PASS_SUBCOMPONENT",x
           assert x["unresolved_rows"]==0,x
-          assert x["formal_membership"]["mapped_stock_date_keys"]==1011607,x
+          assert x["formal_membership"]["coverage_resolved_stock_date_keys"]==1011607,x
+          assert x["formal_membership"]["unresolved_stock_date_keys"]==0,x
           assert x["formal_membership"]["duplicate_stock_date_keys"]==0,x
           assert len(x["seven_859622_resolution"])==7,x
           assert x["taxonomy_switch"]["pass"] is True,x
@@ -101,6 +102,8 @@ jobs:
               "status":x["status"],
               "unresolved_rows":x["unresolved_rows"],
               "mapped_stock_date_keys":x["formal_membership"]["mapped_stock_date_keys"],
+              "explicit_no_membership_stock_date_keys":x["formal_membership"]["explicit_no_membership_stock_date_keys"],
+              "coverage_resolved_stock_date_keys":x["formal_membership"]["coverage_resolved_stock_date_keys"],
               "required_sector_date_keys":x["formal_membership"]["required_sector_date_keys"],
               "seven_resolved":len(x["seven_859622_resolution"]),
               "sw_xls_sha256":x["canonical_sw_xls"]["sha256"],

@@ -410,6 +410,7 @@ def official_membership(
     hist = hist.dropna(subset=["symbol", "start_date", "classification_code"]).copy()
     hist = hist.sort_values(["symbol", "start_date"]).reset_index(drop=True)
     hist_dup = int(hist.duplicated(["symbol", "start_date"], keep=False).sum())
+    first_official_start = hist.groupby("symbol")["start_date"].min().to_dict()
 
     taxonomy_payload = json.loads(taxonomy.read_text(encoding="utf-8"))
     required_codes = set(map(str, taxonomy_payload["required_industry_codes"]))
@@ -553,19 +554,28 @@ def official_membership(
         out_code: str | None = None
         method = "UNRESOLVED"
         l3_idx: str | None = None
-        if code is not None and d <= SW2014_LAST:
+        if code is None:
+            first_start = first_official_start.get(sym)
+            if first_start is not None and d < first_start:
+                method = "OFFICIAL_NOT_YET_CLASSIFIED"
+        elif d <= SW2014_LAST:
             if code in old_l3_to_l1:
                 out_code = old_index.get(old_l3_to_l1[code])
                 method = "SW2014_DIRECT_OFFICIAL_HISTORY"
             else:
                 l3_idx = new_l3_idx.get(code)
+                source_l1_class = new_l3_to_l1.get(code)
+                source_l1_index = new_l1_index.get(source_l1_class) if source_l1_class else None
                 if (sym, code) in special_bridge:
                     out_code = special_bridge[(sym, code)]
                     method = "SW2021_859622_TO_SW2014_EXACT_HISTORY_BRIDGE"
                 elif l3_idx in bridge:
                     out_code = bridge[l3_idx]
                     method = "SW2021_L3_TO_SW2014_PINNED_BRIDGE"
-        elif code is not None and d >= SW2021_FIRST:
+                elif source_l1_index is not None and source_l1_index not in NEW_SW2021_L1:
+                    out_code = source_l1_index
+                    method = "SW2021_UNCHANGED_L1_IDENTITY"
+        elif d >= SW2021_FIRST:
             if code in new_l3_to_l1:
                 out_code = new_l1_index.get(new_l3_to_l1[code])
                 method = "SW2021_NATIVE_OFFICIAL_HISTORY"
@@ -581,7 +591,9 @@ def official_membership(
     panel["migration_l3_index_code"] = migration_l3
     panel["raw_xls_sha256"] = raw_xls_sha
 
-    unresolved = panel.loc[panel["industry_code"].isna()].copy()
+    explicit_no_membership = panel.loc[panel["mapping_method"].eq("OFFICIAL_NOT_YET_CLASSIFIED")].copy()
+    unresolved = panel.loc[panel["mapping_method"].eq("UNRESOLVED")].copy()
+    coverage_resolved = panel["industry_code"].notna() | panel["mapping_method"].eq("OFFICIAL_NOT_YET_CLASSIFIED")
     invalid_required = panel.loc[panel["industry_code"].notna() & ~panel["industry_code"].isin(required_codes)].copy()
     duplicate_mapped = int(panel.duplicated(["symbol_full", "trade_date"], keep=False).sum())
 
@@ -627,6 +639,7 @@ def official_membership(
     panel_out.to_csv(out / "industry_membership_formal.csv.gz", index=False, compression="gzip")
     req.to_csv(out / "formal_required_sector_keys.csv.gz", index=False, compression="gzip")
     unresolved.to_csv(out / "formal_membership_unresolved.csv", index=False)
+    explicit_no_membership.to_csv(out / "formal_membership_explicit_no_membership.csv", index=False)
     pd.DataFrame(seven_evidence).to_json(
         out / "seven_859622_resolution.json", orient="records", force_ascii=False, indent=2
     )
@@ -646,6 +659,7 @@ def official_membership(
         "seven_unresolved_resolved": len(seven_evidence) == 7,
         "unresolved_rows_zero": len(unresolved) == 0,
         "formal_stock_date_rows_exact": len(panel) == FORMAL_RAW_EXPECTED_ROWS,
+        "formal_coverage_resolved": int(coverage_resolved.sum()) == FORMAL_RAW_EXPECTED_ROWS,
         "formal_duplicate_symbol_date_zero": duplicate_mapped == 0,
         "mapped_industry_codes_within_required_32": len(invalid_required) == 0,
         "pre_switch_has_no_sw2021_new_l1": pre_new_l1 == 0,
@@ -655,6 +669,15 @@ def official_membership(
         "weekend_switch_gap_rows_zero": forbidden_gap_rows == 0,
         "seven_bridge_rows_exact": len(special_bad) == 0,
         "required_sector_key_duplicates_zero": req_dup == 0,
+        "explicit_no_membership_is_officially_bounded": (
+            explicit_no_membership.empty
+            or (
+                set(explicit_no_membership["symbol_full"].unique()) == {"001289.SZ"}
+                and str(explicit_no_membership["trade_date"].min()) == "20220124"
+                and str(explicit_no_membership["trade_date"].max()) == "20220217"
+                and first_official_start.get("001289") == "20220218"
+            )
+        ),
     }
     passed = all(checks.values())
     audit = {
@@ -682,12 +705,21 @@ def official_membership(
         },
         "formal_membership": {
             "mapped_stock_date_keys": int(panel["industry_code"].notna().sum()),
+            "explicit_no_membership_stock_date_keys": int(len(explicit_no_membership)),
+            "coverage_resolved_stock_date_keys": int(coverage_resolved.sum()),
             "unresolved_stock_date_keys": int(len(unresolved)),
             "duplicate_stock_date_keys": duplicate_mapped,
             "required_sector_date_keys": int(len(req)),
             "required_sector_date_key_duplicates": req_dup,
             "no_history_symbols": sorted(no_history_symbols),
             "invalid_required_code_rows": int(len(invalid_required)),
+            "explicit_no_membership_symbols": sorted(explicit_no_membership["symbol_full"].dropna().unique().tolist()),
+            "explicit_no_membership_min_date": None if explicit_no_membership.empty else str(explicit_no_membership["trade_date"].min()),
+            "explicit_no_membership_max_date": None if explicit_no_membership.empty else str(explicit_no_membership["trade_date"].max()),
+            "explicit_no_membership_next_official_start": {
+                sym + (".SZ" if sym.startswith(("0","3")) else ".SH"): first_official_start.get(sym)
+                for sym in sorted(explicit_no_membership["symbol"].dropna().unique().tolist())
+            },
         },
         "taxonomy_switch": {
             "sw2014_last_trade_date": SW2014_LAST,
@@ -708,6 +740,8 @@ def official_membership(
             "forward_fill": False,
             "synthetic_membership_rows": False,
             "uses_effective_date_only": True,
+            "future_classification_backfill": False,
+            "official_pre_classification_gap_is_explicit_no_membership": True,
             "historical_gp_v11_identity_claim": False,
         },
     }
