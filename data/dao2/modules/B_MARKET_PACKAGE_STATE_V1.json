@@ -1,10 +1,10 @@
 {
   "artifact": "DAO2_MODULE_B_MARKET_PACKAGE_STATE_V1",
-  "version": "1.0",
+  "version": "1.1",
   "module_id": "B",
   "module_name": "MARKET_PACKAGE",
   "branch": "gp/dao2-b-market-package",
-  "status": "MATERIALIZING",
+  "status": "BLOCKED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING",
   "depends_on": [],
   "owned_blockers": [
     "MARKET_BENCHMARK_UNBOUND",
@@ -16,8 +16,8 @@
   "active_blockers": [
     "MARKET_BREADTH_UNBOUND"
   ],
-  "primary_task": "MARKET_BREADTH_UNBOUND",
-  "objective": "Keep the verified 000985 candidate benchmark fixed and recover authoritative historical GP V1.1 market breadth executable identity without substituting candidate mathematics.",
+  "primary_task": "WAIT_FOR_NEW_AUTHORITATIVE_FINAL_SCORER_CARRIER",
+  "objective": "Preserve verified benchmark and raw historical breadth executable identity, remain fail-closed on MARKET_BREADTH_UNBOUND, and reopen final-scorer recovery only when a new authoritative historical carrier appears.",
   "inputs": [
     "data/GP12_CANDIDATE_FACTORS_V1.json",
     "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json"
@@ -35,7 +35,11 @@
     "candidate_breadth_cannot_close_historical_blocker": true,
     "historical_breadth_close_requires_exact_executable_identity_or_exact_aggregation_normalization_clipping_final_4pct_mapping": true,
     "model_freeze_allowed": false,
-    "oos_metrics_allowed": false
+    "oos_metrics_allowed": false,
+    "formula_recovery_reopen_requires_new_authoritative_carrier": true,
+    "current_authoritative_search_surfaces_exhausted": true,
+    "unconstrained_transform_enumeration_allowed": false,
+    "prior_assistant_description_is_historical_evidence": false
   },
   "progress": {
     "benchmark": {
@@ -49,7 +53,7 @@
       "replay_again": false
     },
     "market_breadth": {
-      "status": "RAW_HISTORICAL_EXECUTABLE_RECOVERED_FINAL_MAPPING_MISSING",
+      "status": "BLOCKED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING",
       "blocker": "MARKET_BREADTH_UNBOUND",
       "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
       "candidate_replay_isolated": true,
@@ -60,6 +64,27 @@
         "normalization",
         "clipping",
         "final_4pct_mapping_or_authoritative_equivalent_executable"
+      ],
+      "evidence_exhaustion_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
+      "evidence_exhaustion_status": "PASS_EVIDENCE_EXHAUSTION_BOUNDARY",
+      "authoritative_pair_count": 0,
+      "final_identity": {
+        "normalization": "UNKNOWN",
+        "clipping": "UNKNOWN",
+        "all_vs_eligible_final_combination": "UNKNOWN",
+        "final_4pct_mapping": "UNKNOWN"
+      },
+      "reopen_requires_one_of": [
+        "exact historical final-scorer source or executable",
+        "same-date raw breadth -> breadth component score authoritative historical row(s)",
+        "breadth component score -> final/total score authoritative historical row(s)",
+        "multiple authoritative historical I/O rows sufficient to uniquely determine the mapping"
+      ],
+      "next_recovery_order": [
+        "provenance_and_hash",
+        "behavior_identity",
+        "finite_candidate_uniqueness_test_if_identifiable",
+        "final_binding_and_checkpoint"
       ]
     }
   }
