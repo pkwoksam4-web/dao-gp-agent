@@ -36,6 +36,13 @@ jobs:
           path: membership-pass
           run-id: 35575433267
           github-token: ${{ github.token }}
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
       - name: Pin taxonomy manifest
         run: |
           mkdir -p upstream artifact_series
@@ -58,6 +65,7 @@ jobs:
             --required-keys membership-pass/membership_out/formal_required_sector_keys.csv.gz \
             --membership-checkpoint data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json \
             --price-basis data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json \
+            --base-panel series-base/sector_close_formal.csv.gz \
             --out artifact_series
       - uses: actions/upload-artifact@v4
         if: always()

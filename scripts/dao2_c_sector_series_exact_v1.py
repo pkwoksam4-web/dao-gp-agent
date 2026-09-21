@@ -141,13 +141,13 @@ def main():
     ap.add_argument("--required-keys",type=Path,required=True)
     ap.add_argument("--membership-checkpoint",type=Path,required=True)
     ap.add_argument("--price-basis",type=Path,required=True)
+    ap.add_argument("--base-panel",type=Path)
     ap.add_argument("--out",type=Path,required=True)
     args=ap.parse_args()
     args.out.mkdir(parents=True,exist_ok=True)
     raw_dir=args.out/"raw_index_hist_sw"
     raw_dir.mkdir(exist_ok=True)
 
-    import akshare as ak
     dates=read_calendar(args.calendar)
     date_set=set(dates)
     tax=json.loads(args.taxonomy.read_text(encoding="utf-8"))
@@ -186,33 +186,76 @@ def main():
     base={}
     rows=[]
     per_code={}
-    for pos,code in enumerate(codes,1):
-        f=ak.index_hist_sw(symbol=code.removesuffix(".SI"),period="day").copy()
-        ren={"日期":"trade_date","收盘":"close","代码":"industry_code"}
-        f=f.rename(columns=ren)
-        if "trade_date" not in f:
-            raise RuntimeError(f"{code}: missing 日期/trade_date")
-        if "close" not in f:
-            raise RuntimeError(f"{code}: missing 收盘/close")
-        f["trade_date"]=pd.to_datetime(f["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
-        f=f[f["trade_date"].isin(dates)].copy()
-        f["industry_code"]=code
-        f["close"]=pd.to_numeric(f["close"],errors="coerce")
-        f=f.dropna(subset=["trade_date","close"]).copy()
-        duplicate_rows=int(f.duplicated(["industry_code","trade_date"],keep=False).sum())
-        if duplicate_rows:
-            raise RuntimeError(f"{code}: duplicate sector-date rows={duplicate_rows}")
-        f.to_parquet(raw_dir/f"{code}.parquet",index=False,compression="zstd")
-        m={(code,d):float(c) for d,c in f[["trade_date","close"]].itertuples(index=False,name=None)}
-        base.update(m)
-        exp=required_by_code[code]
-        pres=set(f["trade_date"])
-        miss=sorted(exp-pres)
-        per_code[code]={"base_rows":len(f),"expected_rows":len(exp),"base_missing":len(miss),"base_missing_dates":miss,"duplicate_rows":duplicate_rows}
-        for d,c in f[["trade_date","close"]].itertuples(index=False,name=None):
-            if d in exp:
-                rows.append({"industry_code":code,"trade_date":d,"close":float(c),"source_provider":"akshare:index_hist_sw","source_trade_date":d,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
-        print(f"hist {pos}/{len(codes)} {code} rows={len(f)} missing={len(miss)}",flush=True)
+    if args.base_panel:
+        prior=pd.read_csv(args.base_panel,dtype={"industry_code":str,"trade_date":str,"source_trade_date":str})
+        needed={"industry_code","trade_date","close","source_provider","source_trade_date","fill_method","price_basis"}
+        if not needed.issubset(prior.columns):
+            raise RuntimeError(f"base panel missing columns: {sorted(needed-set(prior.columns))}")
+        prior=prior[list(needed)].copy()
+        prior["trade_date"]=pd.to_datetime(prior["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+        prior["source_trade_date"]=pd.to_datetime(prior["source_trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+        prior["close"]=pd.to_numeric(prior["close"],errors="coerce")
+        prior=prior.dropna(subset=["industry_code","trade_date","close","source_trade_date"]).copy()
+        prior_keys=set(map(tuple,prior[["industry_code","trade_date"]].astype(str).itertuples(index=False,name=None)))
+        if not prior_keys.issubset(required):
+            extra=sorted(prior_keys-required)[:20]
+            raise RuntimeError(f"base panel has keys outside exact membership required set: {extra}")
+        if int(prior.duplicated(["industry_code","trade_date"],keep=False).sum()):
+            raise RuntimeError("base panel has duplicate sector-date keys")
+        if not prior["trade_date"].astype(str).eq(prior["source_trade_date"].astype(str)).all():
+            raise RuntimeError("base panel violates same-date provenance")
+        if not prior["fill_method"].eq("NONE").all():
+            raise RuntimeError("base panel contains non-NONE fill method")
+        if not prior["price_basis"].eq("SW_INDUSTRY_INDEX_CLOSE_LEVEL").all():
+            raise RuntimeError("base panel price basis mismatch")
+        if not (prior["close"].notna() & prior["close"].gt(0)).all():
+            raise RuntimeError("base panel contains non-positive close")
+        if len(prior_keys)!=42783:
+            raise RuntimeError(f"expected frozen base 42783 exact keys, got {len(prior_keys)}")
+        rows=prior.to_dict("records")
+        base={(str(r["industry_code"]),str(r["trade_date"])):float(r["close"]) for r in rows}
+        for code in codes:
+            exp=required_by_code[code]
+            pres={d for c,d in prior_keys if c==code}
+            miss=sorted(exp-pres)
+            per_code[code]={
+                "base_rows":len(pres),
+                "expected_rows":len(exp),
+                "base_missing":len(miss),
+                "base_missing_dates":miss,
+                "duplicate_rows":0,
+                "base_source":"FROZEN_EXACT_AUDIT_35575797301",
+            }
+        print(f"loaded frozen exact base rows={len(rows)} missing={len(required-prior_keys)}",flush=True)
+    else:
+        import akshare as ak
+        for pos,code in enumerate(codes,1):
+            f=ak.index_hist_sw(symbol=code.removesuffix(".SI"),period="day").copy()
+            ren={"日期":"trade_date","收盘":"close","代码":"industry_code"}
+            f=f.rename(columns=ren)
+            if "trade_date" not in f:
+                raise RuntimeError(f"{code}: missing 日期/trade_date")
+            if "close" not in f:
+                raise RuntimeError(f"{code}: missing 收盘/close")
+            f["trade_date"]=pd.to_datetime(f["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+            f=f[f["trade_date"].isin(dates)].copy()
+            f["industry_code"]=code
+            f["close"]=pd.to_numeric(f["close"],errors="coerce")
+            f=f.dropna(subset=["trade_date","close"]).copy()
+            duplicate_rows=int(f.duplicated(["industry_code","trade_date"],keep=False).sum())
+            if duplicate_rows:
+                raise RuntimeError(f"{code}: duplicate sector-date rows={duplicate_rows}")
+            f.to_parquet(raw_dir/f"{code}.parquet",index=False,compression="zstd")
+            m={(code,d):float(c) for d,c in f[["trade_date","close"]].itertuples(index=False,name=None)}
+            base.update(m)
+            exp=required_by_code[code]
+            pres=set(f["trade_date"])
+            miss=sorted(exp-pres)
+            per_code[code]={"base_rows":len(f),"expected_rows":len(exp),"base_missing":len(miss),"base_missing_dates":miss,"duplicate_rows":duplicate_rows}
+            for d,c in f[["trade_date","close"]].itertuples(index=False,name=None):
+                if d in exp:
+                    rows.append({"industry_code":code,"trade_date":d,"close":float(c),"source_provider":"akshare:index_hist_sw","source_trade_date":d,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
+            print(f"hist {pos}/{len(codes)} {code} rows={len(f)} missing={len(miss)}",flush=True)
 
     missing=set()
     for code,item in per_code.items():
@@ -444,6 +487,9 @@ def main():
       "missing_required_keys":len(final_missing),
       "duplicate_required_keys":duplicate_required_rows,
       "missing_required_key_sample":[{"industry_code":a,"trade_date":b} for a,b in final_missing[:100]],
+      "base_panel_reused":bool(args.base_panel),
+      "base_panel_path":None if not args.base_panel else str(args.base_panel),
+      "base_panel_expected_source_run_id":35575797301 if args.base_panel else None,
       "base_missing_keys":sum(x["base_missing"] for x in per_code.values()),
       "gap_dates":gap_dates,
       "same_day_patch_rows":0 if patch_df.empty else int(len(patch_df)),
