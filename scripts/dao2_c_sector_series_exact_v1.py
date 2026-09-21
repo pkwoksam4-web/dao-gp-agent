@@ -101,9 +101,9 @@ def fetch_eastmoney_sw_history(code: str) -> pd.DataFrame:
         "Referer":"https://quote.eastmoney.com/",
     }
     last=None
-    for attempt in range(4):
+    for attempt in range(2):
         try:
-            resp=requests.get(url,params=params,headers=headers,timeout=30)
+            resp=requests.get(url,params=params,headers=headers,timeout=10)
             resp.raise_for_status()
             payload=resp.json()
             data=payload.get("data") or {}
@@ -128,7 +128,7 @@ def fetch_eastmoney_sw_history(code: str) -> pd.DataFrame:
             return out
         except Exception as exc:
             last=exc
-            if attempt==3:
+            if attempt==1:
                 break
             import time
             time.sleep(2*(attempt+1))
@@ -298,12 +298,18 @@ def main():
     eastmoney_code_validation={}
     eastmoney_raw_dir=args.out/"raw_eastmoney_sw_mirror"
     eastmoney_raw_dir.mkdir(exist_ok=True)
+    eastmoney_consecutive_fetch_errors=0
     for code in sorted({c for c,_ in remaining_for_eastmoney}):
         try:
             em=fetch_eastmoney_sw_history(code)
+            eastmoney_consecutive_fetch_errors=0
         except Exception as exc:
+            eastmoney_consecutive_fetch_errors+=1
             eastmoney_errors.append({"industry_code":code,"error":repr(exc)})
             eastmoney_code_validation[code]={"eligible":False,"reason":"FETCH_ERROR"}
+            if eastmoney_consecutive_fetch_errors>=2:
+                eastmoney_errors.append({"error":"PROVIDER_CIRCUIT_OPEN","after_consecutive_fetch_errors":eastmoney_consecutive_fetch_errors})
+                break
             continue
         if em.empty:
             eastmoney_errors.append({"industry_code":code,"error":"EMPTY"})
