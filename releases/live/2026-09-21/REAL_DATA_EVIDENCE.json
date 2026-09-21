@@ -1,0 +1,83 @@
+{
+  "schema": "agent-brain-live-evidence/v1",
+  "observed_at": "2026-09-21 05:53:47.898736+00",
+  "reproducible_source_release": {
+    "version": "V2.70",
+    "repository": "pkwoksam4-web/dao-gp-agent",
+    "note": "Live cloud control-plane state has advanced beyond the packaged source release; no later source release is asserted by this evidence."
+  },
+  "neon": {
+    "project_id": "red-term-29407678",
+    "project_name": "investment-intelligence-prod",
+    "branch_id": "br-raspy-breeze-b5clzass",
+    "branch_name": "production",
+    "database": "investment_intel",
+    "public_table_count": 202,
+    "cloud_truth_status": "CLOUD_TRUTH_RUNTIME_VERIFIED_RECOVERY_PENDING",
+    "runtime_gate_status": "RUNTIME_VERIFIED_RECOVERY_PENDING",
+    "current_release_recovery_status": "BLOCKED",
+    "current_recovery_blocker": "SNAPSHOT_QUOTA_LIMIT",
+    "plan_constraint": "Free plan; current snapshot quota prevents a new current-release isolated restore without rotating existing evidence."
+  },
+  "canonical_watchlist": {
+    "id": "WAT-core10-final-v1",
+    "symbols": [
+      "000636.SZ",
+      "002138.SZ",
+      "002156.SZ",
+      "600392.SH",
+      "600487.SH",
+      "600522.SH",
+      "600667.SH",
+      "600703.SH",
+      "601991.SH",
+      "605358.SH"
+    ]
+  },
+  "longbridge_real_data": {
+    "route_status": "CONNECTOR_VERIFIED_DATA_INGESTED_AUTOMATION_PENDING",
+    "completed_daily_bars": 9990,
+    "bars_per_symbol": 999,
+    "window": "approximately 2022-08-09 through 2026-09-18 China trading dates",
+    "current_partial_session_excluded": true,
+    "price_basis": "raw/unadjusted; forward_adjust=false",
+    "forward_fill": false,
+    "historical_feature_rows": 9690,
+    "labeled_5d": 9640,
+    "labeled_20d": 9490,
+    "feature_source_mode": "LONGBRIDGE_CANDLESTICKS_BACKFILL_PIT_V1",
+    "generic_candlesticks_count_1000": "VERIFIED",
+    "older_history_offset": "ACCESS_BLOCKED",
+    "older_history_error_code": "301607"
+  },
+  "quality_checks": {
+    "missing_required_feature_rows": 0,
+    "bad_5d_time_order": 0,
+    "bad_20d_time_order": 0,
+    "wrong_source_mode": 0,
+    "raw_daily_jumps_gt_11_5pct": 0,
+    "note": "Historical backfill/replay samples are not LIVE_SHADOW evidence."
+  },
+  "research_diagnostic": {
+    "horizon_days": 20,
+    "baseline": "0.30*5D momentum + 0.70*20D momentum",
+    "candidate": "negative of baseline; mean-reversion ranking-only candidate",
+    "train_2022_2024_baseline_rank_ic": -0.07013713179300889,
+    "holdout_2025_2026_baseline_rank_ic": -0.10967096936800644,
+    "holdout_2025_2026_candidate_rank_ic": 0.10967096936800644,
+    "holdout_candidate_top_bottom_spread": 0.02372927231730496,
+    "holdout_candidate_accuracy": 0.418639798488665,
+    "holdout_candidate_brier": 0.23465161638437027,
+    "holdout_train_prior_naive_brier": 0.20959169199798755,
+    "candidate_status": "SHADOW_ONLY_UNAPPROVED",
+    "interpretation": "Candidate has a cross-sectional ranking signal in holdout, but probability calibration does not beat the simple train-prior probabilistic baseline; no promotion is allowed."
+  },
+  "governance": {
+    "automatic_model_promotion": false,
+    "production_weight_change": false,
+    "portfolio_mutation": false,
+    "brokerage_execution": false,
+    "live_shadow_requires_prospective_post_close_generation": true
+  },
+  "evidence_sha256": "8660835d7c5db9577ae404d99793dac680d2d768877a12b014c2dbe877ab402a"
+}
