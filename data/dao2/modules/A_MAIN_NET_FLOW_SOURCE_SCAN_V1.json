@@ -54,11 +54,11 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "replace repository Actions secret TUSHARE_TOKEN with the exact valid Tushare token value, without quotes/prefix/suffix",
-    "rerun .github/workflows/dao2-a-tushare-exact-probe-v1.yml",
-    "accept rows only if all 16 target keys resolve and overlapping non-residual Jessica rows exact-match on buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount",
-    "if a valid token then reaches entitlement/points/history errors, preserve exact code/message and remain fail-closed",
-    "only after Data PASS materialize GP12_MAIN_NET_FLOW_BINDING_V1 and A_MAIN_NET_FLOW_CHECKPOINT_V1"
+    "keep Infoway as the active source strategy",
+    "obtain/probe an Infoway endpoint or plan with 2020-2023 historical coverage for the residual dates",
+    "require exact equivalent semantics for buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount; generic money-flow or latest-trade fields are not admissible",
+    "cross-check overlapping non-residual Jessica rows field-by-field",
+    "only after 16/16 exact recovery and overlap PASS materialize GP12_MAIN_NET_FLOW_BINDING_V1 and A_MAIN_NET_FLOW_CHECKPOINT_V1"
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -102,10 +102,93 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "TUSHARE_TOKEN_INVALID",
+    "code": "INFOWAY_SEMANTIC_AND_HISTORY_INSUFFICIENT",
     "module_status": "BLOCKED",
-    "api_error_code": 40101,
-    "api_error_message": "您的token不对，请确认。",
-    "actionable_requirement": "Replace repository Actions secret TUSHARE_TOKEN with the exact valid token value from Tushare (no quotes/prefix/suffix), then rerun the same probe."
+    "actionable_requirement": "Use an Infoway endpoint/plan that exposes auditable 2020-2023 historical data with exact equivalent large/extra-large active buy/sell semantics; then exact-match overlapping Jessica rows before admitting any residual row."
+  },
+  "current_source_strategy": "INFOWAY",
+  "infoway_probe": {
+    "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
+    "workflow_path": ".github/workflows/dao2-a-infoway-semantic-probe-v1.yml",
+    "run_id": 35570808474,
+    "run_url": "https://github.com/pkwoksam4-web/dao-gp-agent/actions/runs/35570808474",
+    "run_conclusion": "success",
+    "head_sha": "171e119fe6c63c751dcf09ea73acba74b097b739",
+    "artifact": {
+      "id": 10625767198,
+      "name": "dao2-a-infoway-semantic-capability-probe-v1",
+      "digest": "sha256:5d5764bc24e850859fff000d6a7375d2e2d073d5152537803812c51c5e76c696",
+      "expires_at": "2026-10-21T06:59:14Z"
+    },
+    "authentication": {
+      "credential_present": true,
+      "credential_source": "TUSHARE_TOKEN_LEGACY_FALLBACK",
+      "http_status": 200,
+      "ret": 200,
+      "msg": "success"
+    },
+    "current_symbol_coverage": {
+      "found_count": 7,
+      "missing_count": 9,
+      "found": [
+        "000020.SZ",
+        "000157.SZ",
+        "000592.SZ",
+        "000753.SZ",
+        "000564.SZ",
+        "001337.SZ",
+        "002157.SZ"
+      ],
+      "missing": [
+        "600306.SH",
+        "600898.SH",
+        "603996.SH",
+        "002618.SZ",
+        "002684.SZ",
+        "600112.SH",
+        "002118.SZ",
+        "002503.SZ",
+        "002504.SZ"
+      ]
+    },
+    "latest_trade_schema": {
+      "observed_fields": [
+        "data",
+        "msg",
+        "p",
+        "ret",
+        "s",
+        "t",
+        "td",
+        "traceId",
+        "v",
+        "vw"
+      ],
+      "required_exact_fields": [
+        "buy_lg_amount",
+        "buy_elg_amount",
+        "sell_lg_amount",
+        "sell_elg_amount"
+      ],
+      "required_exact_fields_present": []
+    },
+    "historical_probe": {
+      "symbol": "000020.SZ",
+      "target_trade_date": "20210924",
+      "endpoint": "https://data.infoway.io/stock/v2/batch_kline",
+      "http_status": 200,
+      "ret": 500,
+      "msg": "Timestamp limit error,earliest timestamp：1774076354",
+      "earliest_timestamp": 1774076354,
+      "earliest_timestamp_cst": "2026-03-21T14:59:14+08:00"
+    },
+    "result": {
+      "status": "AUTH_OK_SEMANTIC_CAPABILITY_NOT_PROVEN",
+      "semantic_capability_proven": false,
+      "historical_exact_moneyflow_route_proven": false,
+      "admissible_exact_rows": 0,
+      "result_sha256": "550301e28d6b65b911e82c160990f330cd4c346a291b907622e52a3284f5cb06"
+    },
+    "interpretation": "Infoway authentication is valid, but the documented/probed public A-share schemas do not expose Tushare-equivalent buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount, and the current plan cannot reach a 2021 residual date in the historical-minute probe. Infoway therefore cannot yet be admitted as an exact replacement source for Module A."
   }
 }
