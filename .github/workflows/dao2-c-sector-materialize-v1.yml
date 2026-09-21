@@ -107,16 +107,13 @@ jobs:
           },ensure_ascii=False,indent=2))
           PY
       - name: Materialize 801xxx series with AKShare
-        if: always()
         run: |
           set -o pipefail
           python upstream/download_tushare_data.py --root work --part industry --industry-provider akshare 2>&1 | tee series_out/generator_akshare.log
       - name: Audit Formal required sector keys
-        if: always()
         run: |
           python scripts/dao2_c_sector_materialize_v1.py series             --root work             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --membership-out membership_out             --out series_out
       - name: Freeze raw parquet hashes and run summary
-        if: always()
         run: |
           python - <<'PY'
           import hashlib, json
