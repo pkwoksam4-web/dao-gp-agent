@@ -1,6 +1,6 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
-  "version": "1.2",
+  "version": "1.3",
   "module_id": "B",
   "status": "RAW_HISTORICAL_EXECUTABLE_IDENTITY_RECOVERED_FINAL_MAPPING_MISSING",
   "blocker": "MARKET_BREADTH_UNBOUND",
@@ -169,13 +169,109 @@
     "candidate_verification_cannot_promote_historical_identity": true
   },
   "next_search_order": [
-    "Search historical carriers outside V3.10 Daily Base for the final Market Breadth/Diffusion normalization, clipping and 4% score mapping.",
-    "Search for an authoritative historical executable whose output proves the final 4% mapping even if source text is absent.",
-    "Do not infer the final 4% mapping from raw adv_ratio_all/adv_ratio_eligible.",
-    "Candidate breadth remains isolated and cannot close MARKET_BREADTH_UNBOUND."
+    "Inspect remaining historical external-asset account/relation/GH-archive artifacts for renamed or deleted scorer carriers using exact historical filenames and model-internal field names.",
+    "Inspect historical output artifacts for behavior identity that could uniquely determine normalization, clipping and final 4% mapping even without source bytes.",
+    "Do not reuse candidate breadth formulas as historical evidence.",
+    "Remain fail-closed unless final scorer semantics are uniquely recovered."
   ],
   "module_b_pass_allowed": false,
   "model_freeze_allowed": false,
   "oos_metrics_allowed": false,
-  "historical_source_artifact": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json"
+  "historical_source_artifact": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json",
+  "final_scorer_identity_search_20260921": {
+    "status": "NO_AUTHORITATIVE_FINAL_SCORER_FOUND_YET",
+    "historical_filename_clues": {
+      "source": "docs/superpowers/specs/2026-09-08-model-freeze-recovery-v482-design.md",
+      "names": [
+        "gp_v11_scoring.py",
+        "run_gp_walkforward.py"
+      ],
+      "authority": "SEARCH_CLUES_ONLY_NOT_IDENTITY"
+    },
+    "exact_filename_search": {
+      "library": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0
+      },
+      "github_code_search": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0
+      },
+      "gmail": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0,
+        "alphaagent_2026_07_01_to_2026_09_01": 0
+      },
+      "google_drive": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0,
+        "alphaagent": 0
+      }
+    },
+    "serialized_asset_inventory": {
+      "library_extensions_searched": [
+        "pkl",
+        "pickle",
+        "joblib",
+        "onnx",
+        "pt",
+        "pth",
+        "bin",
+        "model",
+        "yaml",
+        "yml",
+        "toml",
+        "ini",
+        "cfg",
+        "conf"
+      ],
+      "matching_final_scorer_assets": 0
+    },
+    "deleted_github_carriers": {
+      "alphaagent": {
+        "full_name": "leo-quant-research/AlphaAgent",
+        "repo_id": 1317931511,
+        "description": "Multi Agent Factor Research System",
+        "known_branch": "leo",
+        "known_push_heads": [
+          "25812984ac52635af50c6522b964c5ed9f1fa658",
+          "b813095f2fb17d0e890e0a80cc86ad222700b9ef",
+          "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8"
+        ],
+        "direct_repo_commit_codeload_recovery": "FAILED_DELETED_REPOSITORY",
+        "ecosyste_ms_commit_cache": "EMPTY",
+        "software_heritage_origin": "NOT_FOUND",
+        "wayback_raw_source": "NOT_RECOVERED"
+      },
+      "data_lake": {
+        "full_name": "leo-quant-research/data_lake",
+        "repo_id": 1296046921,
+        "role": "historical data carrier; no final scorer bytes recovered"
+      }
+    },
+    "alphaagent_surviving_fork_reverse_probe": {
+      "target_sha": "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8",
+      "repos_tested": [
+        "poiuyaaaa/AlphaAgent",
+        "3123958139/AlphaAgent",
+        "SimonWang666/AlphaAgent",
+        "Wangchanghao12/AlphaAgent",
+        "vxzhong/AlphaAgent",
+        "atanasvasilevjourney/alphaagent"
+      ],
+      "exact_commit_hits": 0,
+      "interpretation": "Known leo-quant-research AlphaAgent commit does not survive in the most plausible current forks tested."
+    },
+    "legacy_migration_false_positive": {
+      "clue": "zjzesheng/legacy_codes",
+      "result": "REJECTED_AS_FALSE_POSITIVE",
+      "evidence": "Historical GH Archive grep matched unrelated aaif-goose/goose and barrettclark/sqlite2pg events containing generic legacy_codes text; no zjzesheng/legacy_codes repository event was recovered."
+    },
+    "final_mapping_requirements_still_missing": [
+      "normalization",
+      "clipping",
+      "all-versus-eligible final combination if any",
+      "final 4% Market Breadth/Diffusion score mapping"
+    ]
+  }
 }
