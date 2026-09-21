@@ -1,0 +1,46 @@
+{
+  "schema": "ranking-shadow-candidate-evidence/v1",
+  "observed_date": "2026-09-21",
+  "watchlist_id": "WAT-core10-final-v1",
+  "source_mode": "LONGBRIDGE_CANDLESTICKS_BACKFILL_PIT_V1",
+  "candidate": {
+    "version": "core10-stable-reversion-lowvol-candidate-v1",
+    "weight_version_id": "RWV-STABLE4-CORE10-CAND-V1",
+    "scope": "RANKING_ONLY",
+    "formula": "-0.25*(percent_rank(return_5d)+percent_rank(return_20d)+percent_rank(return_30d)+percent_rank(realized_vol_20d))",
+    "selection_rule": "Factors selected only after each showed stable negative raw Rank IC direction across train/holdout audit; coefficients fixed equal-weight and not numerically optimized."
+  },
+  "sample": {
+    "feature_rows": 9690,
+    "train_period": "2022-09-21..2024-12-31",
+    "holdout_period": "2025-01-01..2026-09-18",
+    "horizon_days": 20,
+    "train_anchor_days": 552,
+    "holdout_anchor_days": 397
+  },
+  "metrics": {
+    "train_mean_rank_ic": 0.10379511270389893,
+    "holdout_mean_rank_ic": 0.15595457945025207,
+    "train_top_bottom_spread": 0.024503439817554342,
+    "holdout_top_bottom_spread": 0.020950631030333667,
+    "train_spread_hit_rate": 0.625,
+    "holdout_spread_hit_rate": 0.6473551637279596,
+    "purged_offsets": {
+      "count": 20,
+      "train_rank_ic_positive": "20/20",
+      "holdout_rank_ic_positive": "20/20",
+      "holdout_spread_positive": "15/20",
+      "train_observations_per_offset": "27-28",
+      "holdout_observations_per_offset": "19-20"
+    }
+  },
+  "governance": {
+    "status": "SHADOW_ONLY_UNAPPROVED",
+    "probability_model": false,
+    "automatic_promotion": false,
+    "production_ranking_use": false,
+    "live_prospective_validation_required": true,
+    "historical_backfill_not_counted_as_live_shadow": true
+  },
+  "evidence_sha256": "4cf6cca0e6d4f3d8e49546f4fe5e54def106fa1d508e7cea8dd18561c11fbfbe"
+}
