@@ -62,7 +62,7 @@
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
       "workflow_run_id": 35575797301,
-      "manual_blocker": "301 exact same-day SW sector closes remain unresolved. Infoway public route is closed as unsupported; Tushare sw_daily remains unusable until a valid Tushare token or another exact, provenance-valid source is available.",
+      "manual_blocker": "301 exact same-day SW sector closes remain unresolved. Infoway public route is closed as unsupported; legacy official swsindex.com route is closed as transport-unavailable from GitHub Actions; Tushare sw_daily remains unusable until a valid Tushare token or another exact, provenance-valid source is available.",
       "infoway_targeted_probe": {
         "status": "CLOSED_UNSUPPORTED",
         "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
@@ -71,6 +71,16 @@
         "evidence": "data/dao2/modules/C_SECTOR_INFOWAY_EXACT_GAP_PROBE_V1.json",
         "recovery_allowed": false,
         "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL"
+      },
+      "legacy_sw_history_probe": {
+        "status": "CLOSED_TRANSPORT_UNAVAILABLE",
+        "decision": "LEGACY_SW_HISTORY_ROUTE_CLOSED_OR_EMPTY",
+        "workflow_run_id": 35583461060,
+        "artifact_id": 10631811203,
+        "evidence": "data/dao2/modules/C_SECTOR_LEGACY_SW_HISTORY_PROBE_V1.json",
+        "recovery_allowed": false,
+        "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_TRANSPORT_FAIL",
+        "admitted_rows": 0
       }
     },
     "sector_membership_pit": {
