@@ -118,7 +118,7 @@ jobs:
           for c,g in base.groupby("industry_code"):
               by_code[str(c)]=sorted((str(d),float(v)) for d,v in g[["trade_date","close"]].itertuples(index=False,name=None))
 
-          wind_map={(str(r.industry),str(r.date)):float(r.return) for r in wind.itertuples()}
+          wind_map={(str(industry),str(date)):float(ret) for date,industry,ret in wind[["date","industry","return"]].itertuples(index=False,name=None)}
           # Identity audit: on every consecutive accepted base pair, compare direct close return
           # to public Wind-derived return for the mapped current SW industry.
           ident={}
