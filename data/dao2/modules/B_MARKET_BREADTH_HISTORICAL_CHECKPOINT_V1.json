@@ -1,6 +1,6 @@
 {
   "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
-  "version": "1.3",
+  "version": "1.4",
   "module_id": "B",
   "status": "RAW_HISTORICAL_EXECUTABLE_IDENTITY_RECOVERED_FINAL_MAPPING_MISSING",
   "blocker": "MARKET_BREADTH_UNBOUND",
@@ -169,10 +169,10 @@
     "candidate_verification_cannot_promote_historical_identity": true
   },
   "next_search_order": [
-    "Inspect remaining historical external-asset account/relation/GH-archive artifacts for renamed or deleted scorer carriers using exact historical filenames and model-internal field names.",
-    "Inspect historical output artifacts for behavior identity that could uniquely determine normalization, clipping and final 4% mapping even without source bytes.",
-    "Do not reuse candidate breadth formulas as historical evidence.",
-    "Remain fail-closed unless final scorer semantics are uniquely recovered."
+    "Search historical carriers by internal output fields and behavior rows, not by already-exhausted filenames or Daily Base source lineage.",
+    "Prioritize artifacts/logs that contain same-date raw breadth plus component/factor score plus total/final score.",
+    "If authoritative input/output pairs are recovered, enumerate only a finite predeclared transform family and require a unique exact mapping across all pairs.",
+    "Do not start transform fitting without authoritative pairs; remain fail-closed."
   ],
   "module_b_pass_allowed": false,
   "model_freeze_allowed": false,
@@ -273,5 +273,89 @@
       "all-versus-eligible final combination if any",
       "final 4% Market Breadth/Diffusion score mapping"
     ]
+  },
+  "final_scorer_behavior_identity_search_20260921": {
+    "status": "NO_AUTHORITATIVE_INPUT_OUTPUT_PAIRS_FOUND",
+    "search_policy": "Behavior-identity only; raw breadth recovery, Daily Base lineage, benchmark replay, exact filename scans, obvious AlphaAgent fork probes, serialized-extension scans and legacy_codes are not repeated.",
+    "github_internal_field_search": {
+      "terms": [
+        "adv_ratio_all",
+        "adv_ratio_eligible",
+        "Market Breadth",
+        "Diffusion",
+        "component score",
+        "factor score",
+        "normalize clip",
+        "percentile zscore minmax"
+      ],
+      "result": "ZERO_RELEVANT_FINAL_SCORER_CODE_OR_OUTPUT_HITS"
+    },
+    "library_internal_field_search": {
+      "terms": [
+        "adv_ratio_all",
+        "adv_ratio_eligible",
+        "Market Breadth + score",
+        "Diffusion + score",
+        "normalize/clip/percentile/zscore/minmax + factor/component score"
+      ],
+      "result": "NO_RELEVANT_FINAL_SCORER_OUTPUT; ONLY_UNRELATED_DATA_REMEDIATION_RESULTS"
+    },
+    "historical_output_surface_inventory": {
+      "aug26_aug27_library": {
+        "result": "NO_STANDALONE_SUMMARY_BUCKET_STATS_WALK_FORWARD_DAILY_REPLAY_FILES",
+        "note": "The historical conversation clue says starter_v2 exposed summary, bucket_stats, walk_forward and daily_replay surfaces, but the Library inventory contains only package ZIPs and data-governance artifacts; no output rows survived as standalone authoritative files."
+      },
+      "sample50_factor_crosscheck": {
+        "runs": [
+          33965931036,
+          33970355639
+        ],
+        "artifact_ids": [
+          9969422298,
+          9970737451
+        ],
+        "disposition": "EXCLUDED_NOT_SCORER",
+        "reason": "Artifacts validate corporate-action/QFQ event factors and report event_count/formal_rows/max_diff_bp; they contain no Market Breadth component score or final strategy score."
+      },
+      "strategy_recovery_artifact_versions": {
+        "runs": [
+          34213425800,
+          34228858532,
+          34307662289,
+          34207288888
+        ],
+        "artifact_ids": [
+          10050744505,
+          10056893854,
+          10087225436,
+          10048285764
+        ],
+        "disposition": "RECOVERY_SUMMARY_ONLY",
+        "reason": "Artifacts contain recovery/checkpoint JSONs only. They repeat missing normalization/clipping/final-score gaps and contain no authoritative raw-breadth-to-component-score input/output rows."
+      },
+      "external_recovery_packages": {
+        "disposition": "NO_BEHAVIOR_PAIRS",
+        "reason": "Field-level grep across recovered external-asset/account/relation/GH-archive packages for breadth/component/total score and normalize/clip/percentile/zscore/minmax found no authentic historical breadth-score I/O pairs."
+      }
+    },
+    "strategy_recovery_matrix_boundary": {
+      "decision_policy_matrix": "Daily Base walk-forward calibration maps remaining_inertia buckets to binary target probabilities only; it explicitly does not recover final GP12 score or P-up/P-range/P-down mapping.",
+      "candidate_crosswalk": "F2 candidate five-day mean and signed mapping are explicitly proposal-only; input-family overlap is not historical final mapping."
+    },
+    "behavior_identification_gate": {
+      "authoritative_pair_count": 0,
+      "finite_transform_enumeration_allowed": false,
+      "uniqueness_test_allowed": false,
+      "reason": "No authoritative historical input/output pair links raw breadth input to normalized/clipped breadth component score and final score. Enumerating transforms now would be unconstrained curve fitting."
+    },
+    "blocker_effect": {
+      "MARKET_BREADTH_UNBOUND": "OPEN",
+      "normalization_recovered": false,
+      "clipping_recovered": false,
+      "all_vs_eligible_final_combination_recovered": false,
+      "final_4pct_mapping_recovered": false,
+      "final_binding_allowed": false,
+      "final_checkpoint_allowed": false
+    }
   }
 }
