@@ -24,9 +24,14 @@ jobs:
         run: |
           mkdir -p artifact_probe
           python - <<'PY'
-          import json, os, traceback
+          import json, os
           from pathlib import Path
-          out={"artifact":"DAO2_C_TUSHARE_SECTOR_PROBE_V1","token_present":bool(os.environ.get("TUSHARE_TOKEN")),"calls":{}}
+
+          out={
+              "artifact":"DAO2_C_TUSHARE_SECTOR_PROBE_V1",
+              "token_present":bool(os.environ.get("TUSHARE_TOKEN")),
+              "calls":{}
+          }
           if not out["token_present"]:
               out["status"]="NO_TOKEN"
           else:
@@ -36,20 +41,28 @@ jobs:
                   ("index_classify_SW2021",lambda:pro.index_classify(level="L1",src="SW2021")),
                   ("index_classify_SW2014",lambda:pro.index_classify(level="L1",src="SW2014")),
                   ("index_member_all_801960_Y",lambda:pro.index_member_all(l1_code="801960.SI",is_new="Y")),
-                  ("index_member_all_801960_N",lambda:pro.index_member_all(l1_code="801960.SI",is_new="N")),
-                  ("sw_daily_trade_date",lambda:pro.sw_daily(trade_date="20260417")),
-                  ("sw_daily_801960",lambda:pro.sw_daily(ts_code="801960.SI",start_date="20260417",end_date="20260417")),
+                  ("sw_daily_trade_date_20260417",lambda:pro.sw_daily(trade_date="20260417")),
+                  ("sw_daily_gap_801020_20210806",lambda:pro.sw_daily(ts_code="801020.SI",start_date="20210806",end_date="20210806")),
+                  ("sw_daily_gap_801960_20220303",lambda:pro.sw_daily(ts_code="801960.SI",start_date="20220303",end_date="20220303")),
+                  ("sw_daily_gap_801010_20230908",lambda:pro.sw_daily(ts_code="801010.SI",start_date="20230908",end_date="20230908")),
               ]
               for name,fn in tests:
                   try:
                       x=fn()
-                      out["calls"][name]={"ok":True,"rows":0 if x is None else int(len(x)),"columns":[] if x is None else list(x.columns)}
+                      item={
+                          "ok":True,
+                          "rows":0 if x is None else int(len(x)),
+                          "columns":[] if x is None else list(x.columns)
+                      }
                       if x is not None and not x.empty:
-                          out["calls"][name]["sample"]=x.head(2).astype(str).to_dict("records")
+                          item["sample"]=x.head(2).astype(str).to_dict("records")
+                      out["calls"][name]=item
                   except Exception as exc:
                       out["calls"][name]={"ok":False,"error":repr(exc)}
               out["status"]="PROBED"
-          Path("artifact_probe/tushare_sector_probe.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          Path("artifact_probe/tushare_sector_probe.json").write_text(
+              json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8"
+          )
           print(json.dumps(out,ensure_ascii=False,indent=2))
           PY
       - uses: actions/upload-artifact@v4
