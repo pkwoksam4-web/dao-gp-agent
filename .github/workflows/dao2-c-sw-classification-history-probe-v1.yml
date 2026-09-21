@@ -22,45 +22,92 @@ jobs:
         run: |
           mkdir -p artifact_sw_history
           python - <<'PY'
-          import json, hashlib
+          import io, json, hashlib
           from pathlib import Path
-          import akshare as ak
           import pandas as pd
-          out={"artifact":"DAO2_C_SW_CLASSIFICATION_HISTORY_PROBE_V1"}
-          try:
-              try:
-                  f=ak.stock_industry_clf_hist_sw()
-                  out["transport"]="akshare_default_tls"
-              except Exception as first_exc:
-                  import io, requests, urllib3
-                  urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-                  url="https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls"
-                  resp=requests.get(url,timeout=30,verify=False)
-                  resp.raise_for_status()
-                  raw=resp.content
-                  Path("artifact_sw_history/StockClassifyUse_stock.xls").write_bytes(raw)
-                  out["raw_xls_sha256"]=hashlib.sha256(raw).hexdigest()
-                  out["raw_xls_bytes"]=len(raw)
-                  out["transport"]="direct_https_verify_false_after_tls_failure"
-                  out["initial_error"]=repr(first_exc)
-                  f=pd.read_excel(__import__("io").BytesIO(raw),dtype={"股票代码":"str","行业代码":"str"})
-                  f=f.rename(columns={"股票代码":"symbol","计入日期":"start_date","行业代码":"industry_code","更新日期":"update_time"})
-                  if "start_date" in f: f["start_date"]=pd.to_datetime(f["start_date"],errors="coerce").dt.date
-                  if "update_time" in f: f["update_time"]=pd.to_datetime(f["update_time"],errors="coerce").dt.date
-              out["ok"]=True
-              out["rows"]=int(len(f))
-              out["columns"]=list(f.columns)
-              out["start_min"]=str(f["start_date"].min()) if "start_date" in f else None
-              out["start_max"]=str(f["start_date"].max()) if "start_date" in f else None
-              out["industry_code_unique"]=int(f["industry_code"].astype(str).nunique()) if "industry_code" in f else None
-              seven=["300157","002554","300164","300191","600339","600583","603727"]
-              sub=f[f["symbol"].astype(str).str.zfill(6).isin(seven)].copy() if "symbol" in f else pd.DataFrame()
-              out["seven_rows"]=sub.astype(str).to_dict("records")
-              f.to_csv("artifact_sw_history/sw_stock_classification_history.csv.gz",index=False,compression="gzip")
-              sub.to_csv("artifact_sw_history/seven_859622_candidates.csv",index=False)
-          except Exception as exc:
-              out["ok"]=False
-              out["error"]=repr(exc)
+          import requests, urllib3
+          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+          out={"artifact":"DAO2_C_SW_CLASSIFICATION_HISTORY_PROBE_V1","attempts":[]}
+          urls=[
+              "https://www.swsresearch.com/swindex/pdf/StockClassifyUse_stock.xls",
+              "https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls",
+          ]
+          headers={
+              "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+              "X-Requested-With":"XMLHttpRequest",
+              "Accept":"*/*",
+              "Accept-Language":"zh-CN,zh;q=0.9,zh-TW;q=0.8",
+              "Referer":"https://www.swsresearch.com/",
+          }
+          raw=None
+          selected=None
+          for url in urls:
+              for verify in (True,False):
+                  try:
+                      resp=requests.get(url,headers=headers,timeout=45,verify=verify)
+                      attempt={"url":url,"verify_tls":verify,"status_code":resp.status_code,"content_type":resp.headers.get("content-type"),"bytes":len(resp.content)}
+                      out["attempts"].append(attempt)
+                      if resp.status_code != 200:
+                          continue
+                      payload=resp.content
+                      # Legacy XLS must be an OLE compound file, not an HTML/WAF error page.
+                      if not payload.startswith(bytes.fromhex("D0CF11E0A1B11AE1")):
+                          attempt["rejected"]="not_ole_xls_magic"
+                          continue
+                      raw=payload
+                      selected=url
+                      out["transport"]="direct_official_sw"
+                      out["verify_tls"]=verify
+                      break
+                  except Exception as exc:
+                      out["attempts"].append({"url":url,"verify_tls":verify,"error":repr(exc)})
+              if raw is not None:
+                  break
+          if raw is None:
+              raise RuntimeError("official SW XLS unavailable from both canonical paths")
+
+          raw_path=Path("artifact_sw_history/StockClassifyUse_stock.xls")
+          raw_path.write_bytes(raw)
+          out["source_url"]=selected
+          out["raw_xls_sha256"]=hashlib.sha256(raw).hexdigest()
+          out["raw_xls_bytes"]=len(raw)
+          out["known_20260909_reference_sha256"]="15979d9cf8a3b83ccc8dadc967de52f35e667b4f4da5e4e4e3dd5a8bb1f17402"
+          out["matches_known_20260909_reference"]=out["raw_xls_sha256"]==out["known_20260909_reference_sha256"]
+
+          f=pd.read_excel(io.BytesIO(raw),dtype={"股票代码":"str","行业代码":"str"})
+          f=f.rename(columns={"股票代码":"symbol","计入日期":"start_date","行业代码":"industry_code","更新日期":"update_time"})
+          required={"symbol","start_date","industry_code"}
+          if not required.issubset(f.columns):
+              raise RuntimeError(f"official XLS missing columns: {sorted(required-set(f.columns))}; got={list(f.columns)}")
+          f["symbol"]=f["symbol"].astype(str).str.replace(".0","",regex=False).str.zfill(6)
+          f["industry_code"]=f["industry_code"].astype(str).str.replace(".0","",regex=False).str.zfill(6)
+          f["start_date"]=pd.to_datetime(f["start_date"],errors="coerce").dt.strftime("%Y%m%d")
+          if "update_time" in f:
+              f["update_time"]=pd.to_datetime(f["update_time"],errors="coerce").dt.strftime("%Y%m%d")
+          f=f.dropna(subset=["symbol","start_date","industry_code"]).copy()
+          duplicate_symbol_date=int(f.duplicated(["symbol","start_date"],keep=False).sum())
+
+          seven=["300157","002554","300164","300191","600339","600583","603727"]
+          sub=f[f["symbol"].isin(seven)].copy().sort_values(["symbol","start_date","industry_code"])
+          found=sorted(sub["symbol"].unique().tolist())
+          missing_symbols=sorted(set(seven)-set(found))
+
+          out.update({
+              "ok":True,
+              "rows":int(len(f)),
+              "columns":list(f.columns),
+              "start_min":str(f["start_date"].min()),
+              "start_max":str(f["start_date"].max()),
+              "industry_code_unique":int(f["industry_code"].nunique()),
+              "duplicate_symbol_date_rows":duplicate_symbol_date,
+              "seven_symbols_expected":seven,
+              "seven_symbols_found":found,
+              "seven_symbols_missing":missing_symbols,
+              "seven_rows":sub.astype(str).to_dict("records"),
+          })
+          f.to_csv("artifact_sw_history/sw_stock_classification_history.csv.gz",index=False,compression="gzip")
+          sub.to_csv("artifact_sw_history/seven_859622_candidates.csv",index=False)
           Path("artifact_sw_history/probe.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
           print(json.dumps(out,ensure_ascii=False,indent=2))
           PY
