@@ -1,0 +1,122 @@
+{
+  "artifact": "DAO2_C_INFOWAY_SECTOR_EXACT_GAP_PROBE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "purpose": "Targeted exact-gap capability probe for current 301 missing SW industry sector-date close keys.",
+  "status": "INFOWAY_SW_INDEX_UNSUPPORTED",
+  "decision": {
+    "case": "A",
+    "code": "INFOWAY_SW_INDEX_UNSUPPORTED",
+    "route_closed": true,
+    "recovery_allowed": false,
+    "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL",
+    "reason": "Infoway documented INDICES symbol mapping returned none of the targeted SW industry index codes, and the full documented INDICES universe contained no symbol mapping for those 801xxx codes."
+  },
+  "frozen_inputs": {
+    "required_sector_date_keys": 43084,
+    "frozen_observed_base": 42783,
+    "exact_missing": 301,
+    "frozen_base_rewritten": false,
+    "source_base_run_id": 35575797301,
+    "membership_source_run_id": 35575433267
+  },
+  "probe_scope": {
+    "target_codes": [
+      "801020.SI",
+      "801960.SI",
+      "801010.SI",
+      "801030.SI",
+      "801040.SI"
+    ],
+    "priority_gap_dates": [
+      "20210806",
+      "20220303",
+      "20230908",
+      "20211022",
+      "20220509"
+    ],
+    "all_target_codes_verified_as_real_missing_industry_codes": true,
+    "all_priority_dates_verified_as_real_gap_dates": true
+  },
+  "documentation": {
+    "symbol_list": "https://docs.infoway.io/en-docs/rest-api/get-basic-info/get-symbol-list",
+    "documented_index_type": "INDICES",
+    "candles": "https://docs.infoway.io/rest-api/http-endpoints/get-candles",
+    "documented_daily_kline_type": 8,
+    "documented_daily_timestamp_targeting": false
+  },
+  "workflow_evidence": {
+    "head_sha": "0bf34a182403383f3db305631cc256c353ed5b2e",
+    "workflow": "DAO2 C Infoway Sector Exact-Gap Probe V1",
+    "run_id": 35579863921,
+    "job_id": 106269981988,
+    "workflow_conclusion": "success",
+    "artifact_id": 10629836740,
+    "artifact_digest": "sha256:81301d4c99a2d4f1c0a860cab0220fc6113920a218b93b4d8bc6bb639fc721d0",
+    "credential_source": "TUSHARE_TOKEN_LEGACY_INFOWAY_FALLBACK"
+  },
+  "raw_requests": [
+    {
+      "endpoint": "https://data.infoway.io/common/basic/symbols",
+      "method": "GET",
+      "params": {
+        "type": "INDICES",
+        "symbols": [
+          "801020.SI",
+          "801960.SI",
+          "801010.SI",
+          "801030.SI",
+          "801040.SI"
+        ]
+      },
+      "timestamp_utc": "2026-09-21T08:49:03.994747+00:00",
+      "http_status": 200,
+      "api_ret": 200,
+      "api_msg": "success",
+      "trace_id": "37161502-db46-43ee-a359-bea53d2b7838",
+      "response_data_count": 0,
+      "raw_response_sha256": "3c0f59c7d2710923ea98e21b66a64cbd2105b8a22b24a598fea858943afdb2e5"
+    },
+    {
+      "endpoint": "https://data.infoway.io/common/basic/symbols",
+      "method": "GET",
+      "params": {
+        "type": "INDICES"
+      },
+      "timestamp_utc": "2026-09-21T08:49:05.695076+00:00",
+      "http_status": 200,
+      "api_ret": 200,
+      "api_msg": "success",
+      "trace_id": "cfc800f1-bea8-42f8-a710-f951d16cc087",
+      "returned_index_count": 51,
+      "targeted_801xxx_mapping_matches": 0,
+      "raw_response_sha256": "3336549e17e2a1cc385a4e24845e1ac82803c8c9ddd82fa9f700ba05dab14c72"
+    }
+  ],
+  "capability_answers": {
+    "accepts_801xxx_si": false,
+    "documented_alternative_symbol_mapping_found": false,
+    "historical_2021_2023_tested": false,
+    "historical_test_not_executed_reason": "Fail-closed after documented symbol capability gate failed.",
+    "exact_target_trade_date_returned": false,
+    "close_field_semantics_tested": false,
+    "original_sw_index_close_proven": false,
+    "endpoint_params_timestamp_raw_hash_auditable": true
+  },
+  "safety": {
+    "frozen_42783_rows_untouched": true,
+    "no_previous_day_fill": true,
+    "no_nearest_date_substitution": true,
+    "no_interpolation": true,
+    "no_synthetic_ohlc": true,
+    "no_generic_proxy": true,
+    "no_taxonomy_code_substitution": true
+  },
+  "next_state": {
+    "series_blocker": "SECTOR_SERIES_UNBOUND",
+    "series_remains_open": true,
+    "infoway_route": "CLOSED_UNSUPPORTED",
+    "breadth_gate_open": false
+  }
+}

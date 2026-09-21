@@ -36,7 +36,25 @@
     "official_analysis_patch_rows": 0,
     "tushare_patch_rows": 0,
     "tushare_token_present": true,
-    "tushare_error": "您的token不对，请确认。"
+    "tushare_error": "您的token不对，请确认。",
+    "infoway_targeted_probe": {
+      "status": "INFOWAY_SW_INDEX_UNSUPPORTED",
+      "route_closed": true,
+      "recovery_allowed": false,
+      "workflow_run_id": 35579863921,
+      "artifact_id": 10629836740,
+      "artifact_digest": "sha256:81301d4c99a2d4f1c0a860cab0220fc6113920a218b93b4d8bc6bb639fc721d0",
+      "evidence_path": "data/dao2/modules/C_SECTOR_INFOWAY_EXACT_GAP_PROBE_V1.json",
+      "probe_target_codes": [
+        "801020.SI",
+        "801960.SI",
+        "801010.SI",
+        "801030.SI",
+        "801040.SI"
+      ],
+      "documented_symbol_mapping_matches": 0,
+      "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL"
+    }
   },
   "validation": {
     "exact_required_keys_from_pass_membership": true,
@@ -56,14 +74,17 @@
   },
   "blockers": [
     "301 exact Membership-required sector-date close rows remain missing across 10 Formal trading dates.",
-    "Current GitHub Actions TUSHARE_TOKEN is present but invalid, so the existing Tushare sw_daily same-date recovery route cannot execute."
+    "Current GitHub Actions TUSHARE_TOKEN is an Infoway credential under the legacy fallback path and is invalid for Tushare sw_daily exact-gap recovery.",
+    "Infoway public targeted exact-gap route is CLOSED_UNSUPPORTED: documented INDICES mapping returns no targeted SW 801xxx industry index symbols."
   ],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
     "no_forward_fill": true,
     "no_synthetic_rows": true,
     "no_required_key_deletion": true,
-    "no_historical_gp_v11_identity_claim": true
+    "no_historical_gp_v11_identity_claim": true,
+    "infoway_route_fail_closed": true,
+    "infoway_no_proxy_or_mapping_inference": true
   },
   "safety": {
     "candidate_only": true,

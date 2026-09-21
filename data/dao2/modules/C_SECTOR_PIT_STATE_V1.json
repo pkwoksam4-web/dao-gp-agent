@@ -62,7 +62,16 @@
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
       "workflow_run_id": 35575797301,
-      "manual_blocker": "GitHub Actions TUSHARE_TOKEN is invalid for sw_daily exact-gap recovery"
+      "manual_blocker": "301 exact same-day SW sector closes remain unresolved. Infoway public route is closed as unsupported; Tushare sw_daily remains unusable until a valid Tushare token or another exact, provenance-valid source is available.",
+      "infoway_targeted_probe": {
+        "status": "CLOSED_UNSUPPORTED",
+        "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
+        "workflow_run_id": 35579863921,
+        "artifact_id": 10629836740,
+        "evidence": "data/dao2/modules/C_SECTOR_INFOWAY_EXACT_GAP_PROBE_V1.json",
+        "recovery_allowed": false,
+        "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL"
+      }
     },
     "sector_membership_pit": {
       "status": "PASS_SUBCOMPONENT",
