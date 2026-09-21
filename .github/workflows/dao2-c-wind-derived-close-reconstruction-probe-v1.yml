@@ -1,0 +1,291 @@
+name: DAO2 C Wind Derived Close Reconstruction Probe V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-wind-derived-close-reconstruction-probe-v1.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/dao2-c-wind-derived-close-reconstruction-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas
+
+      - name: Download PASS Membership exact required keys
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-backing-materialize-v1
+          path: membership-pass
+          run-id: 35575433267
+          github-token: ${{ github.token }}
+
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+
+      - name: Pin public Wind-derived return evidence and SW2021 map
+        run: |
+          set -euo pipefail
+          mkdir -p artifact_probe/source
+          curl -fL --retry 3 --connect-timeout 20 --max-time 90 \
+            'https://raw.githubusercontent.com/z15114664687-dot/fund-holdings/92864a330e5bad393315cb6664fe626370e9c92d/data/raw/industry_returns.csv' \
+            -o artifact_probe/source/industry_returns.csv
+          curl -fL --retry 3 --connect-timeout 20 --max-time 90 \
+            'https://raw.githubusercontent.com/ZJU-OmniAI/Data-Copilot/c32f9dfa0ea7e9cd6316f06dab38ef2f1eb30187/SW2021_industry_L1.csv' \
+            -o artifact_probe/source/SW2021_industry_L1.csv
+          sha256sum artifact_probe/source/industry_returns.csv artifact_probe/source/SW2021_industry_L1.csv \
+            | tee artifact_probe/source/source_sha256.txt
+
+      - name: Audit code-level return identity and deterministic reconstruction
+        run: |
+          python - <<'PY'
+          import hashlib, json, math
+          from pathlib import Path
+          import pandas as pd
+
+          OUT=Path("artifact_probe")
+          reqp=Path("membership-pass/membership_out/formal_required_sector_keys.csv.gz")
+          basep=Path("series-base/sector_close_formal.csv.gz")
+          windp=OUT/"source/industry_returns.csv"
+          mapp=OUT/"source/SW2021_industry_L1.csv"
+
+          req=pd.read_csv(reqp,dtype=str)[["industry_code","trade_date"]]
+          req["trade_date"]=pd.to_datetime(req["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+          req=req.dropna().drop_duplicates()
+          base=pd.read_csv(basep,dtype={"industry_code":str,"trade_date":str})
+          base["trade_date"]=pd.to_datetime(base["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+          base["close"]=pd.to_numeric(base["close"],errors="coerce")
+          base=base.dropna(subset=["industry_code","trade_date","close"])
+          base=base.drop_duplicates(["industry_code","trade_date"])
+
+          required=set(map(tuple,req.itertuples(index=False,name=None)))
+          observed=set(map(tuple,base[["industry_code","trade_date"]].itertuples(index=False,name=None)))
+          missing=sorted(required-observed)
+          assert len(required)==43084, len(required)
+          assert len(observed)==42783, len(observed)
+          assert len(missing)==301, len(missing)
+
+          wind=pd.read_csv(windp,dtype={"date":str})
+          # CSV includes an exported pandas index column; select named fields only.
+          wind=wind[["date","industry","return"]].copy()
+          wind["date"]=pd.to_datetime(wind["date"].astype(str),errors="coerce").dt.strftime("%Y%m%d")
+          wind["return"]=pd.to_numeric(wind["return"],errors="coerce")
+          wind=wind.dropna().drop_duplicates(["date","industry"],keep="last")
+
+          mp=pd.read_csv(mapp,dtype=str)
+          # Expected columns are index_code/index_name (or close equivalents); resolve defensively.
+          cols={str(c).strip().lower():c for c in mp.columns}
+          code_col=next((c for k,c in cols.items() if k in {"index_code","indexcode","指数代码","sw_index_code"}),None)
+          name_col=next((c for k,c in cols.items() if k in {"index_name","industry_name","name","指数名称","行业名称"}),None)
+          if code_col is None or name_col is None:
+              # ZJU file is stable CSV; fallback by positional schema.
+              if mp.shape[1] < 2:
+                  raise RuntimeError(f"unexpected SW map columns: {list(mp.columns)}")
+              code_col,name_col=mp.columns[0],mp.columns[1]
+          mp=mp[[code_col,name_col]].rename(columns={code_col:"industry_code",name_col:"industry"})
+          mp["industry_code"]=mp["industry_code"].astype(str).str.strip()
+          mp["industry_code"]=mp["industry_code"].map(lambda x:x if x.endswith(".SI") else x+".SI")
+          mp["industry"]=mp["industry"].astype(str).str.strip()
+          code_to_name=dict(mp.itertuples(index=False,name=None))
+
+          # Check current 31-industry universe correspondence.
+          wind_names=set(wind["industry"].dropna().astype(str))
+          mapped_codes=sorted(c for c in code_to_name if c in set(req["industry_code"]))
+          current_map={c:code_to_name[c] for c in mapped_codes if code_to_name[c] in wind_names}
+
+          # Base close lookup and per-code sorted dates.
+          base_map={(str(r.industry_code),str(r.trade_date)):float(r.close) for r in base.itertuples()}
+          by_code={}
+          for c,g in base.groupby("industry_code"):
+              by_code[str(c)]=sorted((str(d),float(v)) for d,v in g[["trade_date","close"]].itertuples(index=False,name=None))
+
+          wind_map={(str(r.industry),str(r.date)):float(r.return) for r in wind.itertuples()}
+          # Identity audit: on every consecutive accepted base pair, compare direct close return
+          # to public Wind-derived return for the mapped current SW industry.
+          ident={}
+          overlap_rows=[]
+          for code,name in sorted(current_map.items()):
+              seq=by_code.get(code,[])
+              diffs=[]
+              round_close_matches=0
+              round_close_total=0
+              for i in range(1,len(seq)):
+                  d0,c0=seq[i-1]; d1,c1=seq[i]
+                  wr=wind_map.get((name,d1))
+                  if wr is None:
+                      continue
+                  direct=c1/c0-1.0
+                  diff=abs(direct-wr)
+                  diffs.append(diff)
+                  recon=round(c0*(1.0+wr),2)
+                  actual=round(c1,2)
+                  round_close_total+=1
+                  if recon==actual:
+                      round_close_matches+=1
+                  if len(overlap_rows)<5000:
+                      overlap_rows.append({
+                          "industry_code":code,"industry":name,"trade_date":d1,
+                          "prev_close":c0,"accepted_close":c1,
+                          "wind_return":wr,"accepted_return":direct,
+                          "abs_return_diff":diff,
+                          "forward_recon_2dp":recon,
+                          "accepted_close_2dp":actual,
+                          "round_2dp_match":recon==actual,
+                      })
+              ident[code]={
+                  "industry":name,
+                  "overlap_rows":len(diffs),
+                  "max_abs_return_diff":None if not diffs else max(diffs),
+                  "p99_abs_return_diff":None if not diffs else float(pd.Series(diffs).quantile(.99)),
+                  "median_abs_return_diff":None if not diffs else float(pd.Series(diffs).median()),
+                  "forward_round_2dp_matches":round_close_matches,
+                  "forward_round_2dp_total":round_close_total,
+                  "forward_round_2dp_match_rate":None if not round_close_total else round_close_matches/round_close_total,
+              }
+
+          # Reconstruct missing rows from both directions where the exact code->Wind-name mapping exists.
+          # This is evidence-only: never admitted into Series by this workflow.
+          recon_rows=[]
+          unresolved=[]
+          for code,d in missing:
+              name=current_map.get(code)
+              if not name:
+                  unresolved.append({"industry_code":code,"trade_date":d,"reason":"NO_CURRENT_SW2021_CODE_NAME_MAPPING"})
+                  continue
+              seq=by_code.get(code,[])
+              prev=[(dd,cc) for dd,cc in seq if dd<d]
+              nxt=[(dd,cc) for dd,cc in seq if dd>d]
+              if not prev or not nxt:
+                  unresolved.append({"industry_code":code,"trade_date":d,"reason":"NO_ADJACENT_FROZEN_CLOSE"})
+                  continue
+              pd0,pc=prev[-1]
+              nd,nc=nxt[0]
+              rt=wind_map.get((name,d))
+              rn=wind_map.get((name,nd))
+              if rt is None or rn is None:
+                  unresolved.append({
+                      "industry_code":code,"trade_date":d,"industry":name,
+                      "reason":"WIND_RETURN_MISSING",
+                      "target_return_present":rt is not None,
+                      "next_return_present":rn is not None,
+                      "next_date":nd,
+                  })
+                  continue
+              fwd=pc*(1.0+rt)
+              back=nc/(1.0+rn)
+              rf=round(fwd,2); rb=round(back,2)
+              recon_rows.append({
+                  "industry_code":code,"industry":name,"trade_date":d,
+                  "prev_trade_date":pd0,"prev_accepted_close":pc,
+                  "wind_target_return":rt,
+                  "next_trade_date":nd,"next_accepted_close":nc,
+                  "wind_next_return":rn,
+                  "forward_reconstructed_close":fwd,
+                  "backward_reconstructed_close":back,
+                  "forward_backward_abs_diff":abs(fwd-back),
+                  "forward_close_2dp":rf,
+                  "backward_close_2dp":rb,
+                  "unique_2dp":rf==rb,
+                  "candidate_close_2dp":rf if rf==rb else None,
+              })
+
+          rdf=pd.DataFrame(recon_rows)
+          udf=pd.DataFrame(unresolved)
+          pd.DataFrame(overlap_rows).to_csv(OUT/"wind_return_identity_overlap_sample.csv",index=False)
+          rdf.to_csv(OUT/"wind_two_sided_reconstruction.csv",index=False)
+          udf.to_csv(OUT/"wind_unresolved.csv",index=False)
+
+          gap_by_date={}
+          for c,d in missing:
+              gap_by_date[d]=gap_by_date.get(d,0)+1
+          recon_by_date={}
+          if not rdf.empty:
+              recon_by_date=rdf.groupby("trade_date").size().astype(int).to_dict()
+          unresolved_by_code={}
+          for x in unresolved:
+              unresolved_by_code[x["industry_code"]]=unresolved_by_code.get(x["industry_code"],0)+1
+
+          high_identity_codes=[
+              c for c,v in ident.items()
+              if v["overlap_rows"]>=100
+              and v["forward_round_2dp_match_rate"] is not None
+              and v["forward_round_2dp_match_rate"]>=0.999
+          ]
+          high_identity_recon=0 if rdf.empty else int(rdf["industry_code"].isin(high_identity_codes).sum())
+          unique_2dp=0 if rdf.empty else int(rdf["unique_2dp"].sum())
+
+          result={
+              "artifact":"DAO2_C_WIND_DERIVED_CLOSE_RECONSTRUCTION_PROBE_V1",
+              "status":"EVIDENCE_ONLY_NOT_ADMITTED",
+              "source":{
+                  "repository":"z15114664687-dot/fund-holdings",
+                  "commit":"92864a330e5bad393315cb6664fe626370e9c92d",
+                  "path":"data/raw/industry_returns.csv",
+                  "git_blob_sha":"45550d4d621ba0e6be39dc3e39b150576784b83c",
+                  "derivation_provenance":"WANDE.wande.dbo.ASWSINDEXEOD S_DQ_CLOSE pct_change by index_code",
+                  "source_code":"repl/source.py::fetch_industry_returns",
+                  "sha256":hashlib.sha256(windp.read_bytes()).hexdigest(),
+              },
+              "sw2021_map":{
+                  "repository":"ZJU-OmniAI/Data-Copilot",
+                  "commit":"c32f9dfa0ea7e9cd6316f06dab38ef2f1eb30187",
+                  "path":"SW2021_industry_L1.csv",
+                  "sha256":hashlib.sha256(mapp.read_bytes()).hexdigest(),
+                  "mapped_required_codes_with_wind_names":len(current_map),
+              },
+              "frozen_inputs":{
+                  "required":len(required),"observed":len(observed),"missing":len(missing),
+                  "gap_dates":gap_by_date,
+              },
+              "identity_audit":{
+                  "per_code":ident,
+                  "high_identity_code_count":len(high_identity_codes),
+                  "high_identity_codes":high_identity_codes,
+              },
+              "reconstruction":{
+                  "attempted_rows":len(recon_rows),
+                  "unresolved_rows":len(unresolved),
+                  "rows_by_date":recon_by_date,
+                  "two_sided_unique_2dp_rows":unique_2dp,
+                  "high_identity_reconstructed_rows":high_identity_recon,
+                  "unresolved_by_code":unresolved_by_code,
+                  "max_forward_backward_abs_diff":None if rdf.empty else float(rdf["forward_backward_abs_diff"].max()),
+                  "p99_forward_backward_abs_diff":None if rdf.empty else float(rdf["forward_backward_abs_diff"].quantile(.99)),
+              },
+              "governance":{
+                  "admitted_to_sector_series":False,
+                  "synthetic_flag_remains_false_in_frozen_series":True,
+                  "series_blocker_closed":False,
+                  "reason":"This probe tests deterministic equivalence only. Candidate reconstructed closes require explicit governance acceptance or an authoritative raw-close carrier before admission.",
+              }
+          }
+          (OUT/"result.json").write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-wind-derived-close-reconstruction-probe-v1
+          path: artifact_probe/
+          if-no-files-found: warn
+          retention-days: 30
