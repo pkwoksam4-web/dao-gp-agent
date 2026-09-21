@@ -54,6 +54,29 @@
       ],
       "documented_symbol_mapping_matches": 0,
       "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL"
+    },
+    "legacy_sw_history_probe": {
+      "status": "LEGACY_SW_HISTORY_ROUTE_CLOSED_TRANSPORT_UNAVAILABLE",
+      "route_closed": true,
+      "recovery_allowed": false,
+      "workflow_run_id": 35583461060,
+      "artifact_id": 10631811203,
+      "artifact_digest": "sha256:4878cfac0bad6047ed4bb356632d269fbb33c1bbd3f97afd12826f2ee676b1ac",
+      "evidence_path": "data/dao2/modules/C_SECTOR_LEGACY_SW_HISTORY_PROBE_V1.json",
+      "endpoint_families_tested": [
+        "handler.aspx/swindexhistory",
+        "excel2.aspx/swindexhistory",
+        "handler.aspx/V_Report type=Day"
+      ],
+      "schemes_tested": [
+        "https",
+        "http"
+      ],
+      "http_responses_received": 0,
+      "redirects_observed": 0,
+      "connect_timeout_across_all_families": true,
+      "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_TRANSPORT_FAIL",
+      "admitted_rows": 0
     }
   },
   "validation": {
@@ -75,7 +98,8 @@
   "blockers": [
     "301 exact Membership-required sector-date close rows remain missing across 10 Formal trading dates.",
     "Current GitHub Actions TUSHARE_TOKEN is an Infoway credential under the legacy fallback path and is invalid for Tushare sw_daily exact-gap recovery.",
-    "Infoway public targeted exact-gap route is CLOSED_UNSUPPORTED: documented INDICES mapping returns no targeted SW 801xxx industry index symbols."
+    "Infoway public targeted exact-gap route is CLOSED_UNSUPPORTED: documented INDICES mapping returns no targeted SW 801xxx industry index symbols.",
+    "Legacy official Shenwan swsindex.com route is CLOSED_TRANSPORT_UNAVAILABLE: HTTP and HTTPS connect timeout across swindexhistory handler, excel2, and V_Report Day endpoint families."
   ],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
@@ -84,7 +108,9 @@
     "no_required_key_deletion": true,
     "no_historical_gp_v11_identity_claim": true,
     "infoway_route_fail_closed": true,
-    "infoway_no_proxy_or_mapping_inference": true
+    "infoway_no_proxy_or_mapping_inference": true,
+    "legacy_sw_route_fail_closed": true,
+    "legacy_sw_no_nonofficial_mirror_admission": true
   },
   "safety": {
     "candidate_only": true,
