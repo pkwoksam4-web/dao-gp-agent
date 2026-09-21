@@ -15,7 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      INFOWAY_API_KEY: ${{ secrets.INFOWAY_API_KEY }}
+      INFOWAY_API_KEY_PRIMARY: ${{ secrets.INFOWAY_API_KEY }}
+      INFOWAY_API_KEY_LEGACY: ${{ secrets.TUSHARE_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

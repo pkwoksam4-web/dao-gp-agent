@@ -169,9 +169,12 @@ def main():
     args=ap.parse_args()
     args.out.mkdir(parents=True,exist_ok=True)
     raw_dir=args.out/"raw"
-    api_key=os.environ.get("INFOWAY_API_KEY","").strip()
+    primary=os.environ.get("INFOWAY_API_KEY_PRIMARY","").strip()
+    legacy=os.environ.get("INFOWAY_API_KEY_LEGACY","").strip()
+    api_key=primary or legacy
+    credential_source="INFOWAY_API_KEY" if primary else ("TUSHARE_TOKEN_LEGACY_INFOWAY_FALLBACK" if legacy else None)
     if not api_key:
-        raise RuntimeError("INFOWAY_API_KEY missing")
+        raise RuntimeError("No Infoway credential present in INFOWAY_API_KEY or legacy fallback")
 
     req_rows=load_csv_gz(args.required_keys)
     base_rows=load_csv_gz(args.base_panel)
@@ -196,6 +199,7 @@ def main():
       "artifact":"DAO2_C_INFOWAY_SECTOR_EXACT_GAP_PROBE_V1",
       "version":"1.0",
       "provider":"INFOWAY",
+      "credential_source":credential_source,
       "status":"RUNNING",
       "run_timestamp_utc":utc_now(),
       "frozen_input":{
