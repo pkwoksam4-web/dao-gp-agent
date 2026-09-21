@@ -48,16 +48,21 @@
       "historical_sector_package_recovered": false
     },
     "sector_series": {
-      "status": "VERIFYING_CONTRACT_BLOCKED_DATA",
+      "status": "BLOCKED_PENDING_EXACT_SERIES_CLOSURE",
       "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
       "full_formal_coverage_proven": false,
       "no_forward_fill_required": true
     },
     "sector_membership_pit": {
-      "status": "VERIFYING_CONTRACT_BLOCKED_DATA",
+      "status": "PASS_SUBCOMPONENT",
       "checkpoint": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
       "taxonomy_switch_contract_verified": true,
-      "pit_membership_proven": false
+      "pit_membership_proven": true,
+      "unresolved_rows": 0,
+      "formal_coverage_resolved_stock_date_keys": 1011607,
+      "required_sector_date_keys": 43084,
+      "workflow_run_id": 35575433267,
+      "artifact_id": 10628585296
     },
     "sector_breadth": {
       "status": "BLOCKED_DEPENDENCIES_AND_FORMULA",
@@ -76,6 +81,20 @@
       "tushare_token_available_in_pr_actions": false,
       "status": "BLOCKED_CI_CREDENTIAL_ABSENT",
       "note": "Do not infer global source unavailability from this CI credential state."
+    },
+    "latest_subcomponent_checkpoint": {
+      "component": "sector_membership_pit",
+      "status": "PASS_SUBCOMPONENT",
+      "path": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
+      "workflow_run_id": 35575433267,
+      "artifact_id": 10628585296
     }
-  }
+  },
+  "open_blockers": [
+    "SECTOR_SERIES_UNBOUND",
+    "SECTOR_BREADTH_UNBOUND"
+  ],
+  "closed_blockers": [
+    "SECTOR_MEMBERSHIP_PIT_UNBOUND"
+  ]
 }
