@@ -1,0 +1,118 @@
+name: DAO2 C GitHub Historical SW DB Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-github-historical-sw-db-probe-v1.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/dao2-c-github-historical-sw-db-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download historical public SQLite blob
+        run: |
+          set -euo pipefail
+          mkdir -p artifact_probe
+          URL='https://raw.githubusercontent.com/xp13465/trade-data-signal/7a33f78ea3bf52f14e7da57d785ae2692a36d373/data/sentiment.db'
+          curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 180 \
+            "$URL" -o artifact_probe/sentiment.db
+          sha256sum artifact_probe/sentiment.db | tee artifact_probe/sentiment.db.sha256
+          ls -lh artifact_probe/sentiment.db
+
+      - name: Query SW exact gap dates
+        run: |
+          python - <<'PY'
+          import csv, hashlib, json, sqlite3
+          from pathlib import Path
+
+          db = Path("artifact_probe/sentiment.db")
+          gap_dates = [
+              "20210806","20211008","20211022","20220303","20220323",
+              "20220331","20220414","20220505","20220509","20230908"
+          ]
+          conn = sqlite3.connect(str(db))
+          tables = [r[0] for r in conn.execute("select name from sqlite_master where type='table' order by name")]
+          cols = [r[1] for r in conn.execute("pragma table_info(index_daily)")] if "index_daily" in tables else []
+
+          rows=[]
+          if "index_daily" in tables:
+              q = """
+              SELECT date,index_id,open,high,low,close,pct_change,amount
+              FROM index_daily
+              WHERE date IN ({})
+                AND index_id LIKE 'sw_%'
+              ORDER BY date,index_id
+              """.format(",".join("?" for _ in gap_dates))
+              rows = conn.execute(q, gap_dates).fetchall()
+
+          out_csv=Path("artifact_probe/sw_gap_rows.csv")
+          with out_csv.open("w",newline="",encoding="utf-8") as f:
+              w=csv.writer(f)
+              w.writerow(["date","index_id","open","high","low","close","pct_change","amount"])
+              w.writerows(rows)
+
+          by_date={}
+          for r in rows:
+              by_date.setdefault(str(r[0]),0)
+              by_date[str(r[0])]+=1
+
+          wanted=[
+              ("20210806","sw_801020"),
+              ("20220303","sw_801960"),
+              ("20220303","sw_801030"),
+              ("20230908","sw_801010"),
+          ]
+          exact={}
+          for d,i in wanted:
+              hit=[r for r in rows if str(r[0])==d and str(r[1])==i]
+              exact[f"{i}/{d}"] = [list(x) for x in hit]
+
+          db_sha=hashlib.sha256(db.read_bytes()).hexdigest()
+          csv_sha=hashlib.sha256(out_csv.read_bytes()).hexdigest()
+          result={
+              "artifact":"DAO2_C_GITHUB_HISTORICAL_SW_DB_PROBE_V1",
+              "source_repository":"xp13465/trade-data-signal",
+              "source_commit":"7a33f78ea3bf52f14e7da57d785ae2692a36d373",
+              "source_path":"data/sentiment.db",
+              "source_blob_sha":"d12a7351436809394fd5545bd51551fc57475cd5",
+              "source_db_sha256":db_sha,
+              "tables":tables,
+              "index_daily_columns":cols,
+              "gap_dates":gap_dates,
+              "returned_sw_rows":len(rows),
+              "rows_by_gap_date":by_date,
+              "exact_samples":exact,
+              "output_csv_sha256":csv_sha,
+          }
+          Path("artifact_probe/result.json").write_text(
+              json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8"
+          )
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          conn.close()
+          PY
+
+      - name: Remove large SQLite before artifact upload
+        if: always()
+        run: rm -f artifact_probe/sentiment.db
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-github-historical-sw-db-probe-v1
+          path: artifact_probe/
+          if-no-files-found: warn
+          retention-days: 30
