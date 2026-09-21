@@ -6,6 +6,8 @@ on:
     paths:
       - 'scripts/dao2_c_sector_series_exact_v1.py'
       - '.github/workflows/dao2-c-sector-series-exact-v1.yml'
+      - 'data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json'
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,13 +21,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -q pandas pyarrow akshare
+      - run: pip install -q pandas pyarrow akshare tushare
       - name: Download frozen Formal calendar
         uses: actions/download-artifact@v4
         with:
           name: gp-pit-st-v480-final-audit
           path: calendar-final
           run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Download PASS Membership exact required keys
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-backing-materialize-v1
+          path: membership-pass
+          run-id: 35575433267
           github-token: ${{ github.token }}
       - name: Pin taxonomy manifest
         run: |
@@ -40,8 +49,16 @@ jobs:
           print(got)
           PY
       - name: Materialize and close same-day gaps
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
         run: |
-          python scripts/dao2_c_sector_series_exact_v1.py             --calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --taxonomy upstream/industry_taxonomy_manifest.json             --out artifact_series
+          python scripts/dao2_c_sector_series_exact_v1.py \
+            --calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv \
+            --taxonomy upstream/industry_taxonomy_manifest.json \
+            --required-keys membership-pass/membership_out/formal_required_sector_keys.csv.gz \
+            --membership-checkpoint data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json \
+            --price-basis data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json \
+            --out artifact_series
       - uses: actions/upload-artifact@v4
         if: always()
         with:

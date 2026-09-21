@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, hashlib, json
+import argparse, hashlib, json, os
 from pathlib import Path
 import pandas as pd
 import requests
@@ -85,6 +85,9 @@ def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--calendar",type=Path,required=True)
     ap.add_argument("--taxonomy",type=Path,required=True)
+    ap.add_argument("--required-keys",type=Path,required=True)
+    ap.add_argument("--membership-checkpoint",type=Path,required=True)
+    ap.add_argument("--price-basis",type=Path,required=True)
     ap.add_argument("--out",type=Path,required=True)
     args=ap.parse_args()
     args.out.mkdir(parents=True,exist_ok=True)
@@ -93,9 +96,39 @@ def main():
 
     import akshare as ak
     dates=read_calendar(args.calendar)
+    date_set=set(dates)
     tax=json.loads(args.taxonomy.read_text(encoding="utf-8"))
-    codes=tax["required_industry_codes"]
-    assert len(codes)==32,len(codes)
+
+    membership_checkpoint=json.loads(args.membership_checkpoint.read_text(encoding="utf-8"))
+    if membership_checkpoint.get("status")!="PASS_SUBCOMPONENT" or membership_checkpoint.get("blocker_closed_within_module") is not True:
+        raise RuntimeError("Membership checkpoint is not PASS_SUBCOMPONENT")
+
+    price_basis=json.loads(args.price_basis.read_text(encoding="utf-8"))
+    if price_basis.get("status")!="PASS_CANDIDATE_PRICE_BASIS_DEFINITION" or not price_basis.get("blocker_effect",{}).get("price_basis_subblocker_closed_for_candidate"):
+        raise RuntimeError("Candidate sector price basis is not PASS")
+
+    req_df=pd.read_csv(args.required_keys,dtype=str)
+    required_cols={"industry_code","trade_date"}
+    if not required_cols.issubset(req_df.columns):
+        raise RuntimeError(f"required keys missing columns: {sorted(required_cols-set(req_df.columns))}")
+    req_df=req_df[["industry_code","trade_date"]].copy()
+    req_df["industry_code"]=req_df["industry_code"].astype(str)
+    req_df["trade_date"]=pd.to_datetime(req_df["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+    req_df=req_df.dropna().copy()
+    input_required_duplicate_rows=int(req_df.duplicated(["industry_code","trade_date"],keep=False).sum())
+    if input_required_duplicate_rows:
+        raise RuntimeError(f"membership required keys duplicate rows={input_required_duplicate_rows}")
+    required=set(map(tuple,req_df.itertuples(index=False,name=None)))
+    if len(required)!=43084:
+        raise RuntimeError(f"membership required key count mismatch: {len(required)} != 43084")
+    if any(d not in date_set for _,d in required):
+        raise RuntimeError("membership required keys contain dates outside frozen Formal calendar")
+    codes=sorted(req_df["industry_code"].unique().tolist())
+    if len(codes)!=32:
+        raise RuntimeError(f"membership required industry code count mismatch: {len(codes)}")
+    if set(codes)!=set(tax["required_industry_codes"]):
+        raise RuntimeError("membership required industry codes disagree with pinned taxonomy manifest")
+    required_by_code={code:{d for c,d in required if c==code} for code in codes}
 
     base={}
     rows=[]
@@ -119,7 +152,7 @@ def main():
         f.to_parquet(raw_dir/f"{code}.parquet",index=False,compression="zstd")
         m={(code,d):float(c) for d,c in f[["trade_date","close"]].itertuples(index=False,name=None)}
         base.update(m)
-        exp=set(expected_dates(code,dates))
+        exp=required_by_code[code]
         pres=set(f["trade_date"])
         miss=sorted(exp-pres)
         per_code[code]={"base_rows":len(f),"expected_rows":len(exp),"base_missing":len(miss),"base_missing_dates":miss,"duplicate_rows":duplicate_rows}
@@ -158,6 +191,68 @@ def main():
                 patch.append({"industry_code":code,"trade_date":td,"close":float(close),"source_provider":"swsresearch:index_analysis_report","source_trade_date":td,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
         print(f"daily {pos}/{len(gap_dates)} {d} rows={len(g)}",flush=True)
 
+    # Existing approved fallback: Tushare SW daily, exact same trade date only.
+    patched_keys={(str(r["industry_code"]),str(r["trade_date"])) for r in patch}
+    remaining_for_tushare=set(missing)-patched_keys
+    tushare_patch_rows=0
+    tushare_errors=[]
+    tushare_overlap=[]
+    tushare_token_present=bool(os.environ.get("TUSHARE_TOKEN"))
+    if remaining_for_tushare and tushare_token_present:
+        import tushare as ts
+        pro=ts.pro_api(os.environ["TUSHARE_TOKEN"])
+        for d in sorted({td for _,td in remaining_for_tushare}):
+            try:
+                t=pro.sw_daily(trade_date=d)
+            except Exception as exc:
+                tushare_errors.append({"trade_date":d,"error":repr(exc)})
+                if "token" in str(exc).lower() or "token不对" in str(exc):
+                    break
+                continue
+            if t is None or t.empty:
+                tushare_errors.append({"trade_date":d,"error":"EMPTY"})
+                continue
+            if not {"ts_code","trade_date","close"}.issubset(t.columns):
+                tushare_errors.append({"trade_date":d,"error":f"missing_columns:{list(t.columns)}"})
+                continue
+            t=t.rename(columns={"ts_code":"industry_code"})[["industry_code","trade_date","close"]].copy()
+            t["industry_code"]=t["industry_code"].astype(str)
+            t["trade_date"]=pd.to_datetime(t["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+            t["close"]=pd.to_numeric(t["close"],errors="coerce")
+            t=t.dropna(subset=["industry_code","trade_date","close"]).copy()
+            wrong=sorted(set(t["trade_date"])-{d})
+            if wrong:
+                tushare_errors.append({"trade_date":d,"error":f"non_same_date:{wrong[:5]}"})
+                continue
+            dup=int(t.duplicated(["industry_code","trade_date"],keep=False).sum())
+            if dup:
+                tushare_errors.append({"trade_date":d,"error":f"duplicate_rows:{dup}"})
+                continue
+            for code,td,close in t.itertuples(index=False,name=None):
+                k=(str(code),str(td))
+                if k in base:
+                    tushare_overlap.append({
+                        "industry_code":str(code),
+                        "trade_date":str(td),
+                        "hist_close":float(base[k]),
+                        "tushare_close":float(close),
+                        "abs_diff":abs(float(base[k])-float(close)),
+                    })
+                if k in remaining_for_tushare:
+                    patch.append({
+                        "industry_code":str(code),
+                        "trade_date":str(td),
+                        "close":float(close),
+                        "source_provider":"tushare:sw_daily",
+                        "source_trade_date":str(td),
+                        "fill_method":"NONE",
+                        "price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL",
+                    })
+                    tushare_patch_rows+=1
+            print(f"tushare exact {d} rows={len(t)} patch_total={tushare_patch_rows}",flush=True)
+    elif remaining_for_tushare:
+        tushare_errors.append({"error":"NO_TUSHARE_TOKEN","remaining_keys":len(remaining_for_tushare)})
+
     overlap_df=pd.DataFrame(overlap)
     patch_df=pd.DataFrame(patch)
     if not overlap_df.empty:
@@ -184,9 +279,6 @@ def main():
     panel.to_csv(args.out/"sector_close_formal.csv.gz",index=False,compression="gzip")
 
     observed=set(map(tuple,panel[["industry_code","trade_date"]].astype(str).itertuples(index=False,name=None)))
-    required=set()
-    for code in codes:
-        required.update((code,d) for d in expected_dates(code,dates))
     final_missing=sorted(required-observed)
     same_date=bool((panel["trade_date"].astype(str)==panel["source_trade_date"].astype(str)).all())
     no_fill=bool(panel["fill_method"].eq("NONE").all())
@@ -197,8 +289,12 @@ def main():
       "status":"PASS_SUBCOMPONENT" if not final_missing and duplicate_required_rows==0 and same_date and no_fill and finite else "BLOCKED",
       "formal":{"start":FORMAL_START,"end":FORMAL_END,"trading_days":len(dates)},
       "taxonomy_switch":{"sw2014_last":SW2014_LAST,"sw2021_first":SW2021_FIRST,"sw2014_only":sorted(SW2014_ONLY),"sw2021_new":sorted(SW2021_NEW)},
+      "required_key_source":"PASS membership artifact: membership_out/formal_required_sector_keys.csv.gz",
+      "membership_checkpoint_status":membership_checkpoint.get("status"),
+      "price_basis_binding_status":price_basis.get("status"),
       "required_industry_codes":len(codes),
       "required_sector_date_keys":len(required),
+      "input_required_duplicate_rows":input_required_duplicate_rows,
       "observed_required_keys":len(required)-len(final_missing),
       "missing_required_keys":len(final_missing),
       "duplicate_required_keys":duplicate_required_rows,
@@ -207,9 +303,13 @@ def main():
       "gap_dates":gap_dates,
       "same_day_patch_rows":0 if patch_df.empty else int(len(patch_df)),
       "same_day_patch_duplicate_rows":patch_duplicate_rows,
+      "tushare_token_present":tushare_token_present,
+      "tushare_patch_rows":tushare_patch_rows,
+      "tushare_errors":tushare_errors,
+      "tushare_same_day_overlap_rows":len(tushare_overlap),
       "same_day_endpoint_overlap":{"rows":int(len(overlap_df)),"max_abs_close_diff":overlap_max,"p99_abs_close_diff":overlap_p99,"exact_pass":overlap_pass},
       "same_date_provenance":same_date,
-      "same_day_official_patch_dates_exact":not daily_errors,
+      "same_day_sources_closed_all_required_gaps":len(final_missing)==0,
       "fill_method_none":no_fill,
       "forward_fill_used":False,
       "finite_positive_close":finite,
@@ -221,6 +321,8 @@ def main():
     }
     (args.out/"series_exact_audit.json").write_text(json.dumps(audit,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(audit,ensure_ascii=False,indent=2),flush=True)
+    if audit["status"]!="PASS_SUBCOMPONENT":
+        raise SystemExit(2)
 
 if __name__=="__main__":
     main()
