@@ -2,6 +2,7 @@ from __future__ import annotations
 import argparse, hashlib, json
 from pathlib import Path
 import pandas as pd
+import requests
 
 FORMAL_START="20200601"
 FORMAL_END="20260417"
@@ -34,6 +35,52 @@ def read_calendar(path):
 def git_blob_sha(data:bytes):
     return hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()
 
+def fetch_sw_analysis_day(trade_date: str) -> pd.DataFrame:
+    """Fetch one SW L1 analysis-report date directly from the same official endpoint AKShare wraps."""
+    url="https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/"
+    params={
+        "page":"1",
+        "page_size":"50",
+        "index_type":"一级行业",
+        "start_date":f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}",
+        "end_date":f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}",
+        "type":"DAY",
+        "swindexcode":"all",
+    }
+    headers={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36"}
+    first=requests.get(url,params=params,headers=headers,verify=False,timeout=30)
+    first.raise_for_status()
+    payload=first.json()
+    data=payload.get("data") or {}
+    count=int(data.get("count") or 0)
+    if count == 0:
+        return pd.DataFrame(columns=["industry_code","trade_date","close"])
+    frames=[]
+    pages=max(1,(count+49)//50)
+    for page in range(1,pages+1):
+        params["page"]=str(page)
+        resp=requests.get(url,params=params,headers=headers,verify=False,timeout=30)
+        resp.raise_for_status()
+        body=resp.json().get("data") or {}
+        part=pd.DataFrame(body.get("results") or [])
+        if not part.empty:
+            frames.append(part)
+    if not frames:
+        return pd.DataFrame(columns=["industry_code","trade_date","close"])
+    g=pd.concat(frames,ignore_index=True)
+    required={"swindexcode","bargaindate","closeindex"}
+    if not required.issubset(g.columns):
+        raise RuntimeError(f"analysis endpoint missing columns: {sorted(required-set(g.columns))}; got={list(g.columns)}")
+    g=g.rename(columns={"swindexcode":"industry_code","bargaindate":"trade_date","closeindex":"close"})
+    g["industry_code"]=g["industry_code"].astype(str).str.replace(".0","",regex=False).map(lambda x:x if x.endswith(".SI") else x+".SI")
+    g["trade_date"]=pd.to_datetime(g["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
+    g["close"]=pd.to_numeric(g["close"],errors="coerce")
+    g=g.dropna(subset=["industry_code","trade_date","close"]).copy()
+    wrong_dates=sorted(set(g["trade_date"])-{trade_date})
+    if wrong_dates:
+        raise RuntimeError(f"analysis endpoint returned non-request dates for {trade_date}: {wrong_dates[:10]}")
+    return g[["industry_code","trade_date","close"]]
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--calendar",type=Path,required=True)
@@ -65,14 +112,17 @@ def main():
         f=f[f["trade_date"].isin(dates)].copy()
         f["industry_code"]=code
         f["close"]=pd.to_numeric(f["close"],errors="coerce")
-        f=f.dropna(subset=["trade_date","close"]).drop_duplicates(["industry_code","trade_date"],keep="last")
+        f=f.dropna(subset=["trade_date","close"]).copy()
+        duplicate_rows=int(f.duplicated(["industry_code","trade_date"],keep=False).sum())
+        if duplicate_rows:
+            raise RuntimeError(f"{code}: duplicate sector-date rows={duplicate_rows}")
         f.to_parquet(raw_dir/f"{code}.parquet",index=False,compression="zstd")
         m={(code,d):float(c) for d,c in f[["trade_date","close"]].itertuples(index=False,name=None)}
         base.update(m)
         exp=set(expected_dates(code,dates))
         pres=set(f["trade_date"])
         miss=sorted(exp-pres)
-        per_code[code]={"base_rows":len(f),"expected_rows":len(exp),"base_missing":len(miss),"base_missing_dates":miss}
+        per_code[code]={"base_rows":len(f),"expected_rows":len(exp),"base_missing":len(miss),"base_missing_dates":miss,"duplicate_rows":duplicate_rows}
         for d,c in f[["trade_date","close"]].itertuples(index=False,name=None):
             if d in exp:
                 rows.append({"industry_code":code,"trade_date":d,"close":float(c),"source_provider":"akshare:index_hist_sw","source_trade_date":d,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
@@ -87,29 +137,25 @@ def main():
     daily_errors=[]
     for pos,d in enumerate(gap_dates,1):
         try:
-            g=ak.index_analysis_daily_sw(symbol="一级行业",start_date=d,end_date=d).copy()
+            g=fetch_sw_analysis_day(d)
         except Exception as exc:
             daily_errors.append({"trade_date":d,"error":repr(exc)})
             continue
         if g.empty:
             daily_errors.append({"trade_date":d,"error":"EMPTY"})
             continue
-        g=g.rename(columns={"指数代码":"industry_code","发布日期":"trade_date","收盘指数":"close"})
-        if not {"industry_code","trade_date","close"}.issubset(g.columns):
-            daily_errors.append({"trade_date":d,"error":f"missing_columns:{list(g.columns)}"})
+        duplicate_patch_rows=int(g.duplicated(["industry_code","trade_date"],keep=False).sum())
+        if duplicate_patch_rows:
+            daily_errors.append({"trade_date":d,"error":f"duplicate_endpoint_rows:{duplicate_patch_rows}"})
             continue
-        g["industry_code"]=g["industry_code"].astype(str).str.replace(".0","",regex=False).map(lambda x:x if x.endswith(".SI") else x+".SI")
-        g["trade_date"]=pd.to_datetime(g["trade_date"],errors="coerce").dt.strftime("%Y%m%d")
-        g["close"]=pd.to_numeric(g["close"],errors="coerce")
-        g=g.dropna(subset=["industry_code","trade_date","close"]).drop_duplicates(["industry_code","trade_date"],keep="last")
 
-        # Cross-check every same-date overlap available between the two SW endpoints.
+        # Cross-check every same-date overlap available between the two official SW endpoints.
         for code,td,close in g[["industry_code","trade_date","close"]].itertuples(index=False,name=None):
             k=(code,td)
             if k in base:
                 overlap.append({"industry_code":code,"trade_date":td,"hist_close":base[k],"analysis_close":float(close),"abs_diff":abs(base[k]-float(close))})
             if k in missing:
-                patch.append({"industry_code":code,"trade_date":td,"close":float(close),"source_provider":"akshare:index_analysis_daily_sw","source_trade_date":td,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
+                patch.append({"industry_code":code,"trade_date":td,"close":float(close),"source_provider":"swsresearch:index_analysis_report","source_trade_date":td,"fill_method":"NONE","price_basis":"SW_INDUSTRY_INDEX_CLOSE_LEVEL"})
         print(f"daily {pos}/{len(gap_dates)} {d} rows={len(g)}",flush=True)
 
     overlap_df=pd.DataFrame(overlap)
@@ -123,10 +169,17 @@ def main():
         overlap_max=None; overlap_p99=None; overlap_pass=False
 
     if not patch_df.empty:
-        patch_df=patch_df.drop_duplicates(["industry_code","trade_date"],keep="last")
+        patch_duplicate_rows=int(patch_df.duplicated(["industry_code","trade_date"],keep=False).sum())
+        if patch_duplicate_rows:
+            raise RuntimeError(f"duplicate same-day patch rows={patch_duplicate_rows}")
         patch_df.to_csv(args.out/"same_day_gap_patch.csv",index=False)
         rows.extend(patch_df.to_dict("records"))
-    panel=pd.DataFrame(rows).drop_duplicates(["industry_code","trade_date"],keep="last")
+    else:
+        patch_duplicate_rows=0
+    panel=pd.DataFrame(rows)
+    duplicate_required_rows=int(panel.duplicated(["industry_code","trade_date"],keep=False).sum())
+    if duplicate_required_rows:
+        raise RuntimeError(f"duplicate required sector-date rows={duplicate_required_rows}")
     panel=panel.sort_values(["industry_code","trade_date"])
     panel.to_csv(args.out/"sector_close_formal.csv.gz",index=False,compression="gzip")
 
@@ -141,19 +194,22 @@ def main():
 
     audit={
       "artifact":"DAO2_C_SECTOR_SERIES_EXACT_AUDIT_V1",
-      "status":"PASS_SUBCOMPONENT" if not final_missing and same_date and no_fill and finite and overlap_pass else "BLOCKED",
+      "status":"PASS_SUBCOMPONENT" if not final_missing and duplicate_required_rows==0 and same_date and no_fill and finite else "BLOCKED",
       "formal":{"start":FORMAL_START,"end":FORMAL_END,"trading_days":len(dates)},
       "taxonomy_switch":{"sw2014_last":SW2014_LAST,"sw2021_first":SW2021_FIRST,"sw2014_only":sorted(SW2014_ONLY),"sw2021_new":sorted(SW2021_NEW)},
       "required_industry_codes":len(codes),
       "required_sector_date_keys":len(required),
       "observed_required_keys":len(required)-len(final_missing),
       "missing_required_keys":len(final_missing),
+      "duplicate_required_keys":duplicate_required_rows,
       "missing_required_key_sample":[{"industry_code":a,"trade_date":b} for a,b in final_missing[:100]],
       "base_missing_keys":sum(x["base_missing"] for x in per_code.values()),
       "gap_dates":gap_dates,
       "same_day_patch_rows":0 if patch_df.empty else int(len(patch_df)),
+      "same_day_patch_duplicate_rows":patch_duplicate_rows,
       "same_day_endpoint_overlap":{"rows":int(len(overlap_df)),"max_abs_close_diff":overlap_max,"p99_abs_close_diff":overlap_p99,"exact_pass":overlap_pass},
       "same_date_provenance":same_date,
+      "same_day_official_patch_dates_exact":not daily_errors,
       "fill_method_none":no_fill,
       "forward_fill_used":False,
       "finite_positive_close":finite,
