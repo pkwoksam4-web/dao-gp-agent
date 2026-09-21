@@ -331,6 +331,392 @@ def audit_series(root: Path, formal_calendar: Path, membership_out: Path, out: P
     }
 
 
+
+SEVEN_859622_SYMBOLS = ["002554","300157","300164","300191","600339","600583","603727"]
+CANONICAL_SW_XLS_URL = "https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls"
+CANONICAL_SW_XLS_SHA256 = "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+FORMAL_RAW_EXPECTED_ROWS = 1_011_607
+FORMAL_RAW_ARTIFACT = {
+    "run_id": 34192233633,
+    "artifact_id": 10042614517,
+    "artifact_name": "gp-sohu-full-raw-v482-reaudit",
+    "artifact_digest_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+}
+
+
+def _six(value: object) -> str:
+    text = str(value).strip().replace(".0", "")
+    return text[:6].zfill(6)
+
+
+def _yyyymmdd(series: pd.Series) -> pd.Series:
+    return pd.to_datetime(series, errors="coerce").dt.strftime("%Y%m%d")
+
+
+def _read_old_index_map(path: Path) -> dict[str, str]:
+    frame = pd.read_csv(path, sep=r"\s+", dtype=str, encoding="utf-8-sig")
+    frame["code"] = frame["code"].astype(str).str.zfill(6)
+    frame["index_code"] = frame["index_code"].astype(str)
+    return dict(zip(frame["code"], frame["index_code"].map(lambda x: x if x.endswith(".SI") else x + ".SI")))
+
+
+def _read_hierarchy(path: Path) -> pd.DataFrame:
+    frame = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
+    for col in ("l3_code", "l2_code", "l1_code"):
+        frame[col] = frame[col].astype(str).str.replace(".0", "", regex=False).str.zfill(6)
+    return frame
+
+
+def official_membership(
+    *,
+    sw_xls: Path,
+    formal_raw: Path,
+    taxonomy: Path,
+    sw2014_hierarchy: Path,
+    sw2014_index_map: Path,
+    sw2021_hierarchy: Path,
+    sw2021_l1: Path,
+    sw2021_l3: Path,
+    out: Path,
+) -> dict[str, Any]:
+    out.mkdir(parents=True, exist_ok=True)
+
+    raw_xls_sha = sha256(sw_xls)
+    raw_xls_bytes = sw_xls.stat().st_size
+    if raw_xls_sha != CANONICAL_SW_XLS_SHA256:
+        raise ValueError(f"canonical SW XLS sha mismatch: {raw_xls_sha}")
+    if raw_xls_bytes != 1_165_824:
+        raise ValueError(f"canonical SW XLS byte count mismatch: {raw_xls_bytes}")
+
+    hist = pd.read_excel(sw_xls, dtype={"股票代码": "str", "行业代码": "str"})
+    hist = hist.rename(
+        columns={
+            "股票代码": "symbol",
+            "计入日期": "start_date",
+            "行业代码": "classification_code",
+            "更新日期": "update_time",
+        }
+    )
+    required_hist = {"symbol", "start_date", "classification_code"}
+    if not required_hist.issubset(hist.columns):
+        raise ValueError(f"SW XLS missing columns: {sorted(required_hist - set(hist.columns))}")
+    hist["symbol"] = hist["symbol"].map(_six)
+    hist["start_date"] = _yyyymmdd(hist["start_date"])
+    hist["classification_code"] = hist["classification_code"].astype(str).str.replace(".0", "", regex=False).str.zfill(6)
+    if "update_time" in hist.columns:
+        hist["update_time"] = _yyyymmdd(hist["update_time"])
+    else:
+        hist["update_time"] = pd.NA
+    hist = hist.dropna(subset=["symbol", "start_date", "classification_code"]).copy()
+    hist = hist.sort_values(["symbol", "start_date"]).reset_index(drop=True)
+    hist_dup = int(hist.duplicated(["symbol", "start_date"], keep=False).sum())
+
+    taxonomy_payload = json.loads(taxonomy.read_text(encoding="utf-8"))
+    required_codes = set(map(str, taxonomy_payload["required_industry_codes"]))
+    bridge = {str(k): str(v) for k, v in taxonomy_payload.get("explicit_l3_bridge", {}).items()}
+
+    old_h = _read_hierarchy(sw2014_hierarchy)
+    old_l3_to_l1 = dict(zip(old_h["l3_code"], old_h["l1_code"]))
+    old_index = _read_old_index_map(sw2014_index_map)
+
+    new_h = _read_hierarchy(sw2021_hierarchy)
+    new_l3_to_l1 = dict(zip(new_h["l3_code"], new_h["l1_code"]))
+
+    new_l1 = pd.read_csv(sw2021_l1, dtype=str, encoding="utf-8-sig")
+    new_l1["industry_code"] = new_l1["industry_code"].astype(str).str.replace(".0", "", regex=False).str.zfill(6)
+    new_l1_index = dict(zip(new_l1["industry_code"], new_l1["index_code"].astype(str)))
+
+    new_l3 = pd.read_csv(sw2021_l3, dtype=str, encoding="utf-8-sig")
+    new_l3["industry_code"] = new_l3["industry_code"].astype(str).str.replace(".0", "", regex=False).str.zfill(6)
+    new_l3_idx = dict(zip(new_l3["industry_code"], new_l3["index_code"].astype(str)))
+
+    # Resolve the exact seven 859622 rows from official history plus fixed taxonomy tables.
+    seven_evidence: list[dict[str, Any]] = []
+    special_bridge: dict[tuple[str, str], str] = {}
+    for sym in SEVEN_859622_SYMBOLS:
+        g = hist.loc[hist["symbol"].eq(sym)].sort_values("start_date").reset_index(drop=True)
+        new_rows = g.loc[g["classification_code"].eq("750202") & g["start_date"].le(SW2014_LAST)]
+        if len(new_rows) != 1:
+            raise ValueError(f"{sym}: expected exactly one pre-switch 750202 row, got {len(new_rows)}")
+        row = new_rows.iloc[0]
+        pos = int(g.index[g["start_date"].eq(row["start_date"]) & g["classification_code"].eq("750202")][0])
+        prev = g.iloc[pos - 1] if pos > 0 else None
+        if prev is None or str(prev["classification_code"]) != "210401":
+            raise ValueError(f"{sym}: previous official classification is not 210401")
+        if old_l3_to_l1.get("210401") != "210000":
+            raise ValueError("SW2014 hierarchy does not map 210401 -> 210000")
+        if old_index.get("210000") != "801020.SI":
+            raise ValueError("SW2014 index map does not map 210000 -> 801020.SI")
+        if new_l3_idx.get("750202") != "859622.SI":
+            raise ValueError("SW2021 L3 table does not map 750202 -> 859622.SI")
+        if new_l3_to_l1.get("750202") != "750000":
+            raise ValueError("SW2021 hierarchy does not map 750202 -> 750000")
+        if new_l1_index.get("750000") != "801960.SI":
+            raise ValueError("SW2021 L1 table does not map 750000 -> 801960.SI")
+        special_bridge[(sym, "750202")] = "801020.SI"
+        next_start = None
+        later = g.loc[g["start_date"].gt(str(row["start_date"]))]
+        if not later.empty:
+            next_start = str(later.iloc[0]["start_date"])
+        seven_evidence.append(
+            {
+                "symbol": sym,
+                "effective_date_interval": ["20210730", SW2014_LAST],
+                "official_previous_classification": {
+                    "start_date": str(prev["start_date"]),
+                    "classification_code": "210401",
+                    "update_time": None if pd.isna(prev["update_time"]) else str(prev["update_time"]),
+                },
+                "official_migration_classification": {
+                    "start_date": str(row["start_date"]),
+                    "classification_code": "750202",
+                    "update_time": None if pd.isna(row["update_time"]) else str(row["update_time"]),
+                    "next_start_date": next_start,
+                },
+                "sw2014": {
+                    "l3_classification_code": "210401",
+                    "l3_name": "油气钻采服务",
+                    "l1_classification_code": "210000",
+                    "l1_name": "采掘",
+                    "l1_index_code": "801020.SI",
+                },
+                "sw2021_migration": {
+                    "classification_code": "750202",
+                    "l3_index_code": "859622.SI",
+                    "l3_name": "油气及炼化工程",
+                    "l1_classification_code": "750000",
+                    "l1_name": "石油石化",
+                    "l1_index_code": "801960.SI",
+                },
+                "pre_switch_resolution": "801020.SI",
+                "post_switch_native_l1": "801960.SI",
+                "raw_xls_sha256": raw_xls_sha,
+                "raw_xls_source_url": CANONICAL_SW_XLS_URL,
+            }
+        )
+
+    formal = pd.read_parquet(formal_raw).copy()
+    required_raw = {"symbol", "date"}
+    if not required_raw.issubset(formal.columns):
+        raise ValueError(f"Formal RAW missing columns: {sorted(required_raw - set(formal.columns))}")
+    formal["symbol_full"] = formal["symbol"].astype(str).str.upper()
+    formal["symbol"] = formal["symbol_full"].str[:6]
+    formal["trade_date"] = _yyyymmdd(formal["date"])
+    formal = formal.dropna(subset=["symbol", "trade_date"]).copy()
+    formal = formal[["symbol_full", "symbol", "trade_date"]].sort_values(["symbol", "trade_date"]).reset_index(drop=True)
+    duplicate_formal = int(formal.duplicated(["symbol_full", "trade_date"], keep=False).sum())
+    if len(formal) != FORMAL_RAW_EXPECTED_ROWS:
+        raise ValueError(f"Formal RAW row mismatch: {len(formal)} != {FORMAL_RAW_EXPECTED_ROWS}")
+    if duplicate_formal:
+        raise ValueError(f"Formal RAW duplicate symbol-date rows: {duplicate_formal}")
+
+    mapped_parts: list[pd.DataFrame] = []
+    no_history_symbols: list[str] = []
+    for sym, trades in formal.groupby("symbol", sort=True):
+        events = hist.loc[hist["symbol"].eq(sym), ["start_date", "classification_code", "update_time"]].copy()
+        if events.empty:
+            z = trades.copy()
+            z["classification_start_date"] = pd.NA
+            z["classification_code"] = pd.NA
+            z["classification_update_time"] = pd.NA
+            mapped_parts.append(z)
+            no_history_symbols.append(sym)
+            continue
+        left = trades.sort_values("trade_date").copy()
+        right = events.rename(
+            columns={"start_date": "classification_start_date", "update_time": "classification_update_time"}
+        ).sort_values("classification_start_date")
+        left["_trade_key"] = left["trade_date"].astype(int)
+        right["_event_key"] = right["classification_start_date"].astype(int)
+        z = pd.merge_asof(
+            left,
+            right,
+            left_on="_trade_key",
+            right_on="_event_key",
+            direction="backward",
+            allow_exact_matches=True,
+        )
+        z = z.drop(columns=["_trade_key", "_event_key"])
+        mapped_parts.append(z)
+
+    panel = pd.concat(mapped_parts, ignore_index=True)
+    if len(panel) != len(formal):
+        raise ValueError("merge_asof changed Formal row count")
+
+    l1_codes: list[str | None] = []
+    methods: list[str] = []
+    migration_l3: list[str | None] = []
+    for rec in panel[["symbol", "trade_date", "classification_code"]].to_dict("records"):
+        sym = str(rec["symbol"])
+        d = str(rec["trade_date"])
+        code = None if pd.isna(rec["classification_code"]) else str(rec["classification_code"]).zfill(6)
+        out_code: str | None = None
+        method = "UNRESOLVED"
+        l3_idx: str | None = None
+        if code is not None and d <= SW2014_LAST:
+            if code in old_l3_to_l1:
+                out_code = old_index.get(old_l3_to_l1[code])
+                method = "SW2014_DIRECT_OFFICIAL_HISTORY"
+            else:
+                l3_idx = new_l3_idx.get(code)
+                if (sym, code) in special_bridge:
+                    out_code = special_bridge[(sym, code)]
+                    method = "SW2021_859622_TO_SW2014_EXACT_HISTORY_BRIDGE"
+                elif l3_idx in bridge:
+                    out_code = bridge[l3_idx]
+                    method = "SW2021_L3_TO_SW2014_PINNED_BRIDGE"
+        elif code is not None and d >= SW2021_FIRST:
+            if code in new_l3_to_l1:
+                out_code = new_l1_index.get(new_l3_to_l1[code])
+                method = "SW2021_NATIVE_OFFICIAL_HISTORY"
+            elif code in new_l1_index:
+                out_code = new_l1_index.get(code)
+                method = "SW2021_NATIVE_L1_OFFICIAL_HISTORY"
+        l1_codes.append(out_code)
+        methods.append(method)
+        migration_l3.append(l3_idx)
+
+    panel["industry_code"] = l1_codes
+    panel["mapping_method"] = methods
+    panel["migration_l3_index_code"] = migration_l3
+    panel["raw_xls_sha256"] = raw_xls_sha
+
+    unresolved = panel.loc[panel["industry_code"].isna()].copy()
+    invalid_required = panel.loc[panel["industry_code"].notna() & ~panel["industry_code"].isin(required_codes)].copy()
+    duplicate_mapped = int(panel.duplicated(["symbol_full", "trade_date"], keep=False).sum())
+
+    pre = panel.loc[panel["trade_date"].le(SW2014_LAST)]
+    post = panel.loc[panel["trade_date"].ge(SW2021_FIRST)]
+    pre_new_l1 = int(pre["industry_code"].isin(NEW_SW2021_L1).sum())
+    post_old_l1 = int(post["industry_code"].isin(SW2014_ONLY_L1).sum())
+    bridge_after_switch = int(post["mapping_method"].str.contains("BRIDGE", na=False).sum())
+    native_before_switch = int(pre["mapping_method"].str.contains("SW2021_NATIVE", na=False).sum())
+    forbidden_gap_rows = int(panel["trade_date"].isin(["20211211", "20211212"]).sum())
+
+    exact_special_rows = panel.loc[
+        panel["symbol"].isin(SEVEN_859622_SYMBOLS)
+        & panel["trade_date"].between("20210730", SW2014_LAST)
+        & panel["classification_code"].astype(str).eq("750202")
+    ].copy()
+    special_bad = exact_special_rows.loc[
+        ~exact_special_rows["industry_code"].eq("801020.SI")
+        | ~exact_special_rows["mapping_method"].eq("SW2021_859622_TO_SW2014_EXACT_HISTORY_BRIDGE")
+    ]
+
+    req = (
+        panel.loc[panel["industry_code"].notna(), ["industry_code", "trade_date"]]
+        .drop_duplicates()
+        .sort_values(["trade_date", "industry_code"])
+        .reset_index(drop=True)
+    )
+    req_dup = int(req.duplicated(["industry_code", "trade_date"], keep=False).sum())
+
+    panel_out = panel[
+        [
+            "symbol_full",
+            "trade_date",
+            "industry_code",
+            "classification_code",
+            "classification_start_date",
+            "classification_update_time",
+            "mapping_method",
+            "migration_l3_index_code",
+            "raw_xls_sha256",
+        ]
+    ].sort_values(["symbol_full", "trade_date"])
+    panel_out.to_csv(out / "industry_membership_formal.csv.gz", index=False, compression="gzip")
+    req.to_csv(out / "formal_required_sector_keys.csv.gz", index=False, compression="gzip")
+    unresolved.to_csv(out / "formal_membership_unresolved.csv", index=False)
+    pd.DataFrame(seven_evidence).to_json(
+        out / "seven_859622_resolution.json", orient="records", force_ascii=False, indent=2
+    )
+    pd.DataFrame(seven_evidence).to_csv(out / "seven_859622_resolution.csv", index=False)
+
+    standards = {
+        "sw2014_hierarchy": {"path": str(sw2014_hierarchy), "sha256": sha256(sw2014_hierarchy)},
+        "sw2014_index_map": {"path": str(sw2014_index_map), "sha256": sha256(sw2014_index_map)},
+        "sw2021_hierarchy": {"path": str(sw2021_hierarchy), "sha256": sha256(sw2021_hierarchy)},
+        "sw2021_l1": {"path": str(sw2021_l1), "sha256": sha256(sw2021_l1)},
+        "sw2021_l3": {"path": str(sw2021_l3), "sha256": sha256(sw2021_l3)},
+        "taxonomy_manifest": {"path": str(taxonomy), "sha256": sha256(taxonomy)},
+    }
+    checks = {
+        "canonical_sw_xls_exact": raw_xls_sha == CANONICAL_SW_XLS_SHA256 and raw_xls_bytes == 1_165_824,
+        "sw_xls_duplicate_symbol_date_rows_zero": hist_dup == 0,
+        "seven_unresolved_resolved": len(seven_evidence) == 7,
+        "unresolved_rows_zero": len(unresolved) == 0,
+        "formal_stock_date_rows_exact": len(panel) == FORMAL_RAW_EXPECTED_ROWS,
+        "formal_duplicate_symbol_date_zero": duplicate_mapped == 0,
+        "mapped_industry_codes_within_required_32": len(invalid_required) == 0,
+        "pre_switch_has_no_sw2021_new_l1": pre_new_l1 == 0,
+        "post_switch_has_no_sw2014_only_l1": post_old_l1 == 0,
+        "bridge_rows_after_switch_zero": bridge_after_switch == 0,
+        "native_rows_before_switch_zero": native_before_switch == 0,
+        "weekend_switch_gap_rows_zero": forbidden_gap_rows == 0,
+        "seven_bridge_rows_exact": len(special_bad) == 0,
+        "required_sector_key_duplicates_zero": req_dup == 0,
+    }
+    passed = all(checks.values())
+    audit = {
+        "artifact": "DAO2_C_SECTOR_MEMBERSHIP_PIT_AUDIT_V1",
+        "version": "1.0",
+        "status": "PASS_SUBCOMPONENT" if passed else "BLOCKED",
+        "blocker": "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+        "blocker_closed_within_module": passed,
+        "historical_gp_v11_membership_recovered": False,
+        "candidate_membership_definition": "Official SW classification-history effective dates with explicit SW2014/SW2021 taxonomy switch",
+        "canonical_sw_xls": {
+            "source_url": CANONICAL_SW_XLS_URL,
+            "sha256": raw_xls_sha,
+            "size_bytes": raw_xls_bytes,
+            "rows": int(len(hist)),
+            "duplicate_symbol_date_rows": hist_dup,
+            "source_probe_run_id": 35558312420,
+            "source_artifact_id": 10620749755,
+        },
+        "formal_raw": {
+            **FORMAL_RAW_ARTIFACT,
+            "parquet_sha256": sha256(formal_raw),
+            "stock_date_keys": int(len(formal)),
+            "symbols_with_trade_rows": int(formal["symbol_full"].nunique()),
+        },
+        "formal_membership": {
+            "mapped_stock_date_keys": int(panel["industry_code"].notna().sum()),
+            "unresolved_stock_date_keys": int(len(unresolved)),
+            "duplicate_stock_date_keys": duplicate_mapped,
+            "required_sector_date_keys": int(len(req)),
+            "required_sector_date_key_duplicates": req_dup,
+            "no_history_symbols": sorted(no_history_symbols),
+            "invalid_required_code_rows": int(len(invalid_required)),
+        },
+        "taxonomy_switch": {
+            "sw2014_last_trade_date": SW2014_LAST,
+            "sw2021_first_trade_date": SW2021_FIRST,
+            "pre_switch_sw2021_new_l1_rows": pre_new_l1,
+            "post_switch_sw2014_only_l1_rows": post_old_l1,
+            "bridge_rows_after_switch": bridge_after_switch,
+            "native_rows_before_switch": native_before_switch,
+            "weekend_gap_rows": forbidden_gap_rows,
+            "pass": pre_new_l1 == 0 and post_old_l1 == 0 and bridge_after_switch == 0 and native_before_switch == 0 and forbidden_gap_rows == 0,
+        },
+        "seven_859622_resolution": seven_evidence,
+        "unresolved_rows": int(len(unresolved)),
+        "checks": checks,
+        "standards": standards,
+        "required_industry_codes": sorted(required_codes),
+        "safety": {
+            "forward_fill": False,
+            "synthetic_membership_rows": False,
+            "uses_effective_date_only": True,
+            "historical_gp_v11_identity_claim": False,
+        },
+    }
+    (out / "membership_audit.json").write_text(
+        json.dumps(audit, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8"
+    )
+    return audit
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd",required=True)
@@ -356,6 +742,17 @@ def main() -> None:
     p.add_argument("--membership-out",type=Path,required=True)
     p.add_argument("--out",type=Path,required=True)
 
+    p = sub.add_parser("official-membership")
+    p.add_argument("--sw-xls",type=Path,required=True)
+    p.add_argument("--formal-raw",type=Path,required=True)
+    p.add_argument("--taxonomy",type=Path,required=True)
+    p.add_argument("--sw2014-hierarchy",type=Path,required=True)
+    p.add_argument("--sw2014-index-map",type=Path,required=True)
+    p.add_argument("--sw2021-hierarchy",type=Path,required=True)
+    p.add_argument("--sw2021-l1",type=Path,required=True)
+    p.add_argument("--sw2021-l3",type=Path,required=True)
+    p.add_argument("--out",type=Path,required=True)
+
     args = ap.parse_args()
     if args.cmd == "prepare":
         prepare_root(args.taxonomy,args.formal_calendar,args.root)
@@ -373,6 +770,21 @@ def main() -> None:
         result = audit_series(args.root,args.formal_calendar,args.membership_out,args.out)
         (args.out/"series_audit.json").write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
         print(json.dumps(result,ensure_ascii=False,indent=2))
+    elif args.cmd == "official-membership":
+        result = official_membership(
+            sw_xls=args.sw_xls,
+            formal_raw=args.formal_raw,
+            taxonomy=args.taxonomy,
+            sw2014_hierarchy=args.sw2014_hierarchy,
+            sw2014_index_map=args.sw2014_index_map,
+            sw2021_hierarchy=args.sw2021_hierarchy,
+            sw2021_l1=args.sw2021_l1,
+            sw2021_l3=args.sw2021_l3,
+            out=args.out,
+        )
+        print(json.dumps(result,ensure_ascii=False,indent=2,default=str))
+        if result.get("status") != "PASS_SUBCOMPONENT":
+            raise SystemExit(2)
 
 
 if __name__ == "__main__":

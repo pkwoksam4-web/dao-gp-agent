@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install sector data dependencies
-        run: pip install -q pandas pyarrow requests akshare tushare
+        run: pip install -q pandas pyarrow requests akshare tushare xlrd
       - name: Download frozen Formal calendar
         uses: actions/download-artifact@v4
         with:
@@ -32,12 +32,31 @@ jobs:
           path: calendar-final
           run-id: 33977325822
           github-token: ${{ github.token }}
+      - name: Download canonical SW classification backing bytes
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sw-classification-history-probe-v1
+          path: sw-history
+          run-id: 35558312420
+          github-token: ${{ github.token }}
+      - name: Download frozen Formal RAW trade keys
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: formal-raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
       - name: Pin upstream generator and manifests
         run: |
           set -euo pipefail
           mkdir -p upstream work membership_out series_out
           curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py' -o upstream/download_tushare_data.py
           curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/03_desktop_quant_results_light/b1_tft_download/data_provenance/industry_taxonomy_manifest.json' -o upstream/industry_taxonomy_manifest.json
+          curl -fsSL 'https://raw.githubusercontent.com/ZJU-OmniAI/Data-Copilot/c32f9dfa0ea7e9cd6316f06dab38ef2f1eb30187/SW2021_industry_L1.csv' -o upstream/SW2021_industry_L1.csv
+          curl -fsSL 'https://raw.githubusercontent.com/ZJU-OmniAI/Data-Copilot/c32f9dfa0ea7e9cd6316f06dab38ef2f1eb30187/SW2021_industry_L3.csv' -o upstream/SW2021_industry_L3.csv
+          curl -fsSL 'https://raw.githubusercontent.com/pibbo88/swcls/33519111b066bb60a20684fa65fcad0c21db4b0d/swcls_2014.csv' -o upstream/swcls_2014.csv
+          curl -fsSL 'https://raw.githubusercontent.com/pibbo88/swcls/33519111b066bb60a20684fa65fcad0c21db4b0d/swcls_2021.csv' -o upstream/swcls_2021.csv
+          curl -fsSL 'https://raw.githubusercontent.com/ramwin/china-public-data/558effa78547d3e212d95be4f3e1c43bf85422ec/sw.csv' -o upstream/sw2014_index_map.csv
           python - <<'PY'
           import hashlib
           from pathlib import Path
@@ -54,56 +73,44 @@ jobs:
       - name: Prepare exact Formal root
         run: |
           python scripts/dao2_c_sector_materialize_v1.py prepare             --taxonomy upstream/industry_taxonomy_manifest.json             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --root work
-      - name: Probe Tushare membership capability
-        id: tushare
-        env:
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+      - name: Close Membership from canonical SW history
         run: |
+          set -euo pipefail
+          test -f sw-history/StockClassifyUse_stock.xls
+          test -f formal-raw/SOHU_RAW_FULL_V482.parquet
+          python scripts/dao2_c_sector_materialize_v1.py official-membership \
+            --sw-xls sw-history/StockClassifyUse_stock.xls \
+            --formal-raw formal-raw/SOHU_RAW_FULL_V482.parquet \
+            --taxonomy upstream/industry_taxonomy_manifest.json \
+            --sw2014-hierarchy upstream/swcls_2014.csv \
+            --sw2014-index-map upstream/sw2014_index_map.csv \
+            --sw2021-hierarchy upstream/swcls_2021.csv \
+            --sw2021-l1 upstream/SW2021_industry_L1.csv \
+            --sw2021-l3 upstream/SW2021_industry_L3.csv \
+            --out membership_out
           python - <<'PY'
-          import json, os
-          from pathlib import Path
-          out={"token_present":bool(os.environ.get("TUSHARE_TOKEN")),"probe_ok":False,"error":None}
-          if out["token_present"]:
-              try:
-                  import tushare as ts
-                  pro=ts.pro_api(os.environ["TUSHARE_TOKEN"])
-                  c=pro.index_classify(level="L1",src="SW2021")
-                  if c is None or c.empty:
-                      raise RuntimeError("index_classify returned empty")
-                  code=str(c.iloc[0]["index_code"])
-                  m=pro.index_member_all(l1_code=code,is_new="Y")
-                  out["probe_ok"]=True
-                  out["probe_code"]=code
-                  out["probe_rows"]=0 if m is None else int(len(m))
-              except Exception as exc:
-                  out["error"]=repr(exc)
-          Path("membership_out/tushare_capability.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-          print(json.dumps(out,ensure_ascii=False,indent=2))
-          with open(os.environ["GITHUB_OUTPUT"],"a",encoding="utf-8") as f:
-              f.write("probe_ok="+("true" if out["probe_ok"] else "false")+"\n")
+          import json
+          x=json.load(open("membership_out/membership_audit.json",encoding="utf-8"))
+          assert x["status"]=="PASS_SUBCOMPONENT",x
+          assert x["unresolved_rows"]==0,x
+          assert x["formal_membership"]["mapped_stock_date_keys"]==1011607,x
+          assert x["formal_membership"]["duplicate_stock_date_keys"]==0,x
+          assert len(x["seven_859622_resolution"])==7,x
+          assert x["taxonomy_switch"]["pass"] is True,x
+          print(json.dumps({
+              "status":x["status"],
+              "unresolved_rows":x["unresolved_rows"],
+              "mapped_stock_date_keys":x["formal_membership"]["mapped_stock_date_keys"],
+              "required_sector_date_keys":x["formal_membership"]["required_sector_date_keys"],
+              "seven_resolved":len(x["seven_859622_resolution"]),
+              "sw_xls_sha256":x["canonical_sw_xls"]["sha256"],
+          },ensure_ascii=False,indent=2))
           PY
-      - name: Materialize membership backing bytes from pinned generator
-        if: steps.tushare.outputs.probe_ok == 'true'
-        env:
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-        run: |
-          set -o pipefail
-          python upstream/download_tushare_data.py --root work --part membership 2>&1 | tee membership_out/generator_membership.log
-      - name: Audit exact switch and export unresolved rows
-        if: always()
-        run: |
-          python scripts/dao2_c_sector_materialize_v1.py membership             --root work             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --out membership_out
       - name: Materialize 801xxx series with AKShare
         if: always()
         run: |
           set -o pipefail
           python upstream/download_tushare_data.py --root work --part industry --industry-provider akshare 2>&1 | tee series_out/generator_akshare.log
-      - name: Patch only exact same-date gaps with Tushare when available
-        if: always()
-        env:
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
-        run: |
-          python scripts/dao2_c_sector_materialize_v1.py patch-series             --root work             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --out-json series_out/tushare_gap_patch.json
       - name: Audit Formal required sector keys
         if: always()
         run: |
@@ -129,6 +136,7 @@ jobs:
           path: |
             membership_out/
             series_out/
+            sw-history/StockClassifyUse_stock.xls
             work/industry_membership*.parquet
             work/industry_source_manifest.json
             work/industry_taxonomy_manifest.json
