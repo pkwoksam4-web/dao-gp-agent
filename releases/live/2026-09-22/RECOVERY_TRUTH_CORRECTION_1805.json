@@ -1,0 +1,43 @@
+{
+  "schema": "agent-brain-live-recovery-truth/v1",
+  "observed_date": "2026-09-22",
+  "observed_at": "2026-09-22T10:05:00Z",
+  "reproducible_release_baseline": "V2.70",
+  "live_cloud": {
+    "project_id": "red-term-29407678",
+    "production_branch_id": "br-raspy-breeze-b5clzass",
+    "database": "investment_intel"
+  },
+  "verified_existing_recovery": {
+    "snapshot_id": "snap-long-unit-b5u1e3ow",
+    "snapshot_name": "v2.70-current-release-recovery-2026-09-20",
+    "isolated_restore_branch_id": "br-falling-glade-b5ez1bho",
+    "isolated_restore_branch_name": "v270-recovery-evidence",
+    "restore_status": "finalized",
+    "restored_from_snapshot": true,
+    "pgvector_verified": true,
+    "restored_public_table_count": 185,
+    "status": "PASS_FOR_V2.70_SNAPSHOT"
+  },
+  "fresh_live_cloud_recovery": {
+    "new_snapshot_attempted": true,
+    "result": "BLOCKED",
+    "blocker_code": "FRESH_LIVE_SNAPSHOT_QUOTA_LIMIT",
+    "provider_error": "snapshots limit exceeded",
+    "existing_snapshot_deleted": false,
+    "existing_branch_deleted": false
+  },
+  "scope": {
+    "existing_release_snapshot_restore_verified": true,
+    "fresh_2026_09_22_live_state_snapshot_verified": false,
+    "prospective_live_shadow_evidence_mutated": false,
+    "software_release_changed": false
+  },
+  "governance": {
+    "automatic_model_promotion": false,
+    "production_weight_change": false,
+    "portfolio_mutation": false,
+    "brokerage_execution": false,
+    "pit_provenance_fail_closed": true
+  }
+}
