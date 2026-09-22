@@ -1,0 +1,44 @@
+{
+  "schema": "agent-brain-core10-pit-continuity-evidence/v1",
+  "observed_date": "2026-09-22",
+  "trade_date": "2026-09-22",
+  "repository": "pkwoksam4-web/dao-gp-agent",
+  "reproducible_release_baseline": "V2.70",
+  "live_cloud": {
+    "project_id": "red-term-29407678",
+    "branch_id": "br-raspy-breeze-b5clzass",
+    "database": "investment_intel"
+  },
+  "watchlist_id": "WAT-core10-final-v1",
+  "pit": {
+    "provider": "longbridge",
+    "canonical_symbols": 10,
+    "provider_sync_runs_completed": 10,
+    "daily_bars_persisted": 10,
+    "capital_flows_persisted": 10,
+    "bar_source_rows_present": 10,
+    "flow_source_rows_present": 10,
+    "provenance_required": true,
+    "partial_skipped": 0,
+    "live_shadow_eligible": true,
+    "sync_finished_at": "2026-09-22T08:17:52.654102777Z",
+    "status": "PASS"
+  },
+  "prospective_boundary": {
+    "historical_recovery_rows_counted_as_live_shadow": false,
+    "prospective_live_shadow_backfill": false,
+    "same_day_pit_is_clean_anchor": true
+  },
+  "settlement": {
+    "forecast_runs_present": 0,
+    "forecast_items_present": 0,
+    "action": "WAIT_FOR_REAL_FUTURE_MATURITY"
+  },
+  "governance": {
+    "automatic_model_promotion": false,
+    "production_weight_change": false,
+    "portfolio_mutation": false,
+    "brokerage_execution": false,
+    "pit_provenance_fail_closed": true
+  }
+}
