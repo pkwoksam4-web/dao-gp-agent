@@ -3,7 +3,7 @@
   "version": "1.0",
   "module_id": "C",
   "component": "sector_series",
-  "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+  "status": "PASS_DERIVED_CLOSE_ADMITTED_CANDIDATE_ONLY",
   "source": {
     "repository": "z15114664687-dot/fund-holdings",
     "commit": "92864a330e5bad393315cb6664fe626370e9c92d",
@@ -53,16 +53,21 @@
     ]
   },
   "governance": {
-    "admitted_to_sector_series": false,
+    "admitted_to_sector_series": true,
     "frozen_42783_rows_rewritten": false,
     "reconstructed_rows_marked_as_raw_close": false,
     "synthetic_false_claim_for_reconstructed_rows": false,
-    "reason": "298 rows are deterministically recoverable from a close-derived Wind return carrier and adjacent accepted closes, but remain evidence-only until governance explicitly accepts derived-close reconstruction or an authoritative raw-close carrier is bound."
+    "reason": "Candidate-only DERIVED_CLOSE admission is permitted by the explicit admission contract; raw-close identity is not claimed.",
+    "admitted_provenance_type": "DERIVED_CLOSE",
+    "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
+    "admitted_rows": 298,
+    "synthetic_semantics": "SEPARATE_PROVENANCE_CLASS_NOT_INHERITED_FROM_FROZEN_BASE"
   },
   "implications": {
     "if_derived_reconstruction_is_approved_candidate_coverage": "43081/43084",
     "remaining_direct_close_keys": 3,
     "series_blocker_closed": false,
-    "breadth_gate_open": false
+    "breadth_gate_open": false,
+    "logical_coverage_after_admission": "43081/43084"
   }
 }
