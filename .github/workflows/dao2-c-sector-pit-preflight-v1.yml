@@ -1,0 +1,133 @@
+name: DAO2 C Sector PIT Preflight V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'data/dao2/modules/C_SECTOR_*_V1.json'
+      - 'scripts/dao2_sector_pit_verify_v1.py'
+      - 'scripts/test_dao2_sector_pit_verify_v1.py'
+      - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
+  pull_request:
+    paths:
+      - 'data/dao2/modules/C_SECTOR_*_V1.json'
+      - 'scripts/dao2_sector_pit_verify_v1.py'
+      - 'scripts/test_dao2_sector_pit_verify_v1.py'
+      - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run fail-closed sector contract tests
+        env:
+          PYTHONPATH: scripts
+        run: python -m unittest -v scripts/test_dao2_sector_pit_verify_v1.py
+
+  preflight:
+    needs: contract-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen Formal calendar
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Verify Formal calendar and blocked component checkpoints
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          mkdir -p artifact_dao2_c_preflight_v1
+          python - <<'PY'
+          import csv
+          import json
+          import os
+          from pathlib import Path
+
+          calendar_path=Path("calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv")
+          with calendar_path.open("r",encoding="utf-8-sig",newline="") as f:
+              rows=list(csv.DictReader(f))
+          dates=[]
+          for row in rows:
+              if "is_open" in row and str(row["is_open"]).strip() not in {"1","1.0","true","True"}:
+                  continue
+              raw=row.get("trade_date") or row.get("cal_date") or row.get("date")
+              if raw:
+                  dates.append(str(raw).replace("-",""))
+          dates=sorted(set(dates))
+          assert len(dates)==1426, len(dates)
+          assert dates[0]=="20200601", dates[0]
+          assert dates[-1]=="20260417", dates[-1]
+
+          base=Path("data/dao2/modules")
+          membership=json.loads((base/"C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json").read_text(encoding="utf-8"))
+          series=json.loads((base/"C_SECTOR_SERIES_CHECKPOINT_V1.json").read_text(encoding="utf-8"))
+          breadth=json.loads((base/"C_SECTOR_BREADTH_CHECKPOINT_V1.json").read_text(encoding="utf-8"))
+          historical=json.loads((base/"C_SECTOR_HISTORICAL_RECOVERY_V1.json").read_text(encoding="utf-8"))
+
+          assert membership["status"]=="PASS_SUBCOMPONENT", membership
+          assert membership["blocker_closed_within_module"] is True, membership
+          assert membership["validation"]["unresolved_rows_zero"] is True, membership
+          assert membership["validation"]["full_formal_symbol_date_coverage_proven"] is True, membership
+          assert series["blocker_closed_within_module"] is False, series
+          series_forward_fill = series["validation"].get("forward_fill", series["validation"].get("forward_fill_allowed"))
+          assert series_forward_fill is False, series
+          assert breadth["blocker_closed_within_module"] is False, breadth
+          assert breadth["derivation_allowed"] is False, breadth
+          assert historical["historical_recovery_claim_allowed"] is False, historical
+          open_blockers=[]
+          if not membership["blocker_closed_within_module"]:
+              open_blockers.append("SECTOR_MEMBERSHIP_PIT_UNBOUND")
+          if not series["blocker_closed_within_module"]:
+              open_blockers.append("SECTOR_SERIES_UNBOUND")
+          if not breadth["blocker_closed_within_module"]:
+              open_blockers.append("SECTOR_BREADTH_UNBOUND")
+          assert open_blockers==["SECTOR_SERIES_UNBOUND","SECTOR_BREADTH_UNBOUND"], open_blockers
+
+          out={
+              "artifact":"DAO2_C_SECTOR_PIT_PREFLIGHT_V1",
+              "status":"PASS_PREFLIGHT_CURRENT_STATE",
+              "formal_calendar":{
+                  "start":"2020-06-01",
+                  "end":"2026-04-17",
+                  "trading_days":len(dates)
+              },
+              "component_status":{
+                  "sector_membership_pit":membership["status"],
+                  "sector_series":series["status"],
+                  "sector_breadth":breadth["status"]
+              },
+              "historical_gp_v11_sector_package_recovered":False,
+              "tushare_token_available":bool(os.environ.get("TUSHARE_TOKEN")),
+              "candidate_materialization_note":"Token presence is capability-only evidence. No provider bytes are accepted by this preflight.",
+              "closed_blockers":[
+                  "SECTOR_MEMBERSHIP_PIT_UNBOUND"
+              ],
+              "blockers":open_blockers,
+              "model_freeze_allowed":False,
+              "oos_metrics_allowed":False
+          }
+          path=Path("artifact_dao2_c_preflight_v1/C_SECTOR_PIT_PREFLIGHT_V1.json")
+          path.write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-sector-pit-preflight-v1
+          path: artifact_dao2_c_preflight_v1/
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,183 @@
+{
+  "artifact": "DAO2_MODULE_C_SECTOR_PIT_STATE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "module_name": "SECTOR_PIT",
+  "branch": "gp/dao2-c-sector-pit",
+  "status": "BLOCKED",
+  "depends_on": [],
+  "owned_blockers": [
+    "SECTOR_SERIES_UNBOUND",
+    "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+    "SECTOR_BREADTH_UNBOUND"
+  ],
+  "objective": "Build a reproducible PIT sector package: sector series, historical membership, and sector breadth for F3/F4/F5.",
+  "inputs": [
+    "data/GP12_CANDIDATE_FACTORS_V1.json",
+    "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json"
+  ],
+  "expected_outputs": [
+    "data/dao2/modules/C_SECTOR_HISTORICAL_RECOVERY_V1.json",
+    "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
+    "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
+    "data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json",
+    "artifact/C_SECTOR_PIT_CHECKPOINT_V1.json"
+  ],
+  "checkpoint": {
+    "verified": true,
+    "kind": "PREFLIGHT_BLOCKED_STATE",
+    "path": "data/dao2/modules/C_SECTOR_PIT_PREFLIGHT_CHECKPOINT_V1.json",
+    "workflow_run_id": 35498836988,
+    "artifact_id": 10600914594,
+    "note": "Preflight verified the frozen calendar and fail-closed contracts; it does not close any of the three sector blockers."
+  },
+  "governance": {
+    "fail_closed": true,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "progress": {
+    "discovery": "data/dao2/modules/C_SECTOR_PIT_DISCOVERY_V1.json",
+    "historical_recovery": {
+      "status": "PARTIAL_ONLY_NOT_PIT_PROOF",
+      "evidence": "data/dao2/modules/C_SECTOR_HISTORICAL_RECOVERY_V1.json",
+      "archive_listed_in_library": true,
+      "archive_raw_bytes_materializable_in_current_project": false,
+      "historical_sector_package_recovered": false
+    },
+    "sector_series": {
+      "status": "BLOCKED_MANUAL_VENDOR_EXPORT_REQUIRED",
+      "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
+      "full_formal_coverage_proven": false,
+      "required_sector_date_keys": 43084,
+      "observed_required_keys": 42783,
+      "missing_required_keys": 301,
+      "duplicate_required_keys": 0,
+      "same_date_provenance": true,
+      "fill_method": "NONE",
+      "forward_fill": false,
+      "synthetic": false,
+      "finite_positive_close": true,
+      "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
+      "workflow_run_id": 35575797301,
+      "manual_blocker": "MANUAL_VENDOR_EXPORT_REQUIRED for three direct SW2014 801020.SI closes: 20210806, 20211008, 20211022. Accept only original authoritative Wind/iFind, RQData, Founder DataCube, or entitled Tushare sw_daily export with required neighbor OHLC rows. DERIVED_CLOSE remains evidence-only with admitted_rows=0.",
+      "infoway_targeted_probe": {
+        "status": "CLOSED_UNSUPPORTED",
+        "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
+        "workflow_run_id": 35579863921,
+        "artifact_id": 10629836740,
+        "evidence": "data/dao2/modules/C_SECTOR_INFOWAY_EXACT_GAP_PROBE_V1.json",
+        "recovery_allowed": false,
+        "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL"
+      },
+      "legacy_sw_history_probe": {
+        "status": "CLOSED_TRANSPORT_UNAVAILABLE",
+        "decision": "LEGACY_SW_HISTORY_ROUTE_CLOSED_OR_EMPTY",
+        "workflow_run_id": 35583461060,
+        "artifact_id": 10631811203,
+        "evidence": "data/dao2/modules/C_SECTOR_LEGACY_SW_HISTORY_PROBE_V1.json",
+        "recovery_allowed": false,
+        "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_TRANSPORT_FAIL",
+        "admitted_rows": 0
+      },
+      "wind_derived_close_reconstruction": {
+        "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+        "workflow_run_id": 35680627829,
+        "artifact_id": 10674701717,
+        "evidence": "data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json",
+        "corrected_identity_audit": "31/31 mapped codes; 100% 2dp match on true adjacent required dates",
+        "candidate_reconstructed_rows": 298,
+        "admitted_rows": 0,
+        "unresolved_rows": 3,
+        "unresolved_keys": [
+          [
+            "801020.SI",
+            "20210806"
+          ],
+          [
+            "801020.SI",
+            "20211008"
+          ],
+          [
+            "801020.SI",
+            "20211022"
+          ]
+        ],
+        "governance_admission_required": true,
+        "provenance_type": "DERIVED_CLOSE_EVIDENCE_ONLY",
+        "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json"
+      },
+      "unresolved_direct_keys": [
+        [
+          "801020.SI",
+          "20210806"
+        ],
+        [
+          "801020.SI",
+          "20211008"
+        ],
+        [
+          "801020.SI",
+          "20211022"
+        ]
+      ],
+      "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+      "admitted_derived_close_rows": 0,
+      "evidence_only_derived_close_rows": 298,
+      "potential_coverage_after_future_governance_migration": "43081/43084",
+      "manual_intervention_required": true,
+      "manual_intervention_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+      "manual_intervention_status": "MANUAL_VENDOR_EXPORT_REQUIRED",
+      "admissible_coverage": "42783/43084",
+      "admitted_direct_recovery_rows": 0,
+      "resume_condition": "Original authoritative vendor export covering target+neighbor dates is supplied and passes exact overlap."
+    },
+    "sector_membership_pit": {
+      "status": "PASS_SUBCOMPONENT",
+      "checkpoint": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
+      "taxonomy_switch_contract_verified": true,
+      "pit_membership_proven": true,
+      "unresolved_rows": 0,
+      "formal_coverage_resolved_stock_date_keys": 1011607,
+      "required_sector_date_keys": 43084,
+      "workflow_run_id": 35575433267,
+      "artifact_id": 10628585296
+    },
+    "sector_breadth": {
+      "status": "BLOCKED_PENDING_SERIES_PASS",
+      "checkpoint": "data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json",
+      "derivation_allowed": false,
+      "membership_dependency_closed": true,
+      "series_dependency_closed": false
+    },
+    "verifier": {
+      "path": "scripts/dao2_sector_pit_verify_v1.py",
+      "tests": "scripts/test_dao2_sector_pit_verify_v1.py",
+      "workflow": ".github/workflows/dao2-c-sector-pit-preflight-v1.yml",
+      "status": "PASS_PREFLIGHT_BLOCKERS_PRESERVED",
+      "workflow_run_id": 35498836988,
+      "artifact_id": 10600914594
+    },
+    "candidate_materialization": {
+      "tushare_token_available_in_pr_actions": false,
+      "status": "BLOCKED_CI_CREDENTIAL_ABSENT",
+      "note": "Do not infer global source unavailability from this CI credential state."
+    },
+    "latest_subcomponent_checkpoint": {
+      "component": "sector_membership_pit",
+      "status": "PASS_SUBCOMPONENT",
+      "path": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
+      "workflow_run_id": 35575433267,
+      "artifact_id": 10628585296
+    }
+  },
+  "open_blockers": [
+    "SECTOR_SERIES_UNBOUND",
+    "SECTOR_BREADTH_UNBOUND"
+  ],
+  "closed_blockers": [
+    "SECTOR_MEMBERSHIP_PIT_UNBOUND"
+  ]
+}

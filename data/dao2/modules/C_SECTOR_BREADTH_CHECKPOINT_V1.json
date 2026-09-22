@@ -1,0 +1,41 @@
+{
+  "artifact": "DAO2_C_SECTOR_BREADTH_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_breadth",
+  "blocker": "SECTOR_BREADTH_UNBOUND",
+  "status": "BLOCKED_DEPENDENCIES_AND_FORMULA",
+  "blocker_closed_within_module": false,
+  "derivation_allowed": false,
+  "dependencies": {
+    "sector_series_checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
+    "sector_series_required_status": "PASS_SUBCOMPONENT",
+    "sector_membership_checkpoint": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
+    "sector_membership_required_status": "PASS_SUBCOMPONENT",
+    "dependencies_satisfied": false
+  },
+  "historical_recovery": {
+    "factor_identity_confirmed": true,
+    "exact_numerator_denominator_recovered": false,
+    "threshold_recovered": false,
+    "normalization_recovered": false,
+    "clipping_recovered": false,
+    "executable_formula_recovered": false
+  },
+  "gp12_candidate_outer_formula": {
+    "formula": "2*mean(sector_breadth_ratio[-5:])-1",
+    "status": "UNAPPROVED_NEW_PROPOSAL",
+    "ratio_definition_recovered": false,
+    "note": "The outer five-session mapping does not define the underlying same-day sector_breadth_ratio numerator/denominator."
+  },
+  "blockers": [
+    "SECTOR_SERIES_UNBOUND",
+    "exact same-day sector breadth ratio definition remains unrecovered"
+  ],
+  "safety": {
+    "candidate_only": true,
+    "derivation_before_dependencies_forbidden": true,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}

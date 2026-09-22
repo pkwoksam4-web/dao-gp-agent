@@ -1,0 +1,352 @@
+{
+  "artifact": "DAO2_C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_membership_pit",
+  "blocker": "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+  "status": "PASS_SUBCOMPONENT",
+  "blocker_closed_within_module": true,
+  "historical_gp_v11_membership_recovered": false,
+  "candidate_only": true,
+  "binding_semantics": {
+    "authority": "Canonical official SW stock classification-history backing bytes with date-effective SW2014/SW2021 taxonomy mapping",
+    "sw2014_last_trade_date": "20211210",
+    "sw2021_first_trade_date": "20211213",
+    "future_classification_backfill": false,
+    "forward_fill": false,
+    "unresolved_fail_closed": true
+  },
+  "evidence": {
+    "membership_audit": {
+      "workflow_run_id": 35575433267,
+      "workflow_job_id": 106256097345,
+      "head_sha": "8f05a07662ebf54f5f895e3ab7a102172b8ba444",
+      "artifact_id": 10628585296,
+      "artifact_name": "dao2-c-sector-backing-materialize-v1",
+      "artifact_digest_sha256": "ccf6fa42fba22a0f4420cba3659acc0f99c34abfc016c4d1454e594d01866143",
+      "conclusion": "SUCCESS"
+    },
+    "canonical_sw_xls": {
+      "source_url": "https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls",
+      "source_probe_run_id": 35558312420,
+      "source_probe_artifact_id": 10620749755,
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742",
+      "raw_xls_bytes": 1165824,
+      "history_rows": 12920,
+      "duplicate_symbol_date_rows": 0
+    },
+    "formal_raw": {
+      "workflow_run_id": 34192233633,
+      "artifact_id": 10042614517,
+      "artifact_name": "gp-sohu-full-raw-v482-reaudit",
+      "artifact_digest_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+      "parquet_sha256": "bc72238d046378cf3b6fa61723e86fb43f1c491ac3da86d76932e3185f60e1eb",
+      "stock_date_keys": 1011607,
+      "symbols_with_trade_rows": 844
+    },
+    "taxonomy_standards": {
+      "sw2014_hierarchy_sha256": "302dfbd8e58c578f70217d8c6afdafed411548a5d32900dfe118eb1abf2a8ddf",
+      "sw2014_index_map_sha256": "45d62bcacb8b8ab2d5c5f8caf0038fa498154894d6c6d1c10d59bc5f16e3a01c",
+      "sw2021_hierarchy_sha256": "e79b2e14f2b285cf726e4383e570b0d310b8315f5c76c93ef4da55399e1c0415",
+      "sw2021_l1_sha256": "4569e31b7a29c46d5a485bbad306f26850b1b9c207c94cfe5fcd22daf7f37bc1",
+      "sw2021_l3_sha256": "26f660c64238bde9cf0f16c8dab6003eee904c2851c65f3aa681436d24956973",
+      "pinned_candidate_taxonomy_manifest_sha256": "a8a0ea953c7df337b8883d3999c0e2580da8279afa3211011416c4cd7f778e37"
+    }
+  },
+  "formal_coverage": {
+    "total_stock_date_keys": 1011607,
+    "mapped_stock_date_keys": 1011592,
+    "explicit_official_not_yet_classified_keys": 15,
+    "coverage_resolved_stock_date_keys": 1011607,
+    "unresolved_stock_date_keys": 0,
+    "duplicate_stock_date_keys": 0,
+    "invalid_required_industry_code_rows": 0,
+    "required_sector_date_keys": 43084,
+    "required_sector_date_key_duplicates": 0,
+    "explicit_official_not_yet_classified": [
+      {
+        "symbol": "001211.SZ",
+        "trade_date_interval": [
+          "20210805",
+          "20210805"
+        ],
+        "key_count": 1,
+        "first_official_classification_start": "20210806",
+        "state": "OFFICIAL_NOT_YET_CLASSIFIED"
+      },
+      {
+        "symbol": "001289.SZ",
+        "trade_date_interval": [
+          "20220124",
+          "20220217"
+        ],
+        "key_count": 14,
+        "first_official_classification_start": "20220218",
+        "state": "OFFICIAL_NOT_YET_CLASSIFIED"
+      }
+    ]
+  },
+  "seven_859622_resolution": [
+    {
+      "symbol": "002554",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20220801",
+        "next_classification_start_date": null
+      },
+      "exact_prior_official_history": {
+        "start_date": "20111010",
+        "classification_code": "210401",
+        "update_time": "20151027"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    },
+    {
+      "symbol": "300157",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20230103",
+        "next_classification_start_date": "20230704"
+      },
+      "exact_prior_official_history": {
+        "start_date": "20111010",
+        "classification_code": "210401",
+        "update_time": "20151027"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    },
+    {
+      "symbol": "300164",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20220801",
+        "next_classification_start_date": null
+      },
+      "exact_prior_official_history": {
+        "start_date": "20111010",
+        "classification_code": "210401",
+        "update_time": "20151027"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    },
+    {
+      "symbol": "300191",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20231023",
+        "next_classification_start_date": null
+      },
+      "exact_prior_official_history": {
+        "start_date": "20111010",
+        "classification_code": "210401",
+        "update_time": "20151027"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    },
+    {
+      "symbol": "600339",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20231023",
+        "next_classification_start_date": null
+      },
+      "exact_prior_official_history": {
+        "start_date": "20170629",
+        "classification_code": "210401",
+        "update_time": "20201106"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    },
+    {
+      "symbol": "600583",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20260226",
+        "next_classification_start_date": null
+      },
+      "exact_prior_official_history": {
+        "start_date": "20111010",
+        "classification_code": "210401",
+        "update_time": "20151027"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    },
+    {
+      "symbol": "603727",
+      "effective_date_interval": [
+        "20210730",
+        "20211210"
+      ],
+      "sw2014_l1": {
+        "index_code": "801020.SI",
+        "name": "采掘",
+        "l1_classification_code": "210000",
+        "supporting_l3_classification_code": "210401",
+        "supporting_l3_name": "油气钻采服务"
+      },
+      "sw2021_l3_migration": {
+        "classification_start_date": "20210730",
+        "classification_code": "750202",
+        "l3_index_code": "859622.SI",
+        "l3_name": "油气及炼化工程",
+        "l1_classification_code": "750000",
+        "l1_index_code": "801960.SI",
+        "l1_name": "石油石化",
+        "update_time": "20240401",
+        "next_classification_start_date": null
+      },
+      "exact_prior_official_history": {
+        "start_date": "20161106",
+        "classification_code": "210401",
+        "update_time": "20161106"
+      },
+      "pre_switch_resolution": "801020.SI",
+      "post_switch_native_l1": "801960.SI",
+      "raw_xls_sha256": "1a181c4a7aa1db22ea3c52233221d9d70b731ed6cb0fd7c9bbc80f6b0c066742"
+    }
+  ],
+  "taxonomy_switch_audit": {
+    "pass": true,
+    "sw2014_last_trade_date": "20211210",
+    "sw2021_first_trade_date": "20211213",
+    "pre_switch_sw2021_new_l1_rows": 0,
+    "post_switch_sw2014_only_l1_rows": 0,
+    "bridge_rows_after_switch": 0,
+    "native_rows_before_switch": 0,
+    "weekend_gap_rows": 0
+  },
+  "validation": {
+    "canonical_backing_bytes_verified": true,
+    "seven_unresolved_resolved": true,
+    "unresolved_rows_zero": true,
+    "full_formal_symbol_date_coverage_proven": true,
+    "taxonomy_switch_verified": true,
+    "exact_required_sector_keys_emitted": true,
+    "pit_valid_for_candidate": true
+  },
+  "blockers": [],
+  "safety": {
+    "candidate_only": true,
+    "silent_proxy_substitution": false,
+    "forward_fill": false,
+    "synthetic_membership_rows": false,
+    "future_classification_backfill": false,
+    "historical_gp_v11_identity_claim": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}

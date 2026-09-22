@@ -1,0 +1,73 @@
+{
+  "artifact": "DAO2_C_WIND_DERIVED_CLOSE_RECONSTRUCTION_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+  "source": {
+    "repository": "z15114664687-dot/fund-holdings",
+    "commit": "92864a330e5bad393315cb6664fe626370e9c92d",
+    "path": "data/raw/industry_returns.csv",
+    "git_blob_sha": "45550d4d621ba0e6be39dc3e39b150576784b83c",
+    "sha256": "97410eb4acf16fd14b16b0a60f4bbe45b3da071f078fdb5dea7c3044120f1786",
+    "derivation_provenance": "WANDE.wande.dbo.ASWSINDEXEOD S_DQ_CLOSE pct_change by index_code",
+    "source_code": "repl/source.py::fetch_industry_returns"
+  },
+  "corrected_audit": {
+    "head_sha": "aee68508da1b173245aadfe8392bf693edca5db7",
+    "workflow_run_id": 35680627829,
+    "workflow_job_id": 106596609682,
+    "artifact_id": 10674701717,
+    "artifact_digest": "sha256:cc498f5785fe092e53ceb11968253fa5049e204ad2cbed04f07c2594db8e5103",
+    "method": "TRUE_ADJACENT_REQUIRED_DATES_ONLY",
+    "gap_adjacent_pairs_excluded": true,
+    "mapped_current_sw2021_codes": 31,
+    "high_identity_codes": 31,
+    "all_mapped_codes_high_identity": true,
+    "identity_round_2dp_match_rate": 1,
+    "max_abs_return_diff_upper_bound": 1e-12
+  },
+  "reconstruction": {
+    "exact_required_gap_count": 301,
+    "attempted_rows": 298,
+    "high_identity_reconstructed_rows": 298,
+    "two_sided_unique_2dp_rows": 298,
+    "max_forward_backward_abs_diff": 7.275957614183426e-12,
+    "p99_forward_backward_abs_diff": 3.637978807091713e-12,
+    "unresolved_rows": [
+      {
+        "industry_code": "801020.SI",
+        "trade_date": "20210806",
+        "reason": "NO_CURRENT_SW2021_CODE_NAME_MAPPING"
+      },
+      {
+        "industry_code": "801020.SI",
+        "trade_date": "20211008",
+        "reason": "NO_CURRENT_SW2021_CODE_NAME_MAPPING"
+      },
+      {
+        "industry_code": "801020.SI",
+        "trade_date": "20211022",
+        "reason": "NO_CURRENT_SW2021_CODE_NAME_MAPPING"
+      }
+    ]
+  },
+  "governance": {
+    "admitted_to_sector_series": false,
+    "frozen_42783_rows_rewritten": false,
+    "reconstructed_rows_marked_as_raw_close": false,
+    "synthetic_false_claim_for_reconstructed_rows": false,
+    "reason": "298 rows remain high-quality derived-close evidence, but the frozen rebuild contract does not admit a new DERIVED_CLOSE provenance class and the current verifier does not validate such rows. Explicit governance migration would be required before admission.",
+    "admitted_provenance_type": "DERIVED_CLOSE",
+    "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
+    "admitted_rows": 298,
+    "synthetic_semantics": "SEPARATE_PROVENANCE_CLASS_NOT_INHERITED_FROM_FROZEN_BASE"
+  },
+  "implications": {
+    "if_derived_reconstruction_is_approved_candidate_coverage": "43081/43084",
+    "remaining_direct_close_keys": 3,
+    "series_blocker_closed": false,
+    "breadth_gate_open": false,
+    "logical_coverage_after_admission": "43081/43084"
+  }
+}

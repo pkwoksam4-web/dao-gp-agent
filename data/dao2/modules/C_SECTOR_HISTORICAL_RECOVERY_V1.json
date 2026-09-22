@@ -1,0 +1,51 @@
+{
+  "artifact": "DAO2_C_SECTOR_HISTORICAL_RECOVERY_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "status": "PARTIAL_HISTORICAL_RECOVERY_ONLY",
+  "recovery_matrix": {
+    "source_pr": 8,
+    "source_branch": "gp/strategy-asset-recovery-v482",
+    "path": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
+    "blob_sha": "40b13cd87066ff2eb78e8f566bc980f79f0f550f"
+  },
+  "historical_archive": {
+    "name": "v11_offline_backtest_v3_10.zip",
+    "library_path": "/倒/v11_offline_backtest_v3_10.zip",
+    "file_id": "file_0000000027d4820683c9a38a9886d045",
+    "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
+    "size_bytes": 1301865,
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "listed_in_library_currently": true,
+    "raw_bytes_currently_materializable_in_project": false,
+    "materialization_note": "Current Project Files materialization denies a raw-byte path even though the Library ZIP entity is directly listed. Do not treat the historical archive as reproducible in this module until bytes can be independently re-materialized and re-hashed."
+  },
+  "recovered_sector_adapter": {
+    "path": "src/prepare_datalake_silver.py",
+    "sha256": "4e41c7f0da2de74f3243b3ab433c94c87fe38fc344eb4f87834d898afdbb2175",
+    "normalize_silver_sha256": "913988b740fe64f5bf406e2689afa4ca165dc5959dccbb444a760168f5f1c797",
+    "columns": [
+      "citic_l1",
+      "citic_l3"
+    ],
+    "semantics": "Row-level passthrough when sector labels are present in the source daily panel.",
+    "historical_scope": "ROW_LEVEL_PASSTHROUGH_ONLY_NOT_PIT_MEMBERSHIP_PROOF"
+  },
+  "recovered_factor_identity": {
+    "sector_rs": "5/10/20 day sector-minus-market relative returns identity confirmed; exact aggregation/normalization/clipping not recovered.",
+    "sector_slope_r2": "Slope x R2 identity confirmed; exact regression transform/window/normalization not recovered.",
+    "sector_breadth": "Identity confirmed; numerator/denominator/threshold/normalization not recovered."
+  },
+  "not_recovered": [
+    "authoritative historical PIT sector-membership bytes",
+    "authoritative historical sector series bytes",
+    "historical Sector RS executable formula",
+    "historical Sector Slope x R2 exact regression contract",
+    "historical Sector Breadth numerator/denominator and executable formula"
+  ],
+  "historical_pit_membership_recovered": false,
+  "historical_sector_series_recovered": false,
+  "historical_sector_breadth_recovered": false,
+  "historical_recovery_claim_allowed": false,
+  "blocker_closure_allowed": false
+}

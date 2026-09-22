@@ -1,0 +1,109 @@
+{
+  "artifact": "DAO2_C_SECTOR_REBUILD_CONTRACT_V1",
+  "version": "1.2",
+  "module_id": "C",
+  "status": "REBUILD_PATH_IDENTIFIED_NOT_ADMITTED",
+  "source": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "generator_path": "xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py",
+    "generator_blob_sha": "f00fed00a969a39a73a71152fb3031e1631c3476",
+    "source_manifest_blob_sha": "3828eb381e60cbcc0af725b538235e041c4485ca",
+    "taxonomy_manifest_blob_sha": "4e00b89478581e85bf37938a8b935bdbb21a0875"
+  },
+  "formal_window": {
+    "start": "2020-06-01",
+    "end": "2026-04-17",
+    "trading_days": 1426,
+    "calendar_sha256": "5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7"
+  },
+  "membership": {
+    "endpoints": [
+      "Tushare index_classify(level=L1, src=SW2014/SW2021)",
+      "Tushare index_member_all(l1_code, is_new=Y/N)"
+    ],
+    "raw_output": "industry_membership_sw2021.parquet",
+    "effective_output": "industry_membership.parquet",
+    "unresolved_output": "industry_membership_unresolved.parquet",
+    "switch": {
+      "sw2014_last": "20211210",
+      "sw2021_first": "20211213"
+    },
+    "interval_semantics": "active when in_date <= trade_date <= out_date, with null out_date treated as open-ended",
+    "pre_switch_method": "project SW2021 member intervals to SW2014 L1 via explicit L3 bridge",
+    "historical_authority_caveat": "not direct retrieval of official historical SW2014 member records",
+    "manifest_effective_rows": 12162,
+    "manifest_unresolved_pre_switch_rows": 7,
+    "unresolved_policy": "FAIL_CLOSED"
+  },
+  "series": {
+    "providers": [
+      "Tushare sw_daily",
+      "AKShare index_hist_sw"
+    ],
+    "local_cache": "industry_by_code/{industry_code}.parquet",
+    "materialized_daily": "industry/{trade_date}.csv",
+    "expected_key_rule": "For every Formal date, require every industry code active under date-effective membership.",
+    "row_provenance_required": [
+      "industry_code",
+      "trade_date",
+      "close",
+      "source_provider",
+      "source_trade_date",
+      "fill_method"
+    ],
+    "same_date_source_required": true,
+    "fill_method_required": "NONE",
+    "synthetic_rows_allowed": false,
+    "no_forward_fill_required": true,
+    "price_basis_binding": "UNRESOLVED",
+    "derived_close_governance": {
+      "provenance_type": "DERIVED_CLOSE",
+      "admitted": false,
+      "admitted_rows": 0,
+      "evidence_only_rows": 298,
+      "raw_close": false,
+      "may_be_labeled_raw_close": false,
+      "may_expand_admissible_coverage": false,
+      "migration_required": [
+        "Explicitly approve DERIVED_CLOSE as an admissible provenance class in this contract.",
+        "Update scripts/dao2_sector_pit_verify_v1.py with DERIVED_CLOSE-specific validation.",
+        "Add verifier tests covering accepted and rejected DERIVED_CLOSE rows.",
+        "Re-run the Module C governance guard and exact Series audit.",
+        "Only then may admitted_rows become non-zero."
+      ],
+      "current_behavior": "FAIL_CLOSED"
+    }
+  },
+  "breadth": {
+    "derivation_gate": "sector_series and sector_membership_pit must each have PASS_SUBCOMPONENT checkpoints",
+    "historical_ratio_definition_recovered": false,
+    "candidate_outer_formula": "2*mean(sector_breadth_ratio[-5:])-1",
+    "candidate_ratio_definition_recovered": false,
+    "derivation_allowed": false
+  },
+  "verifier": {
+    "path": "scripts/dao2_sector_pit_verify_v1.py",
+    "tests": "scripts/test_dao2_sector_pit_verify_v1.py",
+    "behavior": "Reject unresolved membership, taxonomy-switch violations, missing required industry-date keys, same-date provenance breaks, forward fill, duplicate rows, and invalid close values. Any row explicitly marked provenance_type=DERIVED_CLOSE is rejected until a governance migration changes this contract and verifier."
+  },
+  "admission_gates": [
+    "historical claim is always forbidden for this reconstructed package",
+    "all unresolved membership rows must be resolved with auditable backing bytes",
+    "all required Formal sector-date keys must exist exactly once",
+    "each accepted series row must prove same-date source provenance and fill_method=NONE",
+    "sector index close -> sector_adjusted_close basis must be explicitly bound",
+    "sector breadth same-day ratio numerator/denominator must be explicitly defined and approved before derivation",
+    "DERIVED_CLOSE rows are evidence-only and cannot expand admissible coverage under contract v1.2"
+  ],
+  "blockers": [
+    "materialized membership parquet bytes absent from pinned public repository",
+    "materialized industry series bytes absent from pinned public repository",
+    "pre-switch projected taxonomy is not direct official SW2014 historical membership",
+    "7 unresolved pre-switch rows remain",
+    "series date gaps recorded in provenance manifest",
+    "sector price-basis binding unresolved",
+    "sector breadth ratio definition unresolved"
+  ],
+  "admitted": false
+}

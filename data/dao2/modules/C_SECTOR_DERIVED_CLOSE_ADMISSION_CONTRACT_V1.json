@@ -1,0 +1,98 @@
+{
+  "artifact": "DAO2_C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "NOT_ADMITTED_FROZEN_GOVERNANCE_CONFLICT",
+  "admission_scope": "PROPOSAL_ONLY",
+  "source_carrier": {
+    "repository": "z15114664687-dot/fund-holdings",
+    "commit": "92864a330e5bad393315cb6664fe626370e9c92d",
+    "path": "data/raw/industry_returns.csv",
+    "git_blob_sha": "45550d4d621ba0e6be39dc3e39b150576784b83c",
+    "sha256": "97410eb4acf16fd14b16b0a60f4bbe45b3da071f078fdb5dea7c3044120f1786",
+    "upstream_semantics": "WANDE.wande.dbo.ASWSINDEXEOD S_DQ_CLOSE; return = pct_change(close) by index_code",
+    "source_code": "repl/source.py::fetch_industry_returns"
+  },
+  "row_carrier": {
+    "workflow_run_id": 35680627829,
+    "workflow_job_id": 106596609682,
+    "artifact_id": 10674701717,
+    "artifact_digest": "sha256:cc498f5785fe092e53ceb11968253fa5049e204ad2cbed04f07c2594db8e5103",
+    "artifact_member": "wind_two_sided_reconstruction.csv",
+    "member_sha256": "0667a268a025355366012a65db36752d609df3b3cdea194f910b82f2599ff4b1",
+    "rows": 298,
+    "unique_sector_date_keys": 298
+  },
+  "provenance_contract": {
+    "provenance_type": "DERIVED_CLOSE",
+    "raw_close": false,
+    "may_be_labeled_raw_close": false,
+    "fill_method": "NONE",
+    "forward_fill": false,
+    "interpolation": false,
+    "cross_sector_substitution": false,
+    "taxonomy_proxy": false,
+    "frozen_base_rewrite": false,
+    "historical_synthetic_false_inheritance": false,
+    "synthetic_field_for_derived_rows": "NOT_APPLICABLE_USE_PROVENANCE_TYPE",
+    "note": "DERIVED_CLOSE is a distinct provenance class. The frozen base synthetic=false flag must not be inherited or used to imply that a reconstructed row is a raw close."
+  },
+  "reconstruction_contract": {
+    "decimal_price_basis": 2,
+    "production_formula": "round(prev_accepted_close * (1 + same_day_wind_return), 2)",
+    "audit_formula": "round(next_accepted_close / (1 + next_day_wind_return), 2)",
+    "production_uses_future_data": false,
+    "next_day_anchor_usage": "AUDIT_ONLY_NOT_VALUE_PRODUCTION",
+    "required_uniqueness": "forward_2dp == backward_2dp",
+    "observed_unique_rows": 298,
+    "observed_max_forward_backward_abs_diff": 7.275957614183426e-12,
+    "observed_p99_forward_backward_abs_diff": 3.637978807091713e-12
+  },
+  "source_identity_gate": {
+    "method": "TRUE_ADJACENT_REQUIRED_DATES_ONLY",
+    "gap_adjacent_pairs_excluded": true,
+    "mapped_codes": 31,
+    "high_identity_codes": 31,
+    "all_mapped_codes_high_identity": true,
+    "round_2dp_match_rate": 1,
+    "max_abs_return_diff_lte": 1e-12,
+    "corrected_workflow_head": "aee68508da1b173245aadfe8392bf693edca5db7"
+  },
+  "admission_decision": {
+    "admitted": false,
+    "admitted_rows": 0,
+    "rationale": [
+      "The Wind-derived carrier and two-sided reconstruction audit remain valid evidence.",
+      "The frozen C_SECTOR_REBUILD_CONTRACT_V1 forbids synthetic rows and does not define or admit a DERIVED_CLOSE provenance class.",
+      "The current dao2_sector_pit_verify_v1.py verifier has no DERIVED_CLOSE-specific validation path.",
+      "Therefore this contract cannot itself expand admissible series semantics; an explicit governance migration and verifier/test update would be required first."
+    ],
+    "historical_gp_v11_raw_series_recovery_claim": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "coverage_after_admission": {
+    "frozen_base_rows": 42783,
+    "admitted_derived_rows": 0,
+    "logical_covered_required_keys": 42783,
+    "required_keys": 43084,
+    "remaining_direct_gaps": 3,
+    "full_coverage": false,
+    "evidence_only_derived_rows": 298
+  },
+  "remaining_direct_gaps": [
+    {
+      "industry_code": "801020.SI",
+      "trade_date": "20210806"
+    },
+    {
+      "industry_code": "801020.SI",
+      "trade_date": "20211008"
+    },
+    {
+      "industry_code": "801020.SI",
+      "trade_date": "20211022"
+    }
+  ]
+}

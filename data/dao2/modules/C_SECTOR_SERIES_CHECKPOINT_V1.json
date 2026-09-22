@@ -1,0 +1,212 @@
+{
+  "artifact": "DAO2_C_SECTOR_SERIES_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "blocker": "SECTOR_SERIES_UNBOUND",
+  "status": "BLOCKED",
+  "blocker_closed_within_module": false,
+  "historical_gp_v11_sector_series_recovered": false,
+  "candidate_only": true,
+  "exact_audit": {
+    "workflow_run_id": 35575797301,
+    "workflow_job_id": 106257284111,
+    "head_sha": "8b002379793ab4a7652fbcce2ec5c98e5633e84c",
+    "status": "BLOCKED",
+    "membership_source_run_id": 35575433267,
+    "membership_artifact_id": 10628585296,
+    "required_sector_date_keys": 43084,
+    "observed_required_keys": 42783,
+    "missing_required_keys": 301,
+    "duplicate_required_keys": 0,
+    "gap_dates": [
+      "20210806",
+      "20211008",
+      "20211022",
+      "20220303",
+      "20220323",
+      "20220331",
+      "20220414",
+      "20220505",
+      "20220509",
+      "20230908"
+    ],
+    "base_provider": "AKShare index_hist_sw / official SW trend",
+    "base_missing_keys": 301,
+    "official_analysis_patch_rows": 0,
+    "tushare_patch_rows": 0,
+    "tushare_token_present": true,
+    "tushare_error": "您的token不对，请确认。",
+    "infoway_targeted_probe": {
+      "status": "INFOWAY_SW_INDEX_UNSUPPORTED",
+      "route_closed": true,
+      "recovery_allowed": false,
+      "workflow_run_id": 35579863921,
+      "artifact_id": 10629836740,
+      "artifact_digest": "sha256:81301d4c99a2d4f1c0a860cab0220fc6113920a218b93b4d8bc6bb639fc721d0",
+      "evidence_path": "data/dao2/modules/C_SECTOR_INFOWAY_EXACT_GAP_PROBE_V1.json",
+      "probe_target_codes": [
+        "801020.SI",
+        "801960.SI",
+        "801010.SI",
+        "801030.SI",
+        "801040.SI"
+      ],
+      "documented_symbol_mapping_matches": 0,
+      "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_FAIL"
+    },
+    "legacy_sw_history_probe": {
+      "status": "LEGACY_SW_HISTORY_ROUTE_CLOSED_TRANSPORT_UNAVAILABLE",
+      "route_closed": true,
+      "recovery_allowed": false,
+      "workflow_run_id": 35583461060,
+      "artifact_id": 10631811203,
+      "artifact_digest": "sha256:4878cfac0bad6047ed4bb356632d269fbb33c1bbd3f97afd12826f2ee676b1ac",
+      "evidence_path": "data/dao2/modules/C_SECTOR_LEGACY_SW_HISTORY_PROBE_V1.json",
+      "endpoint_families_tested": [
+        "handler.aspx/swindexhistory",
+        "excel2.aspx/swindexhistory",
+        "handler.aspx/V_Report type=Day"
+      ],
+      "schemes_tested": [
+        "https",
+        "http"
+      ],
+      "http_responses_received": 0,
+      "redirects_observed": 0,
+      "connect_timeout_across_all_families": true,
+      "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_TRANSPORT_FAIL",
+      "admitted_rows": 0
+    },
+    "wind_derived_close_reconstruction": {
+      "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+      "corrected_identity_audit": true,
+      "workflow_run_id": 35680627829,
+      "workflow_job_id": 106596609682,
+      "artifact_id": 10674701717,
+      "artifact_digest": "sha256:cc498f5785fe092e53ceb11968253fa5049e204ad2cbed04f07c2594db8e5103",
+      "evidence_path": "data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json",
+      "source_close_derivation": "WANDE.wande.dbo.ASWSINDEXEOD S_DQ_CLOSE pct_change by index_code",
+      "mapped_codes_high_identity": "31/31",
+      "identity_round_2dp_match_rate": 1,
+      "candidate_reconstructed_rows": 298,
+      "two_sided_unique_2dp_rows": 298,
+      "admitted_rows": 0,
+      "unresolved_rows": 3,
+      "unresolved_keys": [
+        [
+          "801020.SI",
+          "20210806"
+        ],
+        [
+          "801020.SI",
+          "20211008"
+        ],
+        [
+          "801020.SI",
+          "20211022"
+        ]
+      ],
+      "governance_admission_required": true,
+      "provenance_type": "DERIVED_CLOSE_EVIDENCE_ONLY",
+      "raw_close": false,
+      "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json"
+    },
+    "frozen_observed_required_keys": 42783,
+    "admitted_derived_close_rows": 0,
+    "logical_observed_required_keys": 42783,
+    "direct_unresolved_keys": [
+      [
+        "801020.SI",
+        "20210806"
+      ],
+      [
+        "801020.SI",
+        "20211008"
+      ],
+      [
+        "801020.SI",
+        "20211022"
+      ]
+    ],
+    "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+    "evidence_only_derived_close_rows": 298,
+    "potential_observed_after_future_derived_governance_migration": 43081,
+    "direct_close_recovery": {
+      "status": "MANUAL_VENDOR_EXPORT_REQUIRED",
+      "evidence_path": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+      "target_code": "801020.SI",
+      "alternate_vendor_code": "801020.INDX",
+      "target_dates": [
+        "20210806",
+        "20211008",
+        "20211022"
+      ],
+      "required_neighbor_dates": [
+        "20210805",
+        "20210809",
+        "20210930",
+        "20211011",
+        "20211021",
+        "20211025"
+      ],
+      "authoritative_providers": [
+        "Wind/iFind",
+        "RiceQuant RQData",
+        "Founder Securities DataCube",
+        "Tushare sw_daily"
+      ],
+      "current_environment_entitlement_available": false,
+      "admitted_raw_close_rows": 0,
+      "resume_condition": "Original authoritative vendor export with target and neighbor OHLC rows."
+    }
+  },
+  "validation": {
+    "exact_required_keys_from_pass_membership": true,
+    "required_key_count": 43084,
+    "exact_required_key_coverage": "42783/43084",
+    "missing_required_keys": 301,
+    "duplicate_required_keys": 0,
+    "same_date_provenance": true,
+    "fill_method": "NONE",
+    "forward_fill": false,
+    "synthetic": false,
+    "finite_positive_close": true,
+    "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
+    "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
+    "price_basis_unresolved": false,
+    "full_formal_coverage_proven": false,
+    "admissible_coverage": "42783/43084",
+    "admitted_derived_close_rows": 0,
+    "admitted_direct_recovery_rows": 0
+  },
+  "blockers": [
+    "301 exact Membership-required sector-date close rows remain absent from the admissible frozen series.",
+    "298/301 have PASS_EVIDENCE_ONLY_NOT_ADMITTED DERIVED_CLOSE evidence, but contract v1.2 and verifier explicitly reject DERIVED_CLOSE admission.",
+    "3 direct historical SW2014 801020.SI closes remain unresolved: 20210806, 20211008, 20211022.",
+    "MANUAL_VENDOR_EXPORT_REQUIRED: current environment has no usable Wind/iFind, RQData, DataCube, or sufficiently entitled Tushare sw_daily access."
+  ],
+  "evidence_boundary": {
+    "akshare_and_official_sw_trend_same_gap_pattern": true,
+    "no_forward_fill": true,
+    "no_synthetic_rows": true,
+    "no_required_key_deletion": true,
+    "no_historical_gp_v11_identity_claim": true,
+    "infoway_route_fail_closed": true,
+    "infoway_no_proxy_or_mapping_inference": true,
+    "legacy_sw_route_fail_closed": true,
+    "legacy_sw_no_nonofficial_mirror_admission": true,
+    "wind_derived_reconstruction_fail_closed": true,
+    "wind_derived_rows_not_yet_admitted": true,
+    "wind_derived_rows_admitted_as_distinct_provenance": false,
+    "frozen_base_immutable": true
+  },
+  "safety": {
+    "candidate_only": true,
+    "silent_proxy_substitution": false,
+    "forward_fill": false,
+    "synthetic_rows": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
