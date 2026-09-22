@@ -4,7 +4,7 @@
   "module_id": "C",
   "component": "sector_series",
   "blocker": "SECTOR_SERIES_UNBOUND",
-  "status": "BLOCKED_MANUAL_ACCESS_REQUIRED",
+  "status": "BLOCKED",
   "blocker_closed_within_module": false,
   "historical_gp_v11_sector_series_recovered": false,
   "candidate_only": true,
@@ -17,7 +17,7 @@
     "membership_artifact_id": 10628585296,
     "required_sector_date_keys": 43084,
     "observed_required_keys": 42783,
-    "missing_required_keys": 3,
+    "missing_required_keys": 301,
     "duplicate_required_keys": 0,
     "gap_dates": [
       "20210806",
@@ -79,7 +79,7 @@
       "admitted_rows": 0
     },
     "wind_derived_close_reconstruction": {
-      "status": "PASS_DERIVED_CLOSE_ADMITTED_CANDIDATE_ONLY",
+      "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
       "corrected_identity_audit": true,
       "workflow_run_id": 35680627829,
       "workflow_job_id": 106596609682,
@@ -91,7 +91,7 @@
       "identity_round_2dp_match_rate": 1,
       "candidate_reconstructed_rows": 298,
       "two_sided_unique_2dp_rows": 298,
-      "admitted_rows": 298,
+      "admitted_rows": 0,
       "unresolved_rows": 3,
       "unresolved_keys": [
         [
@@ -107,8 +107,8 @@
           "20211022"
         ]
       ],
-      "governance_admission_required": false,
-      "provenance_type": "DERIVED_CLOSE",
+      "governance_admission_required": true,
+      "provenance_type": "DERIVED_CLOSE_EVIDENCE_ONLY",
       "raw_close": false,
       "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json"
     },
@@ -134,8 +134,8 @@
   "validation": {
     "exact_required_keys_from_pass_membership": true,
     "required_key_count": 43084,
-    "exact_required_key_coverage": "43081/43084",
-    "missing_required_keys": 3,
+    "exact_required_key_coverage": "42783/43084",
+    "missing_required_keys": 301,
     "duplicate_required_keys": 0,
     "same_date_provenance": true,
     "fill_method": "NONE",
@@ -145,24 +145,13 @@
     "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
     "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
     "price_basis_unresolved": false,
-    "full_formal_coverage_proven": false,
-    "frozen_base_coverage": "42783/43084",
-    "logical_coverage_after_derived_admission": "43081/43084",
-    "admitted_derived_close_rows": 298,
-    "provenance_types": [
-      "BASE_SAME_DATE_CLOSE",
-      "DERIVED_CLOSE"
-    ],
-    "derived_close_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
-    "derived_overlay_raw_close": false,
-    "derived_overlay_fill_method": "NONE",
-    "derived_overlay_forward_fill": false,
-    "derived_overlay_synthetic_semantics": "NOT_INHERITED_USE_DERIVED_CLOSE_PROVENANCE"
+    "full_formal_coverage_proven": false
   },
   "blockers": [
-    "Only three authoritative/traceable SW2014 801020.SI direct closes remain unresolved: 20210806, 20211008, 20211022.",
-    "Public carrier search is exhausted without an admissible raw-close file covering those dates; the remaining executable paths require authenticated RQData historical index access or a Wind/iFind raw export.",
-    "Frozen 42,783-row base remains immutable; 298 additional rows remain admitted only as candidate-only DERIVED_CLOSE, yielding 43,081/43,084 logical coverage."
+    "301 exact Membership-required sector-date close rows are absent from the frozen 42,783-row base.",
+    "298/301 are deterministically reconstructable from a Wind ASWSINDEXEOD close-derived return carrier with corrected 31/31 identity audit and two-sided unique 2dp closes, but remain evidence-only because the frozen rebuild contract and current verifier do not admit a DERIVED_CLOSE provenance class.",
+    "3 direct historical SW2014 801020.SI closes remain unresolved: 20210806, 20211008, 20211022.",
+    "Closing Series requires either authoritative raw-close binding for the missing rows or an explicit governance migration plus verifier coverage; no such migration is admitted by this audit."
   ],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
@@ -175,8 +164,8 @@
     "legacy_sw_route_fail_closed": true,
     "legacy_sw_no_nonofficial_mirror_admission": true,
     "wind_derived_reconstruction_fail_closed": true,
-    "wind_derived_rows_not_yet_admitted": false,
-    "wind_derived_rows_admitted_as_distinct_provenance": true,
+    "wind_derived_rows_not_yet_admitted": true,
+    "wind_derived_rows_admitted_as_distinct_provenance": false,
     "frozen_base_immutable": true
   },
   "safety": {
