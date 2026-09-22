@@ -54,12 +54,11 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "use docs/dao2/modules/A_INFOWAY_CUSTOM_PLAN_DATA_REQUEST.md as the sole technical requirements baseline",
-    "obtain explicit Infoway Custom Plan evidence for 2020-06-08 through 2023-05-22 A-share history and exact L2/order or direct four-field moneyflow semantics",
-    "require 1-2 residual symbol-date samples/schema/endpoint documentation before any purchase",
-    "run Jessica pinned archive field-level exact-match on overlapping non-residual rows before admitting residual keys",
-    "only after overlap PASS retrieve 16/16 residual keys and rebuild the 1,011,607-row binding",
-    "if Infoway explicitly cannot provide original-order semantics or direct exact-equivalent fields, close the Infoway route"
+    "Priority 1: obtain a valid Tushare Pro credential with >=2000 points and call the official moneyflow endpoint, which directly exposes the exact four required fields and covers data from 2010 onward.",
+    "Priority 2: obtain authenticated access to the USTC PAN group 深度学习基础-2026 and recover the original course moneyflow archive bytes; hash and exact-match them against the pinned Jessica archive before using residual rows.",
+    "Priority 3: accept a historical L2 source only if it exposes active direction plus original-order identity/aggregate amount sufficient to reproduce Tushare's official <50k / 50k-200k / 200k-1m / >=1m buckets; require overlap exact-match before admission.",
+    "Priority 4: keep Infoway Custom Plan as fallback rather than sole route.",
+    "Do not use generic main-flow, trade-level-only approximations, or imputation."
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -103,11 +102,11 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "AWAITING_INFOWAY_CUSTOM_PLAN_EVIDENCE",
+    "code": "EXTERNAL_EXACT_SOURCE_ACCESS_REQUIRED",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Obtain explicit Infoway written confirmation plus at least 1-2 residual symbol-date sample responses/schema/endpoint documentation satisfying docs/dao2/modules/A_INFOWAY_CUSTOM_PLAN_DATA_REQUEST.md. No rows may be admitted before Jessica overlap exact-match."
+    "actionable_requirement": "Provide one of: valid Tushare >=2000-point credential; authenticated USTC PAN course archive access; or a historical L2 original-order export/API satisfying Tushare semantics. Infoway is no longer the sole admissible external path."
   },
-  "current_source_strategy": "INFOWAY_CUSTOM_PLAN_ONLY",
+  "current_source_strategy": "MULTI_ROUTE_FAIL_CLOSED",
   "infoway_probe": {
     "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
     "workflow_path": ".github/workflows/dao2-a-infoway-semantic-probe-v1.yml",
@@ -241,5 +240,13 @@
     "public_exact_moneyflow_capability_proven": false,
     "public_2020_2023_l2_history_proven": false,
     "interpretation": "Infoway publicly offers tailored/customized solutions, but public documentation does not prove the exact historical L2/order or direct moneyflow capability required by Module A. Written vendor confirmation and sample/schema evidence remain mandatory."
+  },
+  "baostock_zero_proof_v2": {
+    "workflow_run_id": 35691875224,
+    "artifact_id": 10679120789,
+    "artifact_digest": "sha256:3740f9e6f2ddf0b3335e82c6f893b679a6410795ad991df13a5ff490313c38ab",
+    "status": "NO_NEW_ZERO_PROOF",
+    "proven_count": 0,
+    "conclusion": "Reconfirmed that strict 5-minute upper-bound zero proof cannot close any of the current 16 keys."
   }
 }
