@@ -23,7 +23,7 @@
     "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json"
   ],
   "expected_outputs": [
-    "data/DAO2_MODULE_B_MARKET_PACKAGE_STATE_V1.json",
+    "data/dao2/modules/B_MARKET_PACKAGE_STATE_V1.json",
     "data/GP12_MARKET_PACKAGE_BINDING_V1.json",
     "artifact/B_MARKET_PACKAGE_CHECKPOINT_V1.json"
   ],
