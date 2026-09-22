@@ -17,7 +17,7 @@
     "membership_artifact_id": 10628585296,
     "required_sector_date_keys": 43084,
     "observed_required_keys": 42783,
-    "missing_required_keys": 301,
+    "missing_required_keys": 3,
     "duplicate_required_keys": 0,
     "gap_dates": [
       "20210806",
@@ -79,7 +79,7 @@
       "admitted_rows": 0
     },
     "wind_derived_close_reconstruction": {
-      "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+      "status": "PASS_DERIVED_CLOSE_ADMITTED_CANDIDATE_ONLY",
       "corrected_identity_audit": true,
       "workflow_run_id": 35680627829,
       "workflow_job_id": 106596609682,
@@ -91,7 +91,7 @@
       "identity_round_2dp_match_rate": 1,
       "candidate_reconstructed_rows": 298,
       "two_sided_unique_2dp_rows": 298,
-      "admitted_rows": 0,
+      "admitted_rows": 298,
       "unresolved_rows": 3,
       "unresolved_keys": [
         [
@@ -107,14 +107,34 @@
           "20211022"
         ]
       ],
-      "governance_admission_required": true
-    }
+      "governance_admission_required": false,
+      "provenance_type": "DERIVED_CLOSE",
+      "raw_close": false,
+      "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json"
+    },
+    "frozen_observed_required_keys": 42783,
+    "admitted_derived_close_rows": 298,
+    "logical_observed_required_keys": 43081,
+    "direct_unresolved_keys": [
+      [
+        "801020.SI",
+        "20210806"
+      ],
+      [
+        "801020.SI",
+        "20211008"
+      ],
+      [
+        "801020.SI",
+        "20211022"
+      ]
+    ]
   },
   "validation": {
     "exact_required_keys_from_pass_membership": true,
     "required_key_count": 43084,
-    "exact_required_key_coverage": "42783/43084",
-    "missing_required_keys": 301,
+    "exact_required_key_coverage": "43081/43084",
+    "missing_required_keys": 3,
     "duplicate_required_keys": 0,
     "same_date_provenance": true,
     "fill_method": "NONE",
@@ -124,13 +144,24 @@
     "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
     "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
     "price_basis_unresolved": false,
-    "full_formal_coverage_proven": false
+    "full_formal_coverage_proven": false,
+    "frozen_base_coverage": "42783/43084",
+    "logical_coverage_after_derived_admission": "43081/43084",
+    "admitted_derived_close_rows": 298,
+    "provenance_types": [
+      "BASE_SAME_DATE_CLOSE",
+      "DERIVED_CLOSE"
+    ],
+    "derived_close_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
+    "derived_overlay_raw_close": false,
+    "derived_overlay_fill_method": "NONE",
+    "derived_overlay_forward_fill": false,
+    "derived_overlay_synthetic_semantics": "NOT_INHERITED_USE_DERIVED_CLOSE_PROVENANCE"
   },
   "blockers": [
-    "301 exact Membership-required sector-date close rows are absent from the frozen 42,783-row base.",
-    "298/301 are deterministically reconstructable from a Wind ASWSINDEXEOD close-derived return carrier with corrected 31/31 identity audit and two-sided unique 2dp closes, but remain evidence-only pending governance admission or raw-close binding.",
-    "3 direct historical SW2014 801020.SI closes remain unresolved: 20210806, 20211008, 20211022.",
-    "Current Tushare credential lacks sw_daily permission; Infoway public route is unsupported; legacy swsindex.com transport is unavailable."
+    "Three authoritative / traceable historical SW2014 801020.SI direct closes remain unresolved: 20210806, 20211008, 20211022.",
+    "Frozen 42,783-row base is unchanged. 298 additional rows are admitted only as candidate-only DERIVED_CLOSE provenance, producing logical coverage 43,081/43,084.",
+    "SECTOR_SERIES_UNBOUND remains open until the three direct gaps pass code/date/close plus neighboring overlap exact-match."
   ],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
@@ -143,7 +174,9 @@
     "legacy_sw_route_fail_closed": true,
     "legacy_sw_no_nonofficial_mirror_admission": true,
     "wind_derived_reconstruction_fail_closed": true,
-    "wind_derived_rows_not_yet_admitted": true
+    "wind_derived_rows_not_yet_admitted": false,
+    "wind_derived_rows_admitted_as_distinct_provenance": true,
+    "frozen_base_immutable": true
   },
   "safety": {
     "candidate_only": true,
