@@ -1,6 +1,6 @@
 {
   "artifact": "DAO2_C_SECTOR_REBUILD_CONTRACT_V1",
-  "version": "1.1",
+  "version": "1.2",
   "module_id": "C",
   "status": "REBUILD_PATH_IDENTIFIED_NOT_ADMITTED",
   "source": {
@@ -56,7 +56,24 @@
     "fill_method_required": "NONE",
     "synthetic_rows_allowed": false,
     "no_forward_fill_required": true,
-    "price_basis_binding": "UNRESOLVED"
+    "price_basis_binding": "UNRESOLVED",
+    "derived_close_governance": {
+      "provenance_type": "DERIVED_CLOSE",
+      "admitted": false,
+      "admitted_rows": 0,
+      "evidence_only_rows": 298,
+      "raw_close": false,
+      "may_be_labeled_raw_close": false,
+      "may_expand_admissible_coverage": false,
+      "migration_required": [
+        "Explicitly approve DERIVED_CLOSE as an admissible provenance class in this contract.",
+        "Update scripts/dao2_sector_pit_verify_v1.py with DERIVED_CLOSE-specific validation.",
+        "Add verifier tests covering accepted and rejected DERIVED_CLOSE rows.",
+        "Re-run the Module C governance guard and exact Series audit.",
+        "Only then may admitted_rows become non-zero."
+      ],
+      "current_behavior": "FAIL_CLOSED"
+    }
   },
   "breadth": {
     "derivation_gate": "sector_series and sector_membership_pit must each have PASS_SUBCOMPONENT checkpoints",
@@ -68,7 +85,7 @@
   "verifier": {
     "path": "scripts/dao2_sector_pit_verify_v1.py",
     "tests": "scripts/test_dao2_sector_pit_verify_v1.py",
-    "behavior": "Reject unresolved membership, taxonomy-switch violations, missing required industry-date keys, same-date provenance breaks, forward fill, duplicate rows, and invalid close values."
+    "behavior": "Reject unresolved membership, taxonomy-switch violations, missing required industry-date keys, same-date provenance breaks, forward fill, duplicate rows, and invalid close values. Any row explicitly marked provenance_type=DERIVED_CLOSE is rejected until a governance migration changes this contract and verifier."
   },
   "admission_gates": [
     "historical claim is always forbidden for this reconstructed package",
@@ -76,7 +93,8 @@
     "all required Formal sector-date keys must exist exactly once",
     "each accepted series row must prove same-date source provenance and fill_method=NONE",
     "sector index close -> sector_adjusted_close basis must be explicitly bound",
-    "sector breadth same-day ratio numerator/denominator must be explicitly defined and approved before derivation"
+    "sector breadth same-day ratio numerator/denominator must be explicitly defined and approved before derivation",
+    "DERIVED_CLOSE rows are evidence-only and cannot expand admissible coverage under contract v1.2"
   ],
   "blockers": [
     "materialized membership parquet bytes absent from pinned public repository",
