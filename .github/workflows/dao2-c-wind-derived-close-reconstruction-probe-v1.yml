@@ -119,17 +119,31 @@ jobs:
               by_code[str(c)]=sorted((str(d),float(v)) for d,v in g[["trade_date","close"]].itertuples(index=False,name=None))
 
           wind_map={(str(industry),str(date)):float(ret) for date,industry,ret in wind[["date","industry","return"]].itertuples(index=False,name=None)}
-          # Identity audit: on every consecutive accepted base pair, compare direct close return
-          # to public Wind-derived return for the mapped current SW industry.
+          # Identity audit must compare true adjacent REQUIRED trading dates only.
+          # The prior probe compared consecutive OBSERVED closes. If one required date was
+          # missing, that silently became a two-session accepted-close return versus a
+          # one-session Wind return and created one false mismatch after each gap.
           ident={}
           overlap_rows=[]
+          required_by_code={}
+          for code,g in req.groupby("industry_code"):
+              required_by_code[str(code)]=sorted(g["trade_date"].astype(str).tolist())
           for code,name in sorted(current_map.items()):
-              seq=by_code.get(code,[])
+              req_seq=required_by_code.get(code,[])
               diffs=[]
               round_close_matches=0
               round_close_total=0
-              for i in range(1,len(seq)):
-                  d0,c0=seq[i-1]; d1,c1=seq[i]
+              skipped_gap_adjacent_pairs=0
+              for i in range(1,len(req_seq)):
+                  d0=req_seq[i-1]; d1=req_seq[i]
+                  k0=(code,d0); k1=(code,d1)
+                  # Both exact required dates must already exist in the frozen accepted base.
+                  # Otherwise this pair is adjacent to a known gap and is excluded from the
+                  # source-identity audit rather than treated as a mismatch.
+                  if k0 not in base_map or k1 not in base_map:
+                      skipped_gap_adjacent_pairs+=1
+                      continue
+                  c0=base_map[k0]; c1=base_map[k1]
                   wr=wind_map.get((name,d1))
                   if wr is None:
                       continue
@@ -144,6 +158,7 @@ jobs:
                   if len(overlap_rows)<5000:
                       overlap_rows.append({
                           "industry_code":code,"industry":name,"trade_date":d1,
+                          "prev_required_trade_date":d0,
                           "prev_close":c0,"accepted_close":c1,
                           "wind_return":wr,"accepted_return":direct,
                           "abs_return_diff":diff,
@@ -154,6 +169,7 @@ jobs:
               ident[code]={
                   "industry":name,
                   "overlap_rows":len(diffs),
+                  "skipped_gap_adjacent_pairs":skipped_gap_adjacent_pairs,
                   "max_abs_return_diff":None if not diffs else max(diffs),
                   "p99_abs_return_diff":None if not diffs else float(pd.Series(diffs).quantile(.99)),
                   "median_abs_return_diff":None if not diffs else float(pd.Series(diffs).median()),
@@ -228,7 +244,8 @@ jobs:
               c for c,v in ident.items()
               if v["overlap_rows"]>=100
               and v["forward_round_2dp_match_rate"] is not None
-              and v["forward_round_2dp_match_rate"]>=0.999
+              and v["forward_round_2dp_match_rate"]==1.0
+              and (v["max_abs_return_diff"] is not None and v["max_abs_return_diff"]<=1e-12)
           ]
           high_identity_recon=0 if rdf.empty else int(rdf["industry_code"].isin(high_identity_codes).sum())
           unique_2dp=0 if rdf.empty else int(rdf["unique_2dp"].sum())
@@ -257,8 +274,12 @@ jobs:
                   "gap_dates":gap_by_date,
               },
               "identity_audit":{
+                  "method":"TRUE_ADJACENT_REQUIRED_DATES_ONLY",
+                  "gap_adjacent_pairs_excluded":True,
                   "per_code":ident,
                   "high_identity_code_count":len(high_identity_codes),
+                  "mapped_current_sw2021_code_count":len(current_map),
+                  "all_mapped_codes_high_identity":len(high_identity_codes)==len(current_map),
                   "high_identity_codes":high_identity_codes,
               },
               "reconstruction":{
