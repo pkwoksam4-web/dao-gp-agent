@@ -5,13 +5,29 @@ on:
       - gp/dao2-c-sector-pit
     paths:
       - 'data/dao2/modules/C_SECTOR_PIT_STATE_V1.json'
+      - 'data/dao2/modules/C_SECTOR_REBUILD_CONTRACT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json'
+      - 'data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json'
       - 'docs/dao2/modules/C_SECTOR_PIT.md'
       - 'scripts/dao2_module_state_guard_v1.py'
+      - 'scripts/dao2_c_sector_governance_guard_v1.py'
+      - 'scripts/test_dao2_c_sector_governance_guard_v1.py'
       - '.github/workflows/dao2-c-sector-pit-guard-v1.yml'
   pull_request:
     paths:
       - 'data/dao2/modules/C_SECTOR_PIT_STATE_V1.json'
+      - 'data/dao2/modules/C_SECTOR_REBUILD_CONTRACT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json'
+      - 'data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json'
       - 'scripts/dao2_module_state_guard_v1.py'
+      - 'scripts/dao2_c_sector_governance_guard_v1.py'
+      - 'scripts/test_dao2_c_sector_governance_guard_v1.py'
 permissions:
   contents: read
 jobs:
@@ -26,3 +42,9 @@ jobs:
         env:
           PYTHONPATH: scripts
         run: python scripts/dao2_module_state_guard_v1.py data/dao2/modules/C_SECTOR_PIT_STATE_V1.json
+      - name: Validate sector governance consistency
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python -m unittest -v scripts/test_dao2_c_sector_governance_guard_v1.py
+          python scripts/dao2_c_sector_governance_guard_v1.py
