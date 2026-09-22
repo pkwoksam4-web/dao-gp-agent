@@ -3,7 +3,7 @@
   "version": "1.0",
   "module_id": "C",
   "component": "sector_series",
-  "status": "PASS_DERIVED_CLOSE_ADMITTED_CANDIDATE_ONLY",
+  "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
   "source": {
     "repository": "z15114664687-dot/fund-holdings",
     "commit": "92864a330e5bad393315cb6664fe626370e9c92d",
@@ -53,11 +53,11 @@
     ]
   },
   "governance": {
-    "admitted_to_sector_series": true,
+    "admitted_to_sector_series": false,
     "frozen_42783_rows_rewritten": false,
     "reconstructed_rows_marked_as_raw_close": false,
     "synthetic_false_claim_for_reconstructed_rows": false,
-    "reason": "Candidate-only DERIVED_CLOSE admission is permitted by the explicit admission contract; raw-close identity is not claimed.",
+    "reason": "298 rows remain high-quality derived-close evidence, but the frozen rebuild contract does not admit a new DERIVED_CLOSE provenance class and the current verifier does not validate such rows. Explicit governance migration would be required before admission.",
     "admitted_provenance_type": "DERIVED_CLOSE",
     "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
     "admitted_rows": 298,
