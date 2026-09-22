@@ -290,7 +290,9 @@ jobs:
                   "p99_forward_backward_abs_diff":None if rdf.empty else float(rdf["forward_backward_abs_diff"].quantile(.99)),
               },
               "governance":{
-                  "admitted_to_sector_series":True,\n                  "provenance_type":"DERIVED_CLOSE",\n                  "admission_contract":"data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
+                  "admitted_to_sector_series":True,
+                  "provenance_type":"DERIVED_CLOSE",
+                  "admission_contract":"data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
                   "synthetic_flag_remains_false_in_frozen_series":True,
                   "series_blocker_closed":False,
                   "reason":"298 rows are admitted candidate-only as DERIVED_CLOSE under the explicit contract; three direct 801020.SI gaps remain.",
