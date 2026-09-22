@@ -1,0 +1,261 @@
+{
+  "artifact": "DAO2_C_801020_DIRECT_CLOSE_SEARCH_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "BLOCKED_MANUAL_ACCESS_REQUIRED",
+  "target_identity": {
+    "candidate_code": "801020.SI",
+    "alternate_vendor_code": "801020.INDX",
+    "historical_name": "采掘",
+    "required_dates": [
+      "20210806",
+      "20211008",
+      "20211022"
+    ],
+    "sw2014_valid_through": "20211210",
+    "sw2021_switch_first_trade_date": "20211213"
+  },
+  "frozen_overlap_anchors": {
+    "20210806": {
+      "previous": [
+        [
+          "20210802",
+          2938.73
+        ],
+        [
+          "20210803",
+          2868.65
+        ],
+        [
+          "20210804",
+          2961.69
+        ],
+        [
+          "20210805",
+          2954.25
+        ]
+      ],
+      "target": [
+        "20210806",
+        null
+      ],
+      "next": [
+        [
+          "20210809",
+          3048.39
+        ],
+        [
+          "20210810",
+          3055.83
+        ],
+        [
+          "20210811",
+          3158.45
+        ]
+      ]
+    },
+    "20211008": {
+      "previous": [
+        [
+          "20210928",
+          4101.16
+        ],
+        [
+          "20210929",
+          3856.21
+        ],
+        [
+          "20210930",
+          3976.45
+        ]
+      ],
+      "target": [
+        "20211008",
+        null
+      ],
+      "next": [
+        [
+          "20211011",
+          3971.72
+        ],
+        [
+          "20211012",
+          3882.22
+        ]
+      ]
+    },
+    "20211022": {
+      "previous": [
+        [
+          "20211018",
+          3971.09
+        ],
+        [
+          "20211019",
+          3992.55
+        ],
+        [
+          "20211020",
+          3790.88
+        ],
+        [
+          "20211021",
+          3886.69
+        ]
+      ],
+      "target": [
+        "20211022",
+        null
+      ],
+      "next": [
+        [
+          "20211025",
+          3804.92
+        ],
+        [
+          "20211026",
+          3801.95
+        ],
+        [
+          "20211027",
+          3677.43
+        ]
+      ]
+    }
+  },
+  "admission_gate": {
+    "target_code_date_close_exact": true,
+    "neighboring_overlap_exact_match_required": true,
+    "source_repo_or_vendor_identity_required": true,
+    "source_commit_blob_hash_required_for_public_repo_carrier": true,
+    "source_export_hash_required_for_vendor_export": true,
+    "raw_or_direct_historical_close_only": true,
+    "rounded_return_not_accepted": true,
+    "inferred_close_not_accepted_for_these_three": true,
+    "frozen_42783_rewrite_forbidden": true
+  },
+  "public_carriers_exhausted": [
+    {
+      "source": "williamsyb/Sniper",
+      "commit": "7bcd99c4e14bf71ef43dc2b378e83d6b5c919ea9",
+      "path": "data/sw/801020_采掘.csv",
+      "blob": "41697ff0b95a8b566cac9742fb1d7afa47988f9b",
+      "result": "CLOSED_NO_TARGET_COVERAGE",
+      "reason": "Direct historical OHLC carrier exists but committed series stops in January 2021."
+    },
+    {
+      "source": "Marklieflat/Course_codes_undergrad",
+      "commit": "22389ac45a28f72184b9c203554b69e8ea14e3e8",
+      "metadata_path": "FIN3080/Assignment_1/指数文件/IDX_Idxinfo.csv",
+      "metadata_blob": "314c621284e52f1158cfb9409ab417cb5faacf31",
+      "metadata_identity": "801020=采掘, base date 1999-12-30",
+      "tested_archives": [
+        {
+          "path": "FIN3080/Assignment_3/daily data/指数日行情文件083540184.zip",
+          "blob": "3e2e86ddd472a35443a96750ea1595bc26f263c0",
+          "sha256": "d4486b93927f641a8fbf1a8043c3823ee5ed2553cdc5c65fb4beb64aa1476c9a"
+        },
+        {
+          "path": "FIN3080/Assignment_3/daily data/指数日行情文件083617277.zip",
+          "blob": "0ebe6112019348e985a41a4605fa45f35c6650ca",
+          "sha256": "cb42ccd3fd851c4ff7c680a2b7efa8f3d25adcb191759df8359ab0b2985f8866"
+        }
+      ],
+      "audit_workflow_run_id": 35686615070,
+      "audit_workflow_job_id": 106614701598,
+      "audit_artifact_id": 10676269210,
+      "audit_artifact_digest": "sha256:9643ad82ba2469b2420cea780a4e1aebdf9e0b8b8d71b08a9c9b4b0d50ec2c91",
+      "result": "CLOSED_ARCHIVES_CONTAIN_ONLY_000300_NOT_801020"
+    },
+    {
+      "source": "syhya/syhya.github.io",
+      "commit": "08f4a43cbb78de809e4e11f42b12f418796cfd6c",
+      "path": "content/zh/posts/2021-04-21-deep-learning-stock-prediction/index.md",
+      "blob": "8f3712c99fe7f5ecc95993f2e7baf58de6025384",
+      "result": "TRACEABLE_SW_RAW_OHLC_EXAMPLE_ONLY_NO_TARGET_DATES",
+      "evidence": "Exact 801020 OHLC for 2021-02-05 is published and attributed to 申银万国, but repository tree contains no raw data attachment covering the three target dates."
+    },
+    {
+      "source": "Longbridge",
+      "result": "CLOSED_SYMBOL_UNSUPPORTED",
+      "tested_symbols": [
+        "801020.SH",
+        "801020.SZ",
+        "801020.CN",
+        "801020.SI",
+        "801020.INDX"
+      ]
+    },
+    {
+      "source": "public_news",
+      "result": "EVIDENCE_ONLY_NOT_DIRECT_CLOSE",
+      "known_rounded_returns": {
+        "20210806": "+2.82%",
+        "20211008": "-1.58%",
+        "20211022": "-4.74%"
+      },
+      "reason": "Rounded returns cannot satisfy exact direct-close admission."
+    }
+  ],
+  "authoritative_access_paths_remaining": [
+    {
+      "provider": "RiceQuant RQData",
+      "identity_evidence": "Official RQData index catalogue lists 801020.INDX=采掘, valid 2003-10-15 to 2021-12-13, with historical price availability.",
+      "required_query": {
+        "order_book_id": "801020.INDX",
+        "start_date": "2021-08-02",
+        "end_date": "2021-10-27",
+        "frequency": "1d",
+        "fields": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "prev_close"
+        ],
+        "adjust_type": "none"
+      },
+      "admission_use": "Extract the three target close rows and exact-match the frozen neighboring closes above.",
+      "current_access": "NOT_CONNECTED_NO_CHATGPT_PLUGIN_FOUND",
+      "manual_action_if_used": "Login/connect RQData or export the requested rows."
+    },
+    {
+      "provider": "Wind/iFind",
+      "identity_evidence": "Historical 801020.SI is a standard SW2014 industry index; existing Wind-derived carrier proves ASWSINDEXEOD lineage for mapped SW indices.",
+      "required_query": {
+        "code": "801020.SI",
+        "dates": [
+          "20210805",
+          "20210806",
+          "20210809",
+          "20210930",
+          "20211008",
+          "20211011",
+          "20211021",
+          "20211022",
+          "20211025"
+        ],
+        "fields": [
+          "open",
+          "high",
+          "low",
+          "close"
+        ]
+      },
+      "admission_use": "Use target rows plus neighboring exact overlap; hash the exported file.",
+      "current_access": "NO_DIRECT_WIND_OR_IFIND_CONNECTOR_IN_CURRENT_CHAT",
+      "manual_action_if_used": "Export raw historical index rows from Wind/iFind and provide the file."
+    }
+  ],
+  "governance": {
+    "series_checkpoint_remains": "BLOCKED",
+    "logical_coverage": "43081/43084",
+    "frozen_base_rows": 42783,
+    "admitted_derived_close_rows": 298,
+    "remaining_direct_rows": 3,
+    "breadth_derivation_allowed": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
