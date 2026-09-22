@@ -100,6 +100,25 @@ class SeriesTests(unittest.TestCase):
         self.assertEqual(got["status"], "FAIL")
         self.assertEqual(got["missing_required_keys"], 1)
 
+    def test_derived_close_is_rejected_before_governance_migration(self):
+        expected = {("801010.SI", "20200102")}
+        rows = [
+            {
+                "industry_code": "801010.SI",
+                "trade_date": "20200102",
+                "close": "100.00",
+                "source_provider": "WIND_DERIVED",
+                "source_trade_date": "20200102",
+                "fill_method": "NONE",
+                "provenance_type": "DERIVED_CLOSE",
+            }
+        ]
+        got = validate_series(rows, expected)
+        self.assertEqual(got["status"], "FAIL")
+        self.assertEqual(got["derived_close_rows_rejected"], 1)
+        self.assertIn("row_1:derived_close_not_admitted", got["errors"])
+        self.assertFalse(got["derived_close_admitted"])
+
     def test_forward_fill_or_date_proxy_fails(self):
         expected = {("801010.SI", "20200103")}
         rows = [
