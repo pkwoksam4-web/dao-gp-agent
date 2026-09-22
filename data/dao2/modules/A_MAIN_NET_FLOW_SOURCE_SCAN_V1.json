@@ -54,11 +54,11 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "Priority 1: obtain a valid Tushare Pro credential with >=2000 points and call the official moneyflow endpoint, which directly exposes the exact four required fields and covers data from 2010 onward.",
-    "Priority 2: obtain authenticated access to the USTC PAN group 深度学习基础-2026 and recover the original course moneyflow archive bytes; hash and exact-match them against the pinned Jessica archive before using residual rows.",
-    "Priority 3: accept a historical L2 source only if it exposes active direction plus original-order identity/aggregate amount sufficient to reproduce Tushare's official <50k / 50k-200k / 200k-1m / >=1m buckets; require overlap exact-match before admission.",
-    "Priority 4: keep Infoway Custom Plan as fallback rather than sole route.",
-    "Do not use generic main-flow, trade-level-only approximations, or imputation."
+    "P1 only: authenticate to USTC PAN group 深度学习基础-2026 and recover untouched original A股数据/moneyflow carrier bytes.",
+    "Retrieve only the nine required date CSVs plus overlap sample dates where possible; if only a zip/archive is exposed, download the archive unchanged and hash it before extraction.",
+    "Run Jessica pinned field-level overlap across at least 3 years, 5 dates, 20-50 rows; require 100% exact match on ts_code, trade_date, buy_lg_amount, buy_elg_amount, sell_lg_amount, sell_elg_amount.",
+    "Only after overlap PASS admit residual rows and update resolved/unresolved counts.",
+    "Keep Tushare/L2/Infoway routes frozen while executing P1."
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -102,11 +102,11 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "EXTERNAL_EXACT_SOURCE_ACCESS_REQUIRED",
+    "code": "USTC_PAN_LOGIN_REQUIRED",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Provide one of: valid Tushare >=2000-point credential; authenticated USTC PAN course archive access; or a historical L2 original-order export/API satisfying Tushare semantics. Infoway is no longer the sole admissible external path."
+    "actionable_requirement": "Authorized user must log in at https://pan.ustc.edu.cn/, search/join/open group 深度学习基础-2026, and provide access/share to the top-level A股数据 folder. Do not manually collect individual files."
   },
-  "current_source_strategy": "MULTI_ROUTE_FAIL_CLOSED",
+  "current_source_strategy": "USTC_PAN_COURSE_MONEYFLOW_ARCHIVE",
   "infoway_probe": {
     "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
     "workflow_path": ".github/workflows/dao2-a-infoway-semantic-probe-v1.yml",
@@ -248,5 +248,37 @@
     "status": "NO_NEW_ZERO_PROOF",
     "proven_count": 0,
     "conclusion": "Reconfirmed that strict 5-minute upper-bound zero proof cannot close any of the current 16 keys."
+  },
+  "ustc_pan_source_discovery": "data/dao2/modules/A_USTC_PAN_SOURCE_DISCOVERY_V1.json",
+  "ustc_pan_source": {
+    "status": "SOURCE_LOCATED_LOGIN_REQUIRED",
+    "login_url": "https://pan.ustc.edu.cn/",
+    "group_name": "深度学习基础-2026",
+    "expected_root": "A股数据",
+    "target_directory": "A股数据/moneyflow",
+    "direct_share_url_found": false,
+    "archive_filename_found": false,
+    "public_raw_bytes_retrieved": false,
+    "source_identity_status": "PENDING_RAW_BYTES_AND_OVERLAP",
+    "carrier_evidence": [
+      {
+        "repository": "licunchun/dl",
+        "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+        "path": "大作业 (1).md",
+        "finding": "课程作业说明明确要求登录科大云盘，搜索并加入群组“深度学习基础-2026”，从群盘下载共享数据；数据自2016年开始，详细字段见群盘README。"
+      },
+      {
+        "repository": "licunchun/dl",
+        "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+        "path": "scripts/sync_data.sh",
+        "finding": "真实脚本使用 USTC Pan WebDAV via rclone；REMOTE=ustc_pan:/A股数据，并直接同步 REMOTE/moneyflow/。"
+      },
+      {
+        "repository": "licunchun/dl",
+        "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+        "path": "alpha-stage/DATA_REPORT.md",
+        "finding": "2026-06-03 PAN snapshot 12915 files / 15.321GB；A股数据/moneyflow 2526 files。"
+      }
+    ]
   }
 }
