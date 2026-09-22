@@ -5,9 +5,6 @@ on:
       - gp/dao2-c-sector-pit
     paths:
       - '.github/workflows/dao2-c-github-historical-sw-db-probe-v1.yml'
-  pull_request:
-    paths:
-      - '.github/workflows/dao2-c-github-historical-sw-db-probe-v1.yml'
   workflow_dispatch:
 
 permissions:
