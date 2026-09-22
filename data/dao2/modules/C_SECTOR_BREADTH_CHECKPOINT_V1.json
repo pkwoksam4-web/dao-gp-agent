@@ -30,7 +30,6 @@
   },
   "blockers": [
     "SECTOR_SERIES_UNBOUND",
-    "SECTOR_MEMBERSHIP_PIT_UNBOUND",
     "exact same-day sector breadth ratio definition remains unrecovered"
   ],
   "safety": {
