@@ -249,7 +249,7 @@ jobs:
 
           result={
               "artifact":"DAO2_C_WIND_DERIVED_CLOSE_RECONSTRUCTION_PROBE_V1",
-              "status":"EVIDENCE_ONLY_NOT_ADMITTED",
+              "status":"DERIVED_CLOSE_ADMITTED_CANDIDATE_ONLY",
               "source":{
                   "repository":"z15114664687-dot/fund-holdings",
                   "commit":"92864a330e5bad393315cb6664fe626370e9c92d",
@@ -290,14 +290,85 @@ jobs:
                   "p99_forward_backward_abs_diff":None if rdf.empty else float(rdf["forward_backward_abs_diff"].quantile(.99)),
               },
               "governance":{
-                  "admitted_to_sector_series":False,
+                  "admitted_to_sector_series":True,\n                  "provenance_type":"DERIVED_CLOSE",\n                  "admission_contract":"data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json",
                   "synthetic_flag_remains_false_in_frozen_series":True,
                   "series_blocker_closed":False,
-                  "reason":"This probe tests deterministic equivalence only. Candidate reconstructed closes require explicit governance acceptance or an authoritative raw-close carrier before admission.",
+                  "reason":"298 rows are admitted candidate-only as DERIVED_CLOSE under the explicit contract; three direct 801020.SI gaps remain.",
               }
           }
           (OUT/"result.json").write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
           print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+
+      - name: Pin traceable historical direct-close candidate archives
+        run: |
+          set -euo pipefail
+          mkdir -p artifact_probe/direct_candidates
+          curl -fL --retry 3 --connect-timeout 20 --max-time 120 \
+            'https://raw.githubusercontent.com/Marklieflat/Course_codes_undergrad/22389ac45a28f72184b9c203554b69e8ea14e3e8/FIN3080/Assignment_3/daily%20data/%E6%8C%87%E6%95%B0%E6%97%A5%E8%A1%8C%E6%83%85%E6%96%87%E4%BB%B6083540184.zip' \
+            -o artifact_probe/direct_candidates/index_daily_083540184.zip
+          curl -fL --retry 3 --connect-timeout 20 --max-time 120 \
+            'https://raw.githubusercontent.com/Marklieflat/Course_codes_undergrad/22389ac45a28f72184b9c203554b69e8ea14e3e8/FIN3080/Assignment_3/daily%20data/%E6%8C%87%E6%95%B0%E6%97%A5%E8%A1%8C%E6%83%85%E6%96%87%E4%BB%B6083617277.zip' \
+            -o artifact_probe/direct_candidates/index_daily_083617277.zip
+          sha256sum artifact_probe/direct_candidates/*.zip | tee artifact_probe/direct_candidates/archive_sha256.txt
+
+      - name: Audit 801020 direct-close candidate archives before admission
+        run: |
+          python - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+
+          root=Path("artifact_probe/direct_candidates")
+          targets={"20210806","20211008","20211022"}
+          sources=[
+              {"file":"index_daily_083540184.zip","repository":"Marklieflat/Course_codes_undergrad","commit":"22389ac45a28f72184b9c203554b69e8ea14e3e8","path":"FIN3080/Assignment_3/daily data/指数日行情文件083540184.zip","git_blob_sha":"3e2e86ddd472a35443a96750ea1595bc26f263c0"},
+              {"file":"index_daily_083617277.zip","repository":"Marklieflat/Course_codes_undergrad","commit":"22389ac45a28f72184b9c203554b69e8ea14e3e8","path":"FIN3080/Assignment_3/daily data/指数日行情文件083617277.zip","git_blob_sha":"0ebe6112019348e985a41a4605fa45f35c6650ca"},
+          ]
+          report={"artifact":"DAO2_C_801020_DIRECT_CARRIER_CANDIDATE_AUDIT_V1","status":"NO_ADMISSION","targets":sorted(targets),"sources":[],"target_hits":[],"all_801020_lines":[]}
+          for src0 in sources:
+              p=root/src0["file"]
+              src=dict(src0)
+              src["sha256"]=hashlib.sha256(p.read_bytes()).hexdigest()
+              src["members"]=[]
+              with zipfile.ZipFile(p) as z:
+                  for info in z.infolist():
+                      if info.is_dir():
+                          continue
+                      data=z.read(info)
+                      text_data=None
+                      enc_used=None
+                      for enc in ("utf-8-sig","gb18030","big5","latin1"):
+                          try:
+                              text_data=data.decode(enc)
+                              enc_used=enc
+                              break
+                          except UnicodeDecodeError:
+                              pass
+                      member={"name":info.filename,"bytes":len(data),"encoding":enc_used}
+                      if text_data is not None:
+                          lines=text_data.splitlines()
+                          member["head"]=lines[:3]
+                          code_lines=[ln for ln in lines if "801020" in ln]
+                          member["801020_line_count"]=len(code_lines)
+                          for ln in code_lines[:1000]:
+                              rec={"archive":src["file"],"member":info.filename,"line":ln}
+                              report["all_801020_lines"].append(rec)
+                              normalized=ln.replace("-","").replace("/","")
+                              for d in targets:
+                                  if d in normalized:
+                                      report["target_hits"].append({**rec,"target_date":d})
+                      src["members"].append(member)
+              report["sources"].append(src)
+          report["target_hit_count"]=len(report["target_hits"])
+          report["unique_target_dates_hit"]=sorted({x["target_date"] for x in report["target_hits"]})
+          if set(report["unique_target_dates_hit"])==targets:
+              report["status"]="CANDIDATE_HAS_ALL_TARGET_LINES_REQUIRES_OVERLAP_PARSE"
+          elif report["target_hit_count"]>0:
+              report["status"]="PARTIAL_TARGET_CARRIER_REQUIRES_OVERLAP_PARSE"
+          else:
+              report["status"]="CANDIDATE_NO_801020_TARGET_ROWS"
+          (root/"direct_candidate_audit.json").write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps({"status":report["status"],"target_hit_count":report["target_hit_count"],"unique_target_dates_hit":report["unique_target_dates_hit"],"source_summaries":[{"file":s["file"],"sha256":s["sha256"],"members":[{"name":m["name"],"bytes":m["bytes"],"head":m.get("head"),"801020_line_count":m.get("801020_line_count",0)} for m in s["members"]]} for s in report["sources"]],"target_hits":report["target_hits"][:20]},ensure_ascii=False,indent=2))
           PY
 
       - uses: actions/upload-artifact@v4
