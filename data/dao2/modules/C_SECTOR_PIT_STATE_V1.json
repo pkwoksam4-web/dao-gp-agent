@@ -62,7 +62,7 @@
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
       "workflow_run_id": 35575797301,
-      "manual_blocker": "301 exact same-day SW sector closes remain unresolved. Infoway public route is closed as unsupported; legacy official swsindex.com route is closed as transport-unavailable from GitHub Actions; Tushare sw_daily remains unusable until a valid Tushare token or another exact, provenance-valid source is available.",
+      "manual_blocker": "Series has 301 absent keys in the frozen base. Wind close-derived evidence deterministically reconstructs 298 with corrected 31/31 identity validation, but those rows are not yet admitted under the raw-close/synthetic governance boundary. Three SW2014 801020.SI direct closes remain unresolved (20210806, 20211008, 20211022).",
       "infoway_targeted_probe": {
         "status": "CLOSED_UNSUPPORTED",
         "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
@@ -81,6 +81,31 @@
         "recovery_allowed": false,
         "overlap_validation_status": "NOT_EXECUTABLE_AFTER_CAPABILITY_TRANSPORT_FAIL",
         "admitted_rows": 0
+      },
+      "wind_derived_close_reconstruction": {
+        "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+        "workflow_run_id": 35680627829,
+        "artifact_id": 10674701717,
+        "evidence": "data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json",
+        "corrected_identity_audit": "31/31 mapped codes; 100% 2dp match on true adjacent required dates",
+        "candidate_reconstructed_rows": 298,
+        "admitted_rows": 0,
+        "unresolved_rows": 3,
+        "unresolved_keys": [
+          [
+            "801020.SI",
+            "20210806"
+          ],
+          [
+            "801020.SI",
+            "20211008"
+          ],
+          [
+            "801020.SI",
+            "20211022"
+          ]
+        ],
+        "governance_admission_required": true
       }
     },
     "sector_membership_pit": {
