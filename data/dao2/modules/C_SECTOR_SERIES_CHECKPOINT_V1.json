@@ -131,7 +131,35 @@
     ],
     "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
     "evidence_only_derived_close_rows": 298,
-    "potential_observed_after_future_derived_governance_migration": 43081
+    "potential_observed_after_future_derived_governance_migration": 43081,
+    "direct_close_recovery": {
+      "status": "MANUAL_VENDOR_EXPORT_REQUIRED",
+      "evidence_path": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+      "target_code": "801020.SI",
+      "alternate_vendor_code": "801020.INDX",
+      "target_dates": [
+        "20210806",
+        "20211008",
+        "20211022"
+      ],
+      "required_neighbor_dates": [
+        "20210805",
+        "20210809",
+        "20210930",
+        "20211011",
+        "20211021",
+        "20211025"
+      ],
+      "authoritative_providers": [
+        "Wind/iFind",
+        "RiceQuant RQData",
+        "Founder Securities DataCube",
+        "Tushare sw_daily"
+      ],
+      "current_environment_entitlement_available": false,
+      "admitted_raw_close_rows": 0,
+      "resume_condition": "Original authoritative vendor export with target and neighbor OHLC rows."
+    }
   },
   "validation": {
     "exact_required_keys_from_pass_membership": true,
@@ -147,13 +175,16 @@
     "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
     "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
     "price_basis_unresolved": false,
-    "full_formal_coverage_proven": false
+    "full_formal_coverage_proven": false,
+    "admissible_coverage": "42783/43084",
+    "admitted_derived_close_rows": 0,
+    "admitted_direct_recovery_rows": 0
   },
   "blockers": [
-    "301 exact Membership-required sector-date close rows are absent from the frozen 42,783-row base.",
-    "298/301 are deterministically reconstructable from a Wind ASWSINDEXEOD close-derived return carrier with corrected 31/31 identity audit and two-sided unique 2dp closes, but remain evidence-only because the frozen rebuild contract and current verifier do not admit a DERIVED_CLOSE provenance class.",
+    "301 exact Membership-required sector-date close rows remain absent from the admissible frozen series.",
+    "298/301 have PASS_EVIDENCE_ONLY_NOT_ADMITTED DERIVED_CLOSE evidence, but contract v1.2 and verifier explicitly reject DERIVED_CLOSE admission.",
     "3 direct historical SW2014 801020.SI closes remain unresolved: 20210806, 20211008, 20211022.",
-    "Closing Series requires either authoritative raw-close binding for the missing rows or an explicit governance migration plus verifier coverage; no such migration is admitted by this audit."
+    "MANUAL_VENDOR_EXPORT_REQUIRED: current environment has no usable Wind/iFind, RQData, DataCube, or sufficiently entitled Tushare sw_daily access."
   ],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
