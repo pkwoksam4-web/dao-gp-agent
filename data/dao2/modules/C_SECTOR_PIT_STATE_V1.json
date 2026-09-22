@@ -62,7 +62,7 @@
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
       "workflow_run_id": 35575797301,
-      "manual_blocker": "Series has 301 absent keys in the frozen 42,783-row base. Wind close-derived evidence deterministically reconstructs 298 with corrected 31/31 identity validation, but those rows remain evidence-only because the frozen rebuild contract does not admit a new DERIVED_CLOSE provenance class without an explicit governance migration and verifier coverage. Three SW2014 801020.SI direct closes remain unresolved (20210806, 20211008, 20211022).",
+      "manual_blocker": "Manual vendor access/export is now required for the three remaining direct SW2014 801020.SI closes (20210806, 20211008, 20211022). All accessible public/connected raw-close routes have been exhausted or lack target coverage. Acceptable authoritative carriers: Wind/iFind raw OHLC, RiceQuant RQData 801020.INDX daily OHLC, Founder Securities DataCube aindex_daily 801020.SI, or Tushare sw_daily with sufficient entitlement. DERIVED_CLOSE evidence remains 298 rows, admitted_rows=0.",
       "infoway_targeted_probe": {
         "status": "CLOSED_UNSUPPORTED",
         "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
@@ -123,7 +123,12 @@
           "20211022"
         ]
       ],
-      "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json"
+      "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+      "admitted_derived_close_rows": 0,
+      "evidence_only_derived_close_rows": 298,
+      "potential_coverage_after_future_governance_migration": "43081/43084",
+      "manual_intervention_required": true,
+      "manual_intervention_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json"
     },
     "sector_membership_pit": {
       "status": "PASS_SUBCOMPONENT",
