@@ -113,8 +113,8 @@
       "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json"
     },
     "frozen_observed_required_keys": 42783,
-    "admitted_derived_close_rows": 298,
-    "logical_observed_required_keys": 43081,
+    "admitted_derived_close_rows": 0,
+    "logical_observed_required_keys": 42783,
     "direct_unresolved_keys": [
       [
         "801020.SI",
@@ -129,7 +129,9 @@
         "20211022"
       ]
     ],
-    "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json"
+    "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+    "evidence_only_derived_close_rows": 298,
+    "potential_observed_after_future_derived_governance_migration": 43081
   },
   "validation": {
     "exact_required_keys_from_pass_membership": true,
