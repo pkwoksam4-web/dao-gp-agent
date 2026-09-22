@@ -3,7 +3,7 @@
   "version": "1.0",
   "module_id": "C",
   "component": "sector_series",
-  "status": "BLOCKED_DIRECT_CLOSE_ACCESS_REQUIRED",
+  "status": "MANUAL_VENDOR_EXPORT_REQUIRED",
   "target_identity": {
     "candidate_code": "801020.SI",
     "alternate_vendor_code": "801020.INDX",
@@ -283,6 +283,36 @@
       "admission_use": "Extract target rows only after neighboring rows exact-match the frozen anchors; preserve the original vendor export bytes and SHA256.",
       "current_access": "NO_DCUBE_TOKEN_OR_REPO_CONFIGURATION_FOUND",
       "manual_action_if_used": "Use an authorized DataCube account/token to export the requested 801020.SI rows. Do not supply credentials in chat; provide the original export file."
+    },
+    {
+      "provider": "Tushare sw_daily",
+      "identity_evidence": "Authoritative Tushare Shenwan daily index endpoint previously identified as the canonical direct-close route.",
+      "required_query": {
+        "ts_code": "801020.SI",
+        "trade_dates": [
+          "20210805",
+          "20210806",
+          "20210809",
+          "20210930",
+          "20211008",
+          "20211011",
+          "20211021",
+          "20211022",
+          "20211025"
+        ],
+        "fields": [
+          "ts_code",
+          "trade_date",
+          "open",
+          "high",
+          "low",
+          "close",
+          "pre_close"
+        ]
+      },
+      "admission_use": "Accept target rows only after neighboring closes exact-match frozen anchors.",
+      "current_access": "NO_SUFFICIENT_SW_DAILY_PERMISSION_ALREADY_PROVEN",
+      "manual_action_if_used": "Use a Tushare account with sw_daily entitlement and export the requested rows; do not retry the current insufficient credential."
     }
   ],
   "governance": {
@@ -335,6 +365,26 @@
       "801020.SI/20210806",
       "801020.SI/20211008",
       "801020.SI/20211022"
+    ],
+    "status": "MANUAL_VENDOR_EXPORT_REQUIRED",
+    "do_not_resume_public_search": true,
+    "resume_condition": "Receive one original authoritative vendor export covering the required neighbor+target dates."
+  },
+  "authoritative_access_resolution": {
+    "current_environment_entitlement_available": false,
+    "checked_paths": {
+      "Wind/iFind": "NO_DIRECT_CONNECTOR_IN_CURRENT_CHAT",
+      "RiceQuant RQData": "NO_CONNECTED_PLUGIN_OR_CREDENTIAL",
+      "Founder Securities DataCube": "NO_TOKEN_OR_REPO_CONFIGURATION_FOUND",
+      "Tushare sw_daily": "NO_SUFFICIENT_PERMISSION_ALREADY_PROVEN_DO_NOT_RETRY"
+    },
+    "public_unconstrained_search_stopped": true,
+    "repeated_dead_routes_forbidden": [
+      "Infoway sector route",
+      "legacy swsindex transport",
+      "GitHub historical SW DB zero-row route",
+      "Tushare sw_daily without sufficient permission",
+      "public news rounded-return reverse engineering"
     ]
   }
 }
