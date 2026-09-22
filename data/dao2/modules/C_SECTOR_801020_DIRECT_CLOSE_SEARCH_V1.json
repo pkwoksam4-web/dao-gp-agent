@@ -3,7 +3,7 @@
   "version": "1.0",
   "module_id": "C",
   "component": "sector_series",
-  "status": "BLOCKED_MANUAL_ACCESS_REQUIRED",
+  "status": "BLOCKED_DIRECT_CLOSE_ACCESS_REQUIRED",
   "target_identity": {
     "candidate_code": "801020.SI",
     "alternate_vendor_code": "801020.INDX",
@@ -250,12 +250,15 @@
   ],
   "governance": {
     "series_checkpoint_remains": "BLOCKED",
-    "logical_coverage": "43081/43084",
+    "admissible_coverage": "42783/43084",
     "frozen_base_rows": 42783,
-    "admitted_derived_close_rows": 298,
+    "admitted_derived_close_rows": 0,
+    "evidence_only_derived_close_rows": 298,
+    "potential_coverage_after_future_governance_migration": "43081/43084",
     "remaining_direct_rows": 3,
     "breadth_derivation_allowed": false,
     "model_freeze_allowed": false,
-    "oos_metrics_allowed": false
+    "oos_metrics_allowed": false,
+    "invariant": "DERIVED_CLOSE evidence MUST NOT expand admissible coverage until C_SECTOR_REBUILD_CONTRACT_V1, verifier, tests and governance guard are explicitly migrated."
   }
 }
