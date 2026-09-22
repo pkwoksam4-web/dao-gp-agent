@@ -4,7 +4,7 @@
   "module_id": "C",
   "component": "sector_series",
   "blocker": "SECTOR_SERIES_UNBOUND",
-  "status": "BLOCKED",
+  "status": "BLOCKED_MANUAL_ACCESS_REQUIRED",
   "blocker_closed_within_module": false,
   "historical_gp_v11_sector_series_recovered": false,
   "candidate_only": true,
@@ -128,7 +128,8 @@
         "801020.SI",
         "20211022"
       ]
-    ]
+    ],
+    "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json"
   },
   "validation": {
     "exact_required_keys_from_pass_membership": true,
@@ -159,9 +160,9 @@
     "derived_overlay_synthetic_semantics": "NOT_INHERITED_USE_DERIVED_CLOSE_PROVENANCE"
   },
   "blockers": [
-    "Three authoritative / traceable historical SW2014 801020.SI direct closes remain unresolved: 20210806, 20211008, 20211022.",
-    "Frozen 42,783-row base is unchanged. 298 additional rows are admitted only as candidate-only DERIVED_CLOSE provenance, producing logical coverage 43,081/43,084.",
-    "SECTOR_SERIES_UNBOUND remains open until the three direct gaps pass code/date/close plus neighboring overlap exact-match."
+    "Only three authoritative/traceable SW2014 801020.SI direct closes remain unresolved: 20210806, 20211008, 20211022.",
+    "Public carrier search is exhausted without an admissible raw-close file covering those dates; the remaining executable paths require authenticated RQData historical index access or a Wind/iFind raw export.",
+    "Frozen 42,783-row base remains immutable; 298 additional rows remain admitted only as candidate-only DERIVED_CLOSE, yielding 43,081/43,084 logical coverage."
   ],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
