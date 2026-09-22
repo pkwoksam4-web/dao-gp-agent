@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-20",
+  "as_of": "2026-09-22",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -54,11 +54,12 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "P1 only: authenticate to USTC PAN group 深度学习基础-2026 and recover untouched original A股数据/moneyflow carrier bytes.",
-    "Retrieve only the nine required date CSVs plus overlap sample dates where possible; if only a zip/archive is exposed, download the archive unchanged and hash it before extraction.",
-    "Run Jessica pinned field-level overlap across at least 3 years, 5 dates, 20-50 rows; require 100% exact match on ts_code, trade_date, buy_lg_amount, buy_elg_amount, sell_lg_amount, sell_elg_amount.",
-    "Only after overlap PASS admit residual rows and update resolved/unresolved counts.",
-    "Keep Tushare/L2/Infoway routes frozen while executing P1."
+    "P1: continue searching actual historical raw Tushare moneyflow carriers (CSV/SQLite/Parquet/ZIP/HDF5/DuckDB/release/history), not code-only repositories.",
+    "For every new carrier, run 100% Jessica field-level overlap before inspecting residual keys.",
+    "Allow partial residual recovery only with raw provenance, unique row, non-null four required fields, 10k-CNY unit, no proxy and no imputation.",
+    "P2 USTC PAN remains dormant backup until a directly accessible share/raw carrier appears.",
+    "P3-P5 remain frozen while P1 remains productive.",
+    "If pursuing the identified CNY 50 complete-history package, acquire original bytes first and run the same overlap gate; vendor claims alone are not admission."
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -102,11 +103,11 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "USTC_PAN_LOGIN_REQUIRED",
+    "code": "PUBLIC_MIRROR_RESIDUAL_DATA_NOT_YET_FOUND",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Authorized user must log in at https://pan.ustc.edu.cn/, search/join/open group 深度学习基础-2026, and provide access/share to the top-level A股数据 folder. Do not manually collect individual files."
+    "actionable_requirement": "Continue free public exact Tushare moneyflow historical carrier recovery. A CNY 50 complete-history vendor package is available as a manual-purchase candidate but is not admitted without user authorization and Jessica overlap."
   },
-  "current_source_strategy": "USTC_PAN_COURSE_MONEYFLOW_ARCHIVE",
+  "current_source_strategy": "PUBLIC_TUSHARE_MONEYFLOW_HISTORICAL_MIRROR_RECOVERY",
   "infoway_probe": {
     "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
     "workflow_path": ".github/workflows/dao2-a-infoway-semantic-probe-v1.yml",
@@ -280,5 +281,55 @@
         "finding": "2026-06-03 PAN snapshot 12915 files / 15.321GB；A股数据/moneyflow 2526 files。"
       }
     ]
+  },
+  "public_historical_mirror_audit": "data/dao2/modules/A_PUBLIC_TUSHARE_HISTORICAL_MIRROR_AUDIT_V1.json",
+  "public_historical_mirror_recovery": {
+    "status": "ACTIVE_NO_RESIDUAL_ROWS_YET",
+    "moonlit": {
+      "repository": "Moonlit-Pages/cozeclaw-workspace",
+      "commit": "526ebbb94066bc623add892f6f8c21378d3e945a",
+      "source_identity": "PASS",
+      "overlap_rows": 5183,
+      "mismatch_rows": 0,
+      "residual_hits": 0
+    },
+    "jiu": {
+      "repository": "Jiu-7131/BigDataVisualization",
+      "commit": "102c67acda5151545d54444199140bd869c49004",
+      "path_root": "数据集/tushare_all_interfaces/moneyflow/",
+      "source_identity": "PASS",
+      "overlap_design": "4 years / 5 dates / 8 symbols / 40 rows",
+      "overlap_rows": 40,
+      "mismatch_rows": 0,
+      "residual_hits": 0,
+      "note": "Seven 2022-2023 target keys were checked only after identity PASS; three corresponding stock files exist but omit the target date, four target stock files are absent."
+    },
+    "pangucheng": {
+      "repository": "PanGucheng/a-share-quant-research",
+      "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
+      "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+      "blob_sha": "e8826d3b5e82edb7c85b63ebf371a6987afaa7a5",
+      "sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
+      "actual_raw_carrier": true,
+      "provenance": "Tushare moneyflow with retained network receipts",
+      "sampled_moneyflow_dates": "48 quarterly representatives, 2010-01-04 through 2021-10-08",
+      "target_dates_present": [],
+      "residual_hits": 0
+    }
+  },
+  "paywalled_historical_candidate": {
+    "provider": "tushare.indevs.in",
+    "url": "https://tushare.indevs.in/quant/trading-data/",
+    "product": "Tushare moneyflow 完整历史数据",
+    "price_cny": 50,
+    "package_size": "1.21GB",
+    "file_count": 3993,
+    "record_count": 13690451,
+    "field_count": 23,
+    "sha256_claimed": true,
+    "sample_filename": "moneyflow__sample_50rows.parquet",
+    "vendor_claimed_complete_history": true,
+    "status": "PAYWALLED_NOT_ADMITTED",
+    "reason": "Full bytes require purchase. No row may be admitted until package/file provenance and Jessica field-level exact overlap pass."
   }
 }
