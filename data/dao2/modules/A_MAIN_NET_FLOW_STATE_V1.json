@@ -15,7 +15,7 @@
     "data/DAO2_MAIN_NET_FLOW_16_KEY_TASK_V1.json"
   ],
   "expected_outputs": [
-    "data/DAO2_MODULE_A_MAIN_NET_FLOW_STATE_V1.json",
+    "data/dao2/modules/A_MAIN_NET_FLOW_STATE_V1.json",
     "data/GP12_MAIN_NET_FLOW_BINDING_V1.json",
     "artifact/A_MAIN_NET_FLOW_CHECKPOINT_V1.json"
   ],
