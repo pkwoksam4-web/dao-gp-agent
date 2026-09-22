@@ -1,0 +1,119 @@
+{
+  "artifact": "DAO2_MAIN_NET_FLOW_16_KEY_TASK_V1",
+  "version": "1.0",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "formal_expected_rows": 1011607,
+  "resolved_rows": 1011591,
+  "unresolved_rows": 16,
+  "semantic_contract": {
+    "field": "main_net_flow_cny",
+    "formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
+    "source_unit": "10k_CNY",
+    "output_unit": "CNY",
+    "exact_tushare_semantics_required": true,
+    "generic_main_flow_proxy_allowed": false
+  },
+  "keys": [
+    {
+      "ts_code": "600306.SH",
+      "trade_date": "2020-06-08",
+      "formal_amount_cny": 314500
+    },
+    {
+      "ts_code": "600898.SH",
+      "trade_date": "2020-11-04",
+      "formal_amount_cny": 587900
+    },
+    {
+      "ts_code": "603996.SH",
+      "trade_date": "2021-02-24",
+      "formal_amount_cny": 534300
+    },
+    {
+      "ts_code": "002618.SZ",
+      "trade_date": "2021-09-23",
+      "formal_amount_cny": 12846700
+    },
+    {
+      "ts_code": "000020.SZ",
+      "trade_date": "2021-09-24",
+      "formal_amount_cny": 4760300
+    },
+    {
+      "ts_code": "000157.SZ",
+      "trade_date": "2021-09-24",
+      "formal_amount_cny": 737075800
+    },
+    {
+      "ts_code": "000592.SZ",
+      "trade_date": "2021-09-24",
+      "formal_amount_cny": 315622900
+    },
+    {
+      "ts_code": "000753.SZ",
+      "trade_date": "2021-09-24",
+      "formal_amount_cny": 13478500
+    },
+    {
+      "ts_code": "002684.SZ",
+      "trade_date": "2021-11-25",
+      "formal_amount_cny": 10405500
+    },
+    {
+      "ts_code": "600112.SH",
+      "trade_date": "2022-05-06",
+      "formal_amount_cny": 2238500
+    },
+    {
+      "ts_code": "000564.SZ",
+      "trade_date": "2023-03-20",
+      "formal_amount_cny": 61512300
+    },
+    {
+      "ts_code": "001337.SZ",
+      "trade_date": "2023-03-20",
+      "formal_amount_cny": 18323400
+    },
+    {
+      "ts_code": "002118.SZ",
+      "trade_date": "2023-05-22",
+      "formal_amount_cny": 1401500
+    },
+    {
+      "ts_code": "002157.SZ",
+      "trade_date": "2023-05-22",
+      "formal_amount_cny": 51511600
+    },
+    {
+      "ts_code": "002503.SZ",
+      "trade_date": "2023-05-22",
+      "formal_amount_cny": 3658700
+    },
+    {
+      "ts_code": "002504.SZ",
+      "trade_date": "2023-05-22",
+      "formal_amount_cny": 1610300
+    }
+  ],
+  "admissible_resolution": [
+    "exact archived Tushare-semantic row",
+    "historically versioned public snapshot with exact four bucket fields",
+    "strict exact-zero proof showing every constituent trade is below Tushare large-order threshold"
+  ],
+  "rejected_or_closed_routes": [
+    "generic Eastmoney/THS main-flow semantic substitution",
+    "FDL feature inversion: no large_net_amount_ratio asset in archive",
+    "ApocData historical pagination: endpoint remains recent-only",
+    "stockapi anonymous historical route: recent-only",
+    "JoinQuant CI route: region blocked",
+    "Sina legacy historical tick route: old history unavailable"
+  ],
+  "next_route_order": [
+    "search older commits/tags/history of Jessica-Zhangyj/dlquant for omitted exact rows",
+    "search forks/mirrors/archived snapshots of the same Tushare-derived dataset",
+    "attempt exact-zero proof only for low-amount residual rows where rigorous intraday bound can prove zero",
+    "retain unresolved status for any key without exact admissible evidence"
+  ],
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}

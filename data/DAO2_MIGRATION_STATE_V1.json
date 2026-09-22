@@ -1,0 +1,125 @@
+{
+  "artifact": "DAO2_MIGRATION_STATE_V1",
+  "as_of": "2026-09-20",
+  "inherited_from": "倒/GP",
+  "source_commit": "175de3c17c0c792ee8dcaed39bf544af41184236",
+  "inherited_turnover_closure_commit": "21dd11633daf04379afecb2ff4af00b7e6b54ab1",
+  "quant_version": "V4.82",
+  "formal": {
+    "start": "2020-06-01",
+    "end": "2026-04-17",
+    "calendar_days": 1426,
+    "universe_n": 847,
+    "formal_symbol_n": 844,
+    "na_n": 3,
+    "raw_trade_rows": 1011607,
+    "liquidity_threshold_cny": 80000000,
+    "formal_ready": true,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "gp12": {
+    "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+    "historical_gp_v11_recovered": false,
+    "candidate_adoption_status": "UNAPPROVED",
+    "validated_feature_families": [
+      "amount_turnover",
+      "intraday_15m",
+      "intraday_60m",
+      "market_calendar",
+      "stock_adjusted_close"
+    ],
+    "ready_factors": [
+      "F6",
+      "F7",
+      "F8",
+      "F9",
+      "F10",
+      "F12"
+    ],
+    "blocked_factors": [
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F11"
+    ],
+    "f11_missing_dependencies": [
+      "main_net_flow"
+    ],
+    "blockers": [
+      "LABEL_PROVENANCE_UNBOUND",
+      "MAIN_NET_FLOW_UNBOUND",
+      "MARKET_BENCHMARK_UNBOUND",
+      "MARKET_BREADTH_UNBOUND",
+      "SECTOR_BREADTH_UNBOUND",
+      "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+      "SECTOR_SERIES_UNBOUND",
+      "STATUS_SEMANTICS_INCOMPLETE"
+    ],
+    "turnover_closure": {
+      "workflow_run": 34937058721,
+      "artifact_id": 10383758045,
+      "artifact_zip_sha256": "53e574b91d72359e2dc073fdb1796f1945c46222902cf85beb9089b2a712e55a",
+      "readiness_run": 34938907264,
+      "readiness_artifact_id": 10383992824,
+      "turnover_rows": 1011607,
+      "turnover_symbol_n": 844,
+      "missing_n": 0,
+      "duplicate_n": 0,
+      "bad_turnover_n": 0,
+      "turnover_ratio_pit_verified": true
+    },
+    "main_net_flow_progress": {
+      "status": "RESIDUAL_EXACT_RECOVERY",
+      "formal_expected_rows": 1011607,
+      "direct_public_archive_rows": 1011565,
+      "zero_proof_rows": 26,
+      "resolved_rows": 1011591,
+      "unresolved_rows": 16,
+      "resolved_fraction": 0.9999841835811734,
+      "remaining_blocker": "RECOVER_EXACT_TUSHARE_SEMANTIC_VALUES_FOR_16_SYMBOL_DATE_KEYS"
+    }
+  },
+  "multi_agent": {
+    "inherited_v19": [
+      "master_router",
+      "research_agent",
+      "fund_flow_agent",
+      "event_agent",
+      "eod_archive_agent",
+      "daily_archive_dedup",
+      "provenance_version_chain",
+      "reverse_verification",
+      "prediction_validation_loop"
+    ],
+    "inherited_v20": [
+      "research_data_lake",
+      "pit_feature_store",
+      "knowledge_graph",
+      "unified_query",
+      "context_manifest_hash",
+      "data_platform_auditor",
+      "eod_hash_chain"
+    ],
+    "v20_recorded_tests": "73/73",
+    "v20_source_snapshot_recovered": false,
+    "cloud_verified": false,
+    "v21_next": [
+      "context_compiler",
+      "retrieval_policy",
+      "historical_replay_engine"
+    ]
+  },
+  "governance": {
+    "fail_closed": true,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "ci_equals_model_success": false,
+    "reverse_check_required": true,
+    "daily_knowledge_archive_required": true,
+    "dedup_required": true,
+    "provenance_required": true
+  }
+}
