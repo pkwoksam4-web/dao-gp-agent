@@ -48,7 +48,7 @@
       "historical_sector_package_recovered": false
     },
     "sector_series": {
-      "status": "BLOCKED_3_DIRECT_GAPS",
+      "status": "BLOCKED_MANUAL_ACCESS_REQUIRED",
       "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
       "full_formal_coverage_proven": false,
       "required_sector_date_keys": 43084,
@@ -62,7 +62,7 @@
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
       "workflow_run_id": 35575797301,
-      "manual_blocker": "Only three authoritative / traceable SW2014 801020.SI historical closes remain: 20210806, 20211008, 20211022. The frozen 42,783-row base is unchanged; 298 rows are admitted separately as DERIVED_CLOSE under the explicit candidate-only admission contract.",
+      "manual_blocker": "Exactly three SW2014 801020.SI historical closes remain. Public traceable carriers were exhausted without those dates. Next executable closure requires authenticated RQData 801020.INDX daily history or a Wind/iFind raw export; after receipt, exact neighboring-overlap validation is sufficient to close Series.",
       "infoway_targeted_probe": {
         "status": "CLOSED_UNSUPPORTED",
         "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
@@ -126,7 +126,8 @@
           "801020.SI",
           "20211022"
         ]
-      ]
+      ],
+      "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json"
     },
     "sector_membership_pit": {
       "status": "PASS_SUBCOMPONENT",
@@ -161,10 +162,11 @@
     },
     "latest_subcomponent_checkpoint": {
       "component": "sector_series",
-      "status": "BLOCKED_3_DIRECT_GAPS",
+      "status": "BLOCKED_MANUAL_ACCESS_REQUIRED",
       "path": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
       "logical_coverage": "43081/43084",
-      "admitted_derived_rows": 298
+      "admitted_derived_rows": 298,
+      "remaining_direct_rows": 3
     }
   },
   "open_blockers": [
