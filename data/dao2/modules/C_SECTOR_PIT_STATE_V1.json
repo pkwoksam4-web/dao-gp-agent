@@ -48,12 +48,12 @@
       "historical_sector_package_recovered": false
     },
     "sector_series": {
-      "status": "BLOCKED_EXACT_DATA_GAPS",
+      "status": "BLOCKED_3_DIRECT_GAPS",
       "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
       "full_formal_coverage_proven": false,
       "required_sector_date_keys": 43084,
       "observed_required_keys": 42783,
-      "missing_required_keys": 301,
+      "missing_required_keys": 3,
       "duplicate_required_keys": 0,
       "same_date_provenance": true,
       "fill_method": "NONE",
@@ -62,7 +62,7 @@
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
       "workflow_run_id": 35575797301,
-      "manual_blocker": "Series has 301 absent keys in the frozen base. Wind close-derived evidence deterministically reconstructs 298 with corrected 31/31 identity validation, but those rows are not yet admitted under the raw-close/synthetic governance boundary. Three SW2014 801020.SI direct closes remain unresolved (20210806, 20211008, 20211022).",
+      "manual_blocker": "Only three authoritative / traceable SW2014 801020.SI historical closes remain: 20210806, 20211008, 20211022. The frozen 42,783-row base is unchanged; 298 rows are admitted separately as DERIVED_CLOSE under the explicit candidate-only admission contract.",
       "infoway_targeted_probe": {
         "status": "CLOSED_UNSUPPORTED",
         "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
@@ -83,13 +83,13 @@
         "admitted_rows": 0
       },
       "wind_derived_close_reconstruction": {
-        "status": "PASS_EVIDENCE_ONLY_NOT_ADMITTED",
+        "status": "PASS_DERIVED_CLOSE_ADMITTED_CANDIDATE_ONLY",
         "workflow_run_id": 35680627829,
         "artifact_id": 10674701717,
         "evidence": "data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json",
         "corrected_identity_audit": "31/31 mapped codes; 100% 2dp match on true adjacent required dates",
         "candidate_reconstructed_rows": 298,
-        "admitted_rows": 0,
+        "admitted_rows": 298,
         "unresolved_rows": 3,
         "unresolved_keys": [
           [
@@ -105,8 +105,28 @@
             "20211022"
           ]
         ],
-        "governance_admission_required": true
-      }
+        "governance_admission_required": false,
+        "provenance_type": "DERIVED_CLOSE",
+        "admission_contract": "data/dao2/modules/C_SECTOR_DERIVED_CLOSE_ADMISSION_CONTRACT_V1.json"
+      },
+      "frozen_observed_required_keys": 42783,
+      "admitted_derived_close_rows": 298,
+      "logical_observed_required_keys": 43081,
+      "logical_coverage": "43081/43084",
+      "unresolved_direct_keys": [
+        [
+          "801020.SI",
+          "20210806"
+        ],
+        [
+          "801020.SI",
+          "20211008"
+        ],
+        [
+          "801020.SI",
+          "20211022"
+        ]
+      ]
     },
     "sector_membership_pit": {
       "status": "PASS_SUBCOMPONENT",
@@ -140,11 +160,11 @@
       "note": "Do not infer global source unavailability from this CI credential state."
     },
     "latest_subcomponent_checkpoint": {
-      "component": "sector_membership_pit",
-      "status": "PASS_SUBCOMPONENT",
-      "path": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
-      "workflow_run_id": 35575433267,
-      "artifact_id": 10628585296
+      "component": "sector_series",
+      "status": "BLOCKED_3_DIRECT_GAPS",
+      "path": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
+      "logical_coverage": "43081/43084",
+      "admitted_derived_rows": 298
     }
   },
   "open_blockers": [
