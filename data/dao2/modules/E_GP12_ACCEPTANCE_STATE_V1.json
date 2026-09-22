@@ -22,7 +22,7 @@
     "data/GP12_CANDIDATE_PARAMETERS_V1.json"
   ],
   "expected_outputs": [
-    "data/DAO2_MODULE_E_GP12_ACCEPTANCE_STATE_V1.json",
+    "data/dao2/modules/E_GP12_ACCEPTANCE_STATE_V1.json",
     "artifact/E_GP12_ACCEPTANCE_CHECKPOINT_V1.json"
   ],
   "checkpoint": null,
