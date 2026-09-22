@@ -1,0 +1,42 @@
+{
+  "schema": "agent-brain-eod-persistence-recovery-evidence/v1",
+  "observed_date": "2026-09-22",
+  "affected_trade_date": "2026-09-21",
+  "repository": "pkwoksam4-web/dao-gp-agent",
+  "reproducible_release": "V2.70",
+  "neon": {
+    "project_id": "red-term-29407678",
+    "branch_id": "br-raspy-breeze-b5clzass",
+    "database": "investment_intel"
+  },
+  "incident": {
+    "original_sync_id": "SYN-LB-PIT-EOD-20260921",
+    "original_status": "PARTIAL",
+    "original_blocker": "capital_flows_and_eod_bars_not_persisted_in_this_run_due_to_source-row provenance/idempotent write assembly incomplete; existing bars stop at 2026-09-18",
+    "provider_retrieval_verified": true,
+    "completed_trade_date_verified": "2026-09-21",
+    "pollution_prevented": true
+  },
+  "recovery": {
+    "sync_id": "SYN-LB-EOD-RECOVERY-20260922-FOR-20260921",
+    "repaired_completed_daily_bars": 10,
+    "canonical_symbols": 10,
+    "source_rows_created": 10,
+    "market_bars_count_after_recovery": 10310,
+    "canonical_provider": "longbridge",
+    "completed_bar_timestamp": "2026-09-20T16:00:00Z",
+    "capital_flows_recovered": false,
+    "capital_flow_reason": "Historical same-day capital-flow payload was not preserved by the original partial run; no synthetic reconstruction attempted.",
+    "live_shadow_backfill": false,
+    "live_shadow_eligibility": "FALSE_FOR_RECOVERY_ROWS",
+    "pit_status": "SAFE_FACT_RECOVERY_ONLY"
+  },
+  "prospective_controls": {
+    "next_clean_live_shadow_anchor": "next completed China trading session after a successful same-day PIT persist",
+    "historical_backfill_not_counted_as_live_shadow": true,
+    "automatic_model_promotion": false,
+    "production_weight_change": false,
+    "portfolio_mutation": false,
+    "brokerage_execution": false
+  }
+}
