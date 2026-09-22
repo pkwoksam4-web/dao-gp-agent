@@ -1,0 +1,455 @@
+{
+  "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1",
+  "version": "1.6",
+  "module_id": "B",
+  "status": "EVIDENCE_EXHAUSTED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING",
+  "blocker": "MARKET_BREADTH_UNBOUND",
+  "blocker_closed": false,
+  "close_condition": "Recover a new authoritative historical final-scorer carrier that proves exact executable identity or authoritative historical I/O sufficient to uniquely identify normalization, clipping, any all-vs-eligible final combination, and final 4% mapping.",
+  "historical_gp_v11": {
+    "factor_name": "Market Breadth/Diffusion",
+    "weight_pct": 4,
+    "recovery_status": "RAW_EXECUTABLE_IDENTITY_RECOVERED",
+    "historical_source_file": "src/run_panel_backtest.py",
+    "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "source_archive": {
+      "name": "v11_offline_backtest_v3_10.zip",
+      "library_path": "/倒/v11_offline_backtest_v3_10.zip",
+      "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
+      "library_file_size_bytes": 1301865,
+      "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "historical_exact_bytes_materialized_on_2026_09_10": true,
+      "historical_exact_bytes_evidence": "GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482 records AUTHORITATIVE_FILE surface file_library_v3_10_exact_bytes: V3.10 ZIP was materialized and archive SHA verified; current-session rematerialization denial does not negate that historical verification.",
+      "current_session_raw_byte_materialization": "RECOVERED_VIA_EXACT_LIBRARY_COPY",
+      "current_session_files_read": "NO_READABLE_CONTENT_FOR_ZIP",
+      "current_session_archive_sha256_reverified_from_raw_bytes": true,
+      "package_manifest_sha256": "fa7fe8d4856a1a9140d7c3171c315cd0f2ec0a90ac4946b8c18940507f19aad8",
+      "authorized_recovery_copy_file_id": "file_00000000fd208206b76b9cd1e1dd43ba"
+    },
+    "daily_base_files": {
+      "src/run_backtest.py": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+      "src/run_panel_backtest.py": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+      "src/run_formal_pipeline.py": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c"
+    }
+  },
+  "recovered_behavior": {
+    "outputs": [
+      "adv_all",
+      "dec_all",
+      "flat_all",
+      "adv_ratio_all",
+      "eligible-universe analogues",
+      "median cross-sectional return"
+    ],
+    "source_localization": "Initial factor recovery matrix commit 55b4730b7351ea8121fc29637bbfca693a006365 explicitly states V3.10 file-backed panel code computes these outputs; Market Regime uses the same daily panel component.",
+    "market_regime_partial_mapping": "HOT if adv_all > 3000; NEUTRAL if adv_all >= 1000; otherwise COLD",
+    "daily_base_scope_note": "Historical V3.10 README is recorded as Daily structure layer only; complete Market/Sector/Fund/15m/60m final strategy layers are not merged.",
+    "exact_raw_aggregation": {
+      "active_universe": "ex_suspended == false",
+      "observed_universe": "active rows with ret_d1 not null",
+      "eligible_universe": "observed rows with eligible == true",
+      "adv_ratio_all": "adv_all/max(1, adv_all+dec_all); flat excluded",
+      "adv_ratio_eligible": "adv_eligible/max(1, adv_eligible+dec_eligible)",
+      "median_ret_all": "median(ret_d1) over observed active universe"
+    },
+    "function_source_lines": "617..634",
+    "function_source_bytes_without_final_lf": 1150,
+    "function_source_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "behavior_reverse_check": "PASS_HISTORICAL_STREAMING_EQUIVALENCE_PLUS_CURRENT_CUSTOM_CASE"
+  },
+  "git_recovery_evidence": {
+    "initial_factor_matrix_commit": "55b4730b7351ea8121fc29637bbfca693a006365",
+    "initial_factor_matrix_blob_sha": "2aa1c853ba022bec28d49d05e668ee6b41361b30",
+    "initial_matrix_claims": {
+      "breadth_recovery_status": "PARTIAL_FILE_BACKED",
+      "known": [
+        "V3.10 file-backed panel code computes adv_all, dec_all, flat_all, adv_ratio_all and eligible-universe analogues.",
+        "The same daily panel component computes median cross-sectional return."
+      ],
+      "missing": [
+        "Exact breadth/diffusion factor normalization and clipping.",
+        "Exact aggregation of all-versus-eligible breadth inputs.",
+        "Exact conversion to the final 4-percent weighted factor score."
+      ]
+    },
+    "recovery_test_commit_path": "scripts/test_strategy_factor_recovery_matrix_v482.py",
+    "recovery_test_asserts_function_sha": true,
+    "later_matrix_commit": "29c04309e64995b27898db8c1f621c0e31fbd0a7",
+    "later_matrix_blob_sha": "c604125ea09c77135c011fbb9401605ff5aebe10"
+  },
+  "strategy_recovery_artifacts": {
+    "archive_binding_run": {
+      "workflow_run": 34425611321,
+      "artifact_id": 10132524563,
+      "artifact_name": "gp-strategy-asset-recovery-v482",
+      "artifact_zip_sha256": "75af9f0029cca59e137e1ee9b5d3683c739ab447cefa6a6bc272f9d9112b313b",
+      "contains_original_v3_10_source_bytes": false
+    },
+    "factor_matrix_run": {
+      "workflow_run": 34426367814,
+      "artifact_id": 10132820877,
+      "artifact_name": "gp-strategy-asset-recovery-v482",
+      "artifact_zip_sha256": "804dbdaf7d3ca5beb933a25d58ca598083da18faacbfccba2b688dc30d69f192",
+      "contains_original_v3_10_source_bytes": false
+    },
+    "later_downloaded_recovery_artifact": {
+      "artifact_id": 10134222317,
+      "downloaded_zip_sha256_current_session": "b972d9a794b4c0be7b82cc3bb2ec029b30e0e7714917858f8952413cafc3467c",
+      "factor_matrix_file_sha256": "8f66c1e2719a575a08ec4f8b6c04be955002c05b9a267451de6595fc1cfac55a",
+      "contains_original_v3_10_source_archive": false,
+      "contains_original_market_breadth_function_source_text": false
+    }
+  },
+  "source_text_search": {
+    "pr8_full_patch_search": {
+      "searched_terms": [
+        "adv_all",
+        "dec_all",
+        "flat_all",
+        "adv_ratio_all",
+        "market_breadth_function_sha256"
+      ],
+      "result": "ONLY_RECOVERY_MATRIX_AND_TEST_REFERENCES",
+      "historical_function_source_text_found": false
+    },
+    "library_standalone_source_search": {
+      "searched_targets": [
+        "run_backtest.py",
+        "run_panel_backtest.py",
+        "run_formal_pipeline.py",
+        "market_breadth_function_sha256",
+        "adv_ratio_all"
+      ],
+      "result": "NO_STANDALONE_HISTORICAL_SOURCE_OR_FUNCTION_EXCERPT_FOUND",
+      "historical_function_source_text_found": false
+    },
+    "historical_package_lineage_current_materialize_attempts": {
+      "v3_10": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "v3_9": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "v3_6": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH",
+      "v3_4": "DENIED_NO_AUTHORIZED_RAW_BYTE_PATH"
+    },
+    "current_runtime_filesystem_scan": "NO_V3_10_ZIP_OR_RUN_PANEL_BACKTEST_PY_FOUND",
+    "library_exact_copy_recovery": {
+      "original_file_id": "file_0000000027d4820683c9a38a9886d045",
+      "copied_file_id": "file_00000000fd208206b76b9cd1e1dd43ba",
+      "raw_materialization": "PASS",
+      "archive_sha256_exact_match": true,
+      "source_file_sha256_exact_match": true,
+      "function_sha256_exact_match": true
+    },
+    "historical_function_source_text_found": true,
+    "historical_function_source_path": "src/run_panel_backtest.py"
+  },
+  "historical_identity_boundary": {
+    "market_breadth_function_hash_recovered": true,
+    "market_breadth_function_source_text_recovered": true,
+    "exact_all_vs_eligible_aggregation_recovered": true,
+    "normalization_recovered": false,
+    "clipping_recovered": false,
+    "final_4pct_mapping_recovered": false,
+    "proof_candidate_ratio_equals_historical_adv_ratio_all": false,
+    "silent_proxy_substitution_allowed": false,
+    "forward_fill_allowed": false,
+    "v310_package_contains_final_4pct_mapping": false,
+    "raw_executable_identity_status": "PASS",
+    "final_factor_identity_status": "BLOCKED",
+    "scope_evidence": {
+      "readme_cn_sha256": "195e8e126437cdd4a9ed1f68e7d503d07ba2470cfbef124c17504d21ede42b6a",
+      "readme_panel_cn_sha256": "21d47ec268115f036a89bb99517b73dfc6eff5d5a73ced8e0d8cc37aa70f4395",
+      "data_source_validation_sha256": "089bf7a29e123591d90749b0f00d20f9b95304882d1fc212c9527afbd0439892",
+      "finding": "V3.10 explicitly declares Daily Base only; Market Regime and Sector RS/Breadth are not merged into the final score layer."
+    }
+  },
+  "candidate_boundary": {
+    "checkpoint": "data/dao2/modules/B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1.json",
+    "candidate_origin": "NEW_RECONSTRUCTION_CANDIDATE",
+    "candidate_series_is_historical_identity": false,
+    "candidate_can_be_verified_separately": true,
+    "candidate_verification_cannot_promote_historical_identity": true
+  },
+  "next_search_order": [
+    "Current authoritative search surfaces are exhausted. Do not continue unconstrained search or transform enumeration.",
+    "Reopen final-scorer identity recovery only when a genuinely new authoritative carrier appears.",
+    "For a new carrier: establish provenance/hash first, recover behavior identity second, run finite candidate uniqueness tests only if authoritative I/O permits, and generate final B binding/checkpoint only after unique identity is proven.",
+    "Until then remain fail-closed: MARKET_BREADTH_UNBOUND stays OPEN."
+  ],
+  "module_b_pass_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "historical_source_artifact": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json",
+  "final_scorer_identity_search_20260921": {
+    "status": "NO_AUTHORITATIVE_FINAL_SCORER_FOUND_YET",
+    "historical_filename_clues": {
+      "source": "docs/superpowers/specs/2026-09-08-model-freeze-recovery-v482-design.md",
+      "names": [
+        "gp_v11_scoring.py",
+        "run_gp_walkforward.py"
+      ],
+      "authority": "SEARCH_CLUES_ONLY_NOT_IDENTITY"
+    },
+    "exact_filename_search": {
+      "library": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0
+      },
+      "github_code_search": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0
+      },
+      "gmail": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0,
+        "alphaagent_2026_07_01_to_2026_09_01": 0
+      },
+      "google_drive": {
+        "gp_v11_scoring_py": 0,
+        "run_gp_walkforward_py": 0,
+        "alphaagent": 0
+      }
+    },
+    "serialized_asset_inventory": {
+      "library_extensions_searched": [
+        "pkl",
+        "pickle",
+        "joblib",
+        "onnx",
+        "pt",
+        "pth",
+        "bin",
+        "model",
+        "yaml",
+        "yml",
+        "toml",
+        "ini",
+        "cfg",
+        "conf"
+      ],
+      "matching_final_scorer_assets": 0
+    },
+    "deleted_github_carriers": {
+      "alphaagent": {
+        "full_name": "leo-quant-research/AlphaAgent",
+        "repo_id": 1317931511,
+        "description": "Multi Agent Factor Research System",
+        "known_branch": "leo",
+        "known_push_heads": [
+          "25812984ac52635af50c6522b964c5ed9f1fa658",
+          "b813095f2fb17d0e890e0a80cc86ad222700b9ef",
+          "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8"
+        ],
+        "direct_repo_commit_codeload_recovery": "FAILED_DELETED_REPOSITORY",
+        "ecosyste_ms_commit_cache": "EMPTY",
+        "software_heritage_origin": "NOT_FOUND",
+        "wayback_raw_source": "NOT_RECOVERED"
+      },
+      "data_lake": {
+        "full_name": "leo-quant-research/data_lake",
+        "repo_id": 1296046921,
+        "role": "historical data carrier; no final scorer bytes recovered"
+      }
+    },
+    "alphaagent_surviving_fork_reverse_probe": {
+      "target_sha": "166bc13f93d4538a66f2f4bff5d4cfa09d1b26e8",
+      "repos_tested": [
+        "poiuyaaaa/AlphaAgent",
+        "3123958139/AlphaAgent",
+        "SimonWang666/AlphaAgent",
+        "Wangchanghao12/AlphaAgent",
+        "vxzhong/AlphaAgent",
+        "atanasvasilevjourney/alphaagent"
+      ],
+      "exact_commit_hits": 0,
+      "interpretation": "Known leo-quant-research AlphaAgent commit does not survive in the most plausible current forks tested."
+    },
+    "legacy_migration_false_positive": {
+      "clue": "zjzesheng/legacy_codes",
+      "result": "REJECTED_AS_FALSE_POSITIVE",
+      "evidence": "Historical GH Archive grep matched unrelated aaif-goose/goose and barrettclark/sqlite2pg events containing generic legacy_codes text; no zjzesheng/legacy_codes repository event was recovered."
+    },
+    "final_mapping_requirements_still_missing": [
+      "normalization",
+      "clipping",
+      "all-versus-eligible final combination if any",
+      "final 4% Market Breadth/Diffusion score mapping"
+    ]
+  },
+  "final_scorer_behavior_identity_search_20260921": {
+    "status": "NO_AUTHORITATIVE_INPUT_OUTPUT_PAIRS_FOUND",
+    "search_policy": "Behavior-identity only; raw breadth recovery, Daily Base lineage, benchmark replay, exact filename scans, obvious AlphaAgent fork probes, serialized-extension scans and legacy_codes are not repeated.",
+    "github_internal_field_search": {
+      "terms": [
+        "adv_ratio_all",
+        "adv_ratio_eligible",
+        "Market Breadth",
+        "Diffusion",
+        "component score",
+        "factor score",
+        "normalize clip",
+        "percentile zscore minmax"
+      ],
+      "result": "ZERO_RELEVANT_FINAL_SCORER_CODE_OR_OUTPUT_HITS"
+    },
+    "library_internal_field_search": {
+      "terms": [
+        "adv_ratio_all",
+        "adv_ratio_eligible",
+        "Market Breadth + score",
+        "Diffusion + score",
+        "normalize/clip/percentile/zscore/minmax + factor/component score"
+      ],
+      "result": "NO_RELEVANT_FINAL_SCORER_OUTPUT; ONLY_UNRELATED_DATA_REMEDIATION_RESULTS"
+    },
+    "historical_output_surface_inventory": {
+      "aug26_aug27_library": {
+        "result": "NO_STANDALONE_SUMMARY_BUCKET_STATS_WALK_FORWARD_DAILY_REPLAY_FILES",
+        "note": "The historical conversation clue says starter_v2 exposed summary, bucket_stats, walk_forward and daily_replay surfaces, but the Library inventory contains only package ZIPs and data-governance artifacts; no output rows survived as standalone authoritative files."
+      },
+      "sample50_factor_crosscheck": {
+        "runs": [
+          33965931036,
+          33970355639
+        ],
+        "artifact_ids": [
+          9969422298,
+          9970737451
+        ],
+        "disposition": "EXCLUDED_NOT_SCORER",
+        "reason": "Artifacts validate corporate-action/QFQ event factors and report event_count/formal_rows/max_diff_bp; they contain no Market Breadth component score or final strategy score."
+      },
+      "strategy_recovery_artifact_versions": {
+        "runs": [
+          34213425800,
+          34228858532,
+          34307662289,
+          34207288888
+        ],
+        "artifact_ids": [
+          10050744505,
+          10056893854,
+          10087225436,
+          10048285764
+        ],
+        "disposition": "RECOVERY_SUMMARY_ONLY",
+        "reason": "Artifacts contain recovery/checkpoint JSONs only. They repeat missing normalization/clipping/final-score gaps and contain no authoritative raw-breadth-to-component-score input/output rows."
+      },
+      "external_recovery_packages": {
+        "disposition": "NO_BEHAVIOR_PAIRS",
+        "reason": "Field-level grep across recovered external-asset/account/relation/GH-archive packages for breadth/component/total score and normalize/clip/percentile/zscore/minmax found no authentic historical breadth-score I/O pairs."
+      }
+    },
+    "strategy_recovery_matrix_boundary": {
+      "decision_policy_matrix": "Daily Base walk-forward calibration maps remaining_inertia buckets to binary target probabilities only; it explicitly does not recover final GP12 score or P-up/P-range/P-down mapping.",
+      "candidate_crosswalk": "F2 candidate five-day mean and signed mapping are explicitly proposal-only; input-family overlap is not historical final mapping."
+    },
+    "behavior_identification_gate": {
+      "authoritative_pair_count": 0,
+      "finite_transform_enumeration_allowed": false,
+      "uniqueness_test_allowed": false,
+      "reason": "Across repository artifacts, Library, Gmail, Drive, Replit and prior-conversation recovery, no authoritative historical input/output pair links raw breadth input to normalized/clipped component score and final score. Any transform enumeration would be underdetermined."
+    },
+    "blocker_effect": {
+      "MARKET_BREADTH_UNBOUND": "OPEN",
+      "normalization_recovered": false,
+      "clipping_recovered": false,
+      "all_vs_eligible_final_combination_recovered": false,
+      "final_4pct_mapping_recovered": false,
+      "final_binding_allowed": false,
+      "final_checkpoint_allowed": false
+    },
+    "gmail_drive_content_field_search": {
+      "time_scope": "Gmail 2026-08-20..2026-09-10; current authorized Google Drive scope",
+      "terms": [
+        "adv_ratio_all",
+        "adv_ratio_eligible",
+        "Market Breadth",
+        "Diffusion",
+        "score_total"
+      ],
+      "gmail_hits": 0,
+      "google_drive_hits": 0,
+      "result": "NO_INTERNAL_FIELD_CARRIER_FOUND"
+    },
+    "replit_historical_carriers": {
+      "apps": [
+        {
+          "title": "FruitfulStormySign",
+          "last_updated": "2026-08-29T13:37:40.513Z",
+          "status": "UNINSPECTABLE_FOR_EVIDENCE"
+        },
+        {
+          "title": "AgedCapitalDeclaration",
+          "last_updated": "2026-08-30T13:41:54.437Z",
+          "status": "UNINSPECTABLE_FOR_EVIDENCE"
+        }
+      ],
+      "current_attempt": "Read-only final-scorer field inspection timed out; follow-up on FruitfulStormySign returned Replit Agent busy and AgedCapitalDeclaration timed out.",
+      "evidentiary_effect": "NO_POSITIVE_EVIDENCE; cannot satisfy behavior identity or reduce blocker."
+    },
+    "prior_conversation_output_recovery": {
+      "result": "NO_AUTHORITATIVE_ROW_LEVEL_SCORER_OUTPUT_RECOVERED",
+      "recovered_clue_only": [
+        "summary",
+        "bucket_stats",
+        "walk_forward",
+        "daily_replay"
+      ],
+      "authority": "PRIOR_ASSISTANT_DESCRIPTION_ONLY",
+      "explicit_absence": [
+        "no user-provided/uploaded final scorer table",
+        "no same-date adv_ratio_all/adv_ratio_eligible -> normalized/clipped breadth score pair",
+        "no same-date breadth component -> total/final score pair",
+        "no historical Structure/Inertia/Execution numeric row usable as executable identity"
+      ],
+      "disposition": "CLUE_ONLY_NOT_BEHAVIOR_EVIDENCE"
+    }
+  },
+  "evidence_exhaustion_checkpoint_20260921": {
+    "status": "PASS_EVIDENCE_EXHAUSTION_BOUNDARY",
+    "search_scope_status": "CURRENT_AUTHORITATIVE_SURFACES_EXHAUSTED",
+    "authoritative_surfaces_searched": [
+      "GitHub repository final-scorer/internal-field code and output surfaces",
+      "Library historical packages and output-like artifacts",
+      "GitHub Actions strategy/model recovery artifacts",
+      "Sample50 factor artifacts (excluded as non-scorer)",
+      "Recovered external asset/account/relation/GH-archive packages",
+      "Gmail content field search in the authorized historical window",
+      "Google Drive content field search in current authorized scope",
+      "Replit historical carrier inspection attempts",
+      "Prior-conversation recovery, treated as clue-only unless backed by original user-provided artifact"
+    ],
+    "authoritative_pair_count": 0,
+    "final_identity": {
+      "normalization": "UNKNOWN",
+      "clipping": "UNKNOWN",
+      "all_vs_eligible_final_combination": "UNKNOWN",
+      "final_4pct_mapping": "UNKNOWN"
+    },
+    "blocker": "MARKET_BREADTH_UNBOUND",
+    "blocker_state": "OPEN",
+    "module_b_pass_allowed": false,
+    "final_binding_allowed": false,
+    "final_checkpoint_allowed": false,
+    "reopen_requires_new_authoritative_carrier": true,
+    "valid_new_authoritative_carrier_types": [
+      "exact historical final-scorer source or executable",
+      "same-date raw breadth -> breadth component score authoritative historical row(s)",
+      "breadth component score -> final/total score authoritative historical row(s)",
+      "multiple authoritative historical I/O rows sufficient to uniquely determine the mapping"
+    ],
+    "recovery_order_after_reopen": [
+      "provenance_and_hash",
+      "behavior_identity",
+      "finite_candidate_uniqueness_test_if_identifiable",
+      "final_binding_and_checkpoint"
+    ],
+    "prohibited_without_new_carrier": [
+      "normalization formula enumeration",
+      "clipping guesses",
+      "candidate breadth fitting to historical scorer",
+      "repeat of already-completed GitHub/Library/Gmail/Drive field searches",
+      "repeat of V3.2-V3.10 Daily Base lineage",
+      "use of prior assistant descriptions as historical evidence"
+    ]
+  }
+}

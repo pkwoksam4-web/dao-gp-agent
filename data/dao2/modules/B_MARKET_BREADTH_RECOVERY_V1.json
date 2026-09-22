@@ -1,0 +1,45 @@
+{
+  "artifact": "DAO2_B_MARKET_BREADTH_RECOVERY_V1",
+  "version": "1.2",
+  "module_id": "B",
+  "status": "RAW_HISTORICAL_EXECUTABLE_RECOVERED_FINAL_MAPPING_MISSING",
+  "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
+  "historical_source": {
+    "archive_name": "v11_offline_backtest_v3_10.zip",
+    "library_path": "/倒/v11_offline_backtest_v3_10.zip",
+    "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "source_file": "src/run_panel_backtest.py",
+    "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+    "market_breadth_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "historically_materialized_and_archive_hash_verified": true,
+    "raw_bytes_currently_materializable": true,
+    "current_recovery_copy_file_id": "file_00000000fd208206b76b9cd1e1dd43ba",
+    "package_manifest_sha256": "fa7fe8d4856a1a9140d7c3171c315cd0f2ec0a90ac4946b8c18940507f19aad8",
+    "source_artifact": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json"
+  },
+  "recovered_behavior": {
+    "outputs": [
+      "adv_all",
+      "dec_all",
+      "flat_all",
+      "adv_ratio_all",
+      "eligible-universe analogues",
+      "median cross-sectional return"
+    ],
+    "regime_rule": "HOT if adv_all>3000; NEUTRAL if adv_all>=1000; otherwise COLD",
+    "exact_raw_aggregation_recovered": true,
+    "behavior_reverse_check": "PASS"
+  },
+  "unrecovered": [
+    "exact final Market Breadth/Diffusion normalization",
+    "exact final Market Breadth/Diffusion clipping",
+    "exact conversion to final 4% GP V1.0 factor score or an authoritative executable proving equivalent final semantics"
+  ],
+  "candidate_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1.json",
+  "candidate_binding_allowed_to_close_historical_blocker": false,
+  "blocker_closed": false,
+  "blocker": "MARKET_BREADTH_UNBOUND",
+  "raw_historical_breadth_identity_closed": true,
+  "final_historical_factor_identity_closed": false
+}

@@ -1,0 +1,45 @@
+{
+  "artifact": "DAO2_B_MARKET_PACKAGE_DISCOVERY_V1",
+  "version": "1.0",
+  "as_of": "2026-09-20",
+  "primary_task": "MARKET_BREADTH_UNBOUND",
+  "benchmark": {
+    "status": "PASS_SUBCOMPONENT",
+    "candidate_only": true,
+    "historical_gp_v11_recovery": false,
+    "definition": {
+      "name": "CSI All Share",
+      "local_name": "中证全指",
+      "code": "000985",
+      "source": "Eastmoney historical daily kline endpoint",
+      "formal_window": ["2020-06-01", "2026-04-17"],
+      "expected_calendar_n": 1426,
+      "same_session_close_usable_before_1500": false
+    },
+    "verified_checkpoint": "data/dao2/modules/B_MARKET_BENCHMARK_CHECKPOINT_V1.json",
+    "workflow_run_id": 35493957183,
+    "artifact_id": 10599722775,
+    "artifact_zip_sha256": "9cbfccb5a35aec7b84394897574a9a08db70ddea32863b7e69ca9624f1b4f77e",
+    "replay_required_on_module_branch": false
+  },
+  "breadth": {
+    "status": "HISTORICAL_IDENTITY_RECOVERY_ACTIVE",
+    "blocker": "MARKET_BREADTH_UNBOUND",
+    "historical_checkpoint": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json",
+    "historical_function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "historical_source_file": "src/run_panel_backtest.py",
+    "known_historical_outputs": [
+      "adv_all",
+      "dec_all",
+      "flat_all",
+      "adv_ratio_all",
+      "eligible-universe analogues",
+      "median cross-sectional return"
+    ],
+    "candidate_breadth_status": "SEPARATE_VERIFIED_CANDIDATE_NOT_HISTORICAL_IDENTITY",
+    "close_condition": "Recover exact aggregation + normalization + clipping + final 4% mapping, or sufficiently authoritative historical executable identity."
+  },
+  "market_package_ready": false,
+  "closed_blockers": ["MARKET_BENCHMARK_UNBOUND"],
+  "blockers": ["MARKET_BREADTH_UNBOUND"]
+}

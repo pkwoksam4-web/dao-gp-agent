@@ -1,0 +1,128 @@
+{
+  "artifact": "DAO2_B_MARKET_BREADTH_PACKAGE_LINEAGE_AUDIT_V1",
+  "version": "1.0",
+  "module_id": "B",
+  "status": "PASS_LINEAGE_AUDIT_FINAL_MAPPING_NOT_PRESENT",
+  "audited_packages": [
+    {
+      "version": "V3.2",
+      "archive_sha256": "71c242fc19822e32a994f53a677735518d855a446765b0b0bd6c3171fa2adbea",
+      "archive_size": 45293,
+      "run_panel_sha256": "23a3361e5c616c9696cac8992a9d65acaf34a208b548d1293b6c7912f1e3e079",
+      "function_lines": [
+        427,
+        444
+      ]
+    },
+    {
+      "version": "V3.3",
+      "archive_sha256": "330bca45bdf6358a55148d37a96fe89a50290f9b6789e6780e11edc5edcc4e12",
+      "archive_size": 65818,
+      "run_panel_sha256": "194328dc103ed90827cad1ca77d7a712012b18ecd498c548c3f9940d530562b7",
+      "function_lines": [
+        597,
+        614
+      ]
+    },
+    {
+      "version": "V3.4",
+      "archive_sha256": "d320a0cf3b7378e3d1919a323af227c45c91810f48df32255e94d371da1d5bba",
+      "archive_size": 84632,
+      "run_panel_sha256": "c34b59f88c7d534b583988cd962cf74d845958afec52dabfb9f9400eb2549d5e",
+      "function_lines": [
+        601,
+        618
+      ]
+    },
+    {
+      "version": "V3.5",
+      "archive_sha256": "3b82e3f004f0991c4c2d841e1d6905eee102c5274f7c6b8b5a430f845492cda8",
+      "archive_size": 265652,
+      "run_panel_sha256": "c34b59f88c7d534b583988cd962cf74d845958afec52dabfb9f9400eb2549d5e",
+      "function_lines": [
+        601,
+        618
+      ]
+    },
+    {
+      "version": "V3.6",
+      "archive_sha256": "d3b521126329a504c85ca5d4ccbbe59dd5fec8a0a73089ab462eb355f5156d9a",
+      "archive_size": 286525,
+      "run_panel_sha256": "e35093b96afad6d2c4026da66b4dfa4954a8bfbb31eb1f640036aab89a0ef2af",
+      "function_lines": [
+        601,
+        618
+      ]
+    },
+    {
+      "version": "V3.7",
+      "archive_sha256": "1e48012b9330288d4be23c0f1bab4b2851d932624eafa895dba632ba55b1998f",
+      "archive_size": 141777,
+      "run_panel_sha256": "969f17541d45d02df186eceebc122b50a913ee1943d77e585f9cd23c06534181",
+      "function_lines": [
+        615,
+        632
+      ]
+    },
+    {
+      "version": "V3.9",
+      "archive_sha256": "f5e60507102b6846a1ab2edaaa5bbe79b55ec9a44d6763ea3b6d0c61d3296b22",
+      "archive_size": 266220,
+      "run_panel_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+      "function_lines": [
+        617,
+        634
+      ],
+      "package_manifest_sha256": "6a5f51e772a1c2f3f87e271d387bba07bd837ecbe7389241d6cd6458bf146740"
+    },
+    {
+      "version": "V3.10",
+      "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "archive_size": 1301865,
+      "run_panel_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+      "function_lines": [
+        617,
+        634
+      ],
+      "package_manifest_sha256": "fa7fe8d4856a1a9140d7c3171c315cd0f2ec0a90ac4946b8c18940507f19aad8"
+    }
+  ],
+  "invariant": {
+    "function_name": "market_breadth_daily",
+    "function_source_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "function_source_bytes_without_final_lf": 1150,
+    "exact_same_source_across_all_audited_versions": true,
+    "first_verified_version": "V3.2",
+    "last_verified_version": "V3.10"
+  },
+  "downstream_usage_audit": {
+    "direct_calls": "Across audited packages, market_breadth_daily(panel) is called to write market_breadth_daily.csv; normalized runners do the same.",
+    "adv_ratio_all_downstream_score_references": 0,
+    "adv_ratio_eligible_downstream_score_references": 0,
+    "score_weight_normalize_clip_mapping_references_for_market_breadth": 0,
+    "historical_streaming_implementation_role": "V3.7+ reconstructs the same raw breadth outputs and has an exact equivalence test; it does not map breadth into final factor score.",
+    "conclusion": "No audited V3.2-V3.10 package contains a downstream Market Breadth/Diffusion normalization, clipping, factor weighting or final 4% mapping."
+  },
+  "scope_documents": {
+    "stable_statements": [
+      "README_PANEL_CN: market_breadth_daily.csv is Daily-layer directly computable breadth and only a partial state.",
+      "README_PANEL_CN: Daily Base Layer only; Market Regime, Sector RS/Breadth, fund direction, Event Shock and 15/60m Execution must be added incrementally later.",
+      "README_CN: Daily structure layer only; Market Regime, Sector RS/Breadth, fund direction, 15/60m execution and Event Shock score not merged.",
+      "DATA_SOURCE_VALIDATION (V3.3+): add Market Regime -> Sector RS/Breadth -> fund -> Event Shock -> 15/60m Execution only after Base passes."
+    ],
+    "interpretation": "The absence of final 4% mapping is an explicit package-scope boundary, not merely a failed text search."
+  },
+  "blocker_effect": {
+    "raw_historical_breadth_identity": "PASS_SUBCOMPONENT",
+    "MARKET_BREADTH_UNBOUND": "REMAINS_OPEN",
+    "remaining_search_scope": [
+      "historical carrier outside V3.2-V3.10 Daily Base package lineage",
+      "separate final 12-factor scorer/parameter package",
+      "serialized/compiled executable proving normalization, clipping and final 4% mapping",
+      "historical output artifact whose input/output behavior uniquely identifies final mapping"
+    ]
+  },
+  "candidate_breadth_promoted": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
