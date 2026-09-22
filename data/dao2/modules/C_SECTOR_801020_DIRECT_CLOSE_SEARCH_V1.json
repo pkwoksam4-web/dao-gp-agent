@@ -246,6 +246,43 @@
       "admission_use": "Use target rows plus neighboring exact overlap; hash the exported file.",
       "current_access": "NO_DIRECT_WIND_OR_IFIND_CONNECTOR_IN_CURRENT_CHAT",
       "manual_action_if_used": "Export raw historical index rows from Wind/iFind and provide the file."
+    },
+    {
+      "provider": "Founder Securities DataCube",
+      "identity_evidence": "Official DataCube index_basic documentation lists 801020.SI=采掘, market=SW, publisher=申万, 一级行业指数, base_date=19991230. Official aindex_daily/AIndexEODPrices documentation exposes code/trade_dt/preclose/open/high/low/close for index daily history.",
+      "official_docs": [
+        "https://datacube.foundersc.com/document/2?doc_id=94",
+        "https://datacube.foundersc.com/document/2?doc_id=10284"
+      ],
+      "required_query": {
+        "interface": "aindex_daily",
+        "code": "801020.SI",
+        "start_date": "20210802",
+        "end_date": "20211027",
+        "fields": [
+          "code",
+          "trade_dt",
+          "preclose",
+          "open",
+          "high",
+          "low",
+          "close"
+        ]
+      },
+      "minimum_admission_dates": [
+        "20210805",
+        "20210806",
+        "20210809",
+        "20210930",
+        "20211008",
+        "20211011",
+        "20211021",
+        "20211022",
+        "20211025"
+      ],
+      "admission_use": "Extract target rows only after neighboring rows exact-match the frozen anchors; preserve the original vendor export bytes and SHA256.",
+      "current_access": "NO_DCUBE_TOKEN_OR_REPO_CONFIGURATION_FOUND",
+      "manual_action_if_used": "Use an authorized DataCube account/token to export the requested 801020.SI rows. Do not supply credentials in chat; provide the original export file."
     }
   ],
   "governance": {
@@ -260,5 +297,44 @@
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false,
     "invariant": "DERIVED_CLOSE evidence MUST NOT expand admissible coverage until C_SECTOR_REBUILD_CONTRACT_V1, verifier, tests and governance guard are explicitly migrated."
+  },
+  "manual_intervention": {
+    "required": true,
+    "reason": "All currently accessible public/connected raw-close routes are exhausted or lack target-date coverage. Remaining authoritative carriers require an authorized vendor login/export.",
+    "acceptable_providers": [
+      "Wind",
+      "iFind",
+      "RiceQuant RQData",
+      "Founder Securities DataCube",
+      "Tushare sw_daily with sufficient entitlement"
+    ],
+    "minimum_export_dates": [
+      "20210805",
+      "20210806",
+      "20210809",
+      "20210930",
+      "20211008",
+      "20211011",
+      "20211021",
+      "20211022",
+      "20211025"
+    ],
+    "required_fields": [
+      "code",
+      "trade_date",
+      "open",
+      "high",
+      "low",
+      "close"
+    ],
+    "optional_fields": [
+      "pre_close"
+    ],
+    "preserve_original_bytes": true,
+    "target_rows": [
+      "801020.SI/20210806",
+      "801020.SI/20211008",
+      "801020.SI/20211022"
+    ]
   }
 }
