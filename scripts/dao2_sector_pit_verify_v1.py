@@ -174,6 +174,12 @@ def validate_series(
         if not str(row["source_provider"]).strip():
             errors.append(f"row_{index}:missing_source_provider")
 
+        provenance_type = str(row.get("provenance_type") or "").strip().upper()
+        if provenance_type == "DERIVED_CLOSE":
+            errors.append(f"row_{index}:derived_close_not_admitted")
+        elif provenance_type and provenance_type != "RAW_CLOSE":
+            errors.append(f"row_{index}:unknown_provenance_type:{provenance_type}")
+
     missing_keys = sorted(expected_keys - observed)
     if missing_keys:
         errors.append(f"missing_required_sector_dates:{len(missing_keys)}")
@@ -189,6 +195,8 @@ def validate_series(
             for code, date in missing_keys[:20]
         ],
         "no_forward_fill_proven": not any("fill_method" in err or "source_trade_date" in err for err in errors),
+        "derived_close_admitted": False,
+        "derived_close_rows_rejected": sum("derived_close_not_admitted" in err for err in errors),
         "full_coverage": not missing_keys,
         "errors": errors,
     }
