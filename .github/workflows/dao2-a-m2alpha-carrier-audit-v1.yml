@@ -1,0 +1,138 @@
+name: DAO2 A M2Alpha Carrier Audit V1
+
+on:
+  push:
+    branches: [gp/dao2-a-main-net-flow]
+    paths:
+      - .github/workflows/dao2-a-m2alpha-carrier-audit-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install
+        run: python -m pip install --quiet pandas pyarrow requests
+
+      - name: Audit fixed public parquet
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, io, json
+          from decimal import Decimal, InvalidOperation
+          import pandas as pd, requests
+
+          SRC_REPO="Johnny-xuan/M2-Alpha"
+          SRC_COMMIT="e587b95a33de0c628f683914c4eb2fc5ed1d205e"
+          SRC_PATH="build/cache/panel.parquet"
+          SRC_BLOB="49867646ea659a87333ad1c09f92d13c5e8bd78a"
+          URL=f"https://raw.githubusercontent.com/{SRC_REPO}/{SRC_COMMIT}/{SRC_PATH}"
+          JCOMMIT="6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          REQUIRED=["ts_code","trade_date","buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount"]
+          EXTRA=["buy_sm_amount","buy_md_amount","sell_sm_amount","sell_md_amount","net_mf_amount"]
+          TARGETS=[
+            ("600306.SH","20200608"),("600898.SH","20201104"),("603996.SH","20210224"),
+            ("002618.SZ","20210923"),("000020.SZ","20210924"),("000157.SZ","20210924"),
+            ("000592.SZ","20210924"),("000753.SZ","20210924"),("002684.SZ","20211125"),
+            ("600112.SH","20220506"),("000564.SZ","20230320"),("001337.SZ","20230320"),
+            ("002118.SZ","20230522"),("002157.SZ","20230522"),("002503.SZ","20230522"),
+            ("002504.SZ","20230522")
+          ]
+          out={
+            "artifact":"DAO2_A_M2ALPHA_CARRIER_AUDIT_V1",
+            "source":{"repository":SRC_REPO,"commit":SRC_COMMIT,"path":SRC_PATH,"blob_sha":SRC_BLOB},
+            "admissible_rows":0,
+            "source_identity_pass":False,
+          }
+          try:
+            r=requests.get(URL,timeout=120); r.raise_for_status()
+            raw=r.content
+            out["raw_bytes"]=len(raw)
+            out["raw_sha256"]=hashlib.sha256(raw).hexdigest()
+            df=pd.read_parquet(io.BytesIO(raw))
+            out["rows"]=int(len(df))
+            out["columns"]=[str(c) for c in df.columns]
+            out["required_fields_present"]=[c for c in REQUIRED if c in df.columns]
+            out["missing_required_fields"]=[c for c in REQUIRED if c not in df.columns]
+            if out["missing_required_fields"]:
+                out["status"]="REJECT_PROCESSED_CARRIER_MISSING_EXACT_FIELDS"
+            else:
+                d=df.copy()
+                d["ts_code"]=d["ts_code"].astype(str)
+                d["trade_date"]=d["trade_date"].astype(str).str.replace("-","",regex=False).str.replace(".0","",regex=False)
+                dates=sorted(set(d["trade_date"]))
+                out["min_date"]=dates[0] if dates else None
+                out["max_date"]=dates[-1] if dates else None
+                hits=[]
+                for s,dt in TARGETS:
+                    z=d[(d["ts_code"]==s)&(d["trade_date"]==dt)]
+                    if len(z):
+                        hits.extend(z[REQUIRED+[c for c in EXTRA if c in d.columns]].to_dict("records"))
+                out["target_hits"]=hits
+                out["target_hit_count"]=len(hits)
+
+                # Identity gate: sample up to 50 rows across >=5 dates / >=3 years if available.
+                years={}
+                for dt in dates:
+                    years.setdefault(dt[:4],[]).append(dt)
+                sample_dates=[]
+                for y in sorted(years):
+                    sample_dates.append(years[y][len(years[y])//2])
+                for dt in dates:
+                    if len(sample_dates)>=5: break
+                    if dt not in sample_dates: sample_dates.append(dt)
+                sample_dates=sample_dates[:max(5,min(len(sample_dates),8))]
+                sample=d[d["trade_date"].isin(sample_dates)].head(50)
+                cmp=[c for c in REQUIRED+EXTRA if c in d.columns]
+                mismatches=[]; overlap=0
+                for dt,g in sample.groupby("trade_date"):
+                    jr=requests.get(
+                      f"https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/{JCOMMIT}/data/moneyflow/{dt}.csv",
+                      timeout=60)
+                    if jr.status_code!=200: continue
+                    jd=pd.read_csv(io.BytesIO(jr.content),dtype={"ts_code":str,"trade_date":str})
+                    jd["trade_date"]=jd["trade_date"].astype(str).str.replace(".0","",regex=False)
+                    jm={(str(x.ts_code),str(x.trade_date)):x for _,x in jd.iterrows()}
+                    for _,x in g.iterrows():
+                        key=(str(x["ts_code"]),str(x["trade_date"]))
+                        y=jm.get(key)
+                        if y is None: continue
+                        overlap+=1
+                        dif={}
+                        for c in cmp:
+                            av=x[c]; bv=y[c]
+                            if c in ("ts_code","trade_date"):
+                                same=str(av)==str(bv)
+                            else:
+                                try: same=Decimal(str(av))==Decimal(str(bv))
+                                except Exception: same=str(av)==str(bv)
+                            if not same: dif[c]={"carrier":str(av),"jessica":str(bv)}
+                        if dif: mismatches.append({"key":key,"diffs":dif})
+                out["overlap_rows"]=overlap
+                out["mismatch_rows"]=len(mismatches)
+                out["mismatch_examples"]=mismatches[:10]
+                out["source_identity_pass"]=overlap>0 and not mismatches
+                out["status"]="IDENTITY_PASS" if out["source_identity_pass"] else "IDENTITY_FAIL_OR_NO_OVERLAP"
+          except Exception as e:
+            out["status"]="AUDIT_ERROR"; out["error"]=f"{type(e).__name__}: {e}"
+
+          canon=json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          out["content_sha256_without_hash_field"]=hashlib.sha256(canon.encode()).hexdigest()
+          open("dao2_a_m2alpha_carrier_audit_v1.json","w",encoding="utf-8").write(json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True)+"\n")
+          print(json.dumps({
+            "status":out.get("status"),"rows":out.get("rows"),"missing_required_fields":out.get("missing_required_fields"),
+            "target_hit_count":out.get("target_hit_count"),"overlap_rows":out.get("overlap_rows"),
+            "mismatch_rows":out.get("mismatch_rows"),"source_identity_pass":out.get("source_identity_pass"),
+            "raw_sha256":out.get("raw_sha256")
+          },ensure_ascii=False))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-m2alpha-carrier-audit-v1
+          path: dao2_a_m2alpha_carrier_audit_v1.json
+          retention-days: 30
+          if-no-files-found: error
