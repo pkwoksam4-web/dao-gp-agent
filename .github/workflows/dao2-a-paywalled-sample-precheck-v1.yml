@@ -236,15 +236,23 @@ jobs:
               # documented/public client UAs; no login or private credential.
               zip_bytes = None
               attempts = []
+              download_variants = []
               for dua in (ua, "pan.baidu.com", "LogStatistic", "netdisk;P2SP;2.2.60.26"):
+                  download_variants.append((dua, None, "no_manual_cookie"))
+                  download_variants.append((dua, f"BDCLND={randsk_raw}", "public_BDCLND_raw"))
+                  download_variants.append((dua, f"BDCLND={sekey}", "public_BDCLND_decoded"))
+              for dua, cookie_header, cookie_mode in download_variants:
                   dh = {
                       "User-Agent": dua,
                       "Referer": share_page,
                       "Range": "bytes=0-",
                   }
+                  if cookie_header:
+                      dh["Cookie"] = cookie_header
                   zr = requests.get(dlink, headers=dh, stream=False, timeout=60, allow_redirects=True)
                   attempts.append({
                       "user_agent": dua,
+                      "cookie_mode": cookie_mode,
                       "status": zr.status_code,
                       "bytes": len(zr.content),
                       "final_host": requests.utils.urlparse(zr.url).hostname,
