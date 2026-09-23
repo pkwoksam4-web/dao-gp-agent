@@ -603,5 +603,103 @@
       ],
       "inference": "Current independent evidence does not span the target date or lacks the target symbol file. Upstream/source-level absence is not yet proven."
     }
-  ]
+  ],
+  "jiu_generation_evidence": {
+    "repository": "Jiu-7131/BigDataVisualization",
+    "commit": "102c67acda5151545d54444199140bd869c49004",
+    "script_path": "源代码/数据获取.py",
+    "method": "for each code from stock_basic, call pro.moneyflow(ts_code=ts_code,start_date=20220101,end_date=20251231); write moneyflow/{ts_code}.csv only when returned DataFrame is non-empty",
+    "exact_tushare_api": true,
+    "source_window": "20220101-20251231",
+    "caution": "An absent symbol file can also reflect that the symbol is absent from the committed stock_basic universe or an API exception. Therefore absent symbol files alone are not treated as source-absence proof."
+  },
+  "adjacency_evidence": {
+    "000564.SZ/20230320": {
+      "path": "数据集/tushare_all_interfaces/moneyflow/000564_SZ.csv",
+      "blob_sha": "03546e6ca821ae4faf35766540c5e013c45b8776",
+      "target_present": false,
+      "nearest_before": "20230317",
+      "nearest_after": "20230321",
+      "five_before": [
+        "20230313",
+        "20230314",
+        "20230315",
+        "20230316",
+        "20230317"
+      ],
+      "five_after": [
+        "20230321",
+        "20230322",
+        "20230323",
+        "20230324",
+        "20230327"
+      ]
+    },
+    "001337.SZ/20230320": {
+      "path": "数据集/tushare_all_interfaces/moneyflow/001337_SZ.csv",
+      "blob_sha": "0636b1df663588d3f01563f2a2a9e6d042bd1df5",
+      "target_present": false,
+      "nearest_before": "20230317",
+      "nearest_after": "20230321",
+      "five_before": [
+        "20230313",
+        "20230314",
+        "20230315",
+        "20230316",
+        "20230317"
+      ],
+      "five_after": [
+        "20230321",
+        "20230322",
+        "20230323",
+        "20230324",
+        "20230327"
+      ]
+    },
+    "002157.SZ/20230522": {
+      "path": "数据集/tushare_all_interfaces/moneyflow/002157_SZ.csv",
+      "blob_sha": "8608ad5bca63e084519829a5b79ab251903ba373",
+      "target_present": false,
+      "nearest_before": "20230519",
+      "nearest_after": "20230523",
+      "five_before": [
+        "20230515",
+        "20230516",
+        "20230517",
+        "20230518",
+        "20230519"
+      ],
+      "five_after": [
+        "20230523",
+        "20230524",
+        "20230525",
+        "20230526",
+        "20230529"
+      ]
+    }
+  },
+  "jiu_stock_basic_evidence": {
+    "blob_sha": "8f106c6e08ae00b6f2d32360230189c80d874883",
+    "present_target_symbols": [
+      "000020.SZ",
+      "000157.SZ",
+      "000592.SZ",
+      "000753.SZ",
+      "000564.SZ",
+      "001337.SZ",
+      "002157.SZ"
+    ],
+    "absent_target_symbols": [
+      "600306.SH",
+      "600898.SH",
+      "603996.SH",
+      "002618.SZ",
+      "002684.SZ",
+      "600112.SH",
+      "002118.SZ",
+      "002503.SZ",
+      "002504.SZ"
+    ],
+    "interpretation": "Only symbols present in this committed stock_basic universe were guaranteed to be iterated by the moneyflow collection step."
+  }
 }
