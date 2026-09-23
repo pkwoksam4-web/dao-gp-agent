@@ -232,12 +232,35 @@ jobs:
               if not isinstance(dlink, str) or not dlink:
                   fail(f"api/sharedownload returned no dlink keys={sorted(dj.keys())}")
 
-              zr = sess.get(dlink, stream=False, timeout=60, allow_redirects=True)
-              out["sample_download_http_status"] = zr.status_code
-              out["sample_download_bytes"] = len(zr.content)
-              if zr.status_code != 200 or not zr.content.startswith(b"PK"):
-                  fail(f"sample zip download failed status={zr.status_code} bytes={len(zr.content)}")
-              zip_bytes = zr.content
+              # Baidu CDN enforces User-Agent policy on dlinks. Try only normal
+              # documented/public client UAs; no login or private credential.
+              zip_bytes = None
+              attempts = []
+              for dua in (ua, "pan.baidu.com", "LogStatistic", "netdisk;P2SP;2.2.60.26"):
+                  dh = {
+                      "User-Agent": dua,
+                      "Referer": share_page,
+                      "Range": "bytes=0-",
+                  }
+                  zr = requests.get(dlink, headers=dh, stream=False, timeout=60, allow_redirects=True)
+                  attempts.append({
+                      "user_agent": dua,
+                      "status": zr.status_code,
+                      "bytes": len(zr.content),
+                      "final_host": requests.utils.urlparse(zr.url).hostname,
+                      "body_prefix": (
+                          zr.content[:160].decode("utf-8", errors="replace")
+                          if zr.status_code != 200 else None
+                      ),
+                  })
+                  if zr.status_code == 200 and zr.content.startswith(b"PK"):
+                      zip_bytes = zr.content
+                      break
+              out["sample_download_attempts"] = attempts
+              if zip_bytes is None:
+                  fail("sample zip dlink returned no downloadable ZIP under public-client UAs")
+              out["sample_download_http_status"] = 200
+              out["sample_download_bytes"] = len(zip_bytes)
               open(zip_name, "wb").write(zip_bytes)
               out["sample_zip_sha256"] = hashlib.sha256(zip_bytes).hexdigest()
 
