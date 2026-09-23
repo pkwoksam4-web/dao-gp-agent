@@ -366,6 +366,22 @@
       "commit": "82e9180cbd842809baf506b3037d4d19363bd0eb",
       "result": "REJECT_NO_PUBLIC_CARRIER_BYTES",
       "reason": "Reports reference local DuckDB/warehouse only; no committed database/release/blob."
+    },
+    {
+      "carrier": "henrylin99/screener-offline-data",
+      "commit": "6347c05e8619a9e132dfdab9f507c36e31842b8a",
+      "path": "data.parquet",
+      "blob_sha": "73df5cefc343a1622b7a50a9e98fb50e153d13c2",
+      "result": "REJECT_IDENTITY_FAIL_OR_INSUFFICIENT",
+      "audit_run": 35839083895,
+      "artifact_id": 10740122533,
+      "artifact_digest": "sha256:404d2c8618c0dac2b9981a19092ace91a3c9fa621a40073074505b0ca4fe6e5b",
+      "rows": 5484,
+      "date_range": "20260521 only",
+      "overlap_rows": 10,
+      "mismatch_rows": 0,
+      "target_hits": 0,
+      "reason": "Actual public parquet and sampled rows are exact-looking, but only one 2026 date is present; identity breadth gate not met and no residual date is covered."
     }
   ],
   "historical_l2_private_carriers": {
@@ -387,5 +403,6 @@
       "authorization": "Hugging Face gated, manual review, academic/non-commercial"
     },
     "interpretation": "Exact reconstruction is testable for a subset, especially Shenzhen/2023, but exact Tushare equivalence is not proven until Jessica-known four-field reconstruction reaches 100% exact match."
-  }
+  },
+  "source_absence_matrix": "data/dao2/modules/A_SOURCE_ABSENCE_MATRIX_V1.json"
 }
