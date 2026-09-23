@@ -15,18 +15,19 @@ jobs:
   precheck:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect public Baidu sample share without login
+      - name: Retrieve public Baidu sample without login
         shell: bash
         run: |
           python - <<'PY'
-          import hashlib, json, os, time
-          from urllib.parse import quote
+          import hashlib, json, os, re, zipfile
+          from urllib.parse import quote, unquote
           import requests
 
           share_url = "https://pan.baidu.com/s/154fXqZgOaiCKXkyBjT95QA?pwd=hhc5"
           surl = "54fXqZgOaiCKXkyBjT95QA"
           pwd = "hhc5"
-          target_name = "moneyflow__sample_50rows.parquet"
+          zip_name = "moneyflow_sample.zip"
+          parquet_name = "moneyflow__sample_50rows.parquet"
           sess = requests.Session()
           ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
           headers = {"User-Agent": ua, "Referer": share_url, "Accept": "application/json, text/plain, */*"}
@@ -37,57 +38,59 @@ jobs:
               "product": "Tushare moneyflow 完整历史数据",
               "price_cny": 50,
               "sample_share_url": share_url,
-              "sample_filename": target_name,
+              "sample_zip_filename": zip_name,
+              "sample_parquet_filename": parquet_name,
               "login_used": False,
               "private_credentials_used": False,
           }
 
+          def safe_json(resp, limit=1000):
+              try:
+                  return resp.json()
+              except Exception:
+                  return {"raw_prefix": resp.text[:limit]}
+
           try:
-              # Public share metadata; no login/private credential.
+              # Public share metadata.
               iurl = (
                   f"https://pan.baidu.com/api/shorturlinfo?shorturl=1{surl}"
                   "&web=5&app_id=250528&channel=chunlei&clienttype=5"
               )
               ir = sess.get(iurl, headers=headers, timeout=20)
+              ij = safe_json(ir)
               out["shorturlinfo_http_status"] = ir.status_code
-              try:
-                  ij = ir.json()
-              except Exception:
-                  ij = {"raw_prefix": ir.text[:1000]}
               out["shorturlinfo"] = ij
 
+              # Public extraction-code verification; no account credential.
               vurl = f"https://pan.baidu.com/share/verify?surl={quote(surl)}&pwd={quote(pwd)}"
-              vr = sess.post(vurl, data={"pwd": pwd, "vcode": "", "vcode_str": ""},
-                             headers={**headers, "Content-Type": "application/x-www-form-urlencoded"}, timeout=20)
+              vr = sess.post(
+                  vurl,
+                  data={"pwd": pwd, "vcode": "", "vcode_str": ""},
+                  headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
+                  timeout=20,
+              )
+              vj = safe_json(vr)
               out["verify_http_status"] = vr.status_code
-              try:
-                  vj = vr.json()
-              except Exception:
-                  vj = {"raw_prefix": vr.text[:500]}
-              out["verify_response"] = vj
-              randsk = vj.get("randsk", "") if isinstance(vj, dict) else ""
-              if randsk:
-                  sess.cookies.set("BDCLND", randsk, domain=".baidu.com")
-                  headers["Cookie"] = f"BDCLND={randsk}"
+              out["verify_errno"] = vj.get("errno") if isinstance(vj, dict) else None
+              if not isinstance(vj, dict) or vj.get("errno") != 0:
+                  raise RuntimeError(f"share verify failed: {vj}")
+              randsk = vj.get("randsk", "")
+              if not randsk:
+                  raise RuntimeError("share verify returned no randsk")
+              sess.cookies.set("BDCLND", randsk, domain=".baidu.com")
+              headers["Cookie"] = f"BDCLND={randsk}"
 
+              # Root list.
               lurl = (
                   "https://pan.baidu.com/share/list?web=1&page=1&num=1000&order=time&desc=1"
                   f"&showempty=0&shorturl={quote(surl)}&root=1&clienttype=0"
               )
               lr = sess.get(lurl, headers=headers, timeout=20)
+              lj = safe_json(lr)
               out["list_http_status"] = lr.status_code
-              try:
-                  lj = lr.json()
-              except Exception:
-                  lj = {"raw_prefix": lr.text[:1000]}
-              if isinstance(lj, dict):
-                  out["list_errno"] = lj.get("errno")
-                  out["list_errmsg"] = lj.get("errmsg")
-                  items = lj.get("list") or []
-              else:
-                  items = []
+              out["list_errno"] = lj.get("errno") if isinstance(lj, dict) else None
+              items = (lj.get("list") or []) if isinstance(lj, dict) else []
               sanitized = []
-              out["root_item_raw_keys"] = [sorted(list(x.keys())) for x in items if isinstance(x, dict)]
               for item in items:
                   if not isinstance(item, dict):
                       continue
@@ -98,15 +101,122 @@ jobs:
                       "size": item.get("size"),
                       "fs_id": item.get("fs_id"),
                       "md5": item.get("md5"),
-                      "shareid": item.get("shareid"),
-                      "uk": item.get("uk"),
-                      "dlink": item.get("dlink"),
                       "server_mtime": item.get("server_mtime"),
                   })
               out["root_items"] = sanitized
-              out["target_root_matches"] = [x for x in sanitized if x.get("server_filename") == target_name]
-              out["target_found_root"] = bool(out["target_root_matches"])
-              out["status"] = "PUBLIC_SAMPLE_SHARE_LISTED" if out.get("list_errno") == 0 else "PUBLIC_SAMPLE_SHARE_LIST_FAILED"
+              zips = [x for x in items if isinstance(x, dict) and x.get("server_filename") == zip_name]
+              if len(zips) != 1:
+                  raise RuntimeError(f"expected exactly one {zip_name}, got {len(zips)}")
+              item = zips[0]
+              fs_id = item.get("fs_id")
+              if not fs_id:
+                  raise RuntimeError("sample zip has no fs_id")
+
+              # Fetch the verified public share page and parse its download signing metadata.
+              page_headers = {
+                  "User-Agent": ua,
+                  "Referer": "https://pan.baidu.com/",
+                  "Cookie": f"BDCLND={randsk}",
+                  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              }
+              pr = sess.get(f"https://pan.baidu.com/s/1{surl}", headers=page_headers, timeout=30)
+              out["share_page_http_status"] = pr.status_code
+              page = pr.text
+              meta = None
+              for pat in (
+                  r'yunData\.setData\((\{.+?\})\);',
+                  r'locals\.mset\((\{.+?\})\);',
+              ):
+                  m = re.search(pat, page, re.S)
+                  if m:
+                      try:
+                          meta = json.loads(m.group(1))
+                          break
+                      except Exception:
+                          pass
+              if not isinstance(meta, dict):
+                  # Fallback to directly embedded fields.
+                  def grab(pattern):
+                      mm = re.search(pattern, page)
+                      return mm.group(1) if mm else None
+                  meta = {
+                      "shareid": grab(r'"shareid"\s*:\s*"?([0-9]+)"?'),
+                      "uk": grab(r'"(?:share_uk|uk)"\s*:\s*"?([0-9]+)"?'),
+                      "sign": grab(r'"sign"\s*:\s*"([^"]+)"'),
+                      "timestamp": grab(r'"timestamp"\s*:\s*"?([0-9]+)"?'),
+                  }
+
+              longurl = (ij.get("longurl") or "") if isinstance(ij, dict) else ""
+              sid_m = re.search(r'(?:^|&)shareid=([0-9]+)', longurl)
+              uk_m = re.search(r'(?:^|&)uk=([0-9]+)', longurl)
+              shareid = str(meta.get("shareid") or (sid_m.group(1) if sid_m else ""))
+              uk = str(meta.get("uk") or meta.get("share_uk") or (uk_m.group(1) if uk_m else ""))
+              sign = str(meta.get("sign") or "")
+              timestamp = str(meta.get("timestamp") or "")
+              out["download_metadata"] = {
+                  "shareid": shareid,
+                  "uk": uk,
+                  "sign_present": bool(sign),
+                  "timestamp": timestamp,
+                  "fs_id": fs_id,
+              }
+              if not all((shareid, uk, sign, timestamp)):
+                  raise RuntimeError("verified public page did not expose complete sign/timestamp/share metadata")
+
+              # Standard public-share download endpoint. No BDUSS/STOKEN/private cookie.
+              dlapi = (
+                  "https://pan.baidu.com/api/sharedownload?app_id=250528&channel=chunlei"
+                  f"&clienttype=12&sign={quote(sign, safe='')}&timestamp={quote(timestamp)}&web=1"
+              )
+              post = {
+                  "encrypt": "0",
+                  "extra": json.dumps({"sekey": unquote(randsk)}, ensure_ascii=False),
+                  "fid_list": f"[{fs_id}]",
+                  "primaryid": shareid,
+                  "uk": uk,
+                  "product": "share",
+                  "type": "nolimit",
+              }
+              dr = sess.post(dlapi, data=post, headers=page_headers, timeout=30)
+              dj = safe_json(dr, limit=2000)
+              out["sharedownload_http_status"] = dr.status_code
+              out["sharedownload_errno"] = dj.get("errno") if isinstance(dj, dict) else None
+              dlist = (dj.get("list") or []) if isinstance(dj, dict) else []
+              dlink = dlist[0].get("dlink") if dlist and isinstance(dlist[0], dict) else None
+              out["dlink_present"] = bool(dlink)
+              if not dlink:
+                  out["sharedownload_response_sanitized"] = {
+                      k: v for k, v in (dj.items() if isinstance(dj, dict) else [])
+                      if k not in {"list"}
+                  }
+                  raise RuntimeError(f"sharedownload did not return dlink; errno={out['sharedownload_errno']}")
+
+              # Resolve/download the small public sample. Do not use any private credential.
+              dl_headers = {"User-Agent": "LogStatistic", "Referer": share_url}
+              zr = requests.get(dlink, headers=dl_headers, timeout=60, allow_redirects=True)
+              out["sample_download_http_status"] = zr.status_code
+              out["sample_download_bytes"] = len(zr.content)
+              out["sample_download_final_host"] = requests.utils.urlparse(zr.url).hostname
+              if zr.status_code != 200 or not zr.content.startswith(b"PK"):
+                  raise RuntimeError(
+                      f"sample zip download failed status={zr.status_code} bytes={len(zr.content)}"
+                  )
+              open(zip_name, "wb").write(zr.content)
+              out["sample_zip_sha256"] = hashlib.sha256(zr.content).hexdigest()
+
+              with zipfile.ZipFile(zip_name, "r") as zf:
+                  names = zf.namelist()
+                  out["sample_zip_members"] = names
+                  candidates = [n for n in names if n.endswith(parquet_name)]
+                  if len(candidates) != 1:
+                      raise RuntimeError(f"expected one {parquet_name} in zip, got {candidates}")
+                  raw = zf.read(candidates[0])
+                  open(parquet_name, "wb").write(raw)
+                  out["sample_parquet_internal_path"] = candidates[0]
+                  out["sample_parquet_bytes"] = len(raw)
+                  out["sample_parquet_sha256"] = hashlib.sha256(raw).hexdigest()
+
+              out["status"] = "PUBLIC_SAMPLE_BYTES_RETRIEVED"
           except Exception as e:
               out["status"] = "PRECHECK_EXCEPTION"
               out["error"] = f"{type(e).__name__}: {e}"
@@ -117,11 +227,16 @@ jobs:
               json.dump(out,f,ensure_ascii=False,indent=2,sort_keys=True); f.write("\n")
           print(json.dumps({
               "status":out.get("status"),
-              "verify_errno":(out.get("verify_response") or {}).get("errno") if isinstance(out.get("verify_response"),dict) else None,
+              "verify_errno":out.get("verify_errno"),
               "list_errno":out.get("list_errno"),
-              "target_found_root":out.get("target_found_root"),
-              "root_item_count":len(out.get("root_items") or []),
-              "sha256":out.get("content_sha256_without_hash_field"),
+              "sign_present":out.get("download_metadata",{}).get("sign_present"),
+              "sharedownload_errno":out.get("sharedownload_errno"),
+              "dlink_present":out.get("dlink_present"),
+              "sample_download_http_status":out.get("sample_download_http_status"),
+              "sample_download_bytes":out.get("sample_download_bytes"),
+              "sample_zip_sha256":out.get("sample_zip_sha256"),
+              "sample_parquet_sha256":out.get("sample_parquet_sha256"),
+              "error":out.get("error"),
           },ensure_ascii=False))
           PY
 
@@ -129,6 +244,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dao2-a-paywalled-sample-precheck-v1
-          path: dao2_a_paywalled_sample_precheck_v1.json
-          if-no-files-found: error
+          path: |
+            dao2_a_paywalled_sample_precheck_v1.json
+            moneyflow_sample.zip
+            moneyflow__sample_50rows.parquet
+          if-no-files-found: warn
           retention-days: 30
