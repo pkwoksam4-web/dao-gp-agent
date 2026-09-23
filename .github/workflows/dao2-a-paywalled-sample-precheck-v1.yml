@@ -184,89 +184,111 @@ jobs:
                   "uk": uk,
               }
 
-              # Current anonymous public-share download request.
-              payload = {
-                  "product": "share",
-                  "encrypt": "0",
-                  "uk": str(uk),
-                  "primaryid": str(shareid),
-                  "fid_list": json.dumps([fs_id]),
-                  "extra": json.dumps({"sekey": sekey}),
-                  "type": "batch",
-              }
-              params = {
-                  "sign": sign,
-                  "timestamp": timestamp,
-                  "channel": "chunlei",
-                  "web": "1",
-                  "app_id": "250528",
-                  "clienttype": "0",
-                  "bdstoken": "",
-                  "logid": "",
-              }
-              dr = sess.post(
-                  "https://pan.baidu.com/api/sharedownload",
-                  params=params,
-                  data=payload,
-                  headers={
-                      "Referer": share_page,
-                      "Origin": "https://pan.baidu.com",
-                      "X-Requested-With": "XMLHttpRequest",
-                  },
-                  timeout=30,
-              )
-              dr.raise_for_status()
-              dj = dr.json()
-              out["sharedownload_errno"] = dj.get("errno")
-              if dj.get("errno") == -20:
-                  out["captcha_required"] = True
-                  fail("public sample download requires Baidu CAPTCHA")
-              if dj.get("errno") != 0:
-                  fail(f"api/sharedownload failed: errno={dj.get('errno')} msg={dj.get('show_msg')}")
-              dlink = dj.get("dlink")
-              if not isinstance(dlink, str) or not dlink:
-                  # Older shape fallback.
-                  dl = dj.get("list") or []
-                  if dl and isinstance(dl[0], dict):
-                      dlink = dl[0].get("dlink")
-              if not isinstance(dlink, str) or not dlink:
-                  fail(f"api/sharedownload returned no dlink keys={sorted(dj.keys())}")
+              # Request public-share dlinks through both current and legacy web shapes.
+              # Both use only the public extraction-code session, no account credential.
+              dlinks = []
+              sharedownload_attempts = []
 
-              # Baidu CDN enforces User-Agent policy on dlinks. Try only normal
-              # documented/public client UAs; no login or private credential.
+              def request_dlink(clienttype, type_value, shape_name):
+                  payload = {
+                      "product": "share",
+                      "encrypt": "0",
+                      "uk": str(uk),
+                      "primaryid": str(shareid),
+                      "fid_list": json.dumps([fs_id]),
+                      "extra": json.dumps({"sekey": sekey}),
+                      "type": type_value,
+                  }
+                  params = {
+                      "sign": sign,
+                      "timestamp": timestamp,
+                      "channel": "chunlei",
+                      "web": "1",
+                      "app_id": "250528",
+                      "clienttype": str(clienttype),
+                      "bdstoken": "",
+                      "logid": "",
+                  }
+                  resp = sess.post(
+                      "https://pan.baidu.com/api/sharedownload",
+                      params=params,
+                      data=payload,
+                      headers={
+                          "Referer": share_page,
+                          "Origin": "https://pan.baidu.com",
+                          "X-Requested-With": "XMLHttpRequest",
+                      },
+                      timeout=30,
+                  )
+                  resp.raise_for_status()
+                  jj = resp.json()
+                  dl = jj.get("dlink")
+                  if not isinstance(dl, str) or not dl:
+                      ll = jj.get("list") or []
+                      if ll and isinstance(ll[0], dict):
+                          dl = ll[0].get("dlink")
+                  sharedownload_attempts.append({
+                      "shape": shape_name,
+                      "clienttype": clienttype,
+                      "type": type_value,
+                      "errno": jj.get("errno"),
+                      "dlink_present": isinstance(dl, str) and bool(dl),
+                      "response_keys": sorted(jj.keys()),
+                  })
+                  if jj.get("errno") == -20:
+                      out["captcha_required"] = True
+                  if jj.get("errno") == 0 and isinstance(dl, str) and dl:
+                      dlinks.append((shape_name, dl))
+
+              request_dlink(0, "batch", "current_batch")
+              request_dlink(12, "nolimit", "legacy_nolimit")
+              out["sharedownload_attempts"] = sharedownload_attempts
+              out["sharedownload_errno"] = (
+                  0 if dlinks else next(
+                      (x.get("errno") for x in sharedownload_attempts if x.get("errno") is not None),
+                      None
+                  )
+              )
+              if not dlinks:
+                  fail("public sharedownload returned no dlink in current or legacy shape")
+
               zip_bytes = None
               attempts = []
-              download_variants = []
-              for dua in (ua, "pan.baidu.com", "LogStatistic", "netdisk;P2SP;2.2.60.26"):
-                  download_variants.append((dua, None, "no_manual_cookie"))
-                  download_variants.append((dua, f"BDCLND={randsk_raw}", "public_BDCLND_raw"))
-                  download_variants.append((dua, f"BDCLND={sekey}", "public_BDCLND_decoded"))
-              for dua, cookie_header, cookie_mode in download_variants:
-                  dh = {
-                      "User-Agent": dua,
-                      "Referer": share_page,
-                      "Range": "bytes=0-",
-                  }
-                  if cookie_header:
-                      dh["Cookie"] = cookie_header
-                  zr = requests.get(dlink, headers=dh, stream=False, timeout=60, allow_redirects=True)
-                  attempts.append({
-                      "user_agent": dua,
-                      "cookie_mode": cookie_mode,
-                      "status": zr.status_code,
-                      "bytes": len(zr.content),
-                      "final_host": requests.utils.urlparse(zr.url).hostname,
-                      "body_prefix": (
-                          zr.content[:160].decode("utf-8", errors="replace")
-                          if zr.status_code != 200 else None
-                      ),
-                  })
-                  if zr.status_code == 200 and zr.content.startswith(b"PK"):
-                      zip_bytes = zr.content
+              for shape_name, dlink in dlinks:
+                  download_variants = []
+                  for dua in (ua, "pan.baidu.com", "LogStatistic", "netdisk;P2SP;2.2.60.26"):
+                      download_variants.append((dua, None, "no_manual_cookie"))
+                      download_variants.append((dua, f"BDCLND={randsk_raw}", "public_BDCLND_raw"))
+                      download_variants.append((dua, f"BDCLND={sekey}", "public_BDCLND_decoded"))
+                  for dua, cookie_header, cookie_mode in download_variants:
+                      dh = {
+                          "User-Agent": dua,
+                          "Referer": share_page,
+                          "Range": "bytes=0-",
+                      }
+                      if cookie_header:
+                          dh["Cookie"] = cookie_header
+                      zr = requests.get(dlink, headers=dh, stream=False, timeout=60, allow_redirects=True)
+                      attempts.append({
+                          "shape": shape_name,
+                          "user_agent": dua,
+                          "cookie_mode": cookie_mode,
+                          "status": zr.status_code,
+                          "bytes": len(zr.content),
+                          "final_host": requests.utils.urlparse(zr.url).hostname,
+                          "body_prefix": (
+                              zr.content[:160].decode("utf-8", errors="replace")
+                              if zr.status_code != 200 else None
+                          ),
+                      })
+                      if zr.status_code == 200 and zr.content.startswith(b"PK"):
+                          zip_bytes = zr.content
+                          break
+                  if zip_bytes is not None:
                       break
               out["sample_download_attempts"] = attempts
               if zip_bytes is None:
-                  fail("sample zip dlink returned no downloadable ZIP under public-client UAs")
+                  fail("public sample dlinks require account-level file authorization")
               out["sample_download_http_status"] = 200
               out["sample_download_bytes"] = len(zip_bytes)
               open(zip_name, "wb").write(zip_bytes)
