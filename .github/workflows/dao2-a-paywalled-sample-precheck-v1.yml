@@ -43,6 +43,19 @@ jobs:
           }
 
           try:
+              # Public share metadata; no login/private credential.
+              iurl = (
+                  f"https://pan.baidu.com/api/shorturlinfo?shorturl=1{surl}"
+                  "&web=5&app_id=250528&channel=chunlei&clienttype=5"
+              )
+              ir = sess.get(iurl, headers=headers, timeout=20)
+              out["shorturlinfo_http_status"] = ir.status_code
+              try:
+                  ij = ir.json()
+              except Exception:
+                  ij = {"raw_prefix": ir.text[:1000]}
+              out["shorturlinfo"] = ij
+
               vurl = f"https://pan.baidu.com/share/verify?surl={quote(surl)}&pwd={quote(pwd)}"
               vr = sess.post(vurl, data={"pwd": pwd, "vcode": "", "vcode_str": ""},
                              headers={**headers, "Content-Type": "application/x-www-form-urlencoded"}, timeout=20)
@@ -74,6 +87,7 @@ jobs:
               else:
                   items = []
               sanitized = []
+              out["root_item_raw_keys"] = [sorted(list(x.keys())) for x in items if isinstance(x, dict)]
               for item in items:
                   if not isinstance(item, dict):
                       continue
@@ -86,6 +100,8 @@ jobs:
                       "md5": item.get("md5"),
                       "shareid": item.get("shareid"),
                       "uk": item.get("uk"),
+                      "dlink": item.get("dlink"),
+                      "server_mtime": item.get("server_mtime"),
                   })
               out["root_items"] = sanitized
               out["target_root_matches"] = [x for x in sanitized if x.get("server_filename") == target_name]
