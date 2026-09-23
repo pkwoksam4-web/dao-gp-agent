@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-22",
+  "as_of": "2026-09-23",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -54,12 +54,11 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "P1: continue searching actual historical raw Tushare moneyflow carriers (CSV/SQLite/Parquet/ZIP/HDF5/DuckDB/release/history), not code-only repositories.",
-    "For every new carrier, run 100% Jessica field-level overlap before inspecting residual keys.",
-    "Allow partial residual recovery only with raw provenance, unique row, non-null four required fields, 10k-CNY unit, no proxy and no imputation.",
-    "P2 USTC PAN remains dormant backup until a directly accessible share/raw carrier appears.",
-    "P3-P5 remain frozen while P1 remains productive.",
-    "If pursuing the identified CNY 50 complete-history package, acquire original bytes first and run the same overlap gate; vendor claims alone are not admission."
+    "P1: preserve sample identity/authorization evidence; on account authorization, download untouched sample and run Jessica exact overlap.",
+    "P2: continue only actual raw historical carriers with target-key information gain; reject code/README/schema-only repos automatically.",
+    "P3: expand independent exact-Tushare absence evidence per residual key; SOURCE_ABSENCE_CANDIDATE never implies zero.",
+    "P4: if P2 and complete-history routes cannot supply rows and absence becomes likely upstream, require original-order L2 source and exact reconstruction overlap.",
+    "P5 USTC dormant; P6 official Tushare frozen at 40101; P7 Infoway custom last fallback."
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -103,11 +102,11 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "PUBLIC_MIRROR_RESIDUAL_DATA_NOT_YET_FOUND",
+    "code": "P1_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED_P2_P3_ACTIVE",
     "module_status": "BLOCKED",
-    "actionable_requirement": "Continue free public exact Tushare moneyflow historical carrier recovery. A CNY 50 complete-history vendor package is available as a manual-purchase candidate but is not admitted without user authorization and Jessica overlap."
+    "actionable_requirement": "No user action requested yet: continue P2 public-carrier recovery and P3 source-absence proof. P1 sample is preserved at an account-level Baidu authorization gate; do not retry anonymous dlink forms."
   },
-  "current_source_strategy": "PUBLIC_TUSHARE_MONEYFLOW_HISTORICAL_MIRROR_RECOVERY",
+  "current_source_strategy": "AUTONOMOUS_COMPLETION_MODE",
   "infoway_probe": {
     "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
     "workflow_path": ".github/workflows/dao2-a-infoway-semantic-probe-v1.yml",
@@ -331,5 +330,17 @@
     "vendor_claimed_complete_history": true,
     "status": "PAYWALLED_NOT_ADMITTED",
     "reason": "Full bytes require purchase. No row may be admitted until package/file provenance and Jessica field-level exact overlap pass."
+  },
+  "paywalled_sample_authorization_evidence": "data/dao2/modules/A_PAYWALLED_MONEYFLOW_SAMPLE_AUTHORIZATION_V1.json",
+  "source_absence_proof": "data/dao2/modules/A_MAIN_NET_FLOW_SOURCE_ABSENCE_PROOF_V1.json",
+  "source_absence_summary": {
+    "candidate_count": 3,
+    "candidates": [
+      "000564.SZ/20230320",
+      "001337.SZ/20230320",
+      "002157.SZ/20230522"
+    ],
+    "resolution_effect": 0,
+    "note": "Candidate means independent exact-Tushare mirrors omit the same row while same-symbol history spans the target date; no zero-fill or closure is authorized."
   }
 }
