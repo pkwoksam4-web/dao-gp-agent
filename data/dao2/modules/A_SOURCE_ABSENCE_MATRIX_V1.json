@@ -1,0 +1,340 @@
+{
+  "artifact": "DAO2_A_SOURCE_ABSENCE_MATRIX_V1",
+  "version": "1.0",
+  "as_of": "2026-09-23",
+  "module": "A_MAIN_NET_FLOW",
+  "policy": {
+    "absence_does_not_resolve": true,
+    "zero_fill": false,
+    "proxy": false,
+    "candidate_upgrade_requirements": [
+      "at least one independent carrier with exact Tushare identity PASS",
+      "same-symbol historical file exists",
+      "carrier coverage spans target date",
+      "normal row exists before target date",
+      "normal row exists after target date",
+      "target row is absent",
+      "Jessica pinned archive target row is also absent"
+    ]
+  },
+  "identity_evidence": {
+    "jessica": {
+      "repository": "Jessica-Zhangyj/dlquant",
+      "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+      "role": "primary_partial_archive"
+    },
+    "jiu": {
+      "repository": "Jiu-7131/BigDataVisualization",
+      "commit": "102c67acda5151545d54444199140bd869c49004",
+      "source_identity": "PASS",
+      "overlap": "40/40 exact across 4 years, 5 dates, 11 fields",
+      "moneyflow_root": "数据集/tushare_all_interfaces/moneyflow/"
+    },
+    "moonlit": {
+      "repository": "Moonlit-Pages/cozeclaw-workspace",
+      "commit": "526ebbb94066bc623add892f6f8c21378d3e945a",
+      "source_identity": "PASS",
+      "overlap": "5183/5183 exact on 20260403",
+      "target_date_coverage": false
+    },
+    "pangucheng": {
+      "repository": "PanGucheng/a-share-quant-research",
+      "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
+      "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+      "actual_raw_carrier": true,
+      "sampled_dates": "48 quarterly representatives, 2010-01-04 through 2021-10-08",
+      "target_trade_dates_present": [],
+      "role": "independent historical raw carrier without exact target-date coverage"
+    }
+  },
+  "jessica_date_files": {
+    "20200608": {
+      "path": "data/moneyflow/20200608.csv",
+      "blob_sha": "6fc18088cf72cecfef2f957f1e9daf1a6aae1def",
+      "row_count": 3822
+    },
+    "20201104": {
+      "path": "data/moneyflow/20201104.csv",
+      "blob_sha": "c234d16a4a325be732437529626f74c76089469e",
+      "row_count": 4043
+    },
+    "20210224": {
+      "path": "data/moneyflow/20210224.csv",
+      "blob_sha": "ce323c342cd8b054995c33be902ffac9d1aae799",
+      "row_count": 4173
+    },
+    "20210923": {
+      "path": "data/moneyflow/20210923.csv",
+      "blob_sha": "12db52b6610c0374e2e26db489920199269d3da2",
+      "row_count": 4467
+    },
+    "20210924": {
+      "path": "data/moneyflow/20210924.csv",
+      "blob_sha": "d71055fdf356dcb68cff5d9a82b887fb0a469b44",
+      "row_count": 4449
+    },
+    "20211125": {
+      "path": "data/moneyflow/20211125.csv",
+      "blob_sha": "b566ed2ae7bb93d84318e4f09ee11c45f24e9892",
+      "row_count": 4542
+    },
+    "20220506": {
+      "path": "data/moneyflow/20220506.csv",
+      "blob_sha": "ee7321d7b6bfc8634364230f847530b127d80111",
+      "row_count": 4658
+    },
+    "20230320": {
+      "path": "data/moneyflow/20230320.csv",
+      "blob_sha": "dbdac425be07c992669858776cd082b75af47d01",
+      "row_count": 4929
+    },
+    "20230522": {
+      "path": "data/moneyflow/20230522.csv",
+      "blob_sha": "f9d0d5940679039a1c0a07ece52688c5cfdb6bb2",
+      "row_count": 4951
+    }
+  },
+  "rows": [
+    {
+      "ts_code": "600306.SH",
+      "trade_date": "20200608",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "600898.SH",
+      "trade_date": "20201104",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "603996.SH",
+      "trade_date": "20210224",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "002618.SZ",
+      "trade_date": "20210923",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "000020.SZ",
+      "trade_date": "20210924",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/000020_SZ.csv",
+      "carrier_blob_sha": "78bcd7751fb77af63d6a42443f965bec621a090e",
+      "coverage_min": "20220104",
+      "coverage_max": "20251231",
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": "20220104",
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "000157.SZ",
+      "trade_date": "20210924",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/000157_SZ.csv",
+      "carrier_blob_sha": "f47ba07752b673212b63e679aac22b6690fba515",
+      "coverage_min": "20220104",
+      "coverage_max": "20251231",
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": "20220104",
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "000592.SZ",
+      "trade_date": "20210924",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/000592_SZ.csv",
+      "carrier_blob_sha": "3625777926e7888789b13e43490f74b40930e376",
+      "coverage_min": "20220104",
+      "coverage_max": "20251231",
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": "20220104",
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "000753.SZ",
+      "trade_date": "20210924",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/000753_SZ.csv",
+      "carrier_blob_sha": "1c3f2dad2e660262a634dd8a1238e551a70108ae",
+      "coverage_min": "20220104",
+      "coverage_max": "20251231",
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": "20220104",
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "002684.SZ",
+      "trade_date": "20211125",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "600112.SH",
+      "trade_date": "20220506",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "000564.SZ",
+      "trade_date": "20230320",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/000564_SZ.csv",
+      "carrier_blob_sha": "03546e6ca821ae4faf35766540c5e013c45b8776",
+      "coverage_min": "20220104",
+      "coverage_max": "20251231",
+      "coverage_spans_target": true,
+      "nearest_before": "20230317",
+      "nearest_after": "20230321",
+      "target_row_exists": false,
+      "status": "SOURCE_ABSENCE_CANDIDATE"
+    },
+    {
+      "ts_code": "001337.SZ",
+      "trade_date": "20230320",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/001337_SZ.csv",
+      "carrier_blob_sha": "0636b1df663588d3f01563f2a2a9e6d042bd1df5",
+      "coverage_min": "20230303",
+      "coverage_max": "20251231",
+      "coverage_spans_target": true,
+      "nearest_before": "20230317",
+      "nearest_after": "20230321",
+      "target_row_exists": false,
+      "status": "SOURCE_ABSENCE_CANDIDATE"
+    },
+    {
+      "ts_code": "002118.SZ",
+      "trade_date": "20230522",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "002157.SZ",
+      "trade_date": "20230522",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": true,
+      "carrier_path": "数据集/tushare_all_interfaces/moneyflow/002157_SZ.csv",
+      "carrier_blob_sha": "8608ad5bca63e084519829a5b79ab251903ba373",
+      "coverage_min": "20220104",
+      "coverage_max": "20251231",
+      "coverage_spans_target": true,
+      "nearest_before": "20230519",
+      "nearest_after": "20230523",
+      "target_row_exists": false,
+      "status": "SOURCE_ABSENCE_CANDIDATE"
+    },
+    {
+      "ts_code": "002503.SZ",
+      "trade_date": "20230522",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    },
+    {
+      "ts_code": "002504.SZ",
+      "trade_date": "20230522",
+      "jessica_file_exists": true,
+      "jessica_target_row_exists": false,
+      "independent_exact_carrier": "Jiu",
+      "same_symbol_file_exists": false,
+      "coverage_spans_target": false,
+      "nearest_before": null,
+      "nearest_after": null,
+      "target_row_exists": false,
+      "status": "INSUFFICIENT"
+    }
+  ],
+  "summary": {
+    "source_absence_candidate": 3,
+    "insufficient": 13,
+    "resolved_by_absence": 0
+  }
+}
