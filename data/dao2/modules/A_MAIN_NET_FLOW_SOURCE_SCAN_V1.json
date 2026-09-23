@@ -54,11 +54,11 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "P1: preserve sample identity/authorization evidence; on account authorization, download untouched sample and run Jessica exact overlap.",
-    "P2: continue only actual raw historical carriers with target-key information gain; reject code/README/schema-only repos automatically.",
-    "P3: expand independent exact-Tushare absence evidence per residual key; SOURCE_ABSENCE_CANDIDATE never implies zero.",
-    "P4: if P2 and complete-history routes cannot supply rows and absence becomes likely upstream, require original-order L2 source and exact reconstruction overlap.",
-    "P5 USTC dormant; P6 official Tushare frozen at 40101; P7 Infoway custom last fallback."
+    "P2: continue actual public raw-carrier search; auto-reject code/schema/proxy carriers.",
+    "P3: expand source-absence evidence without zero-fill.",
+    "P4: after Hugging Face authorization, reconstruct Jessica-known rows first and require 100% four-field exact match.",
+    "If P4 identity passes, allow partial recovery with raw L2 provenance; unsupported Shanghai-early keys remain open.",
+    "P1 remains preserved at account-level sample authorization gate; no anonymous dlink retry."
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -102,9 +102,9 @@
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
   "environment_blocker": {
-    "code": "P1_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED_P2_P3_ACTIVE",
+    "code": "MULTI_GATE_P1_BAIDU_AUTH_P4_HUGGINGFACE_AUTH",
     "module_status": "BLOCKED",
-    "actionable_requirement": "No user action requested yet: continue P2 public-carrier recovery and P3 source-absence proof. P1 sample is preserved at an account-level Baidu authorization gate; do not retry anonymous dlink forms."
+    "actionable_requirement": "Continue free P2/P3. P1 needs account-level Baidu authorization. P4 needs authorized Hugging Face access. No row is admissible yet."
   },
   "current_source_strategy": "AUTONOMOUS_COMPLETION_MODE",
   "infoway_probe": {
@@ -342,5 +342,50 @@
     ],
     "resolution_effect": 0,
     "note": "Candidate means independent exact-Tushare mirrors omit the same row while same-symbol history spans the target date; no zero-fill or closure is authorized."
+  },
+  "historical_l2_reconstruction_precheck": "data/dao2/modules/A_HISTORICAL_L2_RECONSTRUCTION_PRECHECK_V1.json",
+  "rejected_public_carriers": [
+    {
+      "carrier": "Johnny-xuan/M2-Alpha",
+      "commit": "e587b95a33de0c628f683914c4eb2fc5ed1d205e",
+      "path": "build/cache/panel.parquet",
+      "result": "REJECT_IDENTITY_FAIL_50_OF_50",
+      "audit_run": 35817557183,
+      "raw_sha256": "ffb56f7ee54c62a14f9d3bd1ed3bd8f92bfa252a52eaa37b29120e0fa7770544",
+      "reason": "50/50 Jessica overlap mismatched despite same-named fields."
+    },
+    {
+      "carrier": "mastermindx-market-intelligence/macro",
+      "commit": "2e002ef776b8feeb144a5c19c3d57a2ec10a462c",
+      "path": "data/tushare/moneyflow_hist.parquet",
+      "result": "REJECT_WRONG_ENDPOINT_SEMANTICS",
+      "reason": "Carrier is Tushare moneyflow_dc / Eastmoney-derived, not classic Tushare moneyflow four-field semantics."
+    },
+    {
+      "carrier": "Walter1218/Helix",
+      "commit": "82e9180cbd842809baf506b3037d4d19363bd0eb",
+      "result": "REJECT_NO_PUBLIC_CARRIER_BYTES",
+      "reason": "Reports reference local DuckDB/warehouse only; no committed database/release/blob."
+    }
+  ],
+  "historical_l2_private_carriers": {
+    "status": "AUTHORIZATION_REQUIRED_FOR_EXACT_OVERLAP",
+    "admissible_rows": 0,
+    "venvoo": {
+      "repository": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+      "coverage": "2017-01-03..2026-09-21",
+      "all_residual_dates_in_range": true,
+      "schemas": "order_id/ex_order_id/order_code/price/volume + trade ask_order_id/bid_order_id/bs_flag",
+      "shenzhen_target_count": 12,
+      "early_shanghai_strict_gap_count": 3,
+      "authorization": "Hugging Face gated; Like + follow @venvoo + request access"
+    },
+    "alphat01": {
+      "repository": "alphat01/Tick-by-Tick-Orders-China",
+      "coverage": "2023 full year / every listed SH-SZ stock declared",
+      "residual_raw_carrier_count": 6,
+      "authorization": "Hugging Face gated, manual review, academic/non-commercial"
+    },
+    "interpretation": "Exact reconstruction is testable for a subset, especially Shenzhen/2023, but exact Tushare equivalence is not proven until Jessica-known four-field reconstruction reaches 100% exact match."
   }
 }
