@@ -1,0 +1,178 @@
+{
+  "artifact": "DAO2_A_HISTORICAL_L2_RECONSTRUCTION_PRECHECK_V1",
+  "version": "1.0",
+  "as_of": "2026-09-23",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+  "status": "PRIVATE_L2_CARRIER_FOUND_AUTHORIZATION_REQUIRED",
+  "governance": {
+    "fail_closed": true,
+    "admissible_exact_rows": 0,
+    "residual_rows_resolved": 0,
+    "proxy_allowed": false,
+    "imputation_allowed": false,
+    "approximate_reconstruction_allowed": false,
+    "required_acceptance": "Reconstruct all four Tushare moneyflow amount buckets on Jessica-known dates and require 100% field-level exact match before any residual row is admitted."
+  },
+  "target_semantics": {
+    "formula_cny": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
+    "source_unit": "10k CNY",
+    "output_unit": "CNY",
+    "buckets": {
+      "small": "< 50,000 CNY",
+      "medium": "50,000-200,000 CNY",
+      "large": "200,000-1,000,000 CNY",
+      "extra_large": ">= 1,000,000 CNY"
+    },
+    "required_primitives": [
+      "original order identity",
+      "original order value or sufficient original-order price/quantity semantics",
+      "active/aggressor buy-sell side",
+      "complete-enough historical order/trade lifecycle for the audited symbol-date"
+    ]
+  },
+  "carriers": {
+    "venvoo": {
+      "provider": "Hugging Face",
+      "repository": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+      "url": "https://huggingface.co/datasets/venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+      "access": "GATED_RESEARCH_USE_ONLY",
+      "access_steps": [
+        "Log in to Hugging Face",
+        "Like the dataset repository",
+        "Follow @venvoo",
+        "Request access; dataset card states automated approval within seconds once Like+Follow are satisfied"
+      ],
+      "coverage": {
+        "start": "2017-01-03",
+        "end": "2026-09-21",
+        "trading_days": 2361,
+        "repository_file_pattern": "YYYYMMDD/{行情.parquet,逐笔委托.parquet,逐笔成交.parquet}",
+        "all_nine_residual_dates_within_date_range": true,
+        "note": "Dataset card says each repository trading day has all three files, but explicitly states this does not certify every instrument/message or complete session."
+      },
+      "order_schema": [
+        "wind_code",
+        "ex_code",
+        "date",
+        "time",
+        "order_id",
+        "ex_order_id",
+        "order_type",
+        "order_code",
+        "price",
+        "volume"
+      ],
+      "trade_schema": [
+        "wind_code",
+        "ex_code",
+        "date",
+        "time",
+        "trade_id",
+        "trade_code",
+        "order_code",
+        "bs_flag",
+        "price",
+        "volume",
+        "ask_order_id",
+        "bid_order_id"
+      ],
+      "exact_reconstruction_assessment": {
+        "shenzhen": "TECHNICALLY_TESTABLE_PENDING_ACCESS_AND_OVERLAP",
+        "shanghai_post_2021_07_23": "TECHNICALLY_TESTABLE_BUT_ORIGINAL_ORDER_NOTIONAL_SEMANTICS_UNCERTAIN",
+        "shanghai_pre_2021_07_23": "NOT_ADMISSIBLE_FOR_STRICT_ORIGINAL_ORDER_RECONSTRUCTION_FROM_THIS_CARRIER",
+        "caution": [
+          "Dataset card notes full-market export is not a guarantee every instrument or message is present.",
+          "Dataset card notes some dates have missing session prefixes; date/symbol completeness must be audited.",
+          "Shanghai order-message coverage changes in 2021 and early Shanghai residuals must not be interpreted as zero."
+        ]
+      },
+      "target_scope": {
+        "shenzhen_targets": [
+          "002618.SZ/20210923",
+          "000020.SZ/20210924",
+          "000157.SZ/20210924",
+          "000592.SZ/20210924",
+          "000753.SZ/20210924",
+          "002684.SZ/20211125",
+          "000564.SZ/20230320",
+          "001337.SZ/20230320",
+          "002118.SZ/20230522",
+          "002157.SZ/20230522",
+          "002503.SZ/20230522",
+          "002504.SZ/20230522"
+        ],
+        "shanghai_post_coverage_change": [
+          "600112.SH/20220506"
+        ],
+        "shanghai_early_not_strictly_reconstructible": [
+          "600306.SH/20200608",
+          "600898.SH/20201104",
+          "603996.SH/20210224"
+        ]
+      }
+    },
+    "alphat01_2023": {
+      "provider": "Hugging Face",
+      "repository": "alphat01/Tick-by-Tick-Orders-China",
+      "url": "https://huggingface.co/datasets/alphat01/Tick-by-Tick-Orders-China",
+      "access": "GATED_MANUAL_REVIEW_ACADEMIC_NONCOMMERCIAL",
+      "access_steps": [
+        "Log in to Hugging Face",
+        "Accept dataset conditions and share contact information",
+        "Request access; dataset card states requests are manually reviewed"
+      ],
+      "coverage": {
+        "start": "2023-01-03",
+        "end": "2023-12-29",
+        "trading_days": 242,
+        "archives": 242,
+        "declared_scope": "full-depth Level-2 for every listed stock, fund and ETF on Shanghai and Shenzhen exchanges in 2023",
+        "layout": "YYYYMM/YYYYMMDD.7z/<WIND_CODE>/{行情.csv,逐笔委托.csv,逐笔成交.csv}"
+      },
+      "order_primitives": [
+        "instrument code",
+        "date/time",
+        "exchange order id",
+        "exchange sequence number",
+        "order type",
+        "B/S/D order side",
+        "limit price",
+        "order quantity"
+      ],
+      "trade_primitives": [
+        "trade id",
+        "fill/cancel code",
+        "aggressor side",
+        "execution price",
+        "execution quantity",
+        "resting sell order id",
+        "resting buy order id"
+      ],
+      "residual_raw_carrier_scope": [
+        "000564.SZ/20230320",
+        "001337.SZ/20230320",
+        "002118.SZ/20230522",
+        "002157.SZ/20230522",
+        "002503.SZ/20230522",
+        "002504.SZ/20230522"
+      ],
+      "raw_carrier_coverage_claim_status": "CONFIRMED_BY_DATASET_CARD_PENDING_FILE_ACCESS",
+      "exact_tushare_equivalence": "NOT_PROVEN_PENDING_JESSICA_OVERLAP"
+    }
+  },
+  "acceptance_plan": [
+    "After access, retrieve only metadata/targeted symbol-date data where the provider/storage layer allows range/row-group pruning; do not download entire multi-terabyte archive unnecessarily.",
+    "Choose Jessica-known symbol-dates across multiple dates and reconstruct original-order notional buckets using documented L2 order/trade linkage.",
+    "Compare ts_code, trade_date, buy_lg_amount, buy_elg_amount, sell_lg_amount, sell_elg_amount; prefer sm/md/net_mf_amount too.",
+    "Require 100% field-level exact match. If any required field differs, reject that reconstruction mapping.",
+    "Only after reconstruction identity PASS inspect/admit residual target rows with raw provenance.",
+    "Partial recovery is permitted; unresolved Shanghai-early keys remain open unless another exact carrier supplies them."
+  ],
+  "manual_gate": {
+    "type": "PRIVATE_ACCOUNT_AUTHORIZATION",
+    "provider": "Hugging Face",
+    "credential_handling": "Do not paste tokens into chat. Connect/login through the supported Hugging Face integration or provider UI, then request dataset access.",
+    "reason": "Both useful L2 datasets are gated. Raw file access is required before any exact-overlap or residual reconstruction can be performed."
+  }
+}
