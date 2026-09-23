@@ -34,7 +34,7 @@
     "exact_semantics_required": true,
     "generic_main_flow_proxy_allowed": false,
     "source_scan": "data/dao2/modules/A_MAIN_NET_FLOW_SOURCE_SCAN_V1.json",
-    "source_discovery_status": "P1_ACCOUNT_AUTH_P2_P3_ACTIVE_P4_PRIVATE_AUTH_REQUIRED",
+    "source_discovery_status": "ACTIVE_P2_P3_NO_NEW_ADMISSIBLE_ROWS",
     "same_course_repositories_scanned": 6,
     "admissible_new_exact_rows": 0,
     "latest_exact_probe": {
@@ -251,7 +251,39 @@
         "mismatch_rows": 50,
         "result": "REJECT_IDENTITY_FAIL_50_OF_50",
         "reason": "Same-named moneyflow fields are public/proxy stubs and do not field-level exact-match Jessica."
+      },
+      {
+        "carrier": "henrylin99/screener-offline-data@6347c05e8619a9e132dfdab9f507c36e31842b8a/data.parquet",
+        "audit_run": 35839083895,
+        "artifact_id": 10740122533,
+        "result": "REJECT_IDENTITY_FAIL_OR_INSUFFICIENT",
+        "rows": 5484,
+        "coverage": "20260521 only",
+        "overlap": "10/10 exact but insufficient breadth",
+        "target_hits": 0
       }
-    ]
+    ],
+    "source_absence_matrix": "data/dao2/modules/A_SOURCE_ABSENCE_MATRIX_V1.json",
+    "latest_public_carrier_audit": {
+      "carrier": "henrylin99/screener-offline-data",
+      "commit": "6347c05e8619a9e132dfdab9f507c36e31842b8a",
+      "path": "data.parquet",
+      "blob_sha": "73df5cefc343a1622b7a50a9e98fb50e153d13c2",
+      "workflow_run": 35839083895,
+      "artifact_id": 10740122533,
+      "artifact_digest": "sha256:404d2c8618c0dac2b9981a19092ace91a3c9fa621a40073074505b0ca4fe6e5b",
+      "rows": 5484,
+      "date_range": [
+        "20260521",
+        "20260521"
+      ],
+      "overlap_rows": 10,
+      "mismatch_rows": 0,
+      "source_identity_pass": false,
+      "target_hit_count": 0,
+      "result": "REJECT_IDENTITY_FAIL_OR_INSUFFICIENT",
+      "result_sha256": "7b331f7971509241db91cc837adf116239a18cd4c65cf7b8f6eaa465ce31c5a2",
+      "interpretation": "Public raw parquet is a single-date 2026 carrier. Its 10 sampled rows exact-match Jessica, but it cannot satisfy the identity breadth gate and provides zero historical residual coverage."
+    }
   }
 }
