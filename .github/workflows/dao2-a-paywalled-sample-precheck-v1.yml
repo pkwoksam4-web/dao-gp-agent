@@ -1,0 +1,118 @@
+name: DAO2 A Paywalled Sample Precheck V1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-paywalled-sample-precheck-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect public Baidu sample share without login
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, time
+          from urllib.parse import quote
+          import requests
+
+          share_url = "https://pan.baidu.com/s/154fXqZgOaiCKXkyBjT95QA?pwd=hhc5"
+          surl = "54fXqZgOaiCKXkyBjT95QA"
+          pwd = "hhc5"
+          target_name = "moneyflow__sample_50rows.parquet"
+          sess = requests.Session()
+          ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+          headers = {"User-Agent": ua, "Referer": share_url, "Accept": "application/json, text/plain, */*"}
+
+          out = {
+              "artifact": "DAO2_A_PAYWALLED_SAMPLE_PRECHECK_V1",
+              "provider": "tushare.indevs.in",
+              "product": "Tushare moneyflow 完整历史数据",
+              "price_cny": 50,
+              "sample_share_url": share_url,
+              "sample_filename": target_name,
+              "login_used": False,
+              "private_credentials_used": False,
+          }
+
+          try:
+              vurl = f"https://pan.baidu.com/share/verify?surl={quote(surl)}&pwd={quote(pwd)}"
+              vr = sess.post(vurl, data={"pwd": pwd, "vcode": "", "vcode_str": ""},
+                             headers={**headers, "Content-Type": "application/x-www-form-urlencoded"}, timeout=20)
+              out["verify_http_status"] = vr.status_code
+              try:
+                  vj = vr.json()
+              except Exception:
+                  vj = {"raw_prefix": vr.text[:500]}
+              out["verify_response"] = vj
+              randsk = vj.get("randsk", "") if isinstance(vj, dict) else ""
+              if randsk:
+                  sess.cookies.set("BDCLND", randsk, domain=".baidu.com")
+                  headers["Cookie"] = f"BDCLND={randsk}"
+
+              lurl = (
+                  "https://pan.baidu.com/share/list?web=1&page=1&num=1000&order=time&desc=1"
+                  f"&showempty=0&shorturl={quote(surl)}&root=1&clienttype=0"
+              )
+              lr = sess.get(lurl, headers=headers, timeout=20)
+              out["list_http_status"] = lr.status_code
+              try:
+                  lj = lr.json()
+              except Exception:
+                  lj = {"raw_prefix": lr.text[:1000]}
+              if isinstance(lj, dict):
+                  out["list_errno"] = lj.get("errno")
+                  out["list_errmsg"] = lj.get("errmsg")
+                  items = lj.get("list") or []
+              else:
+                  items = []
+              sanitized = []
+              for item in items:
+                  if not isinstance(item, dict):
+                      continue
+                  sanitized.append({
+                      "server_filename": item.get("server_filename"),
+                      "path": item.get("path"),
+                      "isdir": item.get("isdir"),
+                      "size": item.get("size"),
+                      "fs_id": item.get("fs_id"),
+                      "md5": item.get("md5"),
+                      "shareid": item.get("shareid"),
+                      "uk": item.get("uk"),
+                  })
+              out["root_items"] = sanitized
+              out["target_root_matches"] = [x for x in sanitized if x.get("server_filename") == target_name]
+              out["target_found_root"] = bool(out["target_root_matches"])
+              out["status"] = "PUBLIC_SAMPLE_SHARE_LISTED" if out.get("list_errno") == 0 else "PUBLIC_SAMPLE_SHARE_LIST_FAILED"
+          except Exception as e:
+              out["status"] = "PRECHECK_EXCEPTION"
+              out["error"] = f"{type(e).__name__}: {e}"
+
+          canon = json.dumps(out, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+          out["content_sha256_without_hash_field"] = hashlib.sha256(canon.encode()).hexdigest()
+          with open("dao2_a_paywalled_sample_precheck_v1.json","w",encoding="utf-8") as f:
+              json.dump(out,f,ensure_ascii=False,indent=2,sort_keys=True); f.write("\n")
+          print(json.dumps({
+              "status":out.get("status"),
+              "verify_errno":(out.get("verify_response") or {}).get("errno") if isinstance(out.get("verify_response"),dict) else None,
+              "list_errno":out.get("list_errno"),
+              "target_found_root":out.get("target_found_root"),
+              "root_item_count":len(out.get("root_items") or []),
+              "sha256":out.get("content_sha256_without_hash_field"),
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload precheck evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-paywalled-sample-precheck-v1
+          path: dao2_a_paywalled_sample_precheck_v1.json
+          if-no-files-found: error
+          retention-days: 30
