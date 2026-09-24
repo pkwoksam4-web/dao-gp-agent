@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-23",
+  "as_of": "2026-09-24",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -309,11 +309,17 @@
       "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
       "blob_sha": "e8826d3b5e82edb7c85b63ebf371a6987afaa7a5",
       "sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
-      "actual_raw_carrier": true,
-      "provenance": "Tushare moneyflow with retained network receipts",
-      "sampled_moneyflow_dates": "48 quarterly representatives, 2010-01-04 through 2021-10-08",
-      "target_dates_present": [],
-      "residual_hits": 0
+      "rows": 134472,
+      "columns": [
+        "ts_code",
+        "trade_date",
+        "net_mf_amount"
+      ],
+      "result": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+      "source_identity": "FAIL",
+      "residual_hits": 0,
+      "audit_run": 35944136939,
+      "artifact_id": 10785089768
     }
   },
   "paywalled_historical_candidate": {
@@ -382,6 +388,22 @@
       "mismatch_rows": 0,
       "target_hits": 0,
       "reason": "Actual public parquet and sampled rows are exact-looking, but only one 2026 date is present; identity breadth gate not met and no residual date is covered."
+    },
+    {
+      "carrier": "PanGucheng/a-share-quant-research",
+      "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
+      "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+      "result": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+      "audit_run": 35944136939,
+      "artifact_id": 10785089768,
+      "raw_sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
+      "rows": 134472,
+      "columns": [
+        "ts_code",
+        "trade_date",
+        "net_mf_amount"
+      ],
+      "reason": "Actual raw historical parquet, but only net_mf_amount is present. Four required exact large/extra-large fields are absent; generic/net amount substitution forbidden."
     }
   ],
   "historical_l2_private_carriers": {
