@@ -1,0 +1,105 @@
+{
+  "schema": "agent-brain-control-plane-audit/v1",
+  "observed_date": "2026-09-24",
+  "observed_at": "2026-09-24T02:38:00Z",
+  "repository": "pkwoksam4-web/dao-gp-agent",
+  "reproducible_release": {
+    "version": "V2.70",
+    "release_date": "2026-09-20",
+    "tests_in_release_evidence": {
+      "passed": 193,
+      "failed": 0
+    },
+    "static_postgres_tables": 185,
+    "release_closed": false,
+    "software_release_changed_by_this_audit": false
+  },
+  "pre_audit_git_head": {
+    "sha": "43317e94b6c5f25dbfdfaa10862491383f66ee80",
+    "message": "evidence: correct recovery truth and fresh snapshot blocker",
+    "attached_combined_status_count": 0,
+    "attached_workflow_run_count": 0
+  },
+  "universe_control": {
+    "frozen_core10": {
+      "watchlist_id": "WAT-core10-final-v1",
+      "semantics_frozen": true,
+      "historical_rankings_rewritten": false,
+      "historical_forecasts_rewritten": false
+    },
+    "daily_core13": {
+      "added_symbols": [
+        "000977.SZ",
+        "000938.SZ",
+        "000063.SZ"
+      ],
+      "added_names": [
+        "浪潮信息",
+        "紫光股份",
+        "中兴通讯"
+      ],
+      "mode_for_added_symbols": "DAILY_OBSERVATION_SHADOW",
+      "enters_core10_cross_sectional_ranking": false,
+      "retrospective_live_shadow_backfill_allowed": false
+    }
+  },
+  "automations": {
+    "core13_pit": {
+      "id": "6ab0afda8fa4819187bcbcda1b85632d",
+      "enabled": true,
+      "last_run_time": "2026-09-23T08:26:59.552306Z",
+      "schedule": "weekdays 16:18 Asia/Shanghai"
+    },
+    "core13_shadow": {
+      "id": "6ab0c408565c819185d68eb2cebf096e",
+      "enabled": true,
+      "last_run_time": "2026-09-23T10:01:40.771396Z",
+      "schedule": "weekdays 18:00 Asia/Shanghai"
+    },
+    "controller": {
+      "id": "6ab0af4bff108191ac7f5ce1089591f8",
+      "enabled": true,
+      "reenabled_at": "2026-09-24T02:36:56Z",
+      "control_prompt_aligned_to_core13_at": "2026-09-24T02:37:47Z",
+      "rule": "task-ran is not equivalent to pipeline-passed; verify database evidence when connector access is healthy"
+    }
+  },
+  "upstream_provider_probe": {
+    "provider": "Longbridge",
+    "symbols_requested": 13,
+    "symbols_responded": 13,
+    "completed_china_trade_date_available": "2026-09-23",
+    "current_china_session_date": "2026-09-24",
+    "current_session_candle_observed": true,
+    "current_session_admitted_as_eod": false,
+    "note": "The latest provider day candle was observed while the 2026-09-24 China session was still in progress; it must remain excluded from formal EOD/PIT admission until market close."
+  },
+  "neon_verification": {
+    "project_id": "red-term-29407678",
+    "production_branch_id": "br-raspy-breeze-b5clzass",
+    "database": "investment_intel",
+    "direct_read_status": "BLOCKED_CONNECTOR_CONTRACT_MISMATCH",
+    "blocker": "Current exposed Neon tool schema rejects project_id while the backend requires project_id.",
+    "implication": "Current database write counts and 2026-09-23 Shadow table growth are UNKNOWN from this audit; automation last_run_time is not treated as proof of pipeline success.",
+    "database_failure_inferred": false
+  },
+  "evidence_freshness": {
+    "latest_readme_live_evidence_date": "2026-09-21",
+    "latest_versioned_recovery_truth_date": "2026-09-22",
+    "core13_runtime_control_updated_after_latest_versioned_live_evidence": true,
+    "evidence_lag": true
+  },
+  "recovery": {
+    "v270_snapshot_restore": "PASS_FOR_V2.70_SNAPSHOT",
+    "fresh_live_cloud_snapshot": "BLOCKED",
+    "latest_versioned_blocker_code": "FRESH_LIVE_SNAPSHOT_QUOTA_LIMIT",
+    "destructive_evidence_rotation_performed": false
+  },
+  "governance": {
+    "automatic_model_promotion": false,
+    "production_weight_change": false,
+    "portfolio_mutation": false,
+    "brokerage_execution": false,
+    "pit_provenance_fail_closed": true
+  }
+}
