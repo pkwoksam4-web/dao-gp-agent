@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_SOURCE_ABSENCE_MATRIX_V1",
   "version": "1.0",
-  "as_of": "2026-09-23",
+  "as_of": "2026-09-24",
   "module": "A_MAIN_NET_FLOW",
   "policy": {
     "absence_does_not_resolve": true,
@@ -41,10 +41,18 @@
       "repository": "PanGucheng/a-share-quant-research",
       "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
       "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
-      "actual_raw_carrier": true,
-      "sampled_dates": "48 quarterly representatives, 2010-01-04 through 2021-10-08",
-      "target_trade_dates_present": [],
-      "role": "independent historical raw carrier without exact target-date coverage"
+      "raw_sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
+      "row_count": 134472,
+      "columns": [
+        "ts_code",
+        "trade_date",
+        "net_mf_amount"
+      ],
+      "source_identity": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+      "admissible_for_absence_proof": false,
+      "audit_run": 35944136939,
+      "artifact_id": 10785089768,
+      "reason": "Missing buy_lg_amount, buy_elg_amount, sell_lg_amount, sell_elg_amount. net_mf_amount-only carrier cannot support source-absence inference for exact semantics."
     }
   },
   "jessica_date_files": {
