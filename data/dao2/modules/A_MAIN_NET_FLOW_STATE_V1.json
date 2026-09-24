@@ -214,8 +214,16 @@
         "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
         "blob_sha": "e8826d3b5e82edb7c85b63ebf371a6987afaa7a5",
         "sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
-        "target_trade_dates_present": [],
-        "residual_hits": 0
+        "rows": 134472,
+        "columns": [
+          "ts_code",
+          "trade_date",
+          "net_mf_amount"
+        ],
+        "source_identity": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+        "workflow_run": 35944136939,
+        "artifact_id": 10785089768,
+        "admissible_rows": 0
       }
     },
     "paywalled_public_candidate": {
@@ -261,29 +269,37 @@
         "coverage": "20260521 only",
         "overlap": "10/10 exact but insufficient breadth",
         "target_hits": 0
+      },
+      {
+        "carrier": "PanGucheng/a-share-quant-research@ade0db2cef9dc003d6eb5013bbc68017143cd526/reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+        "audit_run": 35944136939,
+        "artifact_id": 10785089768,
+        "raw_sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
+        "rows": 134472,
+        "target_hits": 0,
+        "result": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+        "reason": "Carrier contains ts_code, trade_date, net_mf_amount only; four required large/extra-large fields are absent."
       }
     ],
     "source_absence_matrix": "data/dao2/modules/A_SOURCE_ABSENCE_MATRIX_V1.json",
     "latest_public_carrier_audit": {
-      "carrier": "henrylin99/screener-offline-data",
-      "commit": "6347c05e8619a9e132dfdab9f507c36e31842b8a",
-      "path": "data.parquet",
-      "blob_sha": "73df5cefc343a1622b7a50a9e98fb50e153d13c2",
-      "workflow_run": 35839083895,
-      "artifact_id": 10740122533,
-      "artifact_digest": "sha256:404d2c8618c0dac2b9981a19092ace91a3c9fa621a40073074505b0ca4fe6e5b",
-      "rows": 5484,
-      "date_range": [
-        "20260521",
-        "20260521"
+      "carrier": "PanGucheng/a-share-quant-research",
+      "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
+      "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+      "blob_sha": "e8826d3b5e82edb7c85b63ebf371a6987afaa7a5",
+      "workflow_run": 35944136939,
+      "artifact_id": 10785089768,
+      "artifact_digest": "sha256:59be13a1168ccc01c71c5779cbd890f921e835f20471c6c50c433cc201a2c9be",
+      "rows": 134472,
+      "columns": [
+        "ts_code",
+        "trade_date",
+        "net_mf_amount"
       ],
-      "overlap_rows": 10,
-      "mismatch_rows": 0,
-      "source_identity_pass": false,
       "target_hit_count": 0,
-      "result": "REJECT_IDENTITY_FAIL_OR_INSUFFICIENT",
-      "result_sha256": "7b331f7971509241db91cc837adf116239a18cd4c65cf7b8f6eaa465ce31c5a2",
-      "interpretation": "Public raw parquet is a single-date 2026 carrier. Its 10 sampled rows exact-match Jessica, but it cannot satisfy the identity breadth gate and provides zero historical residual coverage."
+      "source_identity_pass": false,
+      "result": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+      "evidence_file": "data/dao2/modules/A_PANGUCHENG_HISTORICAL_CARRIER_AUDIT_V1.json"
     }
   }
 }
