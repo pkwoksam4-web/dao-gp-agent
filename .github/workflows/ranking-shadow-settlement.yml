@@ -5,6 +5,10 @@ on:
     workflows: ["Live PIT Manifest Ingest"]
     types: [completed]
   workflow_dispatch:
+  push:
+    paths:
+      - "scripts/ranking_shadow_settlement.py"
+      - ".github/workflows/ranking-shadow-settlement.yml"
 
 permissions:
   contents: read
