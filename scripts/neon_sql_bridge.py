@@ -71,7 +71,7 @@ def normalize_dsn(raw: str) -> str:
         value = value.split("=", 1)[1].strip()
 
     # Extract a PostgreSQL URI from any copied command/text block.
-    uri_match = re.search(r"postgres(?:ql)?://[^\\s'\\\"]+", value)
+    uri_match = re.search(r"postgres(?:ql)?://[^\s'\"]+", value)
     if uri_match:
         return uri_match.group(0).strip()
 
