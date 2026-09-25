@@ -1,0 +1,161 @@
+{
+  "schema": "agent-brain-gap-audit/v1",
+  "snapshot_date": "2026-09-25",
+  "observed_at": "2026-09-25T17:09:30.251Z",
+  "reproducible_release": {
+    "version": "V2.70",
+    "date": "2026-09-20",
+    "unchanged": true,
+    "note": "This audit and runtime bridge work does not declare a new reproducible software release."
+  },
+  "truth_access": {
+    "native_neon_connector": "CONTROL_PLANE_CONTRACT_MISMATCH",
+    "github_neon_sql_bridge": "PASS",
+    "bridge_verified_database": "investment_intel",
+    "bridge_secret": "NEON_DATABASE_URL_PRESENT_AND_WORKING"
+  },
+  "database_truth_after_repair": {
+    "sources": 512,
+    "market_bars": 10460,
+    "market_quotes": 30,
+    "capital_flows": 10,
+    "stock_feature_snapshots": 20,
+    "provider_sync_runs": 36,
+    "watchlists": 3,
+    "watchlist_items": 33,
+    "forecast_runs": 0,
+    "forecast_items": 0,
+    "shadow_strategy_runs": 0,
+    "shadow_observation_snapshots": 0,
+    "live_shadow_run_attestations": 0,
+    "shadow_maturity_snapshots": 0,
+    "settlement_integrity_snapshots": 0,
+    "shadow_cohort_snapshots": 0,
+    "production_verification_gate_runs": 0
+  },
+  "findings_and_actions": [
+    {
+      "finding": "Core13 existed only in automation/evidence, not as a Neon runtime object.",
+      "status": "CLOSED",
+      "action": "Created WAT-core13-observation-v1 without modifying WAT-core10-final-v1.",
+      "verification": {
+        "core10_count": 10,
+        "core13_count": 13,
+        "added_observation_count": 3,
+        "prospective_effective_trade_date": "2026-09-28"
+      },
+      "run_id": 36162893339
+    },
+    {
+      "finding": "9/23 and 9/24 were real trading days but PIT tasks ran without persisting bars/features because connector writes failed.",
+      "status": "FACT_LAYER_RECOVERED_NON_LIVE",
+      "action": "Recovered exact Longbridge completed daily bars only. No historical flow/features/forecast/Shadow were fabricated.",
+      "recovery": {
+        "core10_gap_bars": 20,
+        "added3_history_bars": 120,
+        "total_inserted_bars": 140,
+        "total_inserted_sources": 140
+      },
+      "provenance_gate": {
+        "historical_recovery_sources": 140,
+        "live_shadow_eligible": false
+      },
+      "run_id": 36163280243
+    },
+    {
+      "finding": "Feature Engine formulas were prompt-level rather than executable and realized-volatility semantics were not explicitly bound.",
+      "status": "CLOSED_FOR_CURRENT_FEATURE_SET",
+      "formula_identity": {
+        "high_30d": "max(high,last 30 completed bars)",
+        "low_30d": "min(low,last 30 completed bars)",
+        "drawdown_from_30d_high": "close/high_30d - 1",
+        "return_5d": "close_t/close_t-5 - 1",
+        "return_20d": "close_t/close_t-20 - 1",
+        "return_30d": "close_t/close_t-30 - 1",
+        "volume_ratio_5_20": "mean(volume,last5)/mean(volume,last20)",
+        "amount_ratio_5_20": "mean(turnover,last5)/mean(turnover,last20)",
+        "realized_vol_20d": "sample_std(ddof=1, last20 close-to-close log returns) * sqrt(252)"
+      },
+      "audit_anchor": "2026-09-22",
+      "exactness": {
+        "deterministic_features_max_abs_error": 0,
+        "amount_ratio_max_abs_error": 2.220446049250313e-16,
+        "realized_vol_max_abs_error": 1.1102230246251565e-16
+      },
+      "context_fields_on_anchor": "flow/sector/benchmark fields all NULL"
+    },
+    {
+      "finding": "PIT was prompt-only and depended on native Neon connector as a persistence single point of failure.",
+      "status": "CODE_READY_FIRST_LIVE_RUN_PENDING",
+      "action": "Installed immutable manifest pipeline: Longbridge -> runtime/pit_manifests/YYYY-MM-DD.json -> Live PIT Manifest Ingest -> Neon.",
+      "guards": [
+        "same China date",
+        "post-close",
+        "freshness <=4h",
+        "13/13 bars",
+        "completed candle",
+        "quote same-date and quote last=bar close",
+        "immutable source/fact conflict fail-closed",
+        "forecast/shadow protected"
+      ],
+      "first_prospective_validation_date": "2026-09-28"
+    },
+    {
+      "finding": "Core13 ranking/observation Shadow was prompt-only.",
+      "status": "CODE_READY_FIRST_LIVE_RUN_PENDING",
+      "action": "Installed immutable shadow request -> Shadow Ranking Observation writer.",
+      "ranking_candidate": "core10-stable-reversion-lowvol-candidate-v1",
+      "ranking_formula": "-0.25*(percent_rank(return_5d)+percent_rank(return_20d)+percent_rank(return_30d)+percent_rank(realized_vol_20d))",
+      "observation_scope": "WAT-core13-observation-v1",
+      "attestation_status_on_success": "PASS_RANKING_ONLY",
+      "first_prospective_validation_date": "2026-09-28"
+    },
+    {
+      "finding": "20D ranking settlement had no durable executable.",
+      "status": "CLOSED_CODE_READY",
+      "action": "Installed Ranking Shadow Settlement workflow triggered after successful PIT ingest; settlement occurs only after the 20th completed China trading session after anchor.",
+      "self_test": {
+        "run_id": 36165090798,
+        "result": "PASS",
+        "pending_checked": 0,
+        "settled_now": 0,
+        "still_pending": 0
+      },
+      "automatic_promotion": false
+    },
+    {
+      "finding": "probability-v1.6 `_probabilities` executable mathematical identity is missing from repo and retrievable project history.",
+      "status": "OPEN_BLOCKER",
+      "blocker_code": "PROBABILITY_V1_6_EXECUTABLE_MISSING",
+      "effect": "feature-baseline-v1 probability forecast remains blocked; forecast_runs/items must remain untouched.",
+      "prohibited": [
+        "guess formula from prose",
+        "map ranking score to probability",
+        "backfill past LIVE_SHADOW"
+      ]
+    }
+  ],
+  "runtime_controls": {
+    "pit_automation": "UPDATED_TO_IMMUTABLE_GITHUB_MANIFEST_PATH",
+    "shadow_automation": "UPDATED_TO_RANKING_OBSERVATION_REQUEST_PATH_WITH_PROBABILITY_BLOCKED",
+    "controller": "UPDATED_TO_GITHUB_NEON_BRIDGE_TRUTH_PRECEDENCE",
+    "static_gate": {
+      "workflow": "Runtime Bridge Static Check",
+      "latest_verified_run": 36165201869,
+      "status": "SUCCESS"
+    },
+    "no_model_promotion": true,
+    "no_production_weight_change": true,
+    "no_portfolio_mutation": true,
+    "no_brokerage_execution": true
+  },
+  "expected_zero_states": {
+    "probability_forecasts": "0 until probability-v1.6 executable is recovered and accepted",
+    "maturity_cohort_production_gates": "0 is expected before valid prospective forecast/ranking samples mature"
+  },
+  "next_required_events": [
+    "2026-09-28 16:18 Asia/Shanghai: first prospective Core13 immutable PIT manifest and Live PIT Manifest Ingest validation",
+    "2026-09-28 18:00 Asia/Shanghai: first prospective Core10 ranking-only + Core13 observation-only Shadow request/writer validation",
+    "Recover probability-v1.6 executable identity before enabling feature-baseline-v1 probability forecast"
+  ]
+}
