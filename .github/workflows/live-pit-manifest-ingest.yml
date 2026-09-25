@@ -1,0 +1,42 @@
+name: Live PIT Manifest Ingest
+
+on:
+  push:
+    paths:
+      - "runtime/pit_manifests/*.json"
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
+      - name: Resolve immutable PIT manifest
+        id: manifest
+        shell: bash
+        run: |
+          FILE="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep '^runtime/pit_manifests/.*\.json$' | head -n 1)"
+          test -n "$FILE" || { echo "::error::No PIT manifest in triggering commit"; exit 1; }
+          echo "path=$FILE" >> "$GITHUB_OUTPUT"
+      - name: Ingest live PIT manifest
+        env:
+          PIT_MANIFEST_PATH: ${{ steps.manifest.outputs.path }}
+        run: python scripts/live_pit_ingest.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-pit-ingest-${{ github.run_id }}
+          path: artifacts/live-pit-ingest-report.json
+          if-no-files-found: warn
+          retention-days: 30
