@@ -1,0 +1,47 @@
+name: Neon SQL Bridge
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-neon-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      NEON_BRIDGE_OUTPUT: artifacts/neon-truth.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PostgreSQL client library
+        run: python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
+
+      - name: Validate secret presence
+        shell: bash
+        run: |
+          if [ -z "${NEON_DATABASE_URL:-}" ]; then
+            echo "::error::Repository secret NEON_DATABASE_URL is missing."
+            exit 1
+          fi
+
+      - name: Run read-only Neon truth bridge
+        run: python scripts/neon_sql_bridge.py
+
+      - name: Upload truth artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-truth-${{ github.run_id }}
+          path: artifacts/neon-truth.json
+          if-no-files-found: warn
+          retention-days: 14
