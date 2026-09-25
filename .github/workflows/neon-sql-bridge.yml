@@ -2,6 +2,10 @@ name: Neon SQL Bridge
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/neon-sql-bridge.yml"
+      - "scripts/neon_sql_bridge.py"
 
 permissions:
   contents: read
