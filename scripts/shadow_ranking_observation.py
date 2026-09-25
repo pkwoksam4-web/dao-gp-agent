@@ -64,7 +64,7 @@ def main():
     now=datetime.now(timezone.utc).isoformat()
     req_hash=hashlib.sha256(req_path.read_bytes()).hexdigest()
     report={"trade_date_cn":td,"request_sha256":req_hash,"ranking_written":0,"observation_written":0,
-            "forecast_counts_before":{},"forecast_counts_after":{}}
+            "attestation_written":0,"forecast_counts_before":{},"forecast_counts_after":{}}
 
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
       with conn.cursor() as cur:
@@ -208,6 +208,41 @@ def main():
             """,(observation_id,td,panel_text,now))
             report["observation_written"]=1
 
+        evidence={
+          "schema":"agent-brain-live-shadow-attestation/v1",
+          "scope":"CORE10_RANKING_ONLY",
+          "snapshot_date":td,
+          "watchlist_id":"WAT-core10-final-v1",
+          "candidate_version":RANK_VERSION,
+          "strategy_run_id":strategy_id,
+          "core13_observation_id":observation_id,
+          "pit_manifest_path":req["pit_manifest_path"],
+          "shadow_request_sha256":req_hash,
+          "origin":"LIVE_SHADOW",
+          "context_safety":"PIT_SAFE",
+          "probability_forecast_generated":False,
+          "probability_blocker":"PROBABILITY_V1_6_EXECUTABLE_MISSING",
+          "automatic_promotion":False,
+          "production_ranking_use":False
+        }
+        evidence_text=json.dumps(evidence,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+        evidence_hash=hashlib.sha256(evidence_text.encode()).hexdigest()
+        att_id=f"LSA-CORE10-STABLE4-{td.replace('-','')}"
+        cur.execute("SELECT evidence_hash,evidence_json,status FROM live_shadow_run_attestations WHERE id=%s",(att_id,))
+        ex=cur.fetchone()
+        if ex:
+            if ex["evidence_hash"]!=evidence_hash or ex["evidence_json"]!=evidence_text or ex["status"]!="PASS_RANKING_ONLY":
+                raise RuntimeError(f"immutable live shadow attestation conflict: {att_id}")
+            report["attestation_written"]=0
+        else:
+            cur.execute("""
+              INSERT INTO live_shadow_run_attestations(
+                id,snapshot_date,watchlist_id,candidate_version,production_run_id,eod_snapshot_id,
+                environment_snapshot_id,status,evidence_json,evidence_hash,created_at)
+              VALUES (%s,%s,'WAT-core10-final-v1',%s,NULL,NULL,NULL,'PASS_RANKING_ONLY',%s,%s,%s)
+            """,(att_id,td,RANK_VERSION,evidence_text,evidence_hash,now))
+            report["attestation_written"]=1
+
         for t in ["forecast_runs","forecast_items"]:
             cur.execute(f"SELECT count(*) AS n FROM {t}")
             report["forecast_counts_after"][t]=cur.fetchone()["n"]
@@ -221,6 +256,7 @@ def main():
     print("trade_date_cn="+td)
     print("ranking_candidate_written=true")
     print("core13_observation_written=true")
+    print("ranking_attestation_written=true")
     print("probability_forecast_generated=false")
     print("probability_blocker=PROBABILITY_V1_6_EXECUTABLE_MISSING")
     print("forecast_tables_unchanged=true")
