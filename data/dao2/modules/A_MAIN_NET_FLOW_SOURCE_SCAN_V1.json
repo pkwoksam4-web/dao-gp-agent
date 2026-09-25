@@ -426,5 +426,13 @@
     },
     "interpretation": "Exact reconstruction is testable for a subset, especially Shenzhen/2023, but exact Tushare equivalence is not proven until Jessica-known four-field reconstruction reaches 100% exact match."
   },
-  "source_absence_matrix": "data/dao2/modules/A_SOURCE_ABSENCE_MATRIX_V1.json"
+  "source_absence_matrix": "data/dao2/modules/A_SOURCE_ABSENCE_MATRIX_V1.json",
+  "historical_l2_harness": {
+    "status": "READY_PENDING_PRIVATE_AUTHORIZATION",
+    "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
+    "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
+    "guard_run_id": 36157605173,
+    "guard_conclusion": "success",
+    "admission_gate": "No residual value may be written until a gated carrier reconstructs Jessica-known rows with 100% exact field-level match."
+  }
 }
