@@ -26,6 +26,9 @@ def stdev(xs, ddof):
 def close_returns(closes):
     return [closes[i]/closes[i-1]-1.0 for i in range(1,len(closes))]
 
+def log_returns(closes):
+    return [math.log(closes[i]/closes[i-1]) for i in range(1,len(closes))]
+
 def main():
     dsn=os.environ["NEON_DATABASE_URL"]
     report={"anchor":ANCHOR,"symbols":{},"candidate_errors":{}}
@@ -37,6 +40,13 @@ def main():
       "vol_20ret_ddof1_ann","vol_20ret_ddof0_ann",
       "vol_last20bars_19ret_ddof1_ann","vol_last20bars_19ret_ddof0_ann",
       "vol_20ret_ddof1_noann","vol_20ret_ddof0_noann",
+      "vol_log20_ddof1_ann252","vol_log20_ddof0_ann252",
+      "vol_log19_ddof1_ann252","vol_log19_ddof0_ann252",
+      "vol_20ret_ddof1_ann250","vol_20ret_ddof0_ann250",
+      "vol_20ret_ddof1_ann244","vol_20ret_ddof0_ann244",
+      "vol_log20_ddof1_ann250","vol_log20_ddof0_ann250",
+      "vol_log20_ddof1_ann244","vol_log20_ddof0_ann244",
+      "implied_ann_simple20_ddof0","implied_ann_log20_ddof0",
     ]
     agg={c:[] for c in candidates}
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
@@ -60,6 +70,7 @@ def main():
           vols=[float(r["volume"]) for r in rows]
           amts=[float(r["turnover"]) for r in rows]
           rets=close_returns(closes)
+          lrets=log_returns(closes)
           vals={
             "high30_last30":max(highs[-30:]),
             "high30_last31":max(highs[-31:]),
@@ -78,6 +89,20 @@ def main():
             "vol_last20bars_19ret_ddof0_ann":stdev(close_returns(closes[-20:]),0)*math.sqrt(252),
             "vol_20ret_ddof1_noann":stdev(rets[-20:],1),
             "vol_20ret_ddof0_noann":stdev(rets[-20:],0),
+            "vol_log20_ddof1_ann252":stdev(lrets[-20:],1)*math.sqrt(252),
+            "vol_log20_ddof0_ann252":stdev(lrets[-20:],0)*math.sqrt(252),
+            "vol_log19_ddof1_ann252":stdev(log_returns(closes[-20:]),1)*math.sqrt(252),
+            "vol_log19_ddof0_ann252":stdev(log_returns(closes[-20:]),0)*math.sqrt(252),
+            "vol_20ret_ddof1_ann250":stdev(rets[-20:],1)*math.sqrt(250),
+            "vol_20ret_ddof0_ann250":stdev(rets[-20:],0)*math.sqrt(250),
+            "vol_20ret_ddof1_ann244":stdev(rets[-20:],1)*math.sqrt(244),
+            "vol_20ret_ddof0_ann244":stdev(rets[-20:],0)*math.sqrt(244),
+            "vol_log20_ddof1_ann250":stdev(lrets[-20:],1)*math.sqrt(250),
+            "vol_log20_ddof0_ann250":stdev(lrets[-20:],0)*math.sqrt(250),
+            "vol_log20_ddof1_ann244":stdev(lrets[-20:],1)*math.sqrt(244),
+            "vol_log20_ddof0_ann244":stdev(lrets[-20:],0)*math.sqrt(244),
+            "implied_ann_simple20_ddof0":(float(stored["realized_vol_20d"])/stdev(rets[-20:],0))**2,
+            "implied_ann_log20_ddof0":(float(stored["realized_vol_20d"])/stdev(lrets[-20:],0))**2,
           }
           targets={
             "high30_last30":stored["high_30d"],
@@ -97,6 +122,20 @@ def main():
             "vol_last20bars_19ret_ddof0_ann":stored["realized_vol_20d"],
             "vol_20ret_ddof1_noann":stored["realized_vol_20d"],
             "vol_20ret_ddof0_noann":stored["realized_vol_20d"],
+            "vol_log20_ddof1_ann252":stored["realized_vol_20d"],
+            "vol_log20_ddof0_ann252":stored["realized_vol_20d"],
+            "vol_log19_ddof1_ann252":stored["realized_vol_20d"],
+            "vol_log19_ddof0_ann252":stored["realized_vol_20d"],
+            "vol_20ret_ddof1_ann250":stored["realized_vol_20d"],
+            "vol_20ret_ddof0_ann250":stored["realized_vol_20d"],
+            "vol_20ret_ddof1_ann244":stored["realized_vol_20d"],
+            "vol_20ret_ddof0_ann244":stored["realized_vol_20d"],
+            "vol_log20_ddof1_ann250":stored["realized_vol_20d"],
+            "vol_log20_ddof0_ann250":stored["realized_vol_20d"],
+            "vol_log20_ddof1_ann244":stored["realized_vol_20d"],
+            "vol_log20_ddof0_ann244":stored["realized_vol_20d"],
+            "implied_ann_simple20_ddof0":None,
+            "implied_ann_log20_ddof0":None,
           }
           errors={}
           for k,v in vals.items():
