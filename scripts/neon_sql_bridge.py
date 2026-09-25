@@ -308,7 +308,7 @@ def main() -> None:
     print(f"database={report['database'].get('database')}")
     print(f"public_table_count={report['database'].get('public_table_count')}")
     print("table_name_matches=" + json.dumps(report["table_name_matches"], ensure_ascii=False))
-    for table in ["sources","market_bars","stock_feature_snapshots","provider_sync_runs","forecast_runs","forecast_items","shadow_strategy_runs","live_shadow_run_attestations","watchlists","watchlist_items"]:
+    for table in ["sources","market_bars","market_quotes","capital_flows","stock_feature_snapshots","provider_sync_runs","forecast_runs","forecast_items","shadow_strategy_runs","live_shadow_run_attestations","watchlists","watchlist_items"]:
         audit = report["schema_audit"].get(table, {})
         if audit:
             print("schema_summary[" + table + "]=" + json.dumps({
