@@ -1,0 +1,37 @@
+name: Runtime Bridge Static Check
+
+on:
+  push:
+    paths:
+      - "scripts/live_pit_ingest.py"
+      - "scripts/shadow_ranking_observation.py"
+      - "scripts/pit_gap_recovery.py"
+      - "scripts/core13_runtime_patch.py"
+      - "scripts/neon_sql_bridge.py"
+      - "scripts/feature_formula_audit.py"
+      - ".github/workflows/runtime-bridge-static-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile runtime bridge scripts
+        run: |
+          python -m py_compile \
+            scripts/live_pit_ingest.py \
+            scripts/shadow_ranking_observation.py \
+            scripts/pit_gap_recovery.py \
+            scripts/core13_runtime_patch.py \
+            scripts/neon_sql_bridge.py \
+            scripts/feature_formula_audit.py
+      - name: Validate recovery manifest JSON
+        run: python -m json.tool recovery/manifests/2026-09-25-core13-pit-gap-recovery.json >/dev/null
