@@ -147,7 +147,9 @@ def main():
             "stored":{k:stored[k] for k in [
               "close","high_30d","low_30d","drawdown_from_30d_high",
               "return_5d","return_20d","return_30d","volume_ratio_5_20",
-              "amount_ratio_5_20","realized_vol_20d"
+              "amount_ratio_5_20","realized_vol_20d",
+              "flow_latest","flow_5_obs_mean","flow_positive_share","flow_persistence",
+              "stock_vs_sector_20d","stock_vs_benchmark_20d"
             ]},
             "computed":vals,
             "abs_error":errors,
@@ -160,6 +162,13 @@ def main():
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(report,ensure_ascii=False,indent=2,default=str),encoding="utf-8")
     print("FEATURE_FORMULA_AUDIT_DONE")
+    flow_summary = {
+      s: {k: report["symbols"][s]["stored"][k] for k in [
+        "flow_latest","flow_5_obs_mean","flow_positive_share","flow_persistence",
+        "stock_vs_sector_20d","stock_vs_benchmark_20d"
+      ]} for s in CORE10
+    }
+    print("stored_context_fields=" + json.dumps(flow_summary, ensure_ascii=False, default=str))
     for k,v in report["candidate_errors"].items():
       print(f"{k}: max_abs_error={v['max_abs_error']}")
 if __name__=="__main__":
