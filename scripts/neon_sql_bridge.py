@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,10 +59,40 @@ def fail(msg: str, code: int = 1) -> None:
     raise SystemExit(code)
 
 
+def normalize_dsn(raw: str) -> str:
+    """Accept pure URI, DATABASE_URL=..., or a copied Neon psql command."""
+    value = raw.strip()
+    if not value:
+        return value
+
+    if value.startswith("DATABASE_URL=") or value.startswith("NEON_DATABASE_URL="):
+        value = value.split("=", 1)[1].strip()
+
+    if value.startswith("psql "):
+        try:
+            parts = shlex.split(value)
+        except ValueError:
+            parts = value.split()
+        candidates = [
+            p for p in parts
+            if p.startswith("postgresql://") or p.startswith("postgres://")
+        ]
+        if candidates:
+            value = candidates[0]
+
+    value = value.strip().strip("'").strip('"')
+    return value
+
+
 def main() -> None:
-    dsn = os.getenv("NEON_DATABASE_URL", "").strip()
+    dsn = normalize_dsn(os.getenv("NEON_DATABASE_URL", ""))
     if not dsn:
         fail("NEON_DATABASE_URL secret is missing.")
+    if not (dsn.startswith("postgresql://") or dsn.startswith("postgres://")):
+        fail(
+            "NEON_DATABASE_URL is present but not a PostgreSQL URI after normalization. "
+            "Expected postgresql://... or a copied Neon psql command."
+        )
 
     output_path = Path(os.getenv("NEON_BRIDGE_OUTPUT", "artifacts/neon-truth.json"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
