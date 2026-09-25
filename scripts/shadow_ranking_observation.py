@@ -110,7 +110,7 @@ def main():
         for s in CORE10:
             score=-0.25*sum(ranks[f][s] for f in factors)
             ranking.append({
-              "symbol":s,"candidate_score":score,
+              "symbol":s,"candidate_score":score,"anchor_close":by[s]["close"],
               "return_5d":by[s]["return_5d"],"return_20d":by[s]["return_20d"],
               "return_30d":by[s]["return_30d"],"realized_vol_20d":by[s]["realized_vol_20d"],
               "percent_rank":{f:ranks[f][s] for f in factors},
@@ -126,17 +126,22 @@ def main():
           "request_sha256":req_hash,
         }
         daily={"trade_date":td,"ranking":ranking}
-        cur.execute("""
-          INSERT INTO shadow_strategy_runs(id,watchlist_id,horizon_days,start_date,end_date,top_fraction,
-            transaction_cost_bps,mode,metrics_json,daily_json,created_at)
-          VALUES (%s,'WAT-core10-final-v1',20,%s,%s,0.30,0,
-            %s,%s,%s,%s)
-          ON CONFLICT(id) DO NOTHING
-        """,(f"SSR-CORE10-STABLE4-{td.replace('-','')}",td,td,
-             f"LIVE_SHADOW_RANKING_ONLY|{RANK_VERSION}",
-             json.dumps(metrics,ensure_ascii=False,separators=(",",":")),
-             json.dumps(daily,ensure_ascii=False,separators=(",",":")),now))
-        report["ranking_written"]=max(cur.rowcount,0)
+        strategy_id=f"SSR-CORE10-STABLE4-{td.replace('-','')}"
+        metrics_text=json.dumps(metrics,ensure_ascii=False,separators=(",",":"))
+        daily_text=json.dumps(daily,ensure_ascii=False,separators=(",",":"))
+        cur.execute("SELECT metrics_json,daily_json FROM shadow_strategy_runs WHERE id=%s",(strategy_id,))
+        existing=cur.fetchone()
+        if existing:
+            if existing["metrics_json"]!=metrics_text or existing["daily_json"]!=daily_text:
+                raise RuntimeError(f"immutable ranking Shadow conflict: {strategy_id}")
+            report["ranking_written"]=0
+        else:
+            cur.execute("""
+              INSERT INTO shadow_strategy_runs(id,watchlist_id,horizon_days,start_date,end_date,top_fraction,
+                transaction_cost_bps,mode,metrics_json,daily_json,created_at)
+              VALUES (%s,'WAT-core10-final-v1',20,%s,%s,0.30,0,%s,%s,%s,%s)
+            """,(strategy_id,td,td,f"LIVE_SHADOW_RANKING_ONLY|{RANK_VERSION}",metrics_text,daily_text,now))
+            report["ranking_written"]=1
 
         panel=[]
         for s in CORE13:
@@ -183,17 +188,25 @@ def main():
               "accumulation_evidence_reason":"RULE_NOT_FROZEN",
               "origin":"LIVE_SHADOW","context_safety":"PIT_SAFE",
             })
-        cur.execute("""
-          INSERT INTO shadow_observation_snapshots(id,watchlist_id,snapshot_date,panel_json,created_at)
-          VALUES (%s,'WAT-core13-observation-v1',%s,%s,%s)
-          ON CONFLICT(id) DO NOTHING
-        """,(f"SOS-CORE13-{td.replace('-','')}",td,json.dumps({
+        observation_id=f"SOS-CORE13-{td.replace('-','')}"
+        panel_text=json.dumps({
              "trade_date":td,"origin":"LIVE_SHADOW","context_safety":"PIT_SAFE",
              "forecast_probability_generated":False,
              "probability_blocker":"PROBABILITY_V1_6_EXECUTABLE_MISSING",
              "request_sha256":req_hash,"panel":panel
-           },ensure_ascii=False,separators=(",",":")),now))
-        report["observation_written"]=max(cur.rowcount,0)
+           },ensure_ascii=False,separators=(",",":"))
+        cur.execute("SELECT panel_json FROM shadow_observation_snapshots WHERE id=%s",(observation_id,))
+        existing=cur.fetchone()
+        if existing:
+            if existing["panel_json"]!=panel_text:
+                raise RuntimeError(f"immutable observation Shadow conflict: {observation_id}")
+            report["observation_written"]=0
+        else:
+            cur.execute("""
+              INSERT INTO shadow_observation_snapshots(id,watchlist_id,snapshot_date,panel_json,created_at)
+              VALUES (%s,'WAT-core13-observation-v1',%s,%s,%s)
+            """,(observation_id,td,panel_text,now))
+            report["observation_written"]=1
 
         for t in ["forecast_runs","forecast_items"]:
             cur.execute(f"SELECT count(*) AS n FROM {t}")
