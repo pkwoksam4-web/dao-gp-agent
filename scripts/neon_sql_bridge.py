@@ -143,6 +143,8 @@ def main() -> None:
         "database": {},
         "tables": {},
         "details": {},
+        "schema_audit": {},
+        "table_name_matches": {},
     }
 
     try:
@@ -173,6 +175,11 @@ def main() -> None:
                 existing = {r["table_name"] for r in cur.fetchall()}
                 report["database"]["public_table_count"] = len(existing)
 
+                for keyword in ["watch", "universe", "symbol", "forecast", "shadow", "source", "feature", "sync"]:
+                    report["table_name_matches"][keyword] = sorted(
+                        t for t in existing if keyword in t.lower()
+                    )
+
                 for table in TARGET_TABLES:
                     if table not in existing:
                         report["tables"][table] = {"exists": False}
@@ -188,6 +195,51 @@ def main() -> None:
                         (table,),
                     )
                     columns = [r["column_name"] for r in cur.fetchall()]
+
+                    cur.execute(
+                        """
+                        SELECT column_name, data_type, is_nullable, column_default
+                        FROM information_schema.columns
+                        WHERE table_schema='public' AND table_name=%s
+                        ORDER BY ordinal_position
+                        """,
+                        (table,),
+                    )
+                    column_defs = [dict(r) for r in cur.fetchall()]
+
+                    cur.execute(
+                        """
+                        SELECT tc.constraint_name, tc.constraint_type,
+                               array_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS columns
+                        FROM information_schema.table_constraints tc
+                        LEFT JOIN information_schema.key_column_usage kcu
+                          ON tc.constraint_name=kcu.constraint_name
+                         AND tc.table_schema=kcu.table_schema
+                         AND tc.table_name=kcu.table_name
+                        WHERE tc.table_schema='public' AND tc.table_name=%s
+                        GROUP BY tc.constraint_name, tc.constraint_type
+                        ORDER BY tc.constraint_type, tc.constraint_name
+                        """,
+                        (table,),
+                    )
+                    constraints = [dict(r) for r in cur.fetchall()]
+
+                    cur.execute(
+                        """
+                        SELECT indexname, indexdef
+                        FROM pg_indexes
+                        WHERE schemaname='public' AND tablename=%s
+                        ORDER BY indexname
+                        """,
+                        (table,),
+                    )
+                    indexes = [dict(r) for r in cur.fetchall()]
+
+                    report["schema_audit"][table] = {
+                        "columns": column_defs,
+                        "constraints": constraints,
+                        "indexes": indexes,
+                    }
 
                     cur.execute(
                         sql.SQL("SELECT count(*)::bigint AS n FROM public.{}").format(
@@ -248,6 +300,7 @@ def main() -> None:
     print("Neon read-only bridge PASS")
     print(f"database={report['database'].get('database')}")
     print(f"public_table_count={report['database'].get('public_table_count')}")
+    print("table_name_matches=" + json.dumps(report["table_name_matches"], ensure_ascii=False))
     for table in TARGET_TABLES:
         state = report["tables"].get(table, {})
         if state.get("exists"):
