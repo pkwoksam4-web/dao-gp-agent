@@ -1,0 +1,42 @@
+name: Shadow Ranking Observation
+
+on:
+  push:
+    paths:
+      - "runtime/shadow_requests/*.json"
+
+permissions:
+  contents: read
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
+      - name: Resolve shadow request
+        id: req
+        shell: bash
+        run: |
+          FILE="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep '^runtime/shadow_requests/.*\.json$' | head -n 1)"
+          test -n "$FILE" || { echo "::error::No shadow request in triggering commit"; exit 1; }
+          echo "path=$FILE" >> "$GITHUB_OUTPUT"
+      - name: Write prospective ranking and observation Shadow
+        env:
+          SHADOW_REQUEST_PATH: ${{ steps.req.outputs.path }}
+        run: python scripts/shadow_ranking_observation.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-ranking-observation-${{ github.run_id }}
+          path: artifacts/shadow-ranking-observation-report.json
+          if-no-files-found: warn
+          retention-days: 30
