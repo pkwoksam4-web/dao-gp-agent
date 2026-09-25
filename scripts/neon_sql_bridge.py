@@ -19,6 +19,7 @@ from psycopg import sql
 from psycopg.rows import dict_row
 
 TARGET_TABLES = [
+    "sources",
     "market_bars",
     "market_quotes",
     "capital_flows",
@@ -49,7 +50,9 @@ PREFERRED_TIME_COLUMNS = [
 ]
 
 DETAIL_TABLES = {
-    "provider_sync_runs": 20,
+    "sources": 30,
+    "stock_feature_snapshots": 30,
+    "provider_sync_runs": 30,
     "forecast_runs": 20,
     "forecast_items": 40,
     "live_shadow_run_attestations": 20,
