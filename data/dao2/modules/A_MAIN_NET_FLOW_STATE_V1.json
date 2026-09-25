@@ -300,6 +300,16 @@
       "source_identity_pass": false,
       "result": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
       "evidence_file": "data/dao2/modules/A_PANGUCHENG_HISTORICAL_CARRIER_AUDIT_V1.json"
+    },
+    "historical_l2_harness": {
+      "status": "READY_PENDING_PRIVATE_AUTHORIZATION",
+      "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
+      "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
+      "guard_run_id": 36157605173,
+      "guard_conclusion": "success",
+      "head_sha": "afac299f72394159c9c11b7a8504dd3266c9459f",
+      "strict_admission_allowed": false,
+      "required_next_gate": "Acquire gated raw L2 bytes, reconstruct Jessica-known rows first, require 100% exact four-field overlap before any residual admission."
     }
   }
 }
