@@ -1,0 +1,30 @@
+name: Core13 Runtime Patch
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/core13_runtime_patch.py"
+      - ".github/workflows/core13-runtime-patch.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
+      - name: Validate secret
+        shell: bash
+        run: |
+          test -n "${NEON_DATABASE_URL:-}" || { echo "::error::NEON_DATABASE_URL missing"; exit 1; }
+      - name: Apply idempotent Core13 runtime patch
+        run: python scripts/core13_runtime_patch.py
