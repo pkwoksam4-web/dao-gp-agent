@@ -1,11 +1,14 @@
 import importlib.util
 from pathlib import Path
+import sys
 import unittest
 
 MODULE_PATH = Path(__file__).with_name("dao2_a_l2_reconstruction_harness_v1.py")
-spec = importlib.util.spec_from_file_location("dao2_a_l2_reconstruction_harness_v1", MODULE_PATH)
+MODULE_NAME = "dao2_a_l2_reconstruction_harness_v1"
+spec = importlib.util.spec_from_file_location(MODULE_NAME, MODULE_PATH)
 m = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
+sys.modules[MODULE_NAME] = m
 spec.loader.exec_module(m)
 
 
@@ -20,13 +23,13 @@ class L2HarnessTests(unittest.TestCase):
 
     def test_shenzhen_original_order_bucket_aggregation(self):
         orders = [
-            m.CanonicalOrder("000001.SZ", "20230320", 101, "B", 10.0, 30_000),  # 300k large
-            m.CanonicalOrder("000001.SZ", "20230320", 202, "S", 12.0, 100_000), # 1.2m elg
+            m.CanonicalOrder("000001.SZ", "20230320", 101, "B", 10.0, 30_000),
+            m.CanonicalOrder("000001.SZ", "20230320", 202, "S", 12.0, 100_000),
         ]
         trades = [
-            m.CanonicalTrade("000001.SZ", "20230320", 1, "B", 10.0, 10_000, 999, 101), # 100k execution
-            m.CanonicalTrade("000001.SZ", "20230320", 2, "B", 10.0, 5_000, 998, 101),  # 50k execution
-            m.CanonicalTrade("000001.SZ", "20230320", 3, "S", 12.0, 20_000, 202, 997), # 240k execution
+            m.CanonicalTrade("000001.SZ", "20230320", 1, "B", 10.0, 10_000, 999, 101),
+            m.CanonicalTrade("000001.SZ", "20230320", 2, "B", 10.0, 5_000, 998, 101),
+            m.CanonicalTrade("000001.SZ", "20230320", 3, "S", 12.0, 20_000, 202, 997),
         ]
         out = m.reconstruct(orders, trades, "000001.SZ", "20230320")
         self.assertEqual(out["buy_lg_amount"], 15.0)
