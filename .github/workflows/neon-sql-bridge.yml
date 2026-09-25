@@ -1,4 +1,5 @@
 name: Neon SQL Bridge
+# secret-refresh-probe: 2026-09-25T16:38Z
 
 on:
   workflow_dispatch:
