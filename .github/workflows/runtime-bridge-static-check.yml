@@ -9,6 +9,7 @@ on:
       - "scripts/core13_runtime_patch.py"
       - "scripts/neon_sql_bridge.py"
       - "scripts/feature_formula_audit.py"
+      - "scripts/ranking_shadow_settlement.py"
       - ".github/workflows/runtime-bridge-static-check.yml"
   workflow_dispatch:
 
@@ -32,6 +33,7 @@ jobs:
             scripts/pit_gap_recovery.py \
             scripts/core13_runtime_patch.py \
             scripts/neon_sql_bridge.py \
-            scripts/feature_formula_audit.py
+            scripts/feature_formula_audit.py \
+            scripts/ranking_shadow_settlement.py
       - name: Validate recovery manifest JSON
         run: python -m json.tool recovery/manifests/2026-09-25-core13-pit-gap-recovery.json >/dev/null
