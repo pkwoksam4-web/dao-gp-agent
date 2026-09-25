@@ -42,19 +42,31 @@ def src_id(td: str, symbol: str, dataset: str) -> str:
 
 def insert_source(cur, *, sid, symbol, dataset, published_at, retrieved_at, raw, manifest_sha):
     rt=raw_text(raw)
+    rh=hashlib.sha256(rt.encode()).hexdigest()
     metadata={
       "dataset":dataset,"provider":"longbridge","mode":"LIVE_PIT",
       "trade_date":sh_dt(published_at).date().isoformat() if published_at else None,
       "live_shadow_eligible":True,"retrospective_live_shadow_backfill":False,
       "manifest_sha256":manifest_sha,
     }
+    cur.execute("SELECT raw_hash,metadata_json FROM sources WHERE id=%s",(sid,))
+    existing=cur.fetchone()
+    if existing:
+        if existing["raw_hash"] != rh:
+            raise RuntimeError(f"immutable source conflict: {sid}")
+        try:
+            em=json.loads(existing["metadata_json"])
+        except Exception:
+            em={}
+        if em.get("manifest_sha256") not in (None,manifest_sha):
+            raise RuntimeError(f"immutable manifest conflict for source: {sid}")
+        return rt, False
     cur.execute("""
       INSERT INTO sources(id,source_type,publisher,uri,published_at,retrieved_at,raw_hash,reliability,metadata_json)
       VALUES (%s,'PROVIDER_MARKET_DATA','Longbridge',%s,%s,%s,%s,0.95,%s)
-      ON CONFLICT(id) DO NOTHING
     """,(sid,f"longbridge://{dataset}/{symbol}",published_at,retrieved_at,
-         hashlib.sha256(rt.encode()).hexdigest(),json.dumps(metadata,ensure_ascii=False,separators=(",",":"))))
-    return rt
+         rh,json.dumps(metadata,ensure_ascii=False,separators=(",",":"))))
+    return rt, True
 
 def compute_features(cur, symbol: str, td: str):
     cur.execute("""
@@ -131,6 +143,15 @@ def main():
         q=x.get("quote")
         if not q or not q.get("raw") or not q.get("normalized"):
             raise RuntimeError(f"{x['symbol']}: quote missing")
+        qn=q["normalized"]
+        if sh_dt(qn["as_of"]).date().isoformat()!=td:
+            raise RuntimeError(f"{x['symbol']}: quote date mismatch")
+        if qn.get("last") is not None and abs(float(qn["last"])-float(raw["close"]))>1e-9:
+            raise RuntimeError(f"{x['symbol']}: post-close quote last != daily close")
+        fl=x.get("capital_flow")
+        if fl and fl.get("normalized"):
+            if sh_dt(fl["normalized"]["flow_time"]).date().isoformat()!=td:
+                raise RuntimeError(f"{x['symbol']}: capital flow date mismatch")
 
     report={"schema":"agent-brain-live-pit-ingest-report/v1","manifest_path":p,"manifest_sha256":manifest_sha,
             "trade_date_cn":td,"inserted":{"bars":0,"quotes":0,"flows":0,"features":0,"sources":0},
@@ -149,9 +170,9 @@ def main():
           s=x["symbol"]; b=x["bar"]; br=b["raw"]
           sid=src_id(td,s,"bar")
           before=cur.rowcount
-          bt=insert_source(cur,sid=sid,symbol=s,dataset="candlesticks",published_at=br["timestamp"],
+          bt,source_new=insert_source(cur,sid=sid,symbol=s,dataset="candlesticks",published_at=br["timestamp"],
                            retrieved_at=retrieved,raw=br,manifest_sha=manifest_sha)
-          if cur.rowcount==1: report["inserted"]["sources"]+=1
+          if source_new: report["inserted"]["sources"]+=1
           cur.execute("""
             SELECT close FROM market_bars
             WHERE symbol=%s AND period='day' AND provider='longbridge' AND trade_time < %s
@@ -164,33 +185,52 @@ def main():
             ON CONFLICT(symbol,trade_time,period,provider) DO NOTHING
           """,(s,br["timestamp"],float(br["open"]),float(br["high"]),float(br["low"]),float(br["close"]),
                prev["close"] if prev else None,float(br["volume"]),float(br["turnover"]),sid,bt))
+          if cur.rowcount==0:
+              cur.execute("""SELECT raw_json,source_id FROM market_bars
+                             WHERE symbol=%s AND trade_time=%s AND period='day' AND provider='longbridge'""",
+                          (s,br["timestamp"]))
+              ex=cur.fetchone()
+              if not ex or raw_text(json.loads(ex["raw_json"]))!=bt or ex["source_id"]!=sid:
+                  raise RuntimeError(f"immutable market_bar conflict: {s} {td}")
           report["inserted"]["bars"]+=max(cur.rowcount,0)
 
           q=x["quote"]; qn=q["normalized"]; qraw=q["raw"]
           qsid=src_id(td,s,"quote")
-          qt=insert_source(cur,sid=qsid,symbol=s,dataset="quote",published_at=qn["as_of"],
+          qt,source_new=insert_source(cur,sid=qsid,symbol=s,dataset="quote",published_at=qn["as_of"],
                            retrieved_at=retrieved,raw=qraw,manifest_sha=manifest_sha)
-          if cur.rowcount==1: report["inserted"]["sources"]+=1
+          if source_new: report["inserted"]["sources"]+=1
           cur.execute("""
             INSERT INTO market_quotes(symbol,as_of,provider,last,prev_close,open,high,low,volume,turnover,source_id,raw_json)
             VALUES (%s,%s,'longbridge',%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT(symbol,as_of,provider) DO NOTHING
           """,(s,qn["as_of"],qn.get("last"),qn.get("prev_close"),qn.get("open"),qn.get("high"),qn.get("low"),
                qn.get("volume"),qn.get("turnover"),qsid,qt))
+          if cur.rowcount==0:
+              cur.execute("""SELECT raw_json,source_id FROM market_quotes
+                             WHERE symbol=%s AND as_of=%s AND provider='longbridge'""",(s,qn["as_of"]))
+              ex=cur.fetchone()
+              if not ex or raw_text(json.loads(ex["raw_json"]))!=qt or ex["source_id"]!=qsid:
+                  raise RuntimeError(f"immutable market_quote conflict: {s} {td}")
           report["inserted"]["quotes"]+=max(cur.rowcount,0)
 
           fl=x.get("capital_flow")
           if fl and fl.get("raw") and fl.get("normalized"):
             fn=fl["normalized"]; fraw=fl["raw"]
             fsid=src_id(td,s,"flow")
-            ft=insert_source(cur,sid=fsid,symbol=s,dataset="capital_flow",published_at=fn["flow_time"],
+            ft,source_new=insert_source(cur,sid=fsid,symbol=s,dataset="capital_flow",published_at=fn["flow_time"],
                              retrieved_at=retrieved,raw=fraw,manifest_sha=manifest_sha)
-            if cur.rowcount==1: report["inserted"]["sources"]+=1
+            if source_new: report["inserted"]["sources"]+=1
             cur.execute("""
               INSERT INTO capital_flows(symbol,flow_time,provider,net_flow,large_net,medium_net,small_net,source_id,raw_json)
               VALUES (%s,%s,'longbridge',%s,%s,%s,%s,%s,%s)
               ON CONFLICT(symbol,flow_time,provider) DO NOTHING
             """,(s,fn["flow_time"],fn.get("net_flow"),fn.get("large_net"),fn.get("medium_net"),fn.get("small_net"),fsid,ft))
+            if cur.rowcount==0:
+                cur.execute("""SELECT raw_json,source_id FROM capital_flows
+                               WHERE symbol=%s AND flow_time=%s AND provider='longbridge'""",(s,fn["flow_time"]))
+                ex=cur.fetchone()
+                if not ex or raw_text(json.loads(ex["raw_json"]))!=ft or ex["source_id"]!=fsid:
+                    raise RuntimeError(f"immutable capital_flow conflict: {s} {td}")
             report["inserted"]["flows"]+=max(cur.rowcount,0)
 
         cur.execute("""
