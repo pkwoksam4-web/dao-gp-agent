@@ -33,6 +33,8 @@ TARGET_TABLES = [
     "settlement_integrity_snapshots",
     "shadow_cohort_snapshots",
     "production_verification_gate_runs",
+    "watchlists",
+    "watchlist_items",
 ]
 
 PREFERRED_TIME_COLUMNS = [
@@ -52,6 +54,8 @@ DETAIL_TABLES = {
     "forecast_items": 40,
     "live_shadow_run_attestations": 20,
     "shadow_strategy_runs": 20,
+    "watchlists": 20,
+    "watchlist_items": 100,
 }
 
 
@@ -301,6 +305,14 @@ def main() -> None:
     print(f"database={report['database'].get('database')}")
     print(f"public_table_count={report['database'].get('public_table_count')}")
     print("table_name_matches=" + json.dumps(report["table_name_matches"], ensure_ascii=False))
+    for table in ["sources","market_bars","stock_feature_snapshots","provider_sync_runs","forecast_runs","forecast_items","shadow_strategy_runs","live_shadow_run_attestations","watchlists","watchlist_items"]:
+        audit = report["schema_audit"].get(table, {})
+        if audit:
+            print("schema_summary[" + table + "]=" + json.dumps({
+                "columns": audit.get("columns", []),
+                "constraints": audit.get("constraints", []),
+                "indexes": audit.get("indexes", []),
+            }, ensure_ascii=False, default=str))
     for table in TARGET_TABLES:
         state = report["tables"].get(table, {})
         if state.get("exists"):
