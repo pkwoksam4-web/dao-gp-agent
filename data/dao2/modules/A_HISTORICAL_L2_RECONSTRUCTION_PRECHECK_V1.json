@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_HISTORICAL_L2_RECONSTRUCTION_PRECHECK_V1",
   "version": "1.0",
-  "as_of": "2026-09-23",
+  "as_of": "2026-09-25",
   "module": "A_MAIN_NET_FLOW",
   "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
   "status": "PRIVATE_L2_CARRIER_FOUND_AUTHORIZATION_REQUIRED",
@@ -174,5 +174,26 @@
     "provider": "Hugging Face",
     "credential_handling": "Do not paste tokens into chat. Connect/login through the supported Hugging Face integration or provider UI, then request dataset access.",
     "reason": "Both useful L2 datasets are gated. Raw file access is required before any exact-overlap or residual reconstruction can be performed."
+  },
+  "engineering_readiness": {
+    "status": "HARNESS_READY_PENDING_PRIVATE_DATA_ACCESS",
+    "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
+    "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
+    "guard_workflow": ".github/workflows/dao2-a-l2-reconstruction-harness-guard-v1.yml",
+    "guard_run_id": 36157605173,
+    "guard_conclusion": "success",
+    "guard_head_sha": "afac299f72394159c9c11b7a8504dd3266c9459f",
+    "capabilities": [
+      "symbol/date targeted extraction from CSV or Parquet",
+      "original-order-id linkage",
+      "aggressor-side normalization",
+      "original-order-notional bucket classification",
+      "daily small/medium/large/extra-large buy/sell aggregation",
+      "10k-CNY output normalization",
+      "raw-file SHA256 provenance writer",
+      "strict fail-closed rejection for missing order IDs, side mismatches, unknown sides/types",
+      "Shanghai strict reconstruction disabled unless explicitly experimental"
+    ],
+    "admission_status": "NO_RESIDUAL_ADMISSION_ALLOWED_UNTIL_JESSICA_EXACT_OVERLAP_PASS"
   }
 }
