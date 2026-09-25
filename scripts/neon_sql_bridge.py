@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import sys
 from datetime import datetime, timezone
@@ -60,38 +61,75 @@ def fail(msg: str, code: int = 1) -> None:
 
 
 def normalize_dsn(raw: str) -> str:
-    """Accept pure URI, DATABASE_URL=..., or a copied Neon psql command."""
+    """Accept common Neon clipboard formats without exposing the secret."""
     value = raw.strip()
     if not value:
         return value
 
+    # Direct URI, optionally wrapped in an env assignment.
     if value.startswith("DATABASE_URL=") or value.startswith("NEON_DATABASE_URL="):
         value = value.split("=", 1)[1].strip()
 
-    if value.startswith("psql "):
-        try:
-            parts = shlex.split(value)
-        except ValueError:
-            parts = value.split()
-        candidates = [
-            p for p in parts
-            if p.startswith("postgresql://") or p.startswith("postgres://")
-        ]
-        if candidates:
-            value = candidates[0]
+    # Extract a PostgreSQL URI from any copied command/text block.
+    uri_match = re.search(r"postgres(?:ql)?://[^\\s'\\\"]+", value)
+    if uri_match:
+        return uri_match.group(0).strip()
 
-    value = value.strip().strip("'").strip('"')
-    return value
+    # Standard libpq conninfo: host=... dbname=... user=... password=...
+    lowered = value.lower()
+    if "host=" in lowered and ("dbname=" in lowered or "database=" in lowered) and "user=" in lowered:
+        return value.replace("\\n", " ").strip()
+
+    # Environment-style connection details: PGHOST=..., PGDATABASE=..., etc.
+    try:
+        tokens = shlex.split(value.replace("\n", " "))
+    except ValueError:
+        tokens = value.replace("\n", " ").split()
+
+    env_map = {}
+    for token in tokens:
+        if "=" not in token:
+            continue
+        key, val = token.split("=", 1)
+        if key in {
+            "PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD",
+            "PGSSLMODE", "PGCHANNELBINDING"
+        }:
+            env_map[key] = val.strip().strip("'").strip('"')
+
+    if env_map.get("PGHOST") and env_map.get("PGDATABASE") and env_map.get("PGUSER"):
+        parts = [
+            f"host={env_map['PGHOST']}",
+            f"dbname={env_map['PGDATABASE']}",
+            f"user={env_map['PGUSER']}",
+        ]
+        if env_map.get("PGPORT"):
+            parts.append(f"port={env_map['PGPORT']}")
+        if env_map.get("PGPASSWORD"):
+            # libpq quotes single quotes and backslashes with backslashes.
+            pw = env_map["PGPASSWORD"].replace("\\\\", "\\\\\\\\").replace("'", "\\'")
+            parts.append(f"password='{pw}'")
+        if env_map.get("PGSSLMODE"):
+            parts.append(f"sslmode={env_map['PGSSLMODE']}")
+        if env_map.get("PGCHANNELBINDING"):
+            parts.append(f"channel_binding={env_map['PGCHANNELBINDING']}")
+        return " ".join(parts)
+
+    return value.strip().strip("'").strip('"')
 
 
 def main() -> None:
     dsn = normalize_dsn(os.getenv("NEON_DATABASE_URL", ""))
     if not dsn:
         fail("NEON_DATABASE_URL secret is missing.")
-    if not (dsn.startswith("postgresql://") or dsn.startswith("postgres://")):
+    if not (
+        dsn.startswith("postgresql://")
+        or dsn.startswith("postgres://")
+        or ("host=" in dsn.lower() and "user=" in dsn.lower())
+    ):
         fail(
-            "NEON_DATABASE_URL is present but not a PostgreSQL URI after normalization. "
-            "Expected postgresql://... or a copied Neon psql command."
+            "NEON_DATABASE_URL is present but its format is not recognized. "
+            "Use Neon Connect -> Connection string (URI) or standard libpq connection details."
         )
 
     output_path = Path(os.getenv("NEON_BRIDGE_OUTPUT", "artifacts/neon-truth.json"))
