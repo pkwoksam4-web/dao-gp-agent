@@ -1,10 +1,10 @@
 {
   "artifact": "DAO2_A_HISTORICAL_L2_RECONSTRUCTION_PRECHECK_V1",
   "version": "1.0",
-  "as_of": "2026-09-25",
+  "as_of": "2026-09-26",
   "module": "A_MAIN_NET_FLOW",
   "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
-  "status": "PRIVATE_L2_CARRIER_FOUND_AUTHORIZATION_REQUIRED",
+  "status": "READY_FOR_AUTHORIZATION",
   "governance": {
     "fail_closed": true,
     "admissible_exact_rows": 0,
@@ -173,10 +173,10 @@
     "type": "PRIVATE_ACCOUNT_AUTHORIZATION",
     "provider": "Hugging Face",
     "credential_handling": "Do not paste tokens into chat. Connect/login through the supported Hugging Face integration or provider UI, then request dataset access.",
-    "reason": "Both useful L2 datasets are gated. Raw file access is required before any exact-overlap or residual reconstruction can be performed."
+    "reason": "Harness and tests are complete; raw Hugging Face L2 bytes are the only P4 resume trigger. No further algorithm design is authorized before access."
   },
   "engineering_readiness": {
-    "status": "HARNESS_READY_PENDING_PRIVATE_DATA_ACCESS",
+    "status": "READY_FOR_AUTHORIZATION_SEMANTICS_FROZEN",
     "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
     "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
     "guard_workflow": ".github/workflows/dao2-a-l2-reconstruction-harness-guard-v1.yml",
@@ -195,5 +195,22 @@
       "Shanghai strict reconstruction disabled unless explicitly experimental"
     ],
     "admission_status": "NO_RESIDUAL_ADMISSION_ALLOWED_UNTIL_JESSICA_EXACT_OVERLAP_PASS"
-  }
+  },
+  "semantics_frozen": true,
+  "resume_trigger": "HUGGING_FACE_RAW_L2_ACCESS_AVAILABLE",
+  "authorization_priority": {
+    "primary": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+    "secondary": "alphat01/Tick-by-Tick-Orders-China",
+    "reason": "venvoo covers 2017-2026 and is the highest-value route for 12 Shenzhen residuals; alphat01 adds an independent 2023 L2 carrier for six 2023 residual dates."
+  },
+  "fixed_execution_order": [
+    "targeted raw retrieval only",
+    "persist provider/dataset revision/path/raw size/SHA256/retrieval timestamp",
+    "reconstruct Jessica-known rows first across multiple dates/symbols/activity levels",
+    "compare buy_lg_amount,buy_elg_amount,sell_lg_amount,sell_elg_amount with exact equality and mismatch_rows=0",
+    "do not tune thresholds, mapping, rounding, side logic, or linkage after seeing overlap",
+    "if identity PASS, process Shenzhen residuals and admit partial rows individually with raw provenance",
+    "if any required field mismatch, reject mapping and preserve evidence",
+    "keep Shanghai early keys OPEN under current carrier semantics"
+  ]
 }
