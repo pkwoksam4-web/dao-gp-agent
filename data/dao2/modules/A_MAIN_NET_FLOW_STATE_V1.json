@@ -34,7 +34,7 @@
     "exact_semantics_required": true,
     "generic_main_flow_proxy_allowed": false,
     "source_scan": "data/dao2/modules/A_MAIN_NET_FLOW_SOURCE_SCAN_V1.json",
-    "source_discovery_status": "ACTIVE_P2_P3_NO_NEW_ADMISSIBLE_ROWS",
+    "source_discovery_status": "P4_READY_FOR_AUTHORIZATION_P2_P3_ACTIVE",
     "same_course_repositories_scanned": 6,
     "admissible_new_exact_rows": 0,
     "latest_exact_probe": {
@@ -72,7 +72,7 @@
       ],
       "overlap_execution": "NOT_EXECUTED_API_REJECTED_ALL_DATES"
     },
-    "blocking_environment_requirement": "Two manual gates now exist but neither authorizes closing A: (1) Baidu account-level authorization for the ¥50 package sample; (2) Hugging Face gated access to historical L2 carriers. Continue free P2/P3 autonomously; for P4, user must authorize Hugging Face access before exact reconstruction can be tested.",
+    "blocking_environment_requirement": "Highest-value unlock is now P4 Hugging Face authorization. Harness semantics are frozen and READY_FOR_AUTHORIZATION. Continue P2/P3 autonomously while authorization is pending. No residual row may be written before Jessica exact identity PASS.",
     "current_source_strategy": "AUTONOMOUS_COMPLETION_MODE",
     "latest_infoway_probe": {
       "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
@@ -137,27 +137,32 @@
     "route_priority": [
       {
         "priority": 1,
-        "route": "PAYWALLED_SAMPLE_IDENTITY_VALIDATION",
-        "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED",
-        "close_gate": "Account-authorized sample bytes -> SHA256 -> schema -> Jessica exact overlap; no anonymous dlink retries."
+        "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+        "status": "READY_FOR_AUTHORIZATION",
+        "execution_role": "HIGHEST_VALUE_UNLOCK_ROUTE",
+        "close_gate": "Hugging Face raw L2 access -> targeted raw retrieval -> Jessica-known exact four-field overlap -> residual recovery only after mismatch=0.",
+        "semantics_frozen": true
       },
       {
         "priority": 2,
         "route": "NEW_PUBLIC_HISTORICAL_CARRIER_RECOVERY",
         "status": "ACTIVE",
-        "close_gate": "Actual raw historical carrier only; 100% Jessica overlap before admission."
+        "execution_role": "CONTINUE_WHILE_P4_AUTH_PENDING",
+        "close_gate": "Actual 2020-2023 raw historical carrier spanning a residual date; 100% Jessica overlap before admission."
       },
       {
         "priority": 3,
         "route": "SOURCE_ABSENCE_PROOF",
         "status": "ACTIVE",
-        "close_gate": "Independent exact-Tushare source absence evidence; candidate status never resolves a key."
+        "execution_role": "CONTINUE_WHILE_P4_AUTH_PENDING",
+        "close_gate": "Promote evidence levels only; absence never resolves or zero-fills a key."
       },
       {
         "priority": 4,
-        "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
-        "status": "PRIVATE_CARRIERS_FOUND_AUTHORIZATION_REQUIRED",
-        "close_gate": "Gain gated L2 access, reconstruct on Jessica-known rows, require 100% exact four-field overlap before any residual admission."
+        "route": "PAYWALLED_SAMPLE_IDENTITY_VALIDATION",
+        "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED",
+        "execution_role": "FROZEN_WAITING_AUTH",
+        "close_gate": "Account-authorized sample bytes -> SHA256 -> schema -> Jessica exact overlap -> target-existence precheck."
       },
       {
         "priority": 5,
@@ -302,14 +307,25 @@
       "evidence_file": "data/dao2/modules/A_PANGUCHENG_HISTORICAL_CARRIER_AUDIT_V1.json"
     },
     "historical_l2_harness": {
-      "status": "READY_PENDING_PRIVATE_AUTHORIZATION",
+      "status": "READY_FOR_AUTHORIZATION",
       "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
       "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
       "guard_run_id": 36157605173,
       "guard_conclusion": "success",
       "head_sha": "afac299f72394159c9c11b7a8504dd3266c9459f",
       "strict_admission_allowed": false,
-      "required_next_gate": "Acquire gated raw L2 bytes, reconstruct Jessica-known rows first, require 100% exact four-field overlap before any residual admission."
+      "required_next_gate": "Acquire gated raw L2 bytes, reconstruct Jessica-known rows first, require 100% exact four-field overlap before any residual admission.",
+      "semantics_frozen": true,
+      "resume_trigger": "HUGGING_FACE_RAW_L2_ACCESS_AVAILABLE",
+      "post_authorization_execution_order": [
+        "targeted raw retrieval with provider/revision/path/size/SHA256/retrieval timestamp",
+        "Jessica-known multi-date/multi-symbol exact reconstruction",
+        "require mismatch_rows=0 on buy_lg_amount,buy_elg_amount,sell_lg_amount,sell_elg_amount with no tolerance",
+        "only after identity PASS process Shenzhen residuals",
+        "partial admissions update ledger and Guard immediately",
+        "Shanghai 600112.SH requires independent Shanghai original-order semantic validation",
+        "600306.SH/20200608,600898.SH/20201104,603996.SH/20210224 remain OPEN under current carrier semantics"
+      ]
     }
   }
 }
