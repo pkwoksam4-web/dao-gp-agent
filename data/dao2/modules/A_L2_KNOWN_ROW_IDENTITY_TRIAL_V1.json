@@ -1,0 +1,97 @@
+{
+  "artifact": "DAO2_A_L2_KNOWN_ROW_IDENTITY_TRIAL_V1",
+  "version": "1.0",
+  "as_of": "2026-09-26",
+  "module": "A_MAIN_NET_FLOW",
+  "governance": {
+    "fail_closed": true,
+    "semantics_frozen": true,
+    "no_parameter_retuning": true,
+    "no_residual_value_generated": true,
+    "no_proxy": true,
+    "no_imputation": true
+  },
+  "venvoo": {
+    "repository": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+    "revision": "5534483b49ff44e20255054058d09cfacffd10ad",
+    "authorization": "PASS",
+    "jobs": {
+      "repo_listing": "6ab7dc8052d0dbd7f1d959ee",
+      "file_metadata": "6ab7dca16b030d633f694b4b",
+      "known_row_smoke": "6ab7dd016b030d633f694b76"
+    },
+    "known_row": {
+      "ts_code": "000001.SZ",
+      "trade_date": "20210924",
+      "jessica_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+      "jessica_blob_sha": "d71055fdf356dcb68cff5d9a82b887fb0a469b44",
+      "expected_required_fields": {
+        "buy_lg_amount": "51571.27",
+        "buy_elg_amount": "42858.37",
+        "sell_lg_amount": "87320.98",
+        "sell_elg_amount": "30030.38"
+      }
+    },
+    "raw_files": {
+      "orders": {
+        "path": "20210924/逐笔委托.parquet",
+        "size": 959305168,
+        "sha256": "d5f541c0ab8e112ad00233f058dfd30b4c70b4092f54aa1f56c14a9b0c39914e"
+      },
+      "trades": {
+        "path": "20210924/逐笔成交.parquet",
+        "size": 1211144622,
+        "sha256": "c36de05e77dac95fd493ec7812f38c2432ec055cea0f6043517dc2db32622644"
+      }
+    },
+    "range_read": {
+      "parquet_rowgroup_pruning": true,
+      "order_rows_for_symbol": 166359,
+      "trade_rows_for_symbol": 149301
+    },
+    "observed_schema": {
+      "orders": ["wind_code","ex_code","date","time","order_id","ex_order_id","order_type","order_code","price","volume"],
+      "trades": ["wind_code","ex_code","date","time","trade_id","trade_code","order_code","bs_flag","price","volume","ask_order_id","bid_order_id"]
+    },
+    "critical_observation": {
+      "order_id": "observed 0 in first real Shenzhen order rows",
+      "ex_order_id": "observed positive",
+      "frozen_harness_requirement": "positive order_id used as original-order identity",
+      "failure": "bad order primitive"
+    },
+    "result": "REJECT_FROZEN_MAPPING_INCOMPATIBLE_SCHEMA",
+    "field_level_comparison_executed": false,
+    "reason": "The frozen harness fails before aggregation because the provider's real Shenzhen rows do not satisfy its original-order-id mapping. Per governance, the mapping is not retuned after observing the known-row data."
+  },
+  "alphat01": {
+    "repository": "alphat01/Tick-by-Tick-Orders-China",
+    "revision": "674ef1eae2ebe7aaf6be7306c9859c8fe13ca7fe",
+    "metadata_visible": true,
+    "target_archives": {
+      "20230320": {
+        "path": "202303/20230320.7z",
+        "size": 2875654397,
+        "sha256": "2eeac7dd193f2acb582e7f5ea271e66d413f210c123cc0fb3d647a3f3d523fe5"
+      },
+      "20230522": {
+        "path": "202305/20230522.7z",
+        "size": 2510895083,
+        "sha256": "1e6d921f0b141aae00d514468cee28972a02c8a3a1c4d50b2ce46ad56f9ce0f3"
+      }
+    },
+    "jobs": {
+      "listing": "6ab7dd2152d0dbd7f1d95a39",
+      "metadata": "6ab7dd4c52d0dbd7f1d95a4a",
+      "raw_access_check": "6ab7dd7c6b030d633f694bb3"
+    },
+    "raw_access": false,
+    "error": "403 GatedRepoError: account is not in authorized list",
+    "status": "MANUAL_REVIEW_AUTHORIZATION_REQUIRED"
+  },
+  "admission_effect": {
+    "new_exact_rows": 0,
+    "resolved_rows": 1011591,
+    "unresolved_rows": 16,
+    "checkpoint_created": false
+  }
+}
