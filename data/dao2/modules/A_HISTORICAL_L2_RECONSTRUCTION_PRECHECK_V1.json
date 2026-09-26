@@ -4,7 +4,7 @@
   "as_of": "2026-09-26",
   "module": "A_MAIN_NET_FLOW",
   "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
-  "status": "READY_FOR_AUTHORIZATION",
+  "status": "VENVOO_MAPPING_REJECT_ALPHAT01_AUTH_PENDING",
   "governance": {
     "fail_closed": true,
     "admissible_exact_rows": 0,
@@ -78,7 +78,7 @@
         "bid_order_id"
       ],
       "exact_reconstruction_assessment": {
-        "shenzhen": "TECHNICALLY_TESTABLE_PENDING_ACCESS_AND_OVERLAP",
+        "shenzhen": "REJECTED_UNDER_FROZEN_HARNESS_MAPPING",
         "shanghai_post_2021_07_23": "TECHNICALLY_TESTABLE_BUT_ORIGINAL_ORDER_NOTIONAL_SEMANTICS_UNCERTAIN",
         "shanghai_pre_2021_07_23": "NOT_ADMISSIBLE_FOR_STRICT_ORIGINAL_ORDER_RECONSTRUCTION_FROM_THIS_CARRIER",
         "caution": [
@@ -158,7 +158,18 @@
         "002504.SZ/20230522"
       ],
       "raw_carrier_coverage_claim_status": "CONFIRMED_BY_DATASET_CARD_PENDING_FILE_ACCESS",
-      "exact_tushare_equivalence": "NOT_PROVEN_PENDING_JESSICA_OVERLAP"
+      "exact_tushare_equivalence": "NOT_PROVEN_PENDING_JESSICA_OVERLAP",
+      "access_runtime": {
+        "raw_access": false,
+        "error": "403 GatedRepoError",
+        "detail": "Current account is not in authorized list; metadata/file listing visible but raw resolve denied.",
+        "revision": "674ef1eae2ebe7aaf6be7306c9859c8fe13ca7fe",
+        "sample_target_files": {
+          "20230320": "202303/20230320.7z",
+          "20230522": "202305/20230522.7z"
+        },
+        "status": "MANUAL_REVIEW_AUTHORIZATION_REQUIRED"
+      }
     }
   },
   "acceptance_plan": [
@@ -176,7 +187,7 @@
     "reason": "Harness and tests are complete; raw Hugging Face L2 bytes are the only P4 resume trigger. No further algorithm design is authorized before access."
   },
   "engineering_readiness": {
-    "status": "READY_FOR_AUTHORIZATION_SEMANTICS_FROZEN",
+    "status": "HARNESS_FROZEN_VENVOO_MAPPING_REJECT_ALPHAT01_AUTH_PENDING",
     "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
     "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
     "guard_workflow": ".github/workflows/dao2-a-l2-reconstruction-harness-guard-v1.yml",
@@ -212,5 +223,30 @@
     "if identity PASS, process Shenzhen residuals and admit partial rows individually with raw provenance",
     "if any required field mismatch, reject mapping and preserve evidence",
     "keep Shanghai early keys OPEN under current carrier semantics"
+  ],
+  "identity_trials": [
+    {
+      "provider": "venvoo",
+      "revision": "5534483b49ff44e20255054058d09cfacffd10ad",
+      "symbol": "000001.SZ",
+      "trade_date": "20210924",
+      "stage": "JESSICA_KNOWN_ROW_SMOKE",
+      "result": "REJECT_FROZEN_MAPPING_INCOMPATIBLE_SCHEMA",
+      "raw_access": "PASS",
+      "order_file": "20210924/逐笔委托.parquet",
+      "order_file_size": 959305168,
+      "order_file_sha256": "d5f541c0ab8e112ad00233f058dfd30b4c70b4092f54aa1f56c14a9b0c39914e",
+      "trade_file": "20210924/逐笔成交.parquet",
+      "trade_file_size": 1211144622,
+      "trade_file_sha256": "c36de05e77dac95fd493ec7812f38c2432ec055cea0f6043517dc2db32622644",
+      "rowgroup_range_read": true,
+      "order_rows_symbol": 166359,
+      "trade_rows_symbol": 149301,
+      "observed_order_id_zero": true,
+      "observed_ex_order_id_nonzero": true,
+      "failure": "Frozen harness requires positive order_id; first symbol fails before field comparison.",
+      "parameter_retuning": false,
+      "residual_values_generated": false
+    }
   ]
 }
