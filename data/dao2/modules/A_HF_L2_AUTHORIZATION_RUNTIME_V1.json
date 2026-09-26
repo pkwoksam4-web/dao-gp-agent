@@ -1,0 +1,44 @@
+{
+  "artifact": "DAO2_A_HF_L2_AUTHORIZATION_RUNTIME_V1",
+  "version": "1.0",
+  "as_of": "2026-09-26",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+  "status": "AUTHORIZED_DATASET_METADATA_COMPUTE_BILLING_BLOCKED",
+  "authentication": {
+    "provider": "Hugging Face",
+    "account": "pkwoksam",
+    "oauth_authenticated": true,
+    "oauth_scopes": ["jobs", "openid", "profile", "read-mcp", "read-repos"],
+    "dataset_metadata_access": true
+  },
+  "carriers": {
+    "venvoo": {
+      "repo": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+      "gated": true,
+      "metadata_visible": true,
+      "raw_retrieval_test": "NOT_COMPLETED",
+      "reason": "Authenticated HF Jobs invocation returned HTTP 402 Payment Required before repo file listing/download could execute."
+    },
+    "alphat01": {
+      "repo": "alphat01/Tick-by-Tick-Orders-China",
+      "gated": true,
+      "metadata_visible": true,
+      "raw_retrieval_test": "NOT_COMPLETED"
+    }
+  },
+  "runtime_blocker": {
+    "code": "HF_JOBS_PAYMENT_REQUIRED",
+    "http_status": 402,
+    "interpretation": "Dataset authorization succeeded, but the available authenticated execution path for targeted gated raw retrieval requires Hugging Face Jobs billing/credits. This is an execution-environment billing gate, not evidence that dataset access was denied.",
+    "residual_effect": 0
+  },
+  "governance": {
+    "semantics_frozen": true,
+    "no_algorithm_changes": true,
+    "no_residual_values_generated": true,
+    "no_proxy": true,
+    "no_imputation": true,
+    "required_next_gate": "Obtain a non-billing-gated authenticated raw download path or enable sufficient Hugging Face Jobs billing/credits, then perform targeted retrieval and Jessica exact overlap."
+  }
+}
