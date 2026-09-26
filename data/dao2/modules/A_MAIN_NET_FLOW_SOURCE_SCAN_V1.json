@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-24",
+  "as_of": "2026-09-26",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -54,11 +54,11 @@
     "TreeZhiyuan/python-tks: confirms a direct official Tushare moneyflow ingestion implementation, but its historical D1 data is behind private Cloudflare credentials and no exact historical rows are committed publicly; code is not data provenance."
   ],
   "next_route": [
-    "P2: continue actual public raw-carrier search; auto-reject code/schema/proxy carriers.",
-    "P3: expand source-absence evidence without zero-fill.",
-    "P4: after Hugging Face authorization, reconstruct Jessica-known rows first and require 100% four-field exact match.",
-    "If P4 identity passes, allow partial recovery with raw L2 provenance; unsupported Shanghai-early keys remain open.",
-    "P1 remains preserved at account-level sample authorization gate; no anonymous dlink retry."
+    "P4 highest value: wait only on Hugging Face raw L2 authorization; do not change frozen reconstruction semantics.",
+    "After access, retrieve targeted raw symbol-date bytes with SHA256/revision provenance.",
+    "Run Jessica-known exact four-field identity before any residual reconstruction; mismatch > 0 rejects mapping with no retuning.",
+    "While P4 access is pending, continue P2 residual-date raw-carrier recovery and P3 source-absence evidence.",
+    "P1 remains account-authorization gated; no anonymous Baidu retry."
   ],
   "blocker_closed": false,
   "exact_tushare_probe": {
@@ -407,7 +407,7 @@
     }
   ],
   "historical_l2_private_carriers": {
-    "status": "AUTHORIZATION_REQUIRED_FOR_EXACT_OVERLAP",
+    "status": "READY_FOR_AUTHORIZATION",
     "admissible_rows": 0,
     "venvoo": {
       "repository": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
@@ -424,15 +424,41 @@
       "residual_raw_carrier_count": 6,
       "authorization": "Hugging Face gated, manual review, academic/non-commercial"
     },
-    "interpretation": "Exact reconstruction is testable for a subset, especially Shenzhen/2023, but exact Tushare equivalence is not proven until Jessica-known four-field reconstruction reaches 100% exact match."
+    "interpretation": "Exact reconstruction is testable for a subset, especially Shenzhen/2023, but exact Tushare equivalence is not proven until Jessica-known four-field reconstruction reaches 100% exact match.",
+    "semantics_frozen": true,
+    "resume_trigger": "HUGGING_FACE_RAW_L2_ACCESS_AVAILABLE"
   },
   "source_absence_matrix": "data/dao2/modules/A_SOURCE_ABSENCE_MATRIX_V1.json",
   "historical_l2_harness": {
-    "status": "READY_PENDING_PRIVATE_AUTHORIZATION",
+    "status": "READY_FOR_AUTHORIZATION",
     "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
     "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
     "guard_run_id": 36157605173,
     "guard_conclusion": "success",
-    "admission_gate": "No residual value may be written until a gated carrier reconstructs Jessica-known rows with 100% exact field-level match."
+    "admission_gate": "No residual value may be written until a gated carrier reconstructs Jessica-known rows with 100% exact field-level match.",
+    "semantics_frozen": true
+  },
+  "current_execution_priority": {
+    "p4": {
+      "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+      "status": "READY_FOR_AUTHORIZATION",
+      "role": "HIGHEST_VALUE_UNLOCK_ROUTE",
+      "semantics_frozen": true,
+      "resume_trigger": "HUGGING_FACE_RAW_L2_ACCESS_AVAILABLE"
+    },
+    "p2": {
+      "route": "NEW_PUBLIC_HISTORICAL_CARRIER_RECOVERY",
+      "status": "ACTIVE",
+      "role": "CONTINUE_WHILE_P4_AUTH_PENDING"
+    },
+    "p3": {
+      "route": "SOURCE_ABSENCE_PROOF",
+      "status": "ACTIVE",
+      "role": "CONTINUE_WHILE_P4_AUTH_PENDING"
+    },
+    "p1": {
+      "route": "PAYWALLED_SAMPLE_IDENTITY_VALIDATION",
+      "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED"
+    }
   }
 }
