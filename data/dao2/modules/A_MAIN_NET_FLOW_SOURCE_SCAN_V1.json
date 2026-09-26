@@ -411,10 +411,16 @@
       "result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
       "reason": "Processed manifests span DAO2 residual dates and expose moneyflow-derived features, but current and historical repository trees do not contain actual raw Tushare moneyflow CSV/Parquet/SQLite/archive bytes. Initial/upload commits were checked; only processed factor/backtest artifacts are present.",
       "admissible_rows": 0
+    },
+    {
+      "carrier": "submato/ashare-l2",
+      "result": "REJECT_PUBLIC_COVERAGE_DOES_NOT_REACH_RESIDUAL_DATES",
+      "finding": "README claims private availability from 2017 onward, but public GitHub raw contains only DEMO.SZ/20250102 and the linked free share is 202605-202606. No public 2020-2023 residual-date raw asset is available.",
+      "admissible_rows": 0
     }
   ],
   "historical_l2_private_carriers": {
-    "status": "READY_FOR_AUTHORIZATION",
+    "status": "VENVOO_MAPPING_REJECT_ALPHAT01_MANUAL_AUTH_REQUIRED",
     "admissible_rows": 0,
     "venvoo": {
       "repository": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
@@ -423,13 +429,16 @@
       "schemas": "order_id/ex_order_id/order_code/price/volume + trade ask_order_id/bid_order_id/bs_flag",
       "shenzhen_target_count": 12,
       "early_shanghai_strict_gap_count": 3,
-      "authorization": "Hugging Face gated; Like + follow @venvoo + request access"
+      "authorization": "Hugging Face gated; Like + follow @venvoo + request access",
+      "identity_trial": "REJECT_FROZEN_MAPPING_INCOMPATIBLE_SCHEMA"
     },
     "alphat01": {
       "repository": "alphat01/Tick-by-Tick-Orders-China",
       "coverage": "2023 full year / every listed SH-SZ stock declared",
       "residual_raw_carrier_count": 6,
-      "authorization": "Hugging Face gated, manual review, academic/non-commercial"
+      "authorization": "Hugging Face gated, manual review, academic/non-commercial",
+      "raw_access": "403_GATED_NOT_AUTHORIZED",
+      "status": "MANUAL_REVIEW_AUTHORIZATION_REQUIRED"
     },
     "interpretation": "Exact reconstruction is testable for a subset, especially Shenzhen/2023, but exact Tushare equivalence is not proven until Jessica-known four-field reconstruction reaches 100% exact match.",
     "semantics_frozen": true,
@@ -475,5 +484,12 @@
     "sds7788_history_result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
     "source_absence_level3_new_count": 0,
     "admissible_new_rows": 0
+  },
+  "historical_l2_identity_trial": "data/dao2/modules/A_L2_KNOWN_ROW_IDENTITY_TRIAL_V1.json",
+  "latest_p4_execution": {
+    "venvoo_known_row": "000001.SZ/20210924",
+    "venvoo_result": "REJECT_FROZEN_MAPPING_INCOMPATIBLE_SCHEMA",
+    "alphat01_result": "403_GATED_MANUAL_REVIEW_REQUIRED",
+    "new_admissible_rows": 0
   }
 }
