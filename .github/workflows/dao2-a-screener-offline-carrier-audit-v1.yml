@@ -1,0 +1,215 @@
+name: DAO2 A Screener Offline Carrier Audit V1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-screener-offline-carrier-audit-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install parquet runtime
+        run: python -m pip install --quiet pandas pyarrow requests
+
+      - name: Audit public parquet carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, io, json, os, requests, pandas as pd
+          from pathlib import Path
+
+          OUT="dao2_a_screener_offline_carrier_audit_v1.json"
+          SOURCE_REPO="henrylin99/screener-offline-data"
+          SOURCE_COMMIT="6347c05e8619a9e132dfdab9f507c36e31842b8a"
+          SOURCE_PATH="data.parquet"
+          SOURCE_BLOB_SHA="73df5cefc343a1622b7a50a9e98fb50e153d13c2"
+          URL=f"https://raw.githubusercontent.com/{SOURCE_REPO}/{SOURCE_COMMIT}/{SOURCE_PATH}"
+          JESSICA_REPO="Jessica-Zhangyj/dlquant"
+          JESSICA_COMMIT="6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          REQUIRED=["buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount"]
+          OPTIONAL=["buy_sm_amount","buy_md_amount","sell_sm_amount","sell_md_amount","net_mf_amount"]
+          ID_FIELDS=["ts_code","trade_date"]+REQUIRED+OPTIONAL
+          TARGETS=[
+            ("600306.SH","20200608"),("600898.SH","20201104"),("603996.SH","20210224"),("002618.SZ","20210923"),
+            ("000020.SZ","20210924"),("000157.SZ","20210924"),("000592.SZ","20210924"),("000753.SZ","20210924"),
+            ("002684.SZ","20211125"),("600112.SH","20220506"),("000564.SZ","20230320"),("001337.SZ","20230320"),
+            ("002118.SZ","20230522"),("002157.SZ","20230522"),("002503.SZ","20230522"),("002504.SZ","20230522")
+          ]
+
+          out={
+            "artifact":"DAO2_A_SCREENER_OFFLINE_CARRIER_AUDIT_V1",
+            "source":{"repository":SOURCE_REPO,"commit":SOURCE_COMMIT,"path":SOURCE_PATH,"blob_sha":SOURCE_BLOB_SHA,"url":URL},
+            "jessica":{"repository":JESSICA_REPO,"commit":JESSICA_COMMIT},
+            "required_fields":REQUIRED,"optional_identity_fields":OPTIONAL,
+            "target_count":len(TARGETS),
+          }
+
+          r=requests.get(URL,timeout=120)
+          r.raise_for_status()
+          raw=r.content
+          out["source"]["raw_bytes"]=len(raw)
+          out["source"]["raw_sha256"]=hashlib.sha256(raw).hexdigest()
+          Path("data.parquet").write_bytes(raw)
+
+          try:
+            df=pd.read_parquet(io.BytesIO(raw))
+          except Exception as e:
+            out["status"]="REJECT_PARQUET_READ_FAILED"
+            out["error"]=f"{type(e).__name__}: {e}"
+            Path(OUT).write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+            print(json.dumps({"status":out["status"],"error":out["error"]},ensure_ascii=False))
+            raise SystemExit(0)
+
+          out["row_count"]=int(len(df))
+          out["columns"]=[str(c) for c in df.columns]
+          missing=[c for c in ["ts_code","trade_date"]+REQUIRED if c not in df.columns]
+          out["missing_required_columns"]=missing
+          if missing:
+            out["status"]="REJECT_MISSING_EXACT_MONEYFLOW_FIELDS"
+            out["source_identity_pass"]=False
+            out["target_hits"]=[]
+            Path(OUT).write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+            print(json.dumps({"status":out["status"],"rows":len(df),"missing":missing},ensure_ascii=False))
+            raise SystemExit(0)
+
+          def norm_date(v):
+            if pd.isna(v): return None
+            s=str(v)
+            if s.endswith(".0"): s=s[:-2]
+            s=s.replace("-","").replace("/","")[:8]
+            return s if len(s)==8 and s.isdigit() else None
+
+          df=df.copy()
+          df["ts_code"]=df["ts_code"].astype(str).str.strip()
+          df["trade_date"]=df["trade_date"].map(norm_date)
+          df=df[df["trade_date"].notna()]
+          dates=sorted(df["trade_date"].unique().tolist())
+          years=sorted({d[:4] for d in dates})
+          out["date_range"]={"min":dates[0] if dates else None,"max":dates[-1] if dates else None,"unique_dates":len(dates),"years":years}
+
+          target_hits=[]
+          for sym,date in TARGETS:
+            hit=df[(df.ts_code==sym)&(df.trade_date==date)]
+            if len(hit):
+              rec=hit.iloc[0]
+              target_hits.append({
+                "ts_code":sym,"trade_date":date,"row_count":int(len(hit)),
+                "raw_fields":{f:(None if pd.isna(rec[f]) else float(rec[f])) for f in REQUIRED}
+              })
+          out["target_hits"]=target_hits
+          out["target_hit_count"]=len(target_hits)
+
+          # Identity audit: deterministic up-to-50 rows spanning up to 5 dates and >=3 years where possible.
+          # Pick earliest/middle/latest years, then evenly spaced dates.
+          selected_dates=[]
+          if dates:
+            year_groups={}
+            for d in dates: year_groups.setdefault(d[:4],[]).append(d)
+            candidate_years=years
+            if len(candidate_years)>=3:
+              ysel=[candidate_years[0],candidate_years[len(candidate_years)//2],candidate_years[-1]]
+            else:
+              ysel=candidate_years
+            for y in ysel:
+              ds=year_groups[y]
+              for idx in sorted(set([0,len(ds)//2,len(ds)-1])):
+                selected_dates.append(ds[idx])
+            selected_dates=sorted(dict.fromkeys(selected_dates))
+            if len(selected_dates)>5:
+              idxs=[0,len(selected_dates)//4,len(selected_dates)//2,(3*len(selected_dates))//4,len(selected_dates)-1]
+              selected_dates=[selected_dates[i] for i in sorted(set(idxs))]
+
+          overlap_rows=[]
+          mismatch_rows=[]
+          fetch_evidence=[]
+          for d in selected_dates:
+            ju=f"https://raw.githubusercontent.com/{JESSICA_REPO}/{JESSICA_COMMIT}/data/moneyflow/{d}.csv"
+            jr=requests.get(ju,timeout=60)
+            if jr.status_code!=200:
+              fetch_evidence.append({"trade_date":d,"http_status":jr.status_code,"jessica_file":False})
+              continue
+            jraw=jr.content
+            jdf=pd.read_csv(io.BytesIO(jraw),dtype={"ts_code":str,"trade_date":str})
+            jdf["trade_date"]=jdf["trade_date"].astype(str).str.replace("-","",regex=False)
+            fetch_evidence.append({
+              "trade_date":d,"http_status":200,"jessica_file":True,
+              "jessica_rows":int(len(jdf)),"jessica_sha256":hashlib.sha256(jraw).hexdigest()
+            })
+            sub=df[df.trade_date==d]
+            common=sorted(set(sub.ts_code)&set(jdf.ts_code))
+            # deterministic cap: up to 10 per date, overall <=50
+            common=common[:10]
+            js=jdf.set_index(["ts_code","trade_date"])
+            ss=sub.set_index(["ts_code","trade_date"])
+            fields=[f for f in ID_FIELDS if f in df.columns and f in jdf.columns]
+            for sym in common:
+              key=(sym,d)
+              a=ss.loc[key]
+              b=js.loc[key]
+              if isinstance(a,pd.DataFrame): a=a.iloc[0]
+              if isinstance(b,pd.DataFrame): b=b.iloc[0]
+              diffs=[]
+              for f in fields:
+                if f in ("ts_code","trade_date"): continue
+                av=a[f]; bv=b[f]
+                if pd.isna(av) and pd.isna(bv): continue
+                try:
+                  equal=float(av)==float(bv)
+                except Exception:
+                  equal=str(av)==str(bv)
+                if not equal:
+                  diffs.append({"field":f,"carrier":None if pd.isna(av) else str(av),"jessica":None if pd.isna(bv) else str(bv)})
+              overlap_rows.append({"ts_code":sym,"trade_date":d,"fields_compared":fields})
+              if diffs:
+                mismatch_rows.append({"ts_code":sym,"trade_date":d,"diffs":diffs})
+              if len(overlap_rows)>=50:
+                break
+            if len(overlap_rows)>=50:
+              break
+
+          out["identity_audit"]={
+            "selected_dates":selected_dates,
+            "selected_year_count":len({d[:4] for d in selected_dates}),
+            "jessica_fetch_evidence":fetch_evidence,
+            "overlap_rows":len(overlap_rows),
+            "mismatch_rows":len(mismatch_rows),
+            "sample_mismatches":mismatch_rows[:10],
+            "exact_match_rate":((len(overlap_rows)-len(mismatch_rows))/len(overlap_rows)) if overlap_rows else None
+          }
+          identity_pass=(len(overlap_rows)>=20 and len({d[:4] for d in selected_dates})>=3 and len(selected_dates)>=5 and len(mismatch_rows)==0)
+          out["source_identity_pass"]=identity_pass
+
+          if identity_pass:
+            out["status"]="SOURCE_IDENTITY_PASS_WITH_TARGET_HITS" if target_hits else "SOURCE_IDENTITY_PASS_NO_TARGET_HITS"
+          elif overlap_rows:
+            out["status"]="REJECT_IDENTITY_FAIL_OR_INSUFFICIENT"
+          else:
+            out["status"]="REJECT_NO_JESSICA_OVERLAP"
+
+          canon=json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          out["content_sha256_without_hash_field"]=hashlib.sha256(canon.encode()).hexdigest()
+          Path(OUT).write_text(json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+          print(json.dumps({
+            "status":out["status"],"rows":len(df),"date_range":out["date_range"],
+            "overlap_rows":out["identity_audit"]["overlap_rows"],
+            "mismatch_rows":out["identity_audit"]["mismatch_rows"],
+            "source_identity_pass":identity_pass,"target_hit_count":len(target_hits),
+            "result_sha256":out["content_sha256_without_hash_field"]
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload carrier audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-screener-offline-carrier-audit-v1
+          path: dao2_a_screener_offline_carrier_audit_v1.json
+          if-no-files-found: error
+          retention-days: 30

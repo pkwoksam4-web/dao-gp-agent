@@ -1,0 +1,61 @@
+{
+  "artifact": "DAO2_A_PAYWALLED_MONEYFLOW_SAMPLE_AUTHORIZATION_V1",
+  "version": "1.0",
+  "as_of": "2026-09-23",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "PAYWALLED_SAMPLE_IDENTITY_VALIDATION",
+  "provider": "tushare.indevs.in",
+  "product": "Tushare moneyflow 完整历史数据",
+  "price_cny": 50,
+  "vendor_claims": {
+    "package_size": "1.21GB",
+    "file_count": 3993,
+    "record_count": 13690451,
+    "field_count": 23,
+    "complete_history": true,
+    "sha256_provided": true
+  },
+  "sample": {
+    "share_url": "https://pan.baidu.com/s/154fXqZgOaiCKXkyBjT95QA?pwd=hhc5",
+    "extraction_code": "hhc5",
+    "root_filename": "moneyflow_sample.zip",
+    "expected_member": "moneyflow__sample_50rows.parquet",
+    "public_metadata": {
+      "path": "/apps/bypy/tushare_15000_history_by_api_samples_20260628/moneyflow/moneyflow_sample.zip",
+      "size_bytes": 7764,
+      "fs_id": "234012395265846",
+      "shareid": "62316228570",
+      "uk": "2720789942",
+      "md5_as_reported": "99fb2a409t29163ff6cdc9e522c97f12"
+    }
+  },
+  "precheck": {
+    "workflow": "DAO2 A Paywalled Sample Precheck V1",
+    "run_id": 35811330469,
+    "job_id": 107023360437,
+    "artifact_id": 10729873276,
+    "artifact_digest": "sha256:268fe04aba740f5b6f57068dfedae2a2f834e30f266bc9d546bdb6c1961ef055",
+    "verify_errno": 0,
+    "tplconfig_errno": 0,
+    "list_errno": 0,
+    "sharedownload_dlink_obtained": true,
+    "captcha_required": false,
+    "login_used": false,
+    "private_credentials_used": false,
+    "download_http_status": 403,
+    "baidupcs_error_code": 31064,
+    "baidupcs_error_msg": "file is not authorized",
+    "result": "ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED"
+  },
+  "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED",
+  "sample_identity_validated": false,
+  "purchase_candidate_validated": false,
+  "no_further_anonymous_download_retries": true,
+  "next_on_authorization": [
+    "download untouched moneyflow_sample.zip",
+    "record ZIP SHA256 and parquet SHA256",
+    "audit parquet schema",
+    "field-level exact overlap against Jessica pinned archive",
+    "if overlap PASS, seek pre-purchase 16/16 target-existence proof via package manifest/index/vendor metadata"
+  ]
+}

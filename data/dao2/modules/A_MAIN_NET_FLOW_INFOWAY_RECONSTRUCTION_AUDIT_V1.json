@@ -1,0 +1,105 @@
+{
+  "artifact": "DAO2_A_INFOWAY_RECONSTRUCTION_AUDIT_V1",
+  "version": "1.0",
+  "as_of": "2026-09-21",
+  "module": "A_MAIN_NET_FLOW",
+  "active_source_strategy": "INFOWAY",
+  "target_semantics": {
+    "formula_cny": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
+    "tushare_moneyflow_official_doc": "https://tushare.pro/document/2?doc_id=170",
+    "source_unit": "10k CNY",
+    "output_unit": "CNY",
+    "classification_rules": {
+      "small": "< 50,000 CNY",
+      "medium": "50,000-200,000 CNY",
+      "large": "200,000-1,000,000 CNY",
+      "extra_large": ">= 1,000,000 CNY"
+    },
+    "classification_basis": "active buy/sell orders; Tushare states data are based on L2 orders",
+    "required_exact_fields": [
+      "buy_lg_amount",
+      "buy_elg_amount",
+      "sell_lg_amount",
+      "sell_elg_amount"
+    ]
+  },
+  "infoway_public_capabilities": {
+    "a_share_overview": "https://docs.infoway.io/en-docs/readme/china-a-shares-data-api",
+    "rest_index": "https://docs.infoway.io/en-docs/rest-api",
+    "latest_trade_doc": "https://docs.infoway.io/en-docs/rest-api/market-data/get-latest-trade",
+    "websocket_trade_doc": "https://docs.infoway.io/en-docs/websocket/websocket-subscribe-method/latest-trade-subscription",
+    "websocket_depth_doc": "https://docs.infoway.io/en-docs/websocket/websocket-subscribe-method/depth-subscription",
+    "public_market_data_endpoints": [
+      "latest trade",
+      "top-5 depth",
+      "historical/realtime candlestick"
+    ],
+    "latest_trade_fields": [
+      "s",
+      "t",
+      "p",
+      "v",
+      "vw",
+      "td"
+    ],
+    "latest_trade_direction": "td: 0 default, 1 Buy, 2 Sell",
+    "depth_scope": "real-time top-5 bid/ask price and volume",
+    "order_id_or_original_order_aggregate_exposed": false,
+    "historical_tick_rest_endpoint_documented": false,
+    "direct_moneyflow_endpoint_documented": false
+  },
+  "standard_plan_history": {
+    "pricing_source": "https://infoway.io/en/stock-api",
+    "free": "last 6 months",
+    "basic": "last 1 year",
+    "premium": "last 2 years",
+    "professional": "last 3 years",
+    "residual_date_range": {
+      "earliest": "2020-06-08",
+      "latest": "2023-05-22"
+    },
+    "as_of_date": "2026-09-21",
+    "professional_3y_approx_earliest": "2023-09-21",
+    "all_16_residual_dates_outside_standard_professional_3y_window": true
+  },
+  "live_probe_evidence": {
+    "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
+    "run_id": 35570808474,
+    "artifact_id": 10625767198,
+    "artifact_digest": "sha256:5d5764bc24e850859fff000d6a7375d2e2d073d5152537803812c51c5e76c696",
+    "authentication_pass": true,
+    "historical_probe_symbol": "000020.SZ",
+    "historical_probe_target_date": "2021-09-24",
+    "historical_probe_result": "Timestamp limit error, earliest timestamp 1774076354",
+    "historical_probe_earliest_cst": "2026-03-21T14:59:14+08:00",
+    "required_exact_fields_observed": []
+  },
+  "reconstruction_assessment": {
+    "trade_tick_value_and_direction_are_insufficient_alone": true,
+    "reason": "Tushare moneyflow bucket semantics are based on active buy/sell L2 orders. Infoway public trade events expose trade-level price/value/direction but do not expose original order identifiers or a documented original-order aggregation rule needed to prove the same large/extra-large order buckets.",
+    "top5_depth_is_insufficient": true,
+    "reason_depth": "Top-5 snapshots are real-time book states, not historical executed order provenance and cannot reconstruct the exact historical active-order buckets.",
+    "candles_are_insufficient": true,
+    "direct_exact_reconstruction_proven": false,
+    "admissible_exact_rows": 0
+  },
+  "custom_plan_gate": {
+    "status": "ONLY_REMAINING_INFOWAY_ROUTE",
+    "public_docs_prove_custom_deep_history": false,
+    "public_docs_prove_historical_tick_or_order_archive": false,
+    "minimum_requirements": [
+      "A-share historical coverage for every residual date from 2020-06-08 through 2023-05-22",
+      "historical tick/order records with active buy/sell direction",
+      "original order identifier or documented original-order aggregate amount sufficient to reproduce Tushare 200k-1m and >=1m buckets, OR direct fields exactly equivalent to Tushare buy_lg_amount/buy_elg_amount/sell_lg_amount/sell_elg_amount",
+      "auditable raw bytes / API response provenance",
+      "Jessica pinned-archive field-level exact-match on overlapping non-residual rows before any target row is admitted"
+    ]
+  },
+  "decision": {
+    "status": "BLOCKED_INFOWAY_EXACT_RECONSTRUCTION_NOT_PROVEN",
+    "main_net_flow_unbound_closed": false,
+    "proxy_allowed": false,
+    "imputation_allowed": false,
+    "next_action": "Obtain explicit Infoway custom-plan confirmation or endpoint documentation for deep historical A-share tick/order or exact moneyflow data. Do not purchase/upgrade a standard plan for Module A because all 16 residual dates predate the published Professional 3-year window as of 2026-09-21."
+  }
+}

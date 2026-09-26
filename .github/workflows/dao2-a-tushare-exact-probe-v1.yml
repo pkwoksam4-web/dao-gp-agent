@@ -1,0 +1,239 @@
+name: DAO2 A Tushare Exact Probe V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-tushare-exact-probe-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+    steps:
+      - name: Probe official Tushare moneyflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import io
+          import json
+          import os
+          import urllib.request
+          from decimal import Decimal
+
+          OUT = "dao2_a_tushare_exact_probe_v1.json"
+          PIN = "6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          TARGETS = [
+              ("600306.SH","20200608"),
+              ("600898.SH","20201104"),
+              ("603996.SH","20210224"),
+              ("002618.SZ","20210923"),
+              ("000020.SZ","20210924"),
+              ("000157.SZ","20210924"),
+              ("000592.SZ","20210924"),
+              ("000753.SZ","20210924"),
+              ("002684.SZ","20211125"),
+              ("600112.SH","20220506"),
+              ("000564.SZ","20230320"),
+              ("001337.SZ","20230320"),
+              ("002118.SZ","20230522"),
+              ("002157.SZ","20230522"),
+              ("002503.SZ","20230522"),
+              ("002504.SZ","20230522"),
+          ]
+          FIELDS = [
+              "ts_code","trade_date",
+              "buy_lg_amount","buy_elg_amount",
+              "sell_lg_amount","sell_elg_amount",
+          ]
+
+          token = os.environ.get("TUSHARE_TOKEN", "").strip()
+          result = {
+              "artifact": "DAO2_A_TUSHARE_EXACT_PROBE_V1",
+              "source_identity": {
+                  "provider": "Tushare",
+                  "api_name": "moneyflow",
+                  "endpoint": "https://api.tushare.pro",
+                  "fields": FIELDS,
+              },
+              "jessica_archive": {
+                  "repo": "Jessica-Zhangyj/dlquant",
+                  "commit": PIN,
+                  "path_pattern": "data/moneyflow/YYYYMMDD.csv",
+              },
+              "secret_present": bool(token),
+              "target_count": len(TARGETS),
+              "dates": {},
+              "targets": [],
+              "semantic_overlap_pass": False,
+              "all_targets_resolved": False,
+          }
+
+          if not token:
+              result["status"] = "NO_TUSHARE_TOKEN_SECRET"
+          else:
+              def post_moneyflow(trade_date):
+                  payload = {
+                      "api_name": "moneyflow",
+                      "token": token,
+                      "params": {"trade_date": trade_date},
+                      "fields": ",".join(FIELDS),
+                  }
+                  req = urllib.request.Request(
+                      "https://api.tushare.pro",
+                      data=json.dumps(payload).encode("utf-8"),
+                      headers={"Content-Type": "application/json"},
+                      method="POST",
+                  )
+                  with urllib.request.urlopen(req, timeout=60) as resp:
+                      body = json.loads(resp.read().decode("utf-8"))
+                  if body.get("code") != 0:
+                      raise RuntimeError(
+                          f"Tushare code={body.get('code')} msg={body.get('msg')}"
+                      )
+                  data = body.get("data") or {}
+                  fields = data.get("fields") or []
+                  items = data.get("items") or []
+                  return [dict(zip(fields, row)) for row in items]
+
+              def fetch_jessica(trade_date):
+                  url = (
+                      "https://raw.githubusercontent.com/"
+                      f"Jessica-Zhangyj/dlquant/{PIN}/data/moneyflow/{trade_date}.csv"
+                  )
+                  with urllib.request.urlopen(url, timeout=60) as resp:
+                      text = resp.read().decode("utf-8-sig")
+                  return list(csv.DictReader(io.StringIO(text)))
+
+              def dec(v):
+                  if v is None or v == "":
+                      return None
+                  return Decimal(str(v))
+
+              amount_fields = [
+                  "buy_lg_amount","buy_elg_amount",
+                  "sell_lg_amount","sell_elg_amount",
+              ]
+              date_cache = {}
+              all_overlap_ok = True
+              all_api_ok = True
+              for trade_date in sorted({d for _, d in TARGETS}):
+                  try:
+                      api_rows = post_moneyflow(trade_date)
+                      api_by_code = {r["ts_code"]: r for r in api_rows}
+                      archive_rows = fetch_jessica(trade_date)
+                      archive_by_code = {r["ts_code"]: r for r in archive_rows}
+                      overlap = sorted(set(api_by_code) & set(archive_by_code))
+                      mismatch = []
+                      exact = 0
+                      for code in overlap:
+                          a = api_by_code[code]
+                          j = archive_by_code[code]
+                          diffs = {}
+                          for f in amount_fields:
+                              if dec(a.get(f)) != dec(j.get(f)):
+                                  diffs[f] = {
+                                      "tushare": a.get(f),
+                                      "jessica": j.get(f),
+                                  }
+                          if diffs:
+                              if len(mismatch) < 10:
+                                  mismatch.append({"ts_code": code, "diffs": diffs})
+                          else:
+                              exact += 1
+                      overlap_ok = len(overlap) > 0 and exact == len(overlap) and not mismatch
+                      all_overlap_ok = all_overlap_ok and overlap_ok
+                      date_cache[trade_date] = api_by_code
+                      result["dates"][trade_date] = {
+                          "api_rows": len(api_rows),
+                          "jessica_rows": len(archive_rows),
+                          "overlap_rows": len(overlap),
+                          "exact_overlap_rows": exact,
+                          "mismatch_count": len(overlap) - exact,
+                          "overlap_pass": overlap_ok,
+                          "mismatch_examples": mismatch,
+                      }
+                  except Exception as e:
+                      all_api_ok = False
+                      all_overlap_ok = False
+                      result["dates"][trade_date] = {
+                          "error": f"{type(e).__name__}: {e}",
+                          "overlap_pass": False,
+                      }
+
+              resolved = 0
+              for code, trade_date in TARGETS:
+                  row = date_cache.get(trade_date, {}).get(code)
+                  if row is None:
+                      result["targets"].append({
+                          "ts_code": code,
+                          "trade_date": trade_date,
+                          "resolved": False,
+                      })
+                      continue
+                  vals = {f: row.get(f) for f in amount_fields}
+                  if any(vals[f] is None for f in amount_fields):
+                      result["targets"].append({
+                          "ts_code": code,
+                          "trade_date": trade_date,
+                          "resolved": False,
+                          "reason": "NULL_REQUIRED_AMOUNT_FIELD",
+                          **vals,
+                      })
+                      continue
+                  main = (
+                      dec(vals["buy_lg_amount"])
+                      + dec(vals["buy_elg_amount"])
+                      - dec(vals["sell_lg_amount"])
+                      - dec(vals["sell_elg_amount"])
+                  ) * Decimal("10000")
+                  resolved += 1
+                  result["targets"].append({
+                      "ts_code": code,
+                      "trade_date": trade_date,
+                      "resolved": True,
+                      **vals,
+                      "main_net_flow_cny": str(main.normalize()),
+                  })
+
+              result["resolved_target_count"] = resolved
+              result["semantic_overlap_pass"] = bool(all_api_ok and all_overlap_ok)
+              result["all_targets_resolved"] = resolved == len(TARGETS)
+              result["status"] = (
+                  "PASS"
+                  if result["semantic_overlap_pass"] and result["all_targets_resolved"]
+                  else "INCOMPLETE"
+              )
+
+          canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+          result["content_sha256_without_hash_field"] = hashlib.sha256(
+              canonical.encode("utf-8")
+          ).hexdigest()
+          with open(OUT, "w", encoding="utf-8") as f:
+              json.dump(result, f, ensure_ascii=False, indent=2, sort_keys=True)
+              f.write("\n")
+          print(json.dumps({
+              "status": result.get("status"),
+              "secret_present": result.get("secret_present"),
+              "resolved_target_count": result.get("resolved_target_count", 0),
+              "semantic_overlap_pass": result.get("semantic_overlap_pass"),
+              "all_targets_resolved": result.get("all_targets_resolved"),
+              "result_sha256": result.get("content_sha256_without_hash_field"),
+          }, ensure_ascii=False))
+          PY
+
+      - name: Upload probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-tushare-exact-probe-v1
+          path: dao2_a_tushare_exact_probe_v1.json
+          if-no-files-found: error
+          retention-days: 30

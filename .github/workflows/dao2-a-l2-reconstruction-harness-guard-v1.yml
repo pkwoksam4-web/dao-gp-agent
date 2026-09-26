@@ -1,0 +1,22 @@
+name: DAO2 A L2 Reconstruction Harness Guard V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - scripts/dao2_a_l2_reconstruction_harness_v1.py
+      - scripts/test_dao2_a_l2_reconstruction_harness_v1.py
+      - .github/workflows/dao2-a-l2-reconstruction-harness-guard-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run fail-closed L2 harness tests
+        run: python -m unittest scripts/test_dao2_a_l2_reconstruction_harness_v1.py -v

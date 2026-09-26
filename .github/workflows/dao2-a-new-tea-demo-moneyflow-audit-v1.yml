@@ -1,0 +1,229 @@
+name: DAO2 A New Tea Demo Moneyflow Audit V1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-new-tea-demo-moneyflow-audit-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install readers
+        run: python -m pip install --quiet pandas pyarrow duckdb
+
+      - name: Audit historical demo carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://raw.githubusercontent.com/garnet1985/new-tea-quant/dcbc7a90b068a63eb0dcc79fea443e52f650eecc/initialization/data/data_demo.zip"
+          curl -L --fail --retry 3 -o new_tea_data_demo.zip "$URL"
+          sha256sum new_tea_data_demo.zip
+
+          python - <<'PY'
+          import hashlib, io, json, os, re, sqlite3, zipfile, tempfile
+          from decimal import Decimal, InvalidOperation
+          from pathlib import Path
+          import pandas as pd
+          import duckdb
+          import requests
+
+          ZIP="new_tea_data_demo.zip"
+          REPO="garnet1985/new-tea-quant"
+          COMMIT="dcbc7a90b068a63eb0dcc79fea443e52f650eecc"
+          BLOB="ff8d5a006cff5a986f876eb20d9fb6a5d6ce6599"
+          JCOMMIT="6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          JBASE=f"https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/{JCOMMIT}/data/moneyflow"
+          targets=[
+            ("000564.SZ","20230320"),("001337.SZ","20230320"),
+            ("002118.SZ","20230522"),("002157.SZ","20230522"),
+            ("002503.SZ","20230522"),("002504.SZ","20230522"),
+          ]
+          req=["ts_code","trade_date","buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount"]
+          opt=["buy_sm_amount","buy_md_amount","sell_sm_amount","sell_md_amount","net_mf_amount"]
+          fields=req+opt
+          raw=Path(ZIP).read_bytes()
+          out={
+            "artifact":"DAO2_A_NEW_TEA_DEMO_MONEYFLOW_AUDIT_V1",
+            "repository":REPO,"commit":COMMIT,
+            "path":"initialization/data/data_demo.zip","blob_sha":BLOB,
+            "raw_zip_bytes":len(raw),"raw_zip_sha256":hashlib.sha256(raw).hexdigest(),
+            "declared_window":{"start":"20230101","end":"20251231","stock_count":300},
+            "targets":[{"ts_code":s,"trade_date":d} for s,d in targets],
+            "required_fields":req,"preferred_fields":opt,
+            "files":[],
+            "candidate_tables":[],
+            "target_hits":[],
+            "overlap":{"attempted":False},
+            "admissible_rows":0,
+          }
+
+          def normalize_df(df, source):
+            cols={str(c).lower():c for c in df.columns}
+            # Accept exact names; stock_code/date aliases only for discovery, never admission.
+            exact=all(c in df.columns for c in req)
+            if exact:
+              d=df.copy()
+              d["ts_code"]=d["ts_code"].astype(str)
+              d["trade_date"]=d["trade_date"].astype(str).str.replace("-","",regex=False).str.replace(".0","",regex=False).str.zfill(8)
+              return d, True
+            return df, False
+
+          def audit_df(df, source):
+            if df is None or df.empty: return
+            d, exact=normalize_df(df,source)
+            rec={"source":source,"rows":int(len(d)),"columns":[str(c) for c in d.columns],"exact_schema":exact}
+            if "trade_date" in d.columns:
+              vals=d["trade_date"].astype(str).str.replace("-","",regex=False).str.replace(".0","",regex=False)
+              valid=vals[vals.str.fullmatch(r"\d{8}",na=False)]
+              if len(valid):
+                rec["min_date"]=str(valid.min()); rec["max_date"]=str(valid.max()); rec["unique_dates"]=int(valid.nunique())
+            out["candidate_tables"].append(rec)
+            if not exact: return
+            tset=set(targets)
+            hit=d[d.apply(lambda r:(str(r["ts_code"]),str(r["trade_date"])) in tset,axis=1)]
+            for _,r in hit.iterrows():
+              row={c:(None if pd.isna(r[c]) else str(r[c])) for c in fields if c in d.columns}
+              row["source"]=source
+              out["target_hits"].append(row)
+            # identity sample: up to 5 dates, up to 10 rows/date; later aggregate.
+            dates=sorted(set(d["trade_date"].tolist()))
+            if dates:
+              picks=[]
+              # Prefer multiple years if present.
+              byy={}
+              for dd in dates: byy.setdefault(dd[:4],[]).append(dd)
+              for y in sorted(byy):
+                picks.extend([byy[y][0],byy[y][len(byy[y])//2],byy[y][-1]])
+              picks=list(dict.fromkeys(picks))[:5]
+              samples=[]
+              for dd in picks:
+                samples.append(d[d["trade_date"]==dd].head(10))
+              if samples:
+                sm=pd.concat(samples,ignore_index=True)
+                out.setdefault("_overlap_samples",[]).append((source,sm))
+
+          with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            names=z.namelist()
+            out["zip_member_count"]=len(names)
+            out["zip_members"]=names
+            td=tempfile.mkdtemp(prefix="ntq_")
+            z.extractall(td)
+            root=Path(td)
+            for p in root.rglob("*"):
+              if not p.is_file(): continue
+              rel=str(p.relative_to(root))
+              ext=p.suffix.lower()
+              info={"path":rel,"bytes":p.stat().st_size,"sha256":hashlib.sha256(p.read_bytes()).hexdigest()}
+              out["files"].append(info)
+              try:
+                if ext==".parquet":
+                  audit_df(pd.read_parquet(p),rel)
+                elif ext==".csv" and p.stat().st_size < 200_000_000:
+                  audit_df(pd.read_csv(p,low_memory=False),rel)
+                elif ext in (".db",".sqlite",".sqlite3",".duckdb"):
+                  if ext==".duckdb":
+                    con=duckdb.connect(str(p),read_only=True)
+                    tables=[x[0] for x in con.execute("show tables").fetchall()]
+                    for t in tables:
+                      cols=[x[0] for x in con.execute(f"describe select * from \"{t}\"").fetchall()]
+                      if any(x in cols for x in req) or "money" in t.lower() or "flow" in t.lower():
+                        audit_df(con.execute(f"select * from \"{t}\"").fetchdf(),f"{rel}::{t}")
+                    con.close()
+                  else:
+                    con=sqlite3.connect(f"file:{p}?mode=ro",uri=True)
+                    tables=[x[0] for x in con.execute("select name from sqlite_master where type='table'").fetchall()]
+                    for t in tables:
+                      cols=[x[1] for x in con.execute(f'pragma table_info("{t}")').fetchall()]
+                      if any(x in cols for x in req) or "money" in t.lower() or "flow" in t.lower():
+                        audit_df(pd.read_sql_query(f'select * from "{t}"',con),f"{rel}::{t}")
+                    con.close()
+              except Exception as e:
+                info["read_error"]=f"{type(e).__name__}: {e}"
+
+          # Exact Jessica overlap only if exact-schema table found.
+          samples=out.pop("_overlap_samples",[])
+          mismatches=[]; compared=0; exact=0; source_files=[]
+          if samples:
+            out["overlap"]["attempted"]=True
+            sess=requests.Session()
+            cache={}
+            def dec(v):
+              if v is None or pd.isna(v): return None
+              return Decimal(str(v))
+            for source,sm in samples:
+              for _,r in sm.iterrows():
+                dd=str(r["trade_date"]); key=(str(r["ts_code"]),dd)
+                if dd not in cache:
+                  rr=sess.get(f"{JBASE}/{dd}.csv",timeout=30)
+                  if rr.status_code!=200:
+                    cache[dd]=None; continue
+                  b=rr.content
+                  source_files.append({"trade_date":dd,"sha256":hashlib.sha256(b).hexdigest(),"bytes":len(b)})
+                  jd=pd.read_csv(io.BytesIO(b),dtype={"ts_code":str,"trade_date":str})
+                  jd["trade_date"]=jd["trade_date"].astype(str).str.replace(".0","",regex=False).str.zfill(8)
+                  cache[dd]={(str(x["ts_code"]),str(x["trade_date"])):x for _,x in jd.iterrows()}
+                if cache[dd] is None or key not in cache[dd]: continue
+                jr=cache[dd][key]; compared+=1; dif={}
+                for c in fields:
+                  if c not in r.index or c not in jr.index: continue
+                  a=dec(r[c]) if c not in ("ts_code","trade_date") else str(r[c])
+                  b=dec(jr[c]) if c not in ("ts_code","trade_date") else str(jr[c])
+                  if a!=b: dif[c]={"carrier":str(a),"jessica":str(b)}
+                if dif: mismatches.append({"source":source,"ts_code":key[0],"trade_date":dd,"diff":dif})
+                else: exact+=1
+            out["overlap"].update({
+              "compared_rows":compared,"exact_rows":exact,"mismatch_rows":len(mismatches),
+              "match_rate":(exact/compared if compared else None),
+              "pass":bool(compared and not mismatches),
+              "mismatch_examples":mismatches[:10],
+              "jessica_files":source_files,
+            })
+
+          # Target rows are not admitted unless carrier identity overlap passes.
+          if out["overlap"].get("pass"):
+            # ensure uniqueness/non-null required fields
+            accepted=[]
+            seen=set()
+            for row in out["target_hits"]:
+              k=(row.get("ts_code"),row.get("trade_date"))
+              if k in seen: continue
+              if all(row.get(c) not in (None,"","nan","None") for c in req):
+                accepted.append(row); seen.add(k)
+            out["accepted_target_rows"]=accepted
+            out["admissible_rows"]=len(accepted)
+          out["status"]=(
+            "IDENTITY_PASS_WITH_RESIDUAL_ROWS" if out["admissible_rows"] else
+            "IDENTITY_PASS_NO_RESIDUAL_ROWS" if out["overlap"].get("pass") else
+            "EXACT_SCHEMA_FOUND_IDENTITY_NOT_PASSED" if any(x.get("exact_schema") for x in out["candidate_tables"]) else
+            "NO_EXACT_MONEYFLOW_CARRIER_IN_ZIP"
+          )
+          canon=json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          out["content_sha256_without_hash_field"]=hashlib.sha256(canon.encode()).hexdigest()
+          Path("dao2_a_new_tea_demo_moneyflow_audit_v1.json").write_text(json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+          print(json.dumps({
+            "status":out["status"],
+            "zip_sha256":out["raw_zip_sha256"],
+            "zip_member_count":out.get("zip_member_count"),
+            "candidate_tables":len(out["candidate_tables"]),
+            "exact_schema_tables":sum(1 for x in out["candidate_tables"] if x.get("exact_schema")),
+            "overlap_compared":out["overlap"].get("compared_rows"),
+            "overlap_mismatch":out["overlap"].get("mismatch_rows"),
+            "target_hits":len(out["target_hits"]),
+            "admissible_rows":out["admissible_rows"],
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-new-tea-demo-moneyflow-audit-v1
+          path: dao2_a_new_tea_demo_moneyflow_audit_v1.json
+          if-no-files-found: error
+          retention-days: 30
