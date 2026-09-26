@@ -404,6 +404,13 @@
         "net_mf_amount"
       ],
       "reason": "Actual raw historical parquet, but only net_mf_amount is present. Four required exact large/extra-large fields are absent; generic/net amount substitution forbidden."
+    },
+    {
+      "carrier": "sds7788/Stock_predictor",
+      "commit": "f157e0b82a892c737daae8d035134df31d1ce704",
+      "result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
+      "reason": "Processed manifests span DAO2 residual dates and expose moneyflow-derived features, but current and historical repository trees do not contain actual raw Tushare moneyflow CSV/Parquet/SQLite/archive bytes. Initial/upload commits were checked; only processed factor/backtest artifacts are present.",
+      "admissible_rows": 0
     }
   ],
   "historical_l2_private_carriers": {
@@ -460,5 +467,13 @@
       "route": "PAYWALLED_SAMPLE_IDENTITY_VALIDATION",
       "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED"
     }
+  },
+  "latest_p2_search": {
+    "as_of": "2026-09-26",
+    "focus": "residual-date raw historical carrier only",
+    "exact_key_web_search_result": "NO_NEW_RAW_CARRIER_HITS",
+    "sds7788_history_result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
+    "source_absence_level3_new_count": 0,
+    "admissible_new_rows": 0
   }
 }
