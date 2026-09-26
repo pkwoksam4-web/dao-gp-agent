@@ -416,6 +416,13 @@
       "carrier": "submato/ashare-l2",
       "result": "REJECT_PUBLIC_COVERAGE_DOES_NOT_REACH_RESIDUAL_DATES",
       "finding": "README claims private availability from 2017 onward, but public GitHub raw contains only DEMO.SZ/20250102 and the linked free share is 202605-202606. No public 2020-2023 residual-date raw asset is available.",
+      "admissible_rows": 0,
+      "history_check": "Old commits contained only a local FastAPI/SDK scaffold with synthetic DEMO.SZ data. .env.example used ASHARE_L2_BASE_URL=https://api.example.com/v1; no real public historical endpoint or object-storage URL was committed. No releases carried historical raw."
+    },
+    {
+      "carrier": "tycallen/TushareDB",
+      "result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
+      "finding": "Repository contains schema, SQL and ingestion/backfill code but no committed SQLite/DuckDB/Parquet/CSV historical classic moneyflow data bytes.",
       "admissible_rows": 0
     }
   ],
@@ -479,11 +486,14 @@
   },
   "latest_p2_search": {
     "as_of": "2026-09-26",
-    "focus": "residual-date raw historical carrier only",
-    "exact_key_web_search_result": "NO_NEW_RAW_CARRIER_HITS",
-    "sds7788_history_result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
-    "source_absence_level3_new_count": 0,
-    "admissible_new_rows": 0
+    "focus": "residual-date actual raw only",
+    "new_admissible_rows": 0,
+    "newly_closed": [
+      "tycallen/TushareDB",
+      "submato/ashare-l2 historical scaffold"
+    ],
+    "exact_key_search": "NO_NEW_RAW_CARRIER_HITS",
+    "multi_carrier_absence_upgrades": 0
   },
   "historical_l2_identity_trial": "data/dao2/modules/A_L2_KNOWN_ROW_IDENTITY_TRIAL_V1.json",
   "latest_p4_execution": {
