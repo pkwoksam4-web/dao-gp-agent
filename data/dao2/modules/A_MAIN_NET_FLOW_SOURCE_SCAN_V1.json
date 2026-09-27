@@ -830,5 +830,33 @@
     },
     "vendor_requirement": "For 600112.SH/20220506, require native BuyNo/SellNo/OrderNo/BizIndex/Balance semantics. A simplified carrier without BizIndex is insufficient for exact original-order reconstruction.",
     "admission_effect": 0
+  },
+  "alltick_audit_20260927": {
+    "status": "REJECT_FOR_MODULE_A_HISTORICAL_EXACT_RECOVERY",
+    "official_domain": "https://alltick.co",
+    "a_share_support": true,
+    "auth": "API token required; free account available",
+    "public_stock_endpoints": {
+      "historical_kline": "/kline; max 500 bars per request",
+      "latest_trade_tick": "/trade-tick; latest only",
+      "latest_depth_tick": "/depth-tick; latest only",
+      "realtime_websocket": [
+        "trade subscription",
+        "depth subscription"
+      ]
+    },
+    "a_share_depth": "up to 5 levels on public depth endpoint",
+    "historical_tick_orderbook_public_api": false,
+    "order_by_order_fields": false,
+    "original_order_linkage_fields": false,
+    "moneyflow_four_fields": false,
+    "key_limitations": [
+      "Official onboarding says /trade-tick does not support historical transaction prices.",
+      "Official WebSocket trade/depth docs say historical transaction tick/order-book data are not supported.",
+      "Public stock REST reference exposes historical K-lines, but not historical order-by-order trades/orders with OrderNo/BuyNo/SellNo/BizIndex.",
+      "Marketing pages mention long-range historical/tick capabilities generically, but current public A-share API reference does not expose an admissible historical raw-tick endpoint for Module A."
+    ],
+    "module_a_effect": "0/16",
+    "conclusion": "Useful for live A-share monitoring and K-line ingestion; not a carrier for the 2020-2023 Tushare classic moneyflow residuals."
   }
 }
