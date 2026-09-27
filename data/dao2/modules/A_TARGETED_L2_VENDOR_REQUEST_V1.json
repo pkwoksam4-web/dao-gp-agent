@@ -155,5 +155,30 @@
     "StockApi Level2历史数据",
     "alphat01/Tick-by-Tick-Orders-China"
   ],
-  "purchase_policy": "Do not buy full archive solely for Module A if targeted 25 symbol-date export or one-control sample is available."
+  "purchase_policy": "For L2 purchase, request only the 12 Shenzhen residuals + 600112.SH/20220506 + controls. The 3 pre-2021 Shanghai residuals must not be represented as solvable by official SSE Entrust data; obtain direct classic moneyflow values or independently proven original-order carrier.",
+  "scope_correction": {
+    "l2_reconstruction_targets": 13,
+    "direct_classic_moneyflow_only_targets": [
+      "600306.SH/20200608",
+      "600898.SH/20201104",
+      "603996.SH/20210224"
+    ],
+    "reason": "SSE official historical Entrust order stream begins 2021-04-26."
+  },
+  "shanghai_post_20210426_required_fields": [
+    "OrderNo",
+    "Price",
+    "Balance",
+    "OrderBSFlag",
+    "OrdType",
+    "OrderIndex",
+    "ChannelNo",
+    "BizIndex",
+    "TradeQty",
+    "TradeAmount",
+    "BuyNo",
+    "SellNo",
+    "TradeBSFlag",
+    "TradeIndex"
+  ]
 }
