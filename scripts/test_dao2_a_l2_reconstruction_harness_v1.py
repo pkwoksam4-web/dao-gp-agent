@@ -57,6 +57,28 @@ class L2HarnessTests(unittest.TestCase):
         with self.assertRaises(m.ReconstructionError):
             m.reconstruct(orders, trades, "600001.SH", "20230320")
 
+    def test_submato_uses_exchange_order_id_for_trade_linkage(self):
+        order_rows = [
+            {"万得代码":"DEMO.SZ","自然日":"20250102","委托编号":"1","交易所委托号":"1001","委托类型":"0","委托代码":"B","委托价格":"999900","委托数量":"1000"},
+            {"万得代码":"DEMO.SZ","自然日":"20250102","委托编号":"2","交易所委托号":"1002","委托类型":"0","委托代码":"S","委托价格":"1000100","委托数量":"800"},
+            {"万得代码":"DEMO.SZ","自然日":"20250102","委托编号":"3","交易所委托号":"1003","委托类型":"0","委托代码":"B","委托价格":"1000000","委托数量":"500"},
+        ]
+        trade_rows = [
+            {"万得代码":"DEMO.SZ","自然日":"20250102","成交编号":"5001","成交代码":"0","BS标志":"B","成交价格":"1000000","成交数量":"100","叫卖序号":"1002","叫买序号":"1003"},
+            {"万得代码":"DEMO.SZ","自然日":"20250102","成交编号":"5002","成交代码":"0","BS标志":"S","成交价格":"999900","成交数量":"200","叫卖序号":"1002","叫买序号":"1001"},
+            {"万得代码":"DEMO.SZ","自然日":"20250102","成交编号":"5003","成交代码":"C","BS标志":"","成交价格":"0","成交数量":"100","叫卖序号":"1002","叫买序号":"0"},
+        ]
+        orders = m._parse_orders(order_rows, "DEMO.SZ", "20250102", "submato")
+        trades = m._parse_trades(trade_rows, "DEMO.SZ", "20250102", "submato")
+        self.assertEqual([o.order_id for o in orders], [1001, 1002, 1003])
+        self.assertEqual(len(trades), 2)
+        out = m.reconstruct(orders, trades, "DEMO.SZ", "20250102")
+        self.assertEqual(out["buy_md_amount"], 1.0)
+        self.assertEqual(out["sell_md_amount"], 1.9998)
+        self.assertEqual(out["buy_lg_amount"], 0.0)
+        self.assertEqual(out["sell_lg_amount"], 0.0)
+        self.assertEqual(out["identity_status"], "PENDING_JESSICA_EXACT_OVERLAP")
+
     def test_unknown_side_rejected(self):
         with self.assertRaises(m.ReconstructionError):
             m._normalize_side("U")
