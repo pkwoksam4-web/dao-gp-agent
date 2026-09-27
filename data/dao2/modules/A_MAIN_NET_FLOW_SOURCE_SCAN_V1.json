@@ -559,7 +559,10 @@
     },
     "priority_order": [
       "SUBMATO_ASHARE_L2_TARGETED_HISTORICAL_EXPORT",
+      "CNOPENDATA_TARGETED_L2_EXPORT",
+      "STOCKAPI_TARGETED_HISTORICAL_L2_EXPORT",
       "ALPHAT01_2023_GATED_REVIEW",
+      "MAIRUI_MOMA_DIRECT_FOUR_FIELD_IF_LICENSE_AVAILABLE",
       "NEW_PUBLIC_EXACT_CARRIER"
     ],
     "rqdata_assessment": {
@@ -650,5 +653,56 @@
     "gate": "3 Jessica controls per target date across all 9 target dates; exact 4-field identity under one global schema/unit scale required before residual queries",
     "next_step": "User adds iFinD refresh_token to GitHub Actions secret IFIND_REFRESH_TOKEN, then rerun DAO2 A iFinD Exact Probe V1.",
     "admission_effect": 0
+  },
+  "alternative_channels_20260927": {
+    "cnopendata": {
+      "status": "HIGH_PRIORITY_COMMERCIAL_L2_CARRIER",
+      "coverage": "2017-2025",
+      "data": [
+        "逐笔委托",
+        "逐笔成交"
+      ],
+      "fit": "HIGH",
+      "reason": "Covers all residual years and preserves order/trade event structure suitable for reconstruction; targeted-date export should be requested."
+    },
+    "stockapi_history_l2": {
+      "status": "HIGH_PRIORITY_COMMERCIAL_L2_CARRIER",
+      "coverage": "historical Level2 archive",
+      "data": [
+        "十档委托",
+        "逐笔成交",
+        "逐笔委托"
+      ],
+      "delivery": "Baidu Pan / contact / paid",
+      "fit": "HIGH",
+      "reason": "Potentially faster than full API onboarding because only nine target dates are needed."
+    },
+    "mairui_moma": {
+      "status": "DIRECT_FOUR_FIELD_CANDIDATE_LICENSE_REQUIRED",
+      "fields": {
+        "buy_elg": "zmbtdcje",
+        "buy_lg": "zmbddcje",
+        "sell_elg": "zmstdcje",
+        "sell_lg": "zmsddcje"
+      },
+      "fit": "VERY_HIGH_IF_HISTORICAL_COVERAGE_EXISTS",
+      "demo_probe_jobs": [
+        "6ab8c6716b030d633f698460",
+        "6ab8c6846b030d633f698465"
+      ],
+      "demo_result": "PUBLIC_DEMO_LICENCE_RETURNS_STATIC_SAMPLE; CANNOT VALIDATE 2021/2023 TARGET DATES",
+      "admission_effect": 0
+    },
+    "eastmoney_public_fflow": {
+      "status": "VALIDATION_ONLY_NOT_PRIMARY",
+      "auth": "none",
+      "fields": [
+        "大单净流入",
+        "超大单净流入"
+      ],
+      "limitation": "No buy/sell four-field split; old 2020-2023 dates not reliably available from current endpoint; live probe yielded no target-date rows and throttling.",
+      "probe_job": "6ab8c5f06b030d633f698446",
+      "admission_effect": 0
+    }
   }
 }
