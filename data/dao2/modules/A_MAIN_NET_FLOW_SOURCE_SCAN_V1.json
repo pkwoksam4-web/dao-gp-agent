@@ -545,5 +545,47 @@
       "daily_open_present": 6,
       "exact_rows_recovered": 0
     }
+  },
+  "tushare_exact_probe_latest": {
+    "workflow_run_id": 35498618517,
+    "run_attempt": 8,
+    "artifact_id": 10925396718,
+    "status": "INCOMPLETE",
+    "secret_present": true,
+    "resolved_target_count": 0,
+    "semantic_overlap_pass": false,
+    "all_targets_resolved": false,
+    "error_code": 40203,
+    "error_classification": "TOKEN_PRESENT_BUT_MONEYFLOW_API_PERMISSION_DENIED",
+    "affected_target_dates": [
+      "20200608",
+      "20201104",
+      "20210224",
+      "20210923",
+      "20210924",
+      "20211125",
+      "20220506",
+      "20230320",
+      "20230522"
+    ],
+    "official_min_points_current": 2000,
+    "retry_policy": "Do not retry again unless account moneyflow permission/points materially change."
+  },
+  "p2": {
+    "public_mirror_search_20260927": {
+      "exact_target_hits": 0,
+      "checked": [
+        "Etha-Sun/DeepLearningFinal",
+        "que3sui/A_stock",
+        "GitHub global exact target/date searches",
+        "web exact target/date searches"
+      ],
+      "findings": [
+        "Etha-Sun/DeepLearningFinal documents the USTC moneyflow schema but repository tree has no raw moneyflow files.",
+        "que3sui/A_stock demonstrably consumed USTC moneyflow locally and generated factors, but current and sampled historical Git trees contain no raw moneyflow/cache panel carrier.",
+        "No new public exact target row was found."
+      ],
+      "admission_effect": 0
+    }
   }
 }
