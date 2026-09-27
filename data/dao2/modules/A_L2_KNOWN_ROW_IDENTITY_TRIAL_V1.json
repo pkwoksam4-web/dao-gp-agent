@@ -164,16 +164,54 @@
     "jobs": {
       "listing": "6ab7dd2152d0dbd7f1d95a39",
       "metadata": "6ab7dd4c52d0dbd7f1d95a4a",
-      "raw_access_check": "6ab7dd7c6b030d633f694bb3"
+      "raw_access_check": "6ab7dd7c6b030d633f694bb3",
+      "access_listing_check": "6ab8953e6b030d633f697e71",
+      "raw_access_check_latest": "6ab895cd6b030d633f697e82"
     },
     "raw_access": false,
-    "error": "403 GatedRepoError: account is not in authorized list",
-    "status": "MANUAL_REVIEW_AUTHORIZATION_REQUIRED"
+    "error": "403 GatedRepoError: request is awaiting review from repo authors",
+    "status": "APPLICATION_SUBMITTED_MANUAL_REVIEW_PENDING",
+    "authorization_request": "SUBMITTED",
+    "identity_gate_frozen": {
+      "frozen_before_residual_raw_access": true,
+      "jessica_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+      "source_path": "data/moneyflow/20230320.csv",
+      "source_content_sha256": "dd7d4e00ceb970decc61f5dd4b5951fb89f5401c042a845fe9ccc6000a499680",
+      "rows": {
+        "000652.SZ/20230320": {
+          "buy_lg_amount": "1349.77",
+          "buy_elg_amount": "0.0",
+          "sell_lg_amount": "1005.34",
+          "sell_elg_amount": "275.39"
+        },
+        "000768.SZ/20230320": {
+          "buy_lg_amount": "7302.2",
+          "buy_elg_amount": "1719.14",
+          "sell_lg_amount": "7517.56",
+          "sell_elg_amount": "4381.44"
+        },
+        "000100.SZ/20230320": {
+          "buy_lg_amount": "13032.41",
+          "buy_elg_amount": "20726.5",
+          "sell_lg_amount": "14965.33",
+          "sell_elg_amount": "13870.26"
+        }
+      },
+      "required_comparisons": 12,
+      "acceptance": "12/12 exact required; no tolerance; no retuning after raw access",
+      "execution_status": "NOT_RUN_RAW_ACCESS_PENDING"
+    }
   },
   "admission_effect": {
     "new_exact_rows": 0,
     "resolved_rows": 1011591,
     "unresolved_rows": 16,
     "checkpoint_created": false
+  },
+  "jessica_2023_source_absence_audit": {
+    "job": "6ab8962152d0dbd7f1d99f33",
+    "result": "PASS_SOURCE_ABSENCE_CONFIRMED",
+    "evidence_file": "data/dao2/modules/A_JESSICA_2023_RESIDUAL_ABSENCE_AUDIT_V1.json",
+    "implication": "Six 2023 residual symbol-dates traded on the date but are absent from Jessica pinned classic moneyflow daily source files; this is source-absence evidence only and creates no values."
   }
 }
