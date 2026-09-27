@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_L2_KNOWN_ROW_IDENTITY_TRIAL_V1",
   "version": "1.0",
-  "as_of": "2026-09-26",
+  "as_of": "2026-09-27",
   "module": "A_MAIN_NET_FLOW",
   "governance": {
     "fail_closed": true,
@@ -18,7 +18,9 @@
     "jobs": {
       "repo_listing": "6ab7dc8052d0dbd7f1d959ee",
       "file_metadata": "6ab7dca16b030d633f694b4b",
-      "known_row_smoke": "6ab7dd016b030d633f694b76"
+      "known_row_smoke": "6ab7dd016b030d633f694b76",
+      "provider_schema_diagnostic_v1": "6ab8762552d0dbd7f1d9962c",
+      "provider_schema_diagnostic_v2": "6ab876456b030d633f69789e"
     },
     "known_row": {
       "ts_code": "000001.SZ",
@@ -50,8 +52,32 @@
       "trade_rows_for_symbol": 149301
     },
     "observed_schema": {
-      "orders": ["wind_code","ex_code","date","time","order_id","ex_order_id","order_type","order_code","price","volume"],
-      "trades": ["wind_code","ex_code","date","time","trade_id","trade_code","order_code","bs_flag","price","volume","ask_order_id","bid_order_id"]
+      "orders": [
+        "wind_code",
+        "ex_code",
+        "date",
+        "time",
+        "order_id",
+        "ex_order_id",
+        "order_type",
+        "order_code",
+        "price",
+        "volume"
+      ],
+      "trades": [
+        "wind_code",
+        "ex_code",
+        "date",
+        "time",
+        "trade_id",
+        "trade_code",
+        "order_code",
+        "bs_flag",
+        "price",
+        "volume",
+        "ask_order_id",
+        "bid_order_id"
+      ]
     },
     "critical_observation": {
       "order_id": "observed 0 in first real Shenzhen order rows",
@@ -59,9 +85,65 @@
       "frozen_harness_requirement": "positive order_id used as original-order identity",
       "failure": "bad order primitive"
     },
-    "result": "REJECT_FROZEN_MAPPING_INCOMPATIBLE_SCHEMA",
+    "result": "REJECT_IDENTITY_FAIL_PROVIDER_SCHEMA_DIAGNOSTIC",
     "field_level_comparison_executed": false,
-    "reason": "The frozen harness fails before aggregation because the provider's real Shenzhen rows do not satisfy its original-order-id mapping. Per governance, the mapping is not retuned after observing the known-row data."
+    "reason": "Frozen harness still rejects the provider schema. A separate non-admission diagnostic using the observed ex_order_id linkage and trade_code=0 execution convention reached complete order linkage but materially mismatched all four Jessica-known required fields, so venvoo is closed as an exact carrier without changing formal semantics.",
+    "provider_specific_diagnostic": {
+      "purpose": "Non-admission provider-schema diagnostic after the frozen harness rejected venvoo's order_id mapping. Formal harness semantics were not changed.",
+      "formal_harness_unchanged": true,
+      "diagnostic_only": true,
+      "mapping_tested": {
+        "original_order_identity": "ex_order_id",
+        "execution_trade_code": "0",
+        "cancellation_trade_code": "C",
+        "active_order_linkage": "bid_order_id for B / ask_order_id for S"
+      },
+      "observed": {
+        "order_rows": 166359,
+        "trade_rows": 149301,
+        "order_id_nonzero": 0,
+        "ex_order_id_nonzero": 166359,
+        "order_type_counts": {
+          "0": 165970,
+          "1": 381,
+          "U": 8
+        },
+        "trade_code_counts": {
+          "0": 115656,
+          "C": 33645
+        },
+        "fill_rows": 115656,
+        "matched_used": 115082,
+        "missing_active_order": 0,
+        "side_mismatch": 0,
+        "unclassifiable_zero_price_or_volume": 574,
+        "used_order_type_counts": {
+          "0": 114991,
+          "1": 665
+        }
+      },
+      "reconstructed_required_fields_2dp": {
+        "buy_lg_amount": "24355.76",
+        "buy_elg_amount": "19170.10",
+        "sell_lg_amount": "44340.77",
+        "sell_elg_amount": "19858.80"
+      },
+      "expected_required_fields": {
+        "buy_lg_amount": "51571.27",
+        "buy_elg_amount": "42858.37",
+        "sell_lg_amount": "87320.98",
+        "sell_elg_amount": "30030.38"
+      },
+      "difference_2dp": {
+        "buy_lg_amount": "-27215.51",
+        "buy_elg_amount": "-23688.27",
+        "sell_lg_amount": "-42980.21",
+        "sell_elg_amount": "-10171.58"
+      },
+      "exact_2dp": false,
+      "result": "REJECT_IDENTITY_FAIL",
+      "conclusion": "Even after testing the provider-observed ex_order_id linkage and trade_code=0 execution convention, the Jessica-known four required fields materially mismatch. This diagnostic does not authorize retuning; venvoo is closed as a Module A exact-reconstruction carrier."
+    }
   },
   "alphat01": {
     "repository": "alphat01/Tick-by-Tick-Orders-China",
