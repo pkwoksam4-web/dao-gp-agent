@@ -189,7 +189,12 @@ def _parse_orders(
                 "cannot classify original order notional without guessing"
             )
 
-        oid = _id_int(_first(row, ("order_id", "委托编号"), "order_id"), "order_id")
+        order_id_columns = (
+            ("交易所委托号", "order_id", "委托编号")
+            if provider == "submato"
+            else ("order_id", "委托编号")
+        )
+        oid = _id_int(_first(row, order_id_columns, "order_id"), "order_id")
         side = _normalize_side(order_code)
         raw_price = _positive_float(_first(row, ("price", "委托价格"), "order price"), "order price")
         volume = _positive_float(_first(row, ("volume", "委托数量"), "order volume"), "order volume")
@@ -325,7 +330,7 @@ def reconstruct(
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("--provider", required=True, choices=("venvoo", "alphat01"))
+    p.add_argument("--provider", required=True, choices=("venvoo", "alphat01", "submato"))
     p.add_argument("--orders", required=True, type=Path)
     p.add_argument("--trades", required=True, type=Path)
     p.add_argument("--symbol", required=True)
