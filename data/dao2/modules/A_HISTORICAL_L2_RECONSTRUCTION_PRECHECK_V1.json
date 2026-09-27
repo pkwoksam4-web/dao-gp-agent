@@ -4,7 +4,7 @@
   "as_of": "2026-09-27",
   "module": "A_MAIN_NET_FLOW",
   "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
-  "status": "VENVOO_IDENTITY_REJECT_ALPHAT01_AUTH_PENDING",
+  "status": "ALPHAT01_APPLICATION_SUBMITTED_REVIEW_PENDING",
   "governance": {
     "fail_closed": true,
     "admissible_exact_rows": 0,
@@ -185,13 +185,29 @@
       "access_runtime": {
         "raw_access": false,
         "error": "403 GatedRepoError",
-        "detail": "Current account is not in authorized list; metadata/file listing visible but raw resolve denied.",
+        "detail": "2026-09-27 raw archive resolve check: request is awaiting review from repo authors.",
         "revision": "674ef1eae2ebe7aaf6be7306c9859c8fe13ca7fe",
         "sample_target_files": {
           "20230320": "202303/20230320.7z",
           "20230522": "202305/20230522.7z"
         },
-        "status": "MANUAL_REVIEW_AUTHORIZATION_REQUIRED"
+        "status": "APPLICATION_SUBMITTED_MANUAL_REVIEW_PENDING",
+        "authorization_request": "SUBMITTED",
+        "access_listing_job": "6ab8953e6b030d633f697e71",
+        "raw_access_job": "6ab895cd6b030d633f697e82"
+      },
+      "identity_gate_frozen": {
+        "frozen_before_residual_raw_access": true,
+        "jessica_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+        "source_path": "data/moneyflow/20230320.csv",
+        "source_content_sha256": "dd7d4e00ceb970decc61f5dd4b5951fb89f5401c042a845fe9ccc6000a499680",
+        "rows": [
+          "000652.SZ/20230320",
+          "000768.SZ/20230320",
+          "000100.SZ/20230320"
+        ],
+        "required_comparisons": 12,
+        "acceptance": "12/12 exact; mismatch_rows=0; no tolerance or post-observation retuning"
       }
     }
   },
@@ -204,13 +220,13 @@
     "Partial recovery is permitted; unresolved Shanghai-early keys remain open unless another exact carrier supplies them."
   ],
   "manual_gate": {
-    "type": "PRIVATE_ACCOUNT_AUTHORIZATION",
+    "type": "PRIVATE_ACCOUNT_AUTHORIZATION_REVIEW_PENDING",
     "provider": "Hugging Face",
     "credential_handling": "Do not paste tokens into chat. Connect/login through the supported Hugging Face integration or provider UI, then request dataset access.",
-    "reason": "venvoo is now closed by Jessica-known identity failure. The remaining P4 private-carrier gate is alphat01 raw authorization; no residual row may be generated until that carrier passes its own Jessica-known exact overlap."
+    "reason": "Access request has been submitted. Raw alphat01 archive access still returns 403 awaiting manual review. No user action is currently required unless the provider requests additional information."
   },
   "engineering_readiness": {
-    "status": "VENVOO_IDENTITY_REJECT_ALPHAT01_AUTH_PENDING",
+    "status": "ALPHAT01_APPLICATION_SUBMITTED_REVIEW_PENDING",
     "harness_path": "scripts/dao2_a_l2_reconstruction_harness_v1.py",
     "test_path": "scripts/test_dao2_a_l2_reconstruction_harness_v1.py",
     "guard_workflow": ".github/workflows/dao2-a-l2-reconstruction-harness-guard-v1.yml",
@@ -231,7 +247,7 @@
     "admission_status": "NO_RESIDUAL_ADMISSION_ALLOWED_UNTIL_JESSICA_EXACT_OVERLAP_PASS"
   },
   "semantics_frozen": true,
-  "resume_trigger": "ALPHAT01_RAW_L2_ACCESS_AVAILABLE_OR_NEW_EXACT_CARRIER",
+  "resume_trigger": "ALPHAT01_RAW_L2_ACCESS_GRANTED_OR_NEW_EXACT_CARRIER",
   "authorization_priority": {
     "primary": "alphat01/Tick-by-Tick-Orders-China",
     "secondary": "new exact historical carrier",
@@ -306,5 +322,12 @@
       "exact_2dp": false,
       "residual_values_generated": false
     }
-  ]
+  ],
+  "source_absence_evidence_2023": {
+    "audit_job": "6ab8962152d0dbd7f1d99f33",
+    "evidence_file": "data/dao2/modules/A_JESSICA_2023_RESIDUAL_ABSENCE_AUDIT_V1.json",
+    "moneyflow_absent_count": 6,
+    "daily_open_present_count": 6,
+    "admission_effect": 0
+  }
 }
