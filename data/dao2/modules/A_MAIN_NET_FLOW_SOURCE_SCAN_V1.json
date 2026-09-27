@@ -526,7 +526,50 @@
     "raw_access": false,
     "authorization_request": "SUBMITTED",
     "latest_raw_access_job": "6ab895cd6b030d633f697e82",
-    "identity_gate_frozen_before_access": true
+    "identity_gate_frozen_before_access": true,
+    "submato_ashare_l2": {
+      "repo": "submato/ashare-l2",
+      "status": "NEW_HIGH_PRIORITY_EXTERNAL_CARRIER",
+      "coverage_claim": "Shanghai/Shenzhen 2017-present Level-2",
+      "public_recent_only": true,
+      "historical_access": "CONTACT_AUTHOR_REQUIRED",
+      "contact": "lukalaoban@gmail.com",
+      "schema": {
+        "orders": [
+          "交易所委托号",
+          "委托代码",
+          "委托价格",
+          "委托数量",
+          "委托类型"
+        ],
+        "trades": [
+          "成交编号",
+          "成交代码",
+          "BS标志",
+          "成交价格",
+          "成交数量",
+          "叫卖序号",
+          "叫买序号"
+        ]
+      },
+      "reconstruction_fit": "HIGH",
+      "rationale": "Covers all residual years 2020-2023 by author claim and exposes order/trade linkage fields required for original-order reconstruction. Must pass Jessica exact identity before admission.",
+      "next_step": "Request only the 9 target dates and Jessica overlap dates/symbols; do not request full archive initially.",
+      "admission_effect": 0
+    },
+    "priority_order": [
+      "SUBMATO_ASHARE_L2_TARGETED_HISTORICAL_EXPORT",
+      "ALPHAT01_2023_GATED_REVIEW",
+      "NEW_PUBLIC_EXACT_CARRIER"
+    ],
+    "rqdata_assessment": {
+      "status": "NOT_PRIMARY_FOR_EXACT_RECONSTRUCTION",
+      "reason": "Public RQData documentation exposes historical A-share tick snapshot fields but not the original-order IDs / paired bid-ask order linkage needed by the frozen reconstruction harness."
+    },
+    "wind_assessment": {
+      "status": "QUALIFIED_COMMERCIAL_CARRIER",
+      "reason": "Wind officially advertises historical Tick, transaction-by-transaction trades, order-by-order data, and order queue data. Targeted 9-date export could satisfy reconstruction input if licensed."
+    }
   },
   "p3": {
     "jessica_2023_source_absence_audit": {
