@@ -555,7 +555,32 @@
       "reconstruction_fit": "HIGH",
       "rationale": "Covers all residual years 2020-2023 by author claim and exposes order/trade linkage fields required for original-order reconstruction. Must pass Jessica exact identity before admission.",
       "next_step": "Request only the 9 target dates and Jessica overlap dates/symbols; do not request full archive initially.",
-      "admission_effect": 0
+      "admission_effect": 0,
+      "adapter_status": "PASS_SUBCOMPONENT_PENDING_IDENTITY",
+      "adapter_head": "50c5e49d9f80c7739ba6abff9df02548a9835434",
+      "harness_guard_run": 36305518002,
+      "harness_guard_conclusion": "SUCCESS",
+      "main_guard_run": 36305519014,
+      "main_guard_conclusion": "SUCCESS",
+      "public_demo_findings": {
+        "symbol": "DEMO.SZ",
+        "date": "20250102",
+        "synthetic": true,
+        "order_linkage_key": "交易所委托号",
+        "trade_linkage_keys": [
+          "叫卖序号",
+          "叫买序号"
+        ],
+        "cancellation_code": "C",
+        "note": "DEMO proves schema/linkage adapter only; it cannot prove Tushare/Jessica moneyflow identity."
+      },
+      "historical_readme_evidence": {
+        "commit": "4c903b3e12c13858e9e18cc64388470c3806ecca",
+        "statement": "沪深2017-至今 level2; older README advertised ¥500 bundle for all data and contact via lukalaoban@gmail.com.",
+        "current_status": "price text removed from latest README; targeted quote/sample required before purchase."
+      },
+      "purchase_gate": "NO_PURCHASE_BEFORE_REAL_JESSICA_OVERLAP_SAMPLE_EXACT_IDENTITY",
+      "preferred_request": "One real Shenzhen Jessica-overlap symbol-date sample first, then targeted 9 residual dates only."
     },
     "priority_order": [
       "SUBMATO_ASHARE_L2_TARGETED_HISTORICAL_EXPORT",
