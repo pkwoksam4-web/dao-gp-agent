@@ -101,11 +101,7 @@
     },
     "interpretation": "Forced rerun attempt 7 after the user's manual secret update still received a non-empty secret but Tushare rejected every request with code 40101. This rules out stale-run timing as the explanation. No target row resolved and no Jessica overlap comparison could execute."
   },
-  "environment_blocker": {
-    "code": "MULTI_GATE_P1_BAIDU_AUTH_P4_ALPHAT01_AUTH",
-    "module_status": "BLOCKED",
-    "actionable_requirement": "P1 requires account-level Baidu file authorization for the vendor sample. P4 requires alphat01 gated-dataset authorization. venvoo no longer requires work because its Jessica-known identity diagnostic failed. P2/P3 may continue autonomously."
-  },
+  "environment_blocker": "MULTI_GATE_P1_BAIDU_AUTH_P4_ALPHAT01_MANUAL_REVIEW_PENDING",
   "current_source_strategy": "AUTONOMOUS_COMPLETION_MODE",
   "infoway_probe": {
     "workflow": "DAO2 A Infoway Semantic Capability Probe V1",
@@ -524,5 +520,30 @@
     ],
     "alphat01_result": "403_GATED_MANUAL_REVIEW_REQUIRED",
     "new_admissible_rows": 0
+  },
+  "p4": {
+    "status": "ALPHAT01_APPLICATION_SUBMITTED_REVIEW_PENDING",
+    "raw_access": false,
+    "authorization_request": "SUBMITTED",
+    "latest_raw_access_job": "6ab895cd6b030d633f697e82",
+    "identity_gate_frozen_before_access": true
+  },
+  "p3": {
+    "jessica_2023_source_absence_audit": {
+      "job": "6ab8962152d0dbd7f1d99f33",
+      "status": "PASS_SOURCE_ABSENCE_CONFIRMED",
+      "evidence_file": "data/dao2/modules/A_JESSICA_2023_RESIDUAL_ABSENCE_AUDIT_V1.json",
+      "targets": [
+        "000564.SZ/20230320",
+        "001337.SZ/20230320",
+        "002118.SZ/20230522",
+        "002157.SZ/20230522",
+        "002503.SZ/20230522",
+        "002504.SZ/20230522"
+      ],
+      "moneyflow_absent": 6,
+      "daily_open_present": 6,
+      "exact_rows_recovered": 0
+    }
   }
 }
