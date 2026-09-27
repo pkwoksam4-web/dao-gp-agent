@@ -212,6 +212,6 @@
     "job": "6ab8962152d0dbd7f1d99f33",
     "result": "PASS_SOURCE_ABSENCE_CONFIRMED",
     "evidence_file": "data/dao2/modules/A_JESSICA_2023_RESIDUAL_ABSENCE_AUDIT_V1.json",
-    "implication": "Six 2023 residual symbol-dates traded on the date but are absent from Jessica pinned classic moneyflow daily source files; this is source-absence evidence only and creates no values."
+    "implication": "Six 2023 residual symbol-dates traded on the date but are absent from Jessica pinned classic moneyflow daily source files; evidence only, no values created."
   }
 }
