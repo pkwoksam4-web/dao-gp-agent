@@ -629,6 +629,26 @@
         "No new public exact target row was found."
       ],
       "admission_effect": 0
-    }
+    },
+    "ifind_direct_aggregate_route": "HIGH_PRIORITY"
+  },
+  "ifind_route": {
+    "status": "PROBE_READY_MANUAL_SECRET_REQUIRED",
+    "official_api": "https://quantapi.51ifind.com/api/v1/",
+    "free_account_supported": true,
+    "workflow": ".github/workflows/dao2-a-ifind-exact-probe-v1.yml",
+    "initial_run_id": 36302371768,
+    "initial_artifact_id": 10925773221,
+    "initial_result": "NO_IFIND_REFRESH_TOKEN_SECRET",
+    "secret_name": "IFIND_REFRESH_TOKEN",
+    "candidate_mapping": {
+      "buy_lg_amount": "iFinD 主动买入大单金额 (activeBuyMainAmt / legacy active_buy_main_amount)",
+      "buy_elg_amount": "iFinD 主动买入特大单金额 (activeBuyLargeAmt / legacy active_buy_large_amount)",
+      "sell_lg_amount": "iFinD 主动卖出大单金额 (activeSellMainAmt / legacy active_sell_main_amount)",
+      "sell_elg_amount": "iFinD 主动卖出特大单金额 (activeSellLargeAmt / legacy active_sell_large_amount)"
+    },
+    "gate": "3 Jessica controls per target date across all 9 target dates; exact 4-field identity under one global schema/unit scale required before residual queries",
+    "next_step": "User adds iFinD refresh_token to GitHub Actions secret IFIND_REFRESH_TOKEN, then rerun DAO2 A iFinD Exact Probe V1.",
+    "admission_effect": 0
   }
 }
