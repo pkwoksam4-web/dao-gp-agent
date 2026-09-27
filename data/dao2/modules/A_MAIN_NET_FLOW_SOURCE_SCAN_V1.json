@@ -596,6 +596,11 @@
     "wind_assessment": {
       "status": "QUALIFIED_COMMERCIAL_CARRIER",
       "reason": "Wind officially advertises historical Tick, transaction-by-transaction trades, order-by-order data, and order queue data. Targeted 9-date export could satisfy reconstruction input if licensed."
+    },
+    "scope_after_sse_audit": {
+      "l2_candidate_count": 13,
+      "direct_exact_carrier_required_count": 3,
+      "note": "Do not claim raw Shanghai order reconstruction for dates before 2021-04-26 absent independent authoritative original-order evidence."
     }
   },
   "p3": {
@@ -772,5 +777,58 @@
       },
       "conclusion": "Four-field semantics do not exact-match Jessica/Tushare; no admission."
     }
+  },
+  "shanghai_reconstruction_audit": {
+    "status": "SPLIT_BY_DATE_OFFICIAL_SSE_SEMANTICS_BOUND",
+    "official_source": "Shanghai Stock Exchange Historical Data Interface Specification 1.1.3",
+    "findings": {
+      "entrust_file_start_date": "2021-04-26",
+      "trade_fields": [
+        "TradeQty",
+        "TradeAmount",
+        "BuyNo",
+        "SellNo",
+        "TradeBSFlag",
+        "BizIndex"
+      ],
+      "order_fields": [
+        "OrderNo",
+        "Price",
+        "Balance",
+        "OrderBSFlag",
+        "OrdType",
+        "OrderIndex",
+        "ChannelNo",
+        "BizIndex"
+      ],
+      "continuous_auction_balance_semantics": "Order message Balance is post-match remaining quantity; fully matched incoming orders may have no order message.",
+      "bizindex_semantics": "Trade and order events share a channel-continuous BizIndex, enabling event-order reconstruction from 2021-04-26 onward."
+    },
+    "residual_partition": {
+      "shenzhen_l2_reconstructable_candidates": [
+        "002618.SZ/20210923",
+        "000020.SZ/20210924",
+        "000157.SZ/20210924",
+        "000592.SZ/20210924",
+        "000753.SZ/20210924",
+        "002684.SZ/20211125",
+        "000564.SZ/20230320",
+        "001337.SZ/20230320",
+        "002118.SZ/20230522",
+        "002157.SZ/20230522",
+        "002503.SZ/20230522",
+        "002504.SZ/20230522"
+      ],
+      "shanghai_post_entrust_candidate": [
+        "600112.SH/20220506"
+      ],
+      "shanghai_pre_entrust_direct_carrier_required": [
+        "600306.SH/20200608",
+        "600898.SH/20201104",
+        "603996.SH/20210224"
+      ]
+    },
+    "vendor_requirement": "For 600112.SH/20220506, require native BuyNo/SellNo/OrderNo/BizIndex/Balance semantics. A simplified carrier without BizIndex is insufficient for exact original-order reconstruction.",
+    "admission_effect": 0
   }
 }
