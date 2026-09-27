@@ -587,8 +587,7 @@
       "CNOPENDATA_TARGETED_L2_EXPORT",
       "STOCKAPI_TARGETED_HISTORICAL_L2_EXPORT",
       "ALPHAT01_2023_GATED_REVIEW",
-      "MAIRUI_MOMA_DIRECT_FOUR_FIELD_IF_LICENSE_AVAILABLE",
-      "NEW_PUBLIC_EXACT_CARRIER"
+      "NEW_PUBLIC_RAW_L2_CARRIER"
     ],
     "rqdata_assessment": {
       "status": "NOT_PRIMARY_FOR_EXACT_RECONSTRUCTION",
@@ -703,7 +702,7 @@
       "reason": "Potentially faster than full API onboarding because only nine target dates are needed."
     },
     "mairui_moma": {
-      "status": "DIRECT_FOUR_FIELD_CANDIDATE_LICENSE_REQUIRED",
+      "status": "REJECT_DIRECT_IDENTITY_PUBLIC_SAMPLE_FAIL",
       "fields": {
         "buy_elg": "zmbtdcje",
         "buy_lg": "zmbddcje",
@@ -728,6 +727,50 @@
       "limitation": "No buy/sell four-field split; old 2020-2023 dates not reliably available from current endpoint; live probe yielded no target-date rows and throttling.",
       "probe_job": "6ab8c5f06b030d633f698446",
       "admission_effect": 0
+    }
+  },
+  "direct_aggregate_identity_checks_20260927": {
+    "qmt_thinktrader": {
+      "status": "REJECT_DIRECT_IDENTITY_PUBLIC_SAMPLE_FAIL",
+      "public_sample": {
+        "symbol": "000001.SZ",
+        "date": "20240220",
+        "qmt_cny": {
+          "buy_elg": 180761343,
+          "buy_lg": 156870635,
+          "sell_elg": 182394933,
+          "sell_lg": 148570065
+        },
+        "jessica_wan": {
+          "buy_elg": "30464.45",
+          "buy_lg": "33107.3",
+          "sell_elg": "27108.92",
+          "sell_lg": "32471.99"
+        },
+        "jessica_file_sha": "525c4945f7fafc7c1308b476ffba2e9428d04825"
+      },
+      "conclusion": "Not a unit-scale match; do not use QMT big-order aggregate fields as Tushare classic moneyflow replacement."
+    },
+    "mairui_moma": {
+      "status": "REJECT_DIRECT_IDENTITY_PUBLIC_SAMPLE_FAIL",
+      "public_demo_sample": {
+        "symbol": "000001.SZ",
+        "date": "20250102",
+        "mairui_cny": {
+          "buy_elg": 432625231,
+          "buy_lg": 316416582,
+          "sell_elg": 782288599,
+          "sell_lg": 356733622
+        },
+        "jessica_wan": {
+          "buy_elg": "45227.93",
+          "buy_lg": "62935.98",
+          "sell_elg": "72497.68",
+          "sell_lg": "54679.89"
+        },
+        "jessica_file_sha": "ce6b5955e78fa80daa9152059b38dd08d8bbe5c8"
+      },
+      "conclusion": "Four-field semantics do not exact-match Jessica/Tushare; no admission."
     }
   }
 }
