@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-27",
+  "as_of": "2026-09-28",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -477,38 +477,44 @@
     "semantics_frozen": true
   },
   "current_execution_priority": {
+    "p8": {
+      "route": "IFIND_DIRECT_AGGREGATE_EXACT_PROBE",
+      "status": "BLOCKED_IFIND_REFRESH_TOKEN_SECRET_MISSING",
+      "role": "HIGHEST_PRIORITY",
+      "workflow": "DAO2 A iFinD Exact Probe V1",
+      "run_id": 36302371768,
+      "run_attempt": 2,
+      "artifact_id": 10961977569,
+      "artifact_digest": "sha256:7923de79bd305a85cb888879b7c1bb4287394b7113cae53842c5248c18a3da68",
+      "result": "NO_IFIND_REFRESH_TOKEN_SECRET",
+      "identity_gate_pass": false,
+      "resolved_target_count": 0,
+      "probe_logic_frozen": true
+    },
     "p4": {
-      "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
-      "status": "ALPHAT01_AUTH_REQUIRED",
-      "role": "REMAINING_PRIVATE_L2_ROUTE_FOR_2023_SUBSET",
-      "semantics_frozen": true,
-      "resume_trigger": "ALPHAT01_RAW_L2_ACCESS_AVAILABLE"
+      "route": "TARGETED_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+      "status": "ALPHAT01_REVIEW_PENDING_VENDOR_SAMPLE_PENDING",
+      "role": "SECOND_PRIORITY",
+      "semantics_frozen": true
     },
-    "p2": {
-      "route": "NEW_PUBLIC_HISTORICAL_CARRIER_RECOVERY",
-      "status": "ACTIVE",
-      "role": "CONTINUE_WHILE_P4_AUTH_PENDING"
-    },
-    "p3": {
-      "route": "SOURCE_ABSENCE_PROOF",
-      "status": "ACTIVE",
-      "role": "CONTINUE_WHILE_P4_AUTH_PENDING"
+    "p2_p3": {
+      "route": "RESIDUAL_DATE_FINAL_PUBLIC_EVIDENCE_SWEEP",
+      "status": "FINAL_SWEEP_NO_NEW_DIRECT_CARRIER",
+      "role": "THIRD_PRIORITY"
     },
     "p1": {
-      "route": "PAYWALLED_SAMPLE_IDENTITY_VALIDATION",
-      "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED"
+      "route": "PAYWALLED_SAMPLE_AUTH_WAIT",
+      "status": "BLOCKED_ACCOUNT_LEVEL_FILE_AUTHORIZATION_REQUIRED",
+      "role": "FOURTH_PRIORITY"
     }
   },
   "latest_p2_search": {
-    "as_of": "2026-09-26",
-    "focus": "residual-date actual raw only",
+    "as_of": "2026-09-28",
+    "focus": "final bounded residual-date exact sweep only",
     "new_admissible_rows": 0,
-    "newly_closed": [
-      "tycallen/TushareDB",
-      "submato/ashare-l2 historical scaffold"
-    ],
-    "exact_key_search": "NO_NEW_RAW_CARRIER_HITS",
-    "multi_carrier_absence_upgrades": 0
+    "exact_symbol_date_required_field_hits": 0,
+    "surrounding_history_fingerprint_second_carrier_hits": 0,
+    "result": "NO_NEW_DIRECT_CLASSIC_MONEYFLOW_CARRIER"
   },
   "historical_l2_identity_trial": "data/dao2/modules/A_L2_KNOWN_ROW_IDENTITY_TRIAL_V1.json",
   "latest_p4_execution": {
@@ -525,7 +531,7 @@
     "status": "ALPHAT01_APPLICATION_SUBMITTED_REVIEW_PENDING",
     "raw_access": false,
     "authorization_request": "SUBMITTED",
-    "latest_raw_access_job": "6ab895cd6b030d633f697e82",
+    "latest_raw_access_job": "6aba364952d0dbd7f1da0cba",
     "identity_gate_frozen_before_access": true,
     "submato_ashare_l2": {
       "repo": "submato/ashare-l2",
@@ -601,6 +607,16 @@
       "l2_candidate_count": 13,
       "direct_exact_carrier_required_count": 3,
       "note": "Do not claim raw Shanghai order reconstruction for dates before 2021-04-26 absent independent authoritative original-order evidence."
+    },
+    "latest_raw_access_recheck": {
+      "as_of": "2026-09-28",
+      "paths": [
+        "202303/20230320.7z",
+        "202305/20230522.7z"
+      ],
+      "result": "403_GATED_REPO_AWAITING_AUTHOR_REVIEW_BOTH",
+      "metadata_file_count": 249,
+      "repeat_application": false
     }
   },
   "p3": {
@@ -619,6 +635,30 @@
       "moneyflow_absent": 6,
       "daily_open_present": 6,
       "exact_rows_recovered": 0
+    },
+    "second_independent_carrier_search_20260928": {
+      "targets": [
+        "000564.SZ/20230320",
+        "001337.SZ/20230320",
+        "002157.SZ/20230522"
+      ],
+      "jiu_target_date_identity_controls": {
+        "dates": [
+          "20230320",
+          "20230522"
+        ],
+        "controls": [
+          "000001.SZ",
+          "000002.SZ",
+          "000004.SZ"
+        ],
+        "exact_four_field_comparisons": "6/6 rows exact; 24/24 required fields exact"
+      },
+      "jiu_adjacency_confirmed": true,
+      "second_independent_exact_carrier_found": false,
+      "evidence_level_changed": false,
+      "status": "SOURCE_ABSENCE_CANDIDATE_RETAINED",
+      "resolution_effect": 0
     }
   },
   "tushare_exact_probe_latest": {
@@ -680,8 +720,16 @@
       "sell_elg_amount": "iFinD 主动卖出特大单金额 (activeSellLargeAmt / legacy active_sell_large_amount)"
     },
     "gate": "3 Jessica controls per target date across all 9 target dates; exact 4-field identity under one global schema/unit scale required before residual queries",
-    "next_step": "User adds iFinD refresh_token to GitHub Actions secret IFIND_REFRESH_TOKEN, then rerun DAO2 A iFinD Exact Probe V1.",
-    "admission_effect": 0
+    "next_step": "Add a valid iFinD refresh_token to GitHub Actions Secret IFIND_REFRESH_TOKEN; rerun frozen probe without logic changes.",
+    "admission_effect": 0,
+    "latest_run_id": 36302371768,
+    "latest_run_attempt": 2,
+    "latest_artifact_id": 10961977569,
+    "latest_artifact_digest": "sha256:7923de79bd305a85cb888879b7c1bb4287394b7113cae53842c5248c18a3da68",
+    "latest_result": "NO_IFIND_REFRESH_TOKEN_SECRET",
+    "refresh_token_present": false,
+    "identity_gate_pass": false,
+    "resolved_target_count": 0
   },
   "alternative_channels_20260927": {
     "cnopendata": {
