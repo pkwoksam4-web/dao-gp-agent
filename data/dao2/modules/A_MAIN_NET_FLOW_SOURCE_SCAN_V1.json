@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-29",
+  "as_of": "2026-09-30",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -909,5 +909,38 @@
     ],
     "module_a_effect": "0/16",
     "conclusion": "Useful for live A-share monitoring and K-line ingestion; not a carrier for the 2020-2023 Tushare classic moneyflow residuals."
+  },
+  "vendor_outreach_20260930": {
+    "policy": "SAMPLE_FIRST_NO_FULL_DATABASE_PURCHASE",
+    "sample_gate": {
+      "symbol": "000001.SZ",
+      "trade_date": "20210924",
+      "required": [
+        "full-day order-by-order",
+        "full-day trade-by-trade",
+        "raw order/trade linkage IDs",
+        "no aggregation",
+        "no minute proxy"
+      ],
+      "admission": "run frozen harness; require exact four-field Jessica identity before purchase discussion"
+    },
+    "outreach": [
+      {
+        "provider": "submato/ashare-l2",
+        "contact": "lukalaoban@gmail.com",
+        "gmail_message_id": "1a0f1934c79f5799",
+        "requested": "one real Shenzhen control sample plus targeted quote for 13 L2 candidate symbol-dates",
+        "status": "SENT_WAITING_REPLY"
+      },
+      {
+        "provider": "CnOpenData",
+        "contact": "dingxiaoyu@cnopendata.com",
+        "gmail_message_id": "1a0f193545394141",
+        "requested": "one real Shenzhen control sample plus targeted quote for 13 L2 candidate symbol-dates",
+        "status": "SENT_WAITING_REPLY"
+      }
+    ],
+    "payment_authorized": false,
+    "residual_effect": 0
   }
 }
