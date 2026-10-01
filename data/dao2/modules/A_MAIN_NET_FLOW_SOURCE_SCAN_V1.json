@@ -1,7 +1,7 @@
 {
   "artifact": "DAO2_A_MAIN_NET_FLOW_SOURCE_SCAN_V1",
   "version": "1.0",
-  "as_of": "2026-09-30",
+  "as_of": "2026-10-02",
   "target": {
     "semantic_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
     "source_unit": "10k CNY",
@@ -610,13 +610,12 @@
       "note": "Do not claim raw Shanghai order reconstruction for dates before 2021-04-26 absent independent authoritative original-order evidence."
     },
     "latest_raw_access_recheck": {
-      "as_of": "2026-09-29",
-      "job": "6abb2e3652d0dbd7f1da8d7a",
+      "as_of": "2026-10-02",
+      "job": "6abe8877404719ba37619117",
       "paths": [
         "202303/20230320.7z",
         "202305/20230522.7z"
       ],
-      "metadata_file_count": 249,
       "result": "403_GATED_REPO_AWAITING_AUTHOR_REVIEW_BOTH",
       "raw_access": false,
       "repeat_application": false
@@ -726,7 +725,7 @@
     "next_step": "Add a valid iFinD refresh_token to GitHub Actions Secret IFIND_REFRESH_TOKEN; rerun frozen probe without logic changes.",
     "admission_effect": 0,
     "latest_run_id": 36302371768,
-    "latest_run_attempt": 3,
+    "latest_run_attempt": 5,
     "latest_artifact_id": 10961977569,
     "latest_artifact_digest": "sha256:7923de79bd305a85cb888879b7c1bb4287394b7113cae53842c5248c18a3da68",
     "latest_result": "NO_IFIND_REFRESH_TOKEN_SECRET",
@@ -941,6 +940,7 @@
       }
     ],
     "payment_authorized": false,
-    "residual_effect": 0
+    "residual_effect": 0,
+    "last_reply_check": "2026-10-02"
   }
 }
