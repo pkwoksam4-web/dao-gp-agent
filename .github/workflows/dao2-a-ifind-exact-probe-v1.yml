@@ -1,0 +1,204 @@
+name: DAO2 A iFinD Exact Probe V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-ifind-exact-probe-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      IFIND_REFRESH_TOKEN: ${{ secrets.IFIND_REFRESH_TOKEN }}
+    steps:
+      - name: Probe iFinD historical active-order moneyflow
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv, hashlib, io, json, os, urllib.request
+          from decimal import Decimal
+
+          OUT="dao2_a_ifind_exact_probe_v1.json"
+          PIN="6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          TARGETS=[
+            ("600306.SH","20200608"),("600898.SH","20201104"),("603996.SH","20210224"),
+            ("002618.SZ","20210923"),("000020.SZ","20210924"),("000157.SZ","20210924"),
+            ("000592.SZ","20210924"),("000753.SZ","20210924"),("002684.SZ","20211125"),
+            ("600112.SH","20220506"),("000564.SZ","20230320"),("001337.SZ","20230320"),
+            ("002118.SZ","20230522"),("002157.SZ","20230522"),("002503.SZ","20230522"),
+            ("002504.SZ","20230522"),
+          ]
+          DATES=sorted({d for _,d in TARGETS})
+          JFIELDS=["buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount"]
+          SCHEMAS={
+            "camel_amt":{
+              "buy_lg_amount":"activeBuyMainAmt","buy_elg_amount":"activeBuyLargeAmt",
+              "sell_lg_amount":"activeSellMainAmt","sell_elg_amount":"activeSellLargeAmt"},
+            "camel_amount":{
+              "buy_lg_amount":"activeBuyMainAmount","buy_elg_amount":"activeBuyLargeAmount",
+              "sell_lg_amount":"activeSellMainAmount","sell_elg_amount":"activeSellLargeAmount"},
+            "snake_amount":{
+              "buy_lg_amount":"active_buy_main_amount","buy_elg_amount":"active_buy_large_amount",
+              "sell_lg_amount":"active_sell_main_amount","sell_elg_amount":"active_sell_large_amount"},
+          }
+          SCALES=[Decimal("1"),Decimal("0.0001"),Decimal("10000")]
+          refresh=os.environ.get("IFIND_REFRESH_TOKEN","").strip()
+          result={
+            "artifact":"DAO2_A_IFIND_EXACT_PROBE_V1",
+            "provider":"TongHuaShun iFinD Quant API",
+            "refresh_token_present":bool(refresh),
+            "target_count":len(TARGETS),
+            "control_policy":"3 Jessica-known rows per target date; all controls must exact-match before any residual query",
+            "candidate_schemas":list(SCHEMAS),
+            "candidate_unit_scales":[str(x) for x in SCALES],
+            "identity_gate_pass":False,
+            "targets":[],
+          }
+
+          def post(url,payload=None,headers=None):
+              data=json.dumps(payload or {}).encode()
+              req=urllib.request.Request(url,data=data,headers=headers or {"Content-Type":"application/json"},method="POST")
+              with urllib.request.urlopen(req,timeout=60) as r:
+                  return json.loads(r.read().decode("utf-8"))
+
+          def fetch_jessica(date):
+              url=f"https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/{PIN}/data/moneyflow/{date}.csv"
+              with urllib.request.urlopen(url,timeout=60) as r:
+                  return list(csv.DictReader(io.StringIO(r.read().decode("utf-8-sig"))))
+
+          def dec(v):
+              if v is None or v=="":
+                  return None
+              return Decimal(str(v))
+
+          def extract(body,schema):
+              if body.get("errorcode",0) not in (0,None):
+                  raise RuntimeError(f"iFinD errorcode={body.get('errorcode')} errmsg={body.get('errmsg')}")
+              out={}
+              for t in body.get("tables") or []:
+                  code=t.get("thscode") or t.get("code")
+                  table=t.get("table") or {}
+                  if not code or not isinstance(table,dict):
+                      continue
+                  row={}
+                  for jf,ind in schema.items():
+                      v=table.get(ind)
+                      if isinstance(v,list):
+                          v=v[0] if v else None
+                      row[jf]=v
+                  out[code]=row
+              return out
+
+          if not refresh:
+              result["status"]="NO_IFIND_REFRESH_TOKEN_SECRET"
+          else:
+              tok=post("https://quantapi.51ifind.com/api/v1/get_access_token",None,
+                       {"Content-Type":"application/json","refresh_token":refresh})
+              access=((tok.get("data") or {}).get("access_token"))
+              if not access:
+                  result["status"]="ACCESS_TOKEN_FAILED"
+                  result["token_response"]={k:v for k,v in tok.items() if k!="data"}
+              else:
+                  headers={"Content-Type":"application/json","access_token":access,"ifindlang":"cn"}
+                  controls={}
+                  for date in DATES:
+                      rows=fetch_jessica(date)
+                      controls[date]=[r for r in rows if all(dec(r.get(f)) is not None for f in JFIELDS)][:3]
+
+                  candidate_results=[]
+                  cache={}
+                  for sname,schema in SCHEMAS.items():
+                      indicators=",".join(schema.values())
+                      api_by_date={}
+                      err=None
+                      try:
+                          for date in DATES:
+                              codes=",".join(r["ts_code"] for r in controls[date])
+                              body=post("https://quantapi.51ifind.com/api/v1/cmd_history_quotation",{
+                                  "codes":codes,"indicators":indicators,
+                                  "startdate":date,"enddate":date,
+                                  "functionpara":{"Interval":"D","Fill":"Omit","CPS":"1","Currency":"YSHB"}
+                              },headers)
+                              api_by_date[date]=extract(body,schema)
+                      except Exception as e:
+                          err=f"{type(e).__name__}: {e}"
+                      if err:
+                          candidate_results.append({"schema":sname,"error":err})
+                          continue
+                      cache[sname]=api_by_date
+                      for scale in SCALES:
+                          exact=0; total=0; mismatches=[]
+                          for date in DATES:
+                              for j in controls[date]:
+                                  a=api_by_date.get(date,{}).get(j["ts_code"])
+                                  for f in JFIELDS:
+                                      total+=1
+                                      av=dec(None if a is None else a.get(f)); jv=dec(j.get(f))
+                                      ok=(av is not None and jv is not None and av*scale==jv)
+                                      if ok: exact+=1
+                                      elif len(mismatches)<12:
+                                          mismatches.append({"date":date,"ts_code":j["ts_code"],"field":f,
+                                                             "ifind":None if av is None else str(av),
+                                                             "scaled":None if av is None else str(av*scale),
+                                                             "jessica":str(jv)})
+                          candidate_results.append({"schema":sname,"scale_to_tushare_wan":str(scale),
+                                                    "exact_fields":exact,"total_fields":total,
+                                                    "all_exact":exact==total and total>0,
+                                                    "mismatch_examples":mismatches})
+                  result["identity_candidates"]=candidate_results
+                  winners=[x for x in candidate_results if x.get("all_exact")]
+                  if len(winners)==1:
+                      win=winners[0]; result["identity_gate_pass"]=True
+                      result["selected_schema"]=win["schema"]; result["selected_scale_to_tushare_wan"]=win["scale_to_tushare_wan"]
+                      schema=SCHEMAS[win["schema"]]; scale=Decimal(win["scale_to_tushare_wan"])
+                      indicators=",".join(schema.values()); resolved=0
+                      for date in DATES:
+                          tcodes=[c for c,d in TARGETS if d==date]
+                          body=post("https://quantapi.51ifind.com/api/v1/cmd_history_quotation",{
+                              "codes":",".join(tcodes),"indicators":indicators,
+                              "startdate":date,"enddate":date,
+                              "functionpara":{"Interval":"D","Fill":"Omit","CPS":"1","Currency":"YSHB"}
+                          },headers)
+                          rows=extract(body,schema)
+                          for code in tcodes:
+                              a=rows.get(code)
+                              if not a or any(dec(a.get(f)) is None for f in JFIELDS):
+                                  result["targets"].append({"ts_code":code,"trade_date":date,"resolved":False}); continue
+                              vals={f:str((dec(a[f])*scale).normalize()) for f in JFIELDS}
+                              main=(dec(vals["buy_lg_amount"])+dec(vals["buy_elg_amount"])
+                                    -dec(vals["sell_lg_amount"])-dec(vals["sell_elg_amount"]))*Decimal("10000")
+                              resolved+=1
+                              result["targets"].append({"ts_code":code,"trade_date":date,"resolved":True,
+                                                        **vals,"main_net_flow_cny":str(main.normalize())})
+                      result["resolved_target_count"]=resolved
+                      result["all_targets_resolved"]=resolved==len(TARGETS)
+                      result["status"]="PASS" if result["all_targets_resolved"] else "IDENTITY_PASS_TARGETS_INCOMPLETE"
+                  else:
+                      result["status"]="IDENTITY_NOT_PROVEN"; result["winner_count"]=len(winners)
+
+          canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          result["content_sha256_without_hash_field"]=hashlib.sha256(canonical.encode()).hexdigest()
+          with open(OUT,"w",encoding="utf-8") as f:
+              json.dump(result,f,ensure_ascii=False,indent=2,sort_keys=True); f.write("\n")
+          print(json.dumps({
+              "status":result.get("status"),
+              "refresh_token_present":result.get("refresh_token_present"),
+              "identity_gate_pass":result.get("identity_gate_pass"),
+              "resolved_target_count":result.get("resolved_target_count",0),
+              "hash":result["content_sha256_without_hash_field"]
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-ifind-exact-probe-v1
+          path: dao2_a_ifind_exact_probe_v1.json
+          if-no-files-found: error
+          retention-days: 30

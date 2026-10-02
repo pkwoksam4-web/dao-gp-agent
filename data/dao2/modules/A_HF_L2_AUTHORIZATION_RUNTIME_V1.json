@@ -1,0 +1,59 @@
+{
+  "artifact": "DAO2_A_HF_L2_AUTHORIZATION_RUNTIME_V1",
+  "version": "1.0",
+  "as_of": "2026-09-28",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+  "status": "ALPHAT01_MANUAL_REVIEW_PENDING",
+  "authentication": {
+    "provider": "Hugging Face",
+    "account": "pkwoksam",
+    "oauth_authenticated": true,
+    "oauth_scopes": [
+      "jobs",
+      "openid",
+      "profile",
+      "read-mcp",
+      "read-repos"
+    ],
+    "dataset_metadata_access": true
+  },
+  "carriers": {
+    "venvoo": {
+      "repo": "venvoo/china-a-share-l2-level2-limit-order-book-tick-data",
+      "gated": true,
+      "metadata_visible": true,
+      "raw_retrieval_test": "NOT_COMPLETED",
+      "reason": "Authenticated HF Jobs invocation returned HTTP 402 Payment Required before repo file listing/download could execute.",
+      "status": "CLOSED_REJECT_IDENTITY_FAIL_PROVIDER_SCHEMA_DIAGNOSTIC"
+    },
+    "alphat01": {
+      "repo": "alphat01/Tick-by-Tick-Orders-China",
+      "gated": true,
+      "metadata_visible": true,
+      "raw_retrieval_test": "FAILED_403_AWAITING_AUTHOR_REVIEW",
+      "metadata_file_count": 249,
+      "targeted_paths": [
+        "202303/20230320.7z",
+        "202305/20230522.7z"
+      ],
+      "latest_recheck_job": "6aba364952d0dbd7f1da0cba",
+      "raw_access": false,
+      "reason": "Both targeted archives return GatedRepoError 403; access request is still awaiting review from repo authors."
+    }
+  },
+  "runtime_blocker": {
+    "code": "ALPHAT01_MANUAL_REVIEW_AUTHORIZATION_REQUIRED",
+    "http_status": 403,
+    "interpretation": "Metadata is visible but targeted raw archives remain gated. Do not reapply; resume only when author approval changes raw access.",
+    "residual_effect": 0
+  },
+  "governance": {
+    "semantics_frozen": true,
+    "no_algorithm_changes": true,
+    "no_residual_values_generated": true,
+    "no_proxy": true,
+    "no_imputation": true,
+    "required_next_gate": "Author approval for alphat01 raw access; then download only 20230320 and 20230522 targeted archives and run frozen 12/12 Jessica identity gate before residual processing."
+  }
+}

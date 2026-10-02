@@ -1,0 +1,332 @@
+name: DAO2 A Carl Finance Historical Carrier Audit V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-carl-finance-carrier-audit-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit fixed public SQL dump
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          SOURCE_REPO = "Carl2016/finance"
+          SOURCE_COMMIT = "e810276422bd66e55107aef146212676d26b185f"
+          SOURCE_PATH = "db/finance.sql"
+          SOURCE_BLOB_SHA = "4c52011ac67e83594cf4cde78e489ebddace53b6"
+          SOURCE_URL = (
+              "https://raw.githubusercontent.com/"
+              f"{SOURCE_REPO}/{SOURCE_COMMIT}/{SOURCE_PATH}"
+          )
+          TABLE = "stock_money_flow"
+          TARGETS = [
+              ("600306.SH","20200608"),("600898.SH","20201104"),
+              ("603996.SH","20210224"),("002618.SZ","20210923"),
+              ("000020.SZ","20210924"),("000157.SZ","20210924"),
+              ("000592.SZ","20210924"),("000753.SZ","20210924"),
+              ("002684.SZ","20211125"),("600112.SH","20220506"),
+              ("000564.SZ","20230320"),("001337.SZ","20230320"),
+              ("002118.SZ","20230522"),("002157.SZ","20230522"),
+              ("002503.SZ","20230522"),("002504.SZ","20230522"),
+          ]
+          REQUIRED = [
+              "buy_lg_amount","buy_elg_amount",
+              "sell_lg_amount","sell_elg_amount",
+          ]
+          OPTIONAL = [
+              "buy_sm_amount","buy_md_amount",
+              "sell_sm_amount","sell_md_amount","net_mf_amount",
+          ]
+
+          sql_path = Path("carl_finance.sql")
+          req = urllib.request.Request(
+              SOURCE_URL,
+              headers={"User-Agent":"dao2-a-carrier-audit/1.0"},
+          )
+          with urllib.request.urlopen(req, timeout=120) as resp, sql_path.open("wb") as out:
+              while True:
+                  chunk = resp.read(1024 * 1024)
+                  if not chunk:
+                      break
+                  out.write(chunk)
+
+          raw_sha256 = hashlib.sha256(sql_path.read_bytes()).hexdigest()
+          source_size = sql_path.stat().st_size
+
+          # Parse CREATE TABLE column order.
+          columns = []
+          in_create = False
+          create_lines = []
+          with sql_path.open("r", encoding="utf-8", errors="replace") as f:
+              for line in f:
+                  if not in_create and re.match(
+                      rf"^CREATE TABLE `?{re.escape(TABLE)}`?\s*\(", line
+                  ):
+                      in_create = True
+                      create_lines.append(line.rstrip("\n"))
+                      continue
+                  if in_create:
+                      create_lines.append(line.rstrip("\n"))
+                      m = re.match(r"^\s*`([^`]+)`\s+", line)
+                      if m:
+                          columns.append(m.group(1))
+                      if line.startswith(")") or line.startswith(") ENGINE"):
+                          break
+
+          def split_tuples(values_text):
+              tuples = []
+              cur = []
+              value = []
+              in_quote = False
+              escape = False
+              depth = 0
+
+              def finish_value():
+                  s = "".join(value).strip()
+                  value.clear()
+                  if s.upper() == "NULL":
+                      return None
+                  if len(s) >= 2 and s[0] == "'" and s[-1] == "'":
+                      s = s[1:-1]
+                      s = (
+                          s.replace("\\'", "'")
+                           .replace("\\\\", "\\")
+                           .replace("\\n", "\n")
+                           .replace("\\r", "\r")
+                      )
+                  return s
+
+              i = 0
+              while i < len(values_text):
+                  ch = values_text[i]
+                  if in_quote:
+                      value.append(ch)
+                      if escape:
+                          escape = False
+                      elif ch == "\\":
+                          escape = True
+                      elif ch == "'":
+                          in_quote = False
+                      i += 1
+                      continue
+
+                  if ch == "'":
+                      in_quote = True
+                      value.append(ch)
+                  elif ch == "(":
+                      if depth == 0:
+                          cur = []
+                          value = []
+                      else:
+                          value.append(ch)
+                      depth += 1
+                  elif ch == ")" and depth > 0:
+                      depth -= 1
+                      if depth == 0:
+                          cur.append(finish_value())
+                          tuples.append(cur)
+                          cur = []
+                          value = []
+                      else:
+                          value.append(ch)
+                  elif ch == "," and depth == 1:
+                      cur.append(finish_value())
+                  elif depth >= 1:
+                      value.append(ch)
+                  i += 1
+              return tuples
+
+          def norm_date(v):
+              if v is None:
+                  return None
+              s = str(v).strip()
+              s = s.split(" ")[0]
+              if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+                  return s.replace("-", "")
+              if re.fullmatch(r"\d{8}", s):
+                  return s
+              return None
+
+          target_set = set(TARGETS)
+          target_rows = []
+          row_count = 0
+          min_date = None
+          max_date = None
+          distinct_dates = set()
+          symbols = set()
+          parse_errors = []
+          insert_count = 0
+
+          insert_re = re.compile(
+              rf"^INSERT INTO `?{re.escape(TABLE)}`?(?:\s*\((.*?)\))?\s+VALUES\s*(.*);\s*$",
+              re.S,
+          )
+          buffer = ""
+          collecting = False
+          with sql_path.open("r", encoding="utf-8", errors="replace") as f:
+              for line in f:
+                  if not collecting:
+                      if re.match(rf"^INSERT INTO `?{re.escape(TABLE)}`?", line):
+                          buffer = line
+                          collecting = not line.rstrip().endswith(";")
+                          if collecting:
+                              continue
+                      else:
+                          continue
+                  else:
+                      buffer += line
+                      if not line.rstrip().endswith(";"):
+                          continue
+                      collecting = False
+
+                  m = insert_re.match(buffer.strip())
+                  if not m:
+                      if len(parse_errors) < 20:
+                          parse_errors.append({
+                              "type":"INSERT_PARSE",
+                              "prefix":buffer[:500],
+                          })
+                      buffer = ""
+                      continue
+                  insert_count += 1
+                  explicit_cols = m.group(1)
+                  row_cols = (
+                      [x.strip().strip("` ") for x in explicit_cols.split(",")]
+                      if explicit_cols else columns
+                  )
+                  tuples = split_tuples(m.group(2))
+                  for vals in tuples:
+                      if len(vals) != len(row_cols):
+                          if len(parse_errors) < 20:
+                              parse_errors.append({
+                                  "type":"COLUMN_COUNT",
+                                  "columns":len(row_cols),
+                                  "values":len(vals),
+                                  "sample":vals[:5],
+                              })
+                          continue
+                      row = dict(zip(row_cols, vals))
+                      symbol = str(
+                          row.get("symbol")
+                          or row.get("ts_code")
+                          or row.get("code")
+                          or ""
+                      ).strip()
+                      d = norm_date(row.get("trade_date_str") or row.get("trade_date"))
+                      if not symbol or not d:
+                          continue
+                      row_count += 1
+                      symbols.add(symbol)
+                      distinct_dates.add(d)
+                      min_date = d if min_date is None or d < min_date else min_date
+                      max_date = d if max_date is None or d > max_date else max_date
+
+                      if (symbol, d) in target_set:
+                          target_rows.append({
+                              "ts_code":symbol,
+                              "trade_date":d,
+                              **{k:row.get(k) for k in REQUIRED + OPTIONAL},
+                          })
+                  buffer = ""
+
+          required_present = [x for x in REQUIRED if x in columns]
+          optional_present = [x for x in OPTIONAL if x in columns]
+          target_hit_keys = sorted({
+              f"{r['ts_code']}/{r['trade_date']}" for r in target_rows
+          })
+          duplicates = {}
+          for r in target_rows:
+              k=f"{r['ts_code']}/{r['trade_date']}"
+              duplicates[k]=duplicates.get(k,0)+1
+
+          result = {
+              "artifact":"DAO2_A_CARL_FINANCE_HISTORICAL_CARRIER_AUDIT_V1",
+              "provider":"GitHub public repository",
+              "repository":SOURCE_REPO,
+              "commit":SOURCE_COMMIT,
+              "path":SOURCE_PATH,
+              "blob_sha":SOURCE_BLOB_SHA,
+              "raw_sha256":raw_sha256,
+              "raw_size_bytes":source_size,
+              "table":TABLE,
+              "create_table_columns":columns,
+              "required_fields_present":required_present,
+              "optional_fields_present":optional_present,
+              "all_required_fields_present":set(REQUIRED).issubset(columns),
+              "insert_statement_count":insert_count,
+              "parsed_moneyflow_rows":row_count,
+              "distinct_symbol_count":len(symbols),
+              "distinct_date_count":len(distinct_dates),
+              "coverage_min_date":min_date,
+              "coverage_max_date":max_date,
+              "years":sorted({d[:4] for d in distinct_dates}),
+              "target_hit_count":len(target_rows),
+              "target_hit_keys":target_hit_keys,
+              "target_rows":target_rows,
+              "target_duplicate_counts":{
+                  k:v for k,v in duplicates.items() if v != 1
+              },
+              "parse_errors":parse_errors,
+              "source_identity_status":"PENDING_JESSICA_OVERLAP",
+              "admissible_rows":0,
+              "no_proxy":True,
+              "no_imputation":True,
+          }
+
+          if not result["all_required_fields_present"]:
+              result["result"]="REJECT_MISSING_EXACT_MONEYFLOW_FIELDS"
+          elif row_count == 0:
+              result["result"]="REJECT_NO_RAW_MONEYFLOW_ROWS"
+          elif not (
+              min_date and max_date
+              and min_date <= "20200608"
+              and max_date >= "20230522"
+          ):
+              result["result"]="CARRIER_REAL_BUT_RESIDUAL_RANGE_INCOMPLETE"
+          else:
+              result["result"]="HISTORICAL_CARRIER_COVERAGE_SPANS_RESIDUAL_RANGE_PENDING_IDENTITY"
+
+          canon=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          result["content_sha256_without_hash_field"]=hashlib.sha256(canon.encode()).hexdigest()
+          Path("dao2_a_carl_finance_carrier_audit_v1.json").write_text(
+              json.dumps(result,ensure_ascii=False,indent=2,sort_keys=True)+"\n",
+              encoding="utf-8",
+          )
+          print(json.dumps({
+              "result":result["result"],
+              "raw_size_bytes":source_size,
+              "raw_sha256":raw_sha256,
+              "columns":columns,
+              "parsed_moneyflow_rows":row_count,
+              "coverage":[min_date,max_date],
+              "years":result["years"],
+              "target_hit_count":len(target_rows),
+              "target_hit_keys":target_hit_keys,
+              "parse_error_count":len(parse_errors),
+              "result_sha256":result["content_sha256_without_hash_field"],
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload carrier audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-carl-finance-historical-carrier-audit-v1
+          path: dao2_a_carl_finance_carrier_audit_v1.json
+          if-no-files-found: error
+          retention-days: 30
