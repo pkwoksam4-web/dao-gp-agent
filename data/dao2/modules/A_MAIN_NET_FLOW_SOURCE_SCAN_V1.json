@@ -974,6 +974,8 @@
     ],
     "exact_key_search": "NO_NEW_RAW_CARRIER_HITS",
     "residual_rows_resolved": 0,
-    "governance": "evidence-only; no zero-fill; no proxy; no imputation"
+    "governance": "evidence-only; no zero-fill; no proxy; no imputation",
+    "date_level_snapshot_search": "ZERO_GITHUB_CODE_HITS_FOR_ALL_9_TARGET_DATES",
+    "status": "PUBLIC_INDEXED_SEARCH_EVIDENCE_EXHAUSTED_NO_NEW_DIRECT_CARRIER"
   }
 }
