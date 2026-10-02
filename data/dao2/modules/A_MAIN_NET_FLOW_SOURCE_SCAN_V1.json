@@ -420,6 +420,27 @@
       "result": "REJECT_NO_RAW_MONEYFLOW_CARRIER",
       "finding": "Repository contains schema, SQL and ingestion/backfill code but no committed SQLite/DuckDB/Parquet/CSV historical classic moneyflow data bytes.",
       "admissible_rows": 0
+    },
+    {
+      "carrier": "wbbhcb/stock_market",
+      "result": "REJECT_CODE_LOCAL_CACHE_REFERENCE_NO_COMMITTED_RAW_BYTES",
+      "finding": "Repository code and notebooks reference local MoneyData/<ts_code>.csv files generated from Tushare moneyflow.",
+      "admissible_rows": 0,
+      "evidence_file": "data/dao2/modules/A_PUBLIC_FINAL_SWEEP_20261002_V1.json"
+    },
+    {
+      "carrier": "John15380/Kysec_Quant_Project",
+      "result": "REJECT_EXTERNAL_DATASET_REFERENCE_NO_COMMITTED_OR_RELEASED_RAW_BYTES",
+      "finding": "Loader/README reference annual 资金流向/moneyflow_YYYY.parquet with Tushare-like order-size fields.",
+      "admissible_rows": 0,
+      "evidence_file": "data/dao2/modules/A_PUBLIC_FINAL_SWEEP_20261002_V1.json"
+    },
+    {
+      "carrier": "zhangjiarong01/Quant_DolphinDB",
+      "result": "REJECT_MARKET_AGGREGATE_SEMANTIC_MISMATCH",
+      "finding": "Contains 20230522 and order-size amount column names, but rows are market/index aggregate (close_sh/close_sz/net_amount) rather than stock-level ts_code four-field Tushare moneyflow.",
+      "admissible_rows": 0,
+      "evidence_file": "data/dao2/modules/A_PUBLIC_FINAL_SWEEP_20261002_V1.json"
     }
   ],
   "historical_l2_private_carriers": {
@@ -942,5 +963,17 @@
     "payment_authorized": false,
     "residual_effect": 0,
     "last_reply_check": "2026-10-02"
+  },
+  "public_final_sweep_20261002": {
+    "evidence_file": "data/dao2/modules/A_PUBLIC_FINAL_SWEEP_20261002_V1.json",
+    "result": "NO_NEW_ADMISSIBLE_RAW_CARRIER_HITS",
+    "newly_closed": [
+      "wbbhcb/stock_market MoneyData local-cache reference",
+      "John15380/Kysec_Quant_Project annual moneyflow parquet reference",
+      "zhangjiarong01/Quant_DolphinDB market aggregate moneyflow"
+    ],
+    "exact_key_search": "NO_NEW_RAW_CARRIER_HITS",
+    "residual_rows_resolved": 0,
+    "governance": "evidence-only; no zero-fill; no proxy; no imputation"
   }
 }
