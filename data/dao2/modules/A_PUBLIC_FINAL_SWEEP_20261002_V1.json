@@ -66,5 +66,24 @@
     "repeat_application": false,
     "implication": "No autonomous raw retrieval path available yet; retain frozen 12/12 identity gate."
   },
-  "conclusion": "Public exact-key and field-combination sweep produced no new admissible raw carrier. Do not reopen the audited code-only/local-cache or market-aggregate candidates absent newly published raw bytes. Continue only genuinely new residual-date raw carriers; P8 iFinD and P4 alphat01 remain manual-gated."
+  "conclusion": "Public exact-key and field-combination sweep produced no new admissible raw carrier. Do not reopen the audited code-only/local-cache or market-aggregate candidates absent newly published raw bytes. Continue only genuinely new residual-date raw carriers; P8 iFinD and P4 alphat01 remain manual-gated.",
+  "date_level_snapshot_search": {
+    "query_classes": [
+      "target trade_date + net_mf_amount",
+      "target trade_date + moneyflow.csv"
+    ],
+    "dates": [
+      "20200608",
+      "20201104",
+      "20210224",
+      "20210923",
+      "20210924",
+      "20211125",
+      "20220506",
+      "20230320",
+      "20230522"
+    ],
+    "result": "ZERO_GITHUB_CODE_HITS_FOR_ALL_QUERIES",
+    "implication": "No date-level committed raw moneyflow snapshot surfaced through indexed GitHub code search; does not prove non-existence outside indexed/public repositories."
+  }
 }
