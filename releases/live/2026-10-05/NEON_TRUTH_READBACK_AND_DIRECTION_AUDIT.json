@@ -1,0 +1,108 @@
+{
+  "schema": "agent-brain-direction-audit/v1",
+  "record_date_cn": "2026-10-05",
+  "direction": "ALIGNED",
+  "reason": "Fresh GitHub-to-Neon readback was produced; the missing 2026-09-29 non-live execution path was identified and repaired without generating features, forecasts, or Shadow; post-write readback confirms protected counts unchanged.",
+  "repository": {
+    "full_name": "pkwoksam4-web/dao-gp-agent",
+    "baseline_head_before_fix": "0019ef151593697adc06f5c97b2585062ba1618d",
+    "recovery_workflow_commit": "a841178c4d497a21fc8412a93f3115dbb7f65aaf"
+  },
+  "fresh_neon_readback": {
+    "workflow": "Neon SQL Bridge",
+    "workflow_path": ".github/workflows/neon-sql-bridge.yml",
+    "run_id": 36164003933,
+    "run_attempt": 3,
+    "run_started_at": "2026-10-05T14:46:52Z",
+    "observed_at": "2026-10-05T14:47:05.148232+00:00",
+    "artifact_id": 11353170174,
+    "artifact_digest": "sha256:450183c2c30c54b4c914320c9d988856bc7285d96a7d653d6e96c3b876782d47",
+    "inner_json_sha256": "fa25a48c18d444ac5af7120d3dfd3926074d4a3f7df6775f3366fe3718329a7b",
+    "source_commit": "5ff93bb1a727645e905a26643e01c3098a8ed7e8",
+    "source_blob_sha": "6f4c380916796800af75b7e1dc7211bd5dcdfe49",
+    "mode": "READ_ONLY",
+    "database": "investment_intel",
+    "public_table_count": 202,
+    "project_and_branch_identity": {
+      "expected_project": "red-term-29407678",
+      "expected_branch": "br-raspy-breeze-b5clzass",
+      "status": "UNVERIFIED_IN_ARTIFACT",
+      "reason": "Bridge v1 reports current_database but intentionally does not expose or hash the Neon host/project/branch identity."
+    },
+    "sql_hash_status": "NOT_EMBEDDED_BY_BRIDGE_V1"
+  },
+  "universe": {
+    "core10_watchlist": "WAT-core10-final-v1",
+    "core10_count": 10,
+    "core13_watchlist": "WAT-core13-observation-v1",
+    "core13_count": 13
+  },
+  "prospective_live_dates": {
+    "2026-09-28": {
+      "core13_provider_sync_completed": 13,
+      "core13_bars": 13,
+      "core13_features": 13,
+      "strategy_run_id": "SSR-CORE10-STABLE4-20260928",
+      "observation_id": "SOS-CORE13-20260928",
+      "attestation_id": "LSA-CORE10-STABLE4-20260928",
+      "attestation_status": "PASS_RANKING_ONLY",
+      "attestation_evidence_hash": "dd59d3bc3fb1fc17e6370d37ac3c505b64967e3611d2c405e88fa147149f5ce1"
+    },
+    "2026-09-30": {
+      "core13_provider_sync_completed": 13,
+      "core13_bars": 13,
+      "core13_features": 13,
+      "strategy_run_id": "SSR-CORE10-STABLE4-20260930",
+      "observation_id": "SOS-CORE13-20260930",
+      "attestation_id": "LSA-CORE10-STABLE4-20260930",
+      "attestation_status": "PASS_RANKING_ONLY",
+      "attestation_evidence_hash": "9fdd0b84c278e711f3dc82e85e764d6aca8143efe07056a199d9cc14e88fad84"
+    }
+  },
+  "historical_non_live_recovery": {
+    "trade_date": "2026-09-29",
+    "workflow_path": ".github/workflows/core13-0929-nonlive-recovery.yml",
+    "run_id": 37327209113,
+    "run_conclusion": "success",
+    "artifact_id": 11352073739,
+    "artifact_digest": "sha256:fe3a190c39a4bbef7e9979bbf0f1e62150a30482e1f1c1aea62b758df569b35a",
+    "manifest_sha256": "a8aea6c0a3b4f5bb2166e7a992592de5fcfbe1e89ab44f59c55a82da7f3064ea",
+    "inserted_bars": 13,
+    "inserted_sources": 13,
+    "verified_core13_bars": 13,
+    "live_shadow_eligible": false,
+    "generated_features": false,
+    "generated_forecasts": false,
+    "generated_shadows": false,
+    "post_write_sync_rows": 13
+  },
+  "shadow_and_settlement": {
+    "forecast_runs": 0,
+    "forecast_items": 0,
+    "probability_status": "PROBABILITY_V1_6_EXECUTABLE_MISSING",
+    "ranking_runs": 2,
+    "observation_snapshots": 2,
+    "attestations": 2,
+    "pending_ranking_runs": 2,
+    "maturity_snapshots": 0,
+    "settlement_integrity_snapshots": 0,
+    "cohort_snapshots": 0,
+    "matured_samples": 0,
+    "settled_samples": 0
+  },
+  "workflow_trigger_audit": {
+    "live_pit_manifest_ingest": "push: runtime/pit_manifests/*.json",
+    "shadow_ranking_observation": "push: runtime/shadow_requests/*.json",
+    "ranking_shadow_settlement": "workflow_run after successful Live PIT Manifest Ingest; also workflow_dispatch and guarded push",
+    "github_cron_present": false,
+    "external_core13_collection_schedule": "UNVERIFIED_FROM_GITHUB",
+    "timezone_note": "GitHub workflows are event-driven; the collection scheduler must enforce Asia/Shanghai separately."
+  },
+  "next_gate": {
+    "next_mainland_trading_day": "2026-10-08",
+    "expected_check_after_cn_time": "16:18",
+    "required_chain": "immutable manifest -> ingest PASS -> shadow request -> ranking/observation attestation -> future-only maturity/settlement",
+    "first_remaining_breakpoint": "No unresolved completed-trading-day breakpoint after the guarded 2026-09-29 non-live repair; next prospective evidence is due 2026-10-08.",
+    "restart_trigger": "2026-10-08 after 16:18 Asia/Shanghai, or any earlier Guard/Actions failure."
+  }
+}
