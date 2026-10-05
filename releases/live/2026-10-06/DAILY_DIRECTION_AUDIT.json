@@ -1,0 +1,142 @@
+{
+  "schema": "daily-direction-audit/v1",
+  "record_date_cn": "2026-10-06",
+  "observed_at": "2026-10-06T00:23:10+08:00",
+  "direction": "ALIGNED",
+  "actual_increment": {
+    "agent_brain": "NO_NEW_PROSPECTIVE_DATE_OR_MATURED_SAMPLE",
+    "dao2_a": "RESIDUAL_VENDOR_SCOPE_EXPORTED_ONLY_NOT_DATA_EVIDENCE",
+    "control_plane": "NO_STATUS_TRANSITION"
+  },
+  "repository": {
+    "full_name": "pkwoksam4-web/dao-gp-agent",
+    "main_head_before_archive": "9e061a9b5ecdc7a2042252bdae35708f75101794",
+    "prior_truth_audit": "releases/live/2026-10-05/NEON_TRUTH_READBACK_AND_DIRECTION_AUDIT.json"
+  },
+  "agent_brain": {
+    "verified_contracts": {
+      "core10": {
+        "watchlist": "WAT-core10-final-v1",
+        "count": 10,
+        "status": "FROZEN"
+      },
+      "core13": {
+        "watchlist": "WAT-core13-observation-v1",
+        "count": 13,
+        "status": "PROSPECTIVE_OBSERVATION_ONLY"
+      },
+      "probability": "PROBABILITY_V1_6_EXECUTABLE_MISSING"
+    },
+    "freshest_neon_readback": {
+      "observed_at": "2026-10-05T14:47:05.148232+00:00",
+      "workflow": "Neon SQL Bridge",
+      "run_id": 36164003933,
+      "run_attempt": 3,
+      "artifact_id": 11353170174,
+      "database": "investment_intel",
+      "project_branch_identity": "UNVERIFIED_IN_BRIDGE_V1"
+    },
+    "prospective_dates": {
+      "2026-09-28": {
+        "bars": 13,
+        "features": 13,
+        "ranking_attestation": "PASS_RANKING_ONLY",
+        "observation": true
+      },
+      "2026-09-30": {
+        "bars": 13,
+        "features": 13,
+        "ranking_attestation": "PASS_RANKING_ONLY",
+        "observation": true
+      }
+    },
+    "historical_non_live": {
+      "2026-09-29": {
+        "bars": 13,
+        "live_shadow_eligible": false,
+        "features_generated": false,
+        "forecast_generated": false,
+        "shadow_generated": false
+      }
+    },
+    "counts": {
+      "forecast_runs": 0,
+      "forecast_items": 0,
+      "ranking_runs": 2,
+      "observation_snapshots": 2,
+      "attestations": 2,
+      "pending_ranking_runs": 2,
+      "maturity_snapshots": 0,
+      "settlement_integrity_snapshots": 0,
+      "cohort_snapshots": 0,
+      "matured_samples": 0,
+      "settled_samples": 0
+    },
+    "scheduler": {
+      "github_workflows": "EVENT_DRIVEN",
+      "external_collection_scheduler": "UNVERIFIED_FROM_GITHUB"
+    },
+    "next_gate": {
+      "date": "2026-10-08",
+      "after_cn_time": "16:18",
+      "action": "immutable manifest -> ingest -> ranking/observation attestation -> future-only settlement"
+    },
+    "status": "WAITING_AUTHORITY_CALENDAR_NOT_STALLED"
+  },
+  "dao2": {
+    "control_head": "0b9b17e258aa9719adcb21b96647cc907f3f2440",
+    "modules": {
+      "A": {
+        "head": "e3decd3199162b78f409b60c5b2948d22b229a7c",
+        "guard_run": 37329860187,
+        "guard_conclusion": "success",
+        "status": "BLOCKED",
+        "resolved": 1011591,
+        "expected": 1011607,
+        "unresolved": 16,
+        "admitted_new_rows": 0,
+        "checkpoint": null,
+        "new_artifact": "data/dao2/modules/A_16_KEY_VENDOR_SCOPE_EXPORT_20261005.json",
+        "artifact_judgment": "DERIVED_SCOPE_ONLY_NOT_RAW_CARRIER_NOT_ADMISSION"
+      },
+      "B": {
+        "head": "38859f37e4d49aa2bc743a6ff1127b7ad85c455b",
+        "status": "BLOCKED_EXTERNAL_FINAL_SCORER_CARRIER_MISSING"
+      },
+      "C": {
+        "head": "25553cc10ce625e40cc41764a6941c38862e4b58",
+        "status": "BLOCKED_3_DIRECT_801020_CLOSE_ROWS_MISSING",
+        "admissible": 42783,
+        "required": 43084,
+        "derived_close_admitted": 0
+      },
+      "D": {
+        "head": "2a7056ffd61885046e34dc1494bc668143d96793",
+        "status": "PASS_FROZEN"
+      },
+      "E": {
+        "head": "230da3f090c59ef6c7bc4c0056c516d519741d2c",
+        "status": "WAITING_ON_A_TO_D"
+      },
+      "F": {
+        "head": "61c076d2fcdc2de456bbad0161a942814cf82e0d",
+        "status": "WAITING_ON_E"
+      }
+    }
+  },
+  "drift_checks": {
+    "model_or_agent_promoted": false,
+    "weights_changed": false,
+    "portfolio_or_brokerage_mutated": false,
+    "forecast_fabricated": false,
+    "historical_recovery_used_for_live_shadow": false,
+    "ci_success_treated_as_data_pass": false
+  },
+  "user_action": "NONE",
+  "restart_triggers": [
+    "2026-10-08 after 16:18 Asia/Shanghai",
+    "new authoritative raw carrier for DAO2 A/B/C",
+    "new Guard or Actions failure",
+    "fresh maturity or settlement evidence"
+  ]
+}
