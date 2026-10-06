@@ -32,6 +32,15 @@
       "settlement": "pending_ranking_runs=2; maturity_snapshots=0; matured_samples=0; settled_samples=0"
     },
     "first_real_break": "No break is attributable after 2026-09-30 because 2026-10-01 through 2026-10-07 are non-trading days. External scheduler state remains UNVERIFIED_FROM_GITHUB.",
+    "exchange_calendar": {
+      "status": "VERIFIED_FROM_SSE_AND_SZSE",
+      "closure": "2026-10-01 through 2026-10-07",
+      "reopen": "2026-10-08",
+      "sse_notice_date": "2026-09-17",
+      "sse_url": "https://www.sse.com.cn/disclosure/announcement/general/c/c_20260915_10832273.shtml",
+      "szse_notice_date": "2026-09-17",
+      "szse_url": "https://www.szse.cn/www/disclosure/notice/general/t20260917_622911.html"
+    },
     "next_action": "On 2026-10-08 after 16:18 Asia/Shanghai, verify immutable Core13 manifest -> ingest markers -> schema-bound Neon readback -> ranking/observation attestation -> future-only settlement.",
     "execution_result": "PREPARED_AND_ARCHIVED; WAITING_NEXT_TRADING_DAY",
     "restart_trigger": "2026-10-08 after 16:18 Asia/Shanghai"
