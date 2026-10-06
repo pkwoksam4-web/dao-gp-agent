@@ -1,0 +1,21 @@
+{
+  "artifact": "A_16_KEY_SET_HASH_MANIFEST_20261007",
+  "source_artifact": "A_16_KEY_VENDOR_SCOPE_EXPORT_20261005.json",
+  "source_ledger": "GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
+  "source_ledger_sha": "cf2fcf81f8f561b7edda4a2669a5e8087b039831",
+  "serialization": "sorted(ts_code,trade_date) joined as CSV lines with newline separator",
+  "key_count": 16,
+  "unique_key_count": 16,
+  "key_set_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+  "control_scope": {
+    "status": "NOT_AVAILABLE_IN_CURRENT_SCOPE_EXPORT",
+    "required": "Jessica known-row controls before raw admission",
+    "action": "Do not fabricate controls; use vendor/sample bytes only after authorization"
+  },
+  "validation": {
+    "ledger_key_match": true,
+    "duplicates": 0,
+    "admission_changed": false,
+    "resolved_rows_changed": false
+  }
+}
