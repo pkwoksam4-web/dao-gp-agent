@@ -1,0 +1,116 @@
+{
+  "schema": "daily-direction-audit/v2",
+  "record_date_cn": "2026-10-07",
+  "observed_at": "2026-10-07T00:47:40+08:00",
+  "direction": "DRIFT_DETECTED",
+  "direction_reason": "Agent Brain remains aligned, but DAO2 A repeated a scope/provenance-only route without adding admissible raw evidence; that route is now stopped until the sole restart trigger is met.",
+  "repository": {
+    "full_name": "pkwoksam4-web/dao-gp-agent",
+    "main_head_before_archive": "01c3dfdcb165510d0d9d01098c0a15b17dfb050f",
+    "acceptance_sql": "evidence/agent_brain/neon_readback_acceptance_v1.sql",
+    "acceptance_sql_sha256": "f33af7ffbb357b37e3d62563cbe50b21e25519a1a2d3634fde4fbe3b598d94a1",
+    "acceptance_record": "evidence/agent_brain/neon_readback_expected_vs_observed_20261007.json"
+  },
+  "agent_brain": {
+    "direction": "ALIGNED",
+    "actual_increment": "SCHEMA_BOUND_READ_ONLY_ACCEPTANCE_PACK_COMMITTED_NOT_YET_EXECUTED",
+    "live_cloud_evidence": {
+      "workflow": "Neon SQL Bridge",
+      "run_id": 36164003933,
+      "run_attempt": 3,
+      "artifact_id": 11353170174,
+      "observed_at": "2026-10-05T14:47:05.148232+00:00",
+      "database": "investment_intel",
+      "project_branch_identity": "UNVERIFIED_IN_ARTIFACT"
+    },
+    "verified_contracts": {
+      "core10": "WAT-core10-final-v1 count=10 FROZEN",
+      "core13": "WAT-core13-observation-v1 count=13 PROSPECTIVE_OBSERVATION_ONLY",
+      "probability": "PROBABILITY_V1_6_EXECUTABLE_MISSING; forecast_runs=0; forecast_items=0",
+      "ranking_observation": "2026-09-28 and 2026-09-30 each bars=13, features=13, ranking+observation attested",
+      "historical_recovery": "2026-09-29 count=13; HISTORICAL_RECOVERY_NON_LIVE; no feature/forecast/shadow",
+      "settlement": "pending_ranking_runs=2; maturity_snapshots=0; matured_samples=0; settled_samples=0"
+    },
+    "first_real_break": "No break is attributable after 2026-09-30 because 2026-10-01 through 2026-10-07 are non-trading days. External scheduler state remains UNVERIFIED_FROM_GITHUB.",
+    "next_action": "On 2026-10-08 after 16:18 Asia/Shanghai, verify immutable Core13 manifest -> ingest markers -> schema-bound Neon readback -> ranking/observation attestation -> future-only settlement.",
+    "execution_result": "PREPARED_AND_ARCHIVED; WAITING_NEXT_TRADING_DAY",
+    "restart_trigger": "2026-10-08 after 16:18 Asia/Shanghai"
+  },
+  "dao2_master": {
+    "direction": "DRIFT_DETECTED",
+    "modules": {
+      "A": {
+        "head": "091f7e692ea3f721009ae556814654e6e46c1ebd",
+        "guard_run": 37493322696,
+        "guard_conclusion": "success_not_data_pass",
+        "status": "STALLED_REQUIRES_ACTION",
+        "current_evidence": "data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json; key_count=16; key_set_sha256=8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c; admission_changed=false; resolved_rows_changed=false",
+        "action_now": "Stop further scope-only or hash-only manifests; retain the new manifest solely as provenance.",
+        "external_minimum": "One original raw iFinD direct aggregate, targeted L2, or equivalent direct classic-moneyflow carrier with symbol, trade_date, Jessica's four pinned fields, and supplier provenance.",
+        "acceptance": "Hash original bytes; prove Jessica four-field 100% exact overlap; only then test the 16 residual keys and change admission state.",
+        "execution_result": "ROUTE_STOPPED",
+        "restart_trigger": "New raw carrier bytes or newly granted vendor permission/sample"
+      },
+      "B": {
+        "head": "38859f37aa71542ca3f2e88e25ed664588e5bff0",
+        "status": "WAITING_EXTERNAL_AUTHORITATIVE_SCORER_OR_SAME_DAY_IO_PAIR",
+        "current_evidence": "000985 benchmark checkpoint remains accepted; no new authoritative final scorer or same-day I/O pair.",
+        "action_now": "None; do not replay or infer normalization, clipping, or 4% mapping.",
+        "external_minimum": "Authoritative final scorer source or one authoritative same-day input/output pair with provenance.",
+        "acceptance": "Reproduction matches the authoritative output without guessed transforms.",
+        "execution_result": "NO_RESTART",
+        "restart_trigger": "Authoritative scorer or same-day I/O pair arrives"
+      },
+      "C": {
+        "head": "25553cc61066a3de2a0bd211c641313d67606531",
+        "status": "WAITING_NEW_TRACEABLE_SAME_DAY_RAW_CLOSE",
+        "current_evidence": "required=43084; admissible=42783; total_gap=301; 298 DERIVED_CLOSE evidence-only and not admitted; 3 direct 801020.SI closes unresolved.",
+        "action_now": "None; preserve membership PASS and reject all derived closes.",
+        "external_minimum": "Traceable supplier raw same-day close file for the three unresolved 801020.SI dates.",
+        "acceptance": "Raw file provenance and content hash verify; all three direct closes match their dates; admissible series closes without derived values.",
+        "execution_result": "WAITING_EXTERNAL_FILE",
+        "restart_trigger": "New supplier raw close file for the three dates"
+      },
+      "D": {
+        "head": "2a7056b29a746d2423c54f4aa637647914164f6b",
+        "status": "FROZEN_CANDIDATE_CONSISTENCY_ONLY",
+        "current_evidence": "No new inconsistency or checkpoint change observed.",
+        "action_now": "Consistency check only; no semantic or parameter change.",
+        "external_minimum": "None unless a checkpoint or Guard mismatch appears.",
+        "acceptance": "HEAD, Guard, and frozen checkpoint remain mutually consistent.",
+        "execution_result": "NO_CHANGE",
+        "restart_trigger": "New D commit, Guard failure, or checkpoint mismatch"
+      },
+      "E": {
+        "head": "230da3999c2583b60194232d7d03126f2af0b35d",
+        "status": "BLOCKED_ON_A_TO_D_VERIFIED_CHECKPOINTS",
+        "current_evidence": "No complete A-to-D verified dependency set.",
+        "action_now": "Dependency check only; no promotion or freeze transition.",
+        "external_minimum": "Verified admissible checkpoints from every required A-to-D dependency.",
+        "acceptance": "Every dependency is bound to HEAD, run, artifact, and verified checkpoint.",
+        "execution_result": "FAIL_CLOSED",
+        "restart_trigger": "All required A-to-D checkpoints become verified"
+      },
+      "F": {
+        "head": "61c076193e26fe3aed4ea643ca80715257b08f36",
+        "status": "BLOCKED_ON_E_VERIFIED_CHECKPOINT",
+        "current_evidence": "No verified E checkpoint; Model Freeze/OOS cannot start.",
+        "action_now": "Dependency check only; no OOS or production promotion.",
+        "external_minimum": "One verified E checkpoint with complete upstream provenance.",
+        "acceptance": "E checkpoint hash and upstream A-to-D lineage verify before F consumes it.",
+        "execution_result": "FAIL_CLOSED",
+        "restart_trigger": "Verified E checkpoint arrives"
+      }
+    }
+  },
+  "drift_checks": {
+    "model_or_agent_promoted": false,
+    "weights_changed": false,
+    "portfolio_or_brokerage_mutated": false,
+    "forecast_fabricated": false,
+    "historical_recovery_used_for_live_shadow": false,
+    "ci_success_treated_as_data_pass": false,
+    "closed_route_repeated_after_this_record": false
+  },
+  "user_action": "NONE_NOW"
+}
