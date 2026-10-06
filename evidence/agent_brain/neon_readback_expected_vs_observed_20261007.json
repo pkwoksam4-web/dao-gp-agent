@@ -1,0 +1,152 @@
+{
+  "schema": "agent-brain-neon-readback-acceptance/v1",
+  "record_date_cn": "2026-10-07",
+  "generated_at": "2026-10-06T16:47:40Z",
+  "scope": "read-only acceptance baseline; no trading, promotion, weight, portfolio, or model mutation",
+  "live_cloud_source": {
+    "workflow": "Neon SQL Bridge",
+    "run_id": 36164003933,
+    "run_attempt": 3,
+    "conclusion": "success",
+    "artifact_id": 11353170174,
+    "artifact_name": "neon-truth-36164003933-attempt-3",
+    "artifact_zip_sha256": "450183c2ea7ed4aa2fe362c97998383764785749048573da76cc34651b782d47",
+    "neon_truth_json_sha256": "fa25a48c18d444ac5af7120d3dfd3926074d4a3f7df6775f3366fe3718329a7b",
+    "observed_at": "2026-10-05T14:47:05.148232+00:00",
+    "database": "investment_intel",
+    "db_user": "investment_intel_owner",
+    "project_expected": "red-term-29407678",
+    "branch_expected": "br-raspy-breeze-b5clzass",
+    "project_branch_attestation": "UNVERIFIED_IN_ARTIFACT"
+  },
+  "query_pack": {
+    "path": "evidence/agent_brain/neon_readback_acceptance_v1.sql",
+    "sha256": "f33af7ffbb357b37e3d62563cbe50b21e25519a1a2d3634fde4fbe3b598d94a1",
+    "repository_commit": "5f08331fea7d41aea58b6ebf11f65c4a241225ad",
+    "execution_status": "PREPARED_NOT_EXECUTED_BY_RUN_36164003933_ATTEMPT_3",
+    "safety": [
+      "BEGIN READ ONLY",
+      "statement_timeout=20s",
+      "ROLLBACK"
+    ]
+  },
+  "expected_vs_observed": {
+    "frozen_core10": {
+      "expected": 10,
+      "observed": 10,
+      "status": "PASS_AT_OBSERVED_AT"
+    },
+    "prospective_core13": {
+      "expected": 13,
+      "observed": 13,
+      "status": "PASS_AT_OBSERVED_AT"
+    },
+    "prospective_dates": {
+      "2026-09-28": {
+        "expected_bars": 13,
+        "observed_bars": 13,
+        "expected_features": 13,
+        "observed_features": 13,
+        "ranking_attested": true,
+        "observation_attested": true,
+        "status": "PASS_AT_OBSERVED_AT"
+      },
+      "2026-09-30": {
+        "expected_bars": 13,
+        "observed_bars": 13,
+        "expected_features": 13,
+        "observed_features": 13,
+        "ranking_attested": true,
+        "observation_attested": true,
+        "status": "PASS_AT_OBSERVED_AT"
+      }
+    },
+    "historical_recovery_2026-09-29": {
+      "recovered_symbols": 13,
+      "mode": "HISTORICAL_RECOVERY_NON_LIVE",
+      "live_shadow_eligible": false,
+      "features_recovered": false,
+      "forecast_or_shadow_generated": false,
+      "status": "PASS_AT_OBSERVED_AT"
+    },
+    "probability_forecast": {
+      "forecast_runs": 0,
+      "forecast_items": 0,
+      "executable_status": "PROBABILITY_V1_6_EXECUTABLE_MISSING",
+      "status": "BLOCKED_INDEPENDENTLY_NO_FABRICATION"
+    },
+    "ranking_observation": {
+      "shadow_strategy_runs": 2,
+      "shadow_observation_snapshots": 2,
+      "live_shadow_run_attestations": 2,
+      "status": "PASS_AT_OBSERVED_AT"
+    },
+    "future_only_settlement": {
+      "shadow_maturity_snapshots": 0,
+      "settled_samples": 0,
+      "settlement_integrity_snapshots": 0,
+      "pending_samples": 0,
+      "shadow_cohort_snapshots": 0,
+      "status": "WAITING_FOR_MATURITY_NOT_STALLED"
+    }
+  },
+  "first_real_break": {
+    "component": "current live-cloud freshness",
+    "location": "after the 2026-09-30 attested prospective chain",
+    "error": "No later completed China trading day existed before the 2026-10-01 through 2026-10-07 National Day closure; therefore no missing live manifest is inferred. The next admissible check is 2026-10-08 after 16:18 Asia/Shanghai.",
+    "scheduler_control_plane": "UNVERIFIED_FROM_GITHUB",
+    "next_action": "On 2026-10-08 after 16:18 Asia/Shanghai, require immutable Core13 manifest, successful ingest markers, schema-bound readback, ranking/observation attestation, and future-only settlement accounting. Fail closed if any link is absent."
+  },
+  "dao2_master": {
+    "a": {
+      "head": "091f7e692ea3f721009ae556814654e6e46c1ebd",
+      "new_evidence": "data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json",
+      "key_count": 16,
+      "key_set_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+      "admission_changed": false,
+      "resolved_rows_changed": false,
+      "status": "STALLED_REQUIRES_ACTION",
+      "direction": "DRIFT_DETECTED",
+      "reason": "A second consecutive scope/provenance-only artifact did not add vendor bytes, Jessica four-field exact overlap, or an admissible residual row.",
+      "action": "Stop further scope-only manifests. Restart only when a raw iFinD, targeted L2, or other direct classic-moneyflow carrier is available; hash the bytes, prove Jessica pinned four-field 100% exact identity, then test the residual keys.",
+      "prerequisite": "Original vendor/sample bytes with symbol, trade_date, and the four pinned moneyflow fields plus provenance.",
+      "output_location": "data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json",
+      "acceptance": "Raw bytes are content-addressed; Jessica overlap is 100% exact on all four fields; only then may any of the 16 residual keys change state.",
+      "execution_result": "ROUTE_CLOSED_UNTIL_RAW_CARRIER",
+      "only_restart_trigger": "New raw carrier or newly granted vendor permission/sample."
+    },
+    "b": {
+      "head": "38859f37aa71542ca3f2e88e25ed664588e5bff0",
+      "status": "WAITING_EXTERNAL_AUTHORITATIVE_SCORER_OR_SAME_DAY_IO_PAIR",
+      "action": "Do not replay or guess normalization, clipping, or the 4% mapping."
+    },
+    "c": {
+      "head": "25553cc61066a3de2a0bd211c641313d67606531",
+      "required_rows": 43084,
+      "admissible_rows": 42783,
+      "total_gap": 301,
+      "derived_close_evidence_only_not_admitted": 298,
+      "direct_801020_si_close_unresolved": 3,
+      "status": "WAITING_NEW_TRACEABLE_SAME_DAY_RAW_CLOSE",
+      "action": "Admit no derived close; re-open only for a new supplier raw close file for the three unresolved 801020.SI dates."
+    },
+    "d": {
+      "head": "2a7056b29a746d2423c54f4aa637647914164f6b",
+      "status": "FROZEN_CANDIDATE_CONSISTENCY_ONLY"
+    },
+    "e": {
+      "head": "230da3999c2583b60194232d7d03126f2af0b35d",
+      "status": "BLOCKED_ON_A_TO_D_VERIFIED_CHECKPOINTS"
+    },
+    "f": {
+      "head": "61c076193e26fe3aed4ea643ca80715257b08f36",
+      "status": "BLOCKED_ON_E_VERIFIED_CHECKPOINT"
+    }
+  },
+  "direction_audit": {
+    "agent_brain": "ALIGNED",
+    "agent_brain_reason": "The new artifact is a read-only, schema-bound acceptance pack that preserves Core10/Core13 semantics, does not fabricate probability forecasts, and keeps settlement future-only.",
+    "dao2_master": "DRIFT_DETECTED",
+    "dao2_master_reason": "Module A produced repeated scope/provenance artifacts without admissible raw evidence; that affected route is now stopped while B through F remain fail-closed."
+  }
+}
