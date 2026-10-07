@@ -1,6 +1,6 @@
 {
   "artifact": "A_16_KEY_SET_HASH_MANIFEST_20261007",
-  "version": "1.1",
+  "version": "1.2",
   "module": "A_MAIN_NET_FLOW",
   "authoritative_scope_sources": [
     "data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
@@ -62,5 +62,51 @@
     "resolved_rows_changed": false,
     "fail_closed_on_hash_mismatch": true
   },
-  "content_sha256_without_hash_field": "ede0a02e884282162909ace4ddc2be746fe9d8468fc86ae036943ca9e29bc290"
+  "route_policy": {
+    "ifind": {
+      "status": "WAIT_FOR_REAL_HISTORICAL_EXACT_AGGREGATE_READABILITY",
+      "probe_logic_frozen": true,
+      "schema_reguess_allowed": false,
+      "plaintext_token_request_allowed": false,
+      "repeat_no_permission_run_allowed": false,
+      "on_real_readability": "Run frozen A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1 first; require 32/32 exact field comparisons and zero mismatches before deriving/querying residual scope."
+    },
+    "alphat01_and_targeted_l2": {
+      "status": "WAIT_FOR_REAL_RAW_READABILITY",
+      "repeat_gated_download_attempt_allowed": false,
+      "on_real_readability": "Persist raw -> SHA256 -> frozen Jessica controls -> exact identity 100% -> residual processing; no harness/bucket/mapping/tolerance retune based on residual outcomes."
+    },
+    "public_search": {
+      "status": "EVIDENCE_EXHAUSTED_FROZEN",
+      "github_generic_search_allowed": false,
+      "readme_code_schema_only_search_allowed": false,
+      "recent_snapshot_search_allowed": false,
+      "processed_factor_search_allowed": false,
+      "reopen_condition": "A genuinely new raw carrier is identified and explicitly covers at least one residual date."
+    },
+    "partial_admission": {
+      "enabled": true,
+      "on_any_residual_pass": [
+        "persist_raw",
+        "sha256",
+        "provenance",
+        "control_overlap_evidence",
+        "ledger_update",
+        "resolved_plus_1",
+        "unresolved_minus_1",
+        "guard",
+        "continue"
+      ],
+      "batch_completion_required": false,
+      "final_close_requires": {
+        "resolved_rows": 1011607,
+        "unresolved_rows": 0,
+        "binding_audit": true,
+        "checkpoint": true,
+        "final_guard_pass": true,
+        "MAIN_NET_FLOW_UNBOUND": "CLOSED"
+      }
+    }
+  },
+  "content_sha256_without_hash_field": "cddbbc8e2f19a053aa2d8f125e3496765435bf4504f67844772c62c3cc41dff8"
 }
