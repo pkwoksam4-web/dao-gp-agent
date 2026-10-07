@@ -1,21 +1,66 @@
 {
   "artifact": "A_16_KEY_SET_HASH_MANIFEST_20261007",
-  "source_artifact": "A_16_KEY_VENDOR_SCOPE_EXPORT_20261005.json",
-  "source_ledger": "GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
-  "source_ledger_sha": "cf2fcf81f8f561b7edda4a2669a5e8087b039831",
-  "serialization": "sorted(ts_code,trade_date) joined as CSV lines with newline separator",
+  "version": "1.1",
+  "module": "A_MAIN_NET_FLOW",
+  "authoritative_scope_sources": [
+    "data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
+    "data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json"
+  ],
+  "source_ledger": "data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
+  "source_ledger_blob_sha": "cf2fcf81f8f561b7edda4a2669a5e8087b039831",
+  "legacy_scope_export": {
+    "path": "A_16_KEY_VENDOR_SCOPE_EXPORT_20261005.json",
+    "authority": "NON_AUTHORITATIVE_HISTORICAL_DERIVATIVE_ONLY"
+  },
+  "serialization_contract": {
+    "encoding": "UTF-8",
+    "bom": false,
+    "header": false,
+    "sort": ["ts_code", "trade_date"],
+    "date_format": "YYYY-MM-DD",
+    "line_format": "TS_CODE,YYYY-MM-DD",
+    "line_separator": "LF (0x0A)",
+    "final_line_lf": false
+  },
   "key_count": 16,
   "unique_key_count": 16,
+  "serialized_payload": "000020.SZ,2021-09-24\n000157.SZ,2021-09-24\n000564.SZ,2023-03-20\n000592.SZ,2021-09-24\n000753.SZ,2021-09-24\n001337.SZ,2023-03-20\n002118.SZ,2023-05-22\n002157.SZ,2023-05-22\n002503.SZ,2023-05-22\n002504.SZ,2023-05-22\n002618.SZ,2021-09-23\n002684.SZ,2021-11-25\n600112.SH,2022-05-06\n600306.SH,2020-06-08\n600898.SH,2020-11-04\n603996.SH,2021-02-24",
   "key_set_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+  "independent_recompute": {
+    "method": "Read source_ledger.unresolved_keys; project only (ts_code, trade_date); sort lexicographically by (ts_code, trade_date); serialize exactly per serialization_contract; SHA256 over exact UTF-8 bytes.",
+    "computed_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+    "matches_declared": true,
+    "status": "PASS",
+    "ledger_modified": false
+  },
+  "critical_date_assertions": {
+    "002118.SZ": "2023-05-22",
+    "002503.SZ": "2023-05-22",
+    "002504.SZ": "2023-05-22",
+    "status": "PASS"
+  },
   "control_scope": {
-    "status": "NOT_AVAILABLE_IN_CURRENT_SCOPE_EXPORT",
-    "required": "Jessica known-row controls before raw admission",
-    "action": "Do not fabricate controls; use vendor/sample bytes only after authorization"
+    "status": "FROZEN",
+    "path": "data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json",
+    "control_count": 8,
+    "required_exact_field_comparisons": 32,
+    "control_set_sha256": "cfd220523c16f042326ae9cde6f931589b06d42ab9f961765b615ccbcdebb242",
+    "freeze_rule": "No new vendor residual value may be processed before this control scope is frozen."
+  },
+  "downstream_scope_contract": {
+    "vendor_scope": "MUST_DERIVE_FROM_SOURCE_LEDGER_AND_THIS_MANIFEST",
+    "l2_scope": "MUST_DERIVE_FROM_SOURCE_LEDGER_AND_THIS_MANIFEST",
+    "ifind_scope": "MUST_DERIVE_FROM_SOURCE_LEDGER_AND_THIS_MANIFEST",
+    "absence_audit": "MUST_DERIVE_FROM_SOURCE_LEDGER_AND_THIS_MANIFEST",
+    "admission_task": "MUST_DERIVE_FROM_SOURCE_LEDGER_AND_THIS_MANIFEST",
+    "handwritten_or_chat_key_lists_allowed": false
   },
   "validation": {
     "ledger_key_match": true,
     "duplicates": 0,
     "admission_changed": false,
-    "resolved_rows_changed": false
-  }
+    "resolved_rows_changed": false,
+    "fail_closed_on_hash_mismatch": true
+  },
+  "content_sha256_without_hash_field": "ede0a02e884282162909ace4ddc2be746fe9d8468fc86ae036943ca9e29bc290"
 }
