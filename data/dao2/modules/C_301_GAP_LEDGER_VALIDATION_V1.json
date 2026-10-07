@@ -43,5 +43,10 @@
     "breadth_status": "BLOCKED_PENDING_SERIES_PASS",
     "breadth_derivation_allowed": false
   },
-  "ci_note": "The bot-authored ledger commit produced GitHub pull_request checks with conclusion=action_required and zero jobs because GitHub does not automatically approve workflows triggered by github-actions[bot]. This user-authored validation commit exists to obtain an actual Guard/Preflight execution on the same ledger content; action_required is not treated as PASS."
+  "ci_trigger_contract": {
+    "guard_watches_this_file": true,
+    "preflight_watches_this_file": true,
+    "purpose": "Ensure user-authored ledger validation changes execute both governance checks on the same HEAD."
+  },
+  "ci_note": "The bot-authored ledger commit produced pull_request checks with conclusion=action_required and zero jobs. That status is not treated as PASS. After adding the ledger files to both CI path gates, this user-authored validation update is the explicit trigger for actual Guard and Preflight execution."
 }
