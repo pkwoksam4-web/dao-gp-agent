@@ -11,11 +11,15 @@ on:
       - 'data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json'
       - 'data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json'
       - 'data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_V1.json'
+      - 'data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_VALIDATION_V1.json'
       - 'docs/dao2/modules/C_SECTOR_PIT.md'
       - 'scripts/dao2_module_state_guard_v1.py'
       - 'scripts/dao2_c_sector_governance_guard_v1.py'
       - 'scripts/test_dao2_c_sector_governance_guard_v1.py'
       - '.github/workflows/dao2-c-sector-pit-guard-v1.yml'
+      - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
   pull_request:
     paths:
       - 'data/dao2/modules/C_SECTOR_PIT_STATE_V1.json'
@@ -25,9 +29,13 @@ on:
       - 'data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json'
       - 'data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json'
       - 'data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_V1.json'
+      - 'data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_VALIDATION_V1.json'
       - 'scripts/dao2_module_state_guard_v1.py'
       - 'scripts/dao2_c_sector_governance_guard_v1.py'
       - 'scripts/test_dao2_c_sector_governance_guard_v1.py'
+      - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
 permissions:
   contents: read
 jobs:
