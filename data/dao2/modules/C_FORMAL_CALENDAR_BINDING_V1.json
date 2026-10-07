@@ -1,0 +1,25 @@
+{
+  "artifact": "DAO2_C_FORMAL_CALENDAR_BINDING_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "status": "PASS_BOUND_TO_MEMBERSHIP_PASS_ARTIFACT",
+  "source": {
+    "membership_artifact_id": 10628585296,
+    "membership_artifact_digest": "sha256:ccf6fa42fba22a0f4420cba3659acc0f99c34abfc016c4d1454e594d01866143",
+    "member": "membership_out/formal_required_sector_keys.csv.gz",
+    "required_sector_key_rows": 43084,
+    "derivation": "sorted unique trade_date from PASS membership required-sector keys"
+  },
+  "calendar": {
+    "rows": 1426,
+    "start": "20200601",
+    "end": "20260417",
+    "date_list_sha256": "370349c6ef98420bd34ff8189cea83cb1964cab0467a540b7d11f0ef541ce117"
+  },
+  "governance": {
+    "replaces_expired_ci_transport_only": true,
+    "changes_formal_calendar_semantics": false,
+    "changes_series_coverage": false,
+    "changes_admission_contract": false
+  }
+}
