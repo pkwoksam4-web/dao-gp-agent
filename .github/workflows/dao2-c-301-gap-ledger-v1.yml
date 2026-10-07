@@ -7,6 +7,7 @@ on:
       - gp/dao2-c-sector-pit
     paths:
       - .github/workflows/dao2-c-301-gap-ledger-v1.yml
+      - scripts/dao2_c_301_gap_ledger_v1.py
 
 permissions:
   contents: write
@@ -57,7 +58,10 @@ jobs:
             data/dao2/modules/C_SECTOR_WIND_DERIVED_CLOSE_EVIDENCE_V1.json \
             data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json \
             data/dao2/modules/C_SECTOR_PIT_STATE_V1.json
-          git diff --cached --check
+          # JSON evidence/checkpoints must remain whitespace-clean. The CSV uses the
+          # csv module's standards-compliant CRLF record terminator, so do not treat
+          # its carriage return as semantic trailing whitespace.
+          git diff --cached --check -- '*.json'
           git diff --cached --quiet && { echo "No ledger changes to commit"; exit 0; }
           git commit -m "evidence(dao2-c): freeze 301 sector gap ledger"
           git push origin HEAD:gp/dao2-c-sector-pit
