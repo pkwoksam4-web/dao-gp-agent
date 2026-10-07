@@ -8,6 +8,7 @@ on:
       - 'data/dao2/modules/C_301_GAP_LEDGER_V1.json'
       - 'data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv'
       - 'data/dao2/modules/C_301_GAP_LEDGER_VALIDATION_V1.json'
+      - 'data/dao2/modules/C_FORMAL_CALENDAR_BINDING_V1.json'
       - 'scripts/dao2_sector_pit_verify_v1.py'
       - 'scripts/test_dao2_sector_pit_verify_v1.py'
       - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
@@ -17,6 +18,7 @@ on:
       - 'data/dao2/modules/C_301_GAP_LEDGER_V1.json'
       - 'data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv'
       - 'data/dao2/modules/C_301_GAP_LEDGER_VALIDATION_V1.json'
+      - 'data/dao2/modules/C_FORMAL_CALENDAR_BINDING_V1.json'
       - 'scripts/dao2_sector_pit_verify_v1.py'
       - 'scripts/test_dao2_sector_pit_verify_v1.py'
       - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
@@ -45,44 +47,55 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Download frozen Formal calendar
-        uses: actions/download-artifact@v4
-        with:
-          name: gp-pit-st-v480-final-audit
-          path: calendar-final
-          run-id: 33977325822
-          github-token: ${{ github.token }}
-      - name: Verify Formal calendar and blocked component checkpoints
+      - name: Download PASS membership backing artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/10628585296/zip" \
+            -o /tmp/dao2-c-membership-pass.zip
+          test -s /tmp/dao2-c-membership-pass.zip
+      - name: Verify bound Formal calendar and blocked component checkpoints
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
         run: |
           mkdir -p artifact_dao2_c_preflight_v1
           python - <<'PY'
           import csv
+          import gzip
+          import hashlib
+          import io
           import json
           import os
+          import zipfile
           from pathlib import Path
 
-          calendar_path=Path("calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv")
-          with calendar_path.open("r",encoding="utf-8-sig",newline="") as f:
-              rows=list(csv.DictReader(f))
-          dates=[]
-          for row in rows:
-              if "is_open" in row and str(row["is_open"]).strip() not in {"1","1.0","true","True"}:
-                  continue
-              raw=row.get("trade_date") or row.get("cal_date") or row.get("date")
-              if raw:
-                  dates.append(str(raw).replace("-",""))
-          dates=sorted(set(dates))
-          assert len(dates)==1426, len(dates)
-          assert dates[0]=="20200601", dates[0]
-          assert dates[-1]=="20260417", dates[-1]
-
           base=Path("data/dao2/modules")
+          calendar_binding=json.loads((base/"C_FORMAL_CALENDAR_BINDING_V1.json").read_text(encoding="utf-8"))
           membership=json.loads((base/"C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json").read_text(encoding="utf-8"))
           series=json.loads((base/"C_SECTOR_SERIES_CHECKPOINT_V1.json").read_text(encoding="utf-8"))
           breadth=json.loads((base/"C_SECTOR_BREADTH_CHECKPOINT_V1.json").read_text(encoding="utf-8"))
           historical=json.loads((base/"C_SECTOR_HISTORICAL_RECOVERY_V1.json").read_text(encoding="utf-8"))
+
+          assert calendar_binding["status"]=="PASS_BOUND_TO_MEMBERSHIP_PASS_ARTIFACT", calendar_binding
+          assert calendar_binding["source"]["membership_artifact_id"]==membership["evidence"]["membership_audit"]["artifact_id"], calendar_binding
+          expected_digest="sha256:"+membership["evidence"]["membership_audit"]["artifact_digest_sha256"]
+          assert calendar_binding["source"]["membership_artifact_digest"]==expected_digest, calendar_binding
+
+          with zipfile.ZipFile("/tmp/dao2-c-membership-pass.zip") as z:
+              raw=gzip.decompress(z.read(calendar_binding["source"]["member"])).decode("utf-8")
+          sector_rows=list(csv.DictReader(io.StringIO(raw)))
+          assert len(sector_rows)==43084, len(sector_rows)
+          dates=sorted({str(r["trade_date"]).replace("-","") for r in sector_rows})
+          canonical_text="trade_date\n"+"".join(d+"\n" for d in dates)
+          date_list_sha256=hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
+          assert len(dates)==calendar_binding["calendar"]["rows"]==1426, len(dates)
+          assert dates[0]==calendar_binding["calendar"]["start"]=="20200601", dates[0]
+          assert dates[-1]==calendar_binding["calendar"]["end"]=="20260417", dates[-1]
+          assert date_list_sha256==calendar_binding["calendar"]["date_list_sha256"], date_list_sha256
 
           assert membership["status"]=="PASS_SUBCOMPONENT", membership
           assert membership["blocker_closed_within_module"] is True, membership
@@ -107,9 +120,13 @@ jobs:
               "artifact":"DAO2_C_SECTOR_PIT_PREFLIGHT_V1",
               "status":"PASS_PREFLIGHT_CURRENT_STATE",
               "formal_calendar":{
+                  "source":"PASS membership required-sector keys",
+                  "membership_artifact_id":calendar_binding["source"]["membership_artifact_id"],
+                  "membership_artifact_digest":calendar_binding["source"]["membership_artifact_digest"],
                   "start":"2020-06-01",
                   "end":"2026-04-17",
-                  "trading_days":len(dates)
+                  "trading_days":len(dates),
+                  "date_list_sha256":date_list_sha256
               },
               "component_status":{
                   "sector_membership_pit":membership["status"],
@@ -119,9 +136,7 @@ jobs:
               "historical_gp_v11_sector_package_recovered":False,
               "tushare_token_available":bool(os.environ.get("TUSHARE_TOKEN")),
               "candidate_materialization_note":"Token presence is capability-only evidence. No provider bytes are accepted by this preflight.",
-              "closed_blockers":[
-                  "SECTOR_MEMBERSHIP_PIT_UNBOUND"
-              ],
+              "closed_blockers":["SECTOR_MEMBERSHIP_PIT_UNBOUND"],
               "blockers":open_blockers,
               "model_freeze_allowed":False,
               "oos_metrics_allowed":False
