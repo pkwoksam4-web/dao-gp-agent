@@ -5,12 +5,18 @@ on:
       - gp/dao2-c-sector-pit
     paths:
       - 'data/dao2/modules/C_SECTOR_*_V1.json'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_V1.json'
+      - 'data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_VALIDATION_V1.json'
       - 'scripts/dao2_sector_pit_verify_v1.py'
       - 'scripts/test_dao2_sector_pit_verify_v1.py'
       - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
   pull_request:
     paths:
       - 'data/dao2/modules/C_SECTOR_*_V1.json'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_V1.json'
+      - 'data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv'
+      - 'data/dao2/modules/C_301_GAP_LEDGER_VALIDATION_V1.json'
       - 'scripts/dao2_sector_pit_verify_v1.py'
       - 'scripts/test_dao2_sector_pit_verify_v1.py'
       - '.github/workflows/dao2-c-sector-pit-preflight-v1.yml'
