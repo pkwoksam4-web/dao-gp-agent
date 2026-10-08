@@ -1,0 +1,119 @@
+{
+  "schema": "daily-direction-audit/v2",
+  "record_date_cn": "2026-10-09",
+  "observed_at": "2026-10-09T00:39:38+08:00",
+  "direction": "DRIFT_DETECTED",
+  "direction_reason": "Agent Brain remains aligned and is waiting for the 2026-10-09 post-close prospective gate. No repository or workflow increment occurred after the verified 2026-10-08 chain. DAO2 C remains on the uncorrected drift HEAD that continued public/proxy probing after the restart trigger narrowed to a new supplier raw file.",
+  "repository": {
+    "full_name": "pkwoksam4-web/dao-gp-agent",
+    "main_head_before_archive": "dd7ac2c003715f2b7e74f2d305394a2c553c6887",
+    "new_workflow_runs_after_previous_archive": 0
+  },
+  "daily_actual_increment": {
+    "prospective_samples_added_this_audit": 0,
+    "admissible_dao2_rows_added_this_audit": 0,
+    "head_transitions_since_previous_archive": 0,
+    "note": "Daily first-run audit only; no infrastructure success is counted as model or data progress."
+  },
+  "agent_brain": {
+    "direction": "ALIGNED",
+    "status": "PRE_MARKET_WAITING_2026_10_09_GATE",
+    "verified_baseline": {
+      "core10": "WAT-core10-final-v1 count=10 FROZEN_UNCHANGED",
+      "core13": "WAT-core13-observation-v1 count=13 PROSPECTIVE_OBSERVATION_ONLY",
+      "eligible_prospective_dates": [
+        "2026-09-28",
+        "2026-09-30",
+        "2026-10-08"
+      ],
+      "latest_verified_manifest_commit": "12c099b3ae59fb5dca90c137cbcd328a2d5a49b0",
+      "latest_ingest_run": 37760184154,
+      "latest_shadow_request_commit": "7f31392de49cfd0efa14134af413932497a8bedf",
+      "latest_shadow_run": 37760281530,
+      "probability": "PROBABILITY_V1_6_EXECUTABLE_MISSING; probability forecast generation prohibited",
+      "historical_recovery": "HISTORICAL_RECOVERY_NON_LIVE excluded from LIVE_SHADOW and scoring"
+    },
+    "current_trade_date_cn": "2026-10-09",
+    "trading_day_calendar_status": "EXPECTED_TRADING_DAY; 16:18 prospective gate not reached at observation time",
+    "current_action": "After 16:18 verify immutable 13-symbol manifest and ingest markers; after shadow dispatch verify ranking, observation, attestation, and unchanged forecast tables.",
+    "settlement": {
+      "last_verified_run": 37760235793,
+      "pending_checked": 2,
+      "settled_now": 0,
+      "still_pending": 2,
+      "note": "The last check preceded the 2026-10-08 shadow write. Current aggregate including that run remains unverified until a later readback or settlement check; no maturity is inferred."
+    },
+    "scheduler_control_plane": "UNVERIFIED_FROM_GITHUB_FOR_ENABLED_TIMEZONE_NEXT_RUN",
+    "first_breakpoint_if_gate_fails": "Longbridge collection -> immutable GitHub manifest",
+    "user_action": "NONE_NOW"
+  },
+  "dao2_master": {
+    "direction": "DRIFT_DETECTED",
+    "modules": {
+      "A": {
+        "head": "9dd592798bfc7171a459b7b96a4f89a58b6453b1",
+        "latest_guard_run": 37725191768,
+        "guard_conclusion": "success_consistency_only_not_data_pass",
+        "status": "STALLED_REQUIRES_ACTION",
+        "action": "Wait for readable iFinD, targeted L2, or original carrier; require Jessica four-field exact identity before residual admission.",
+        "external_minimum": "Authorized original carrier bytes covering the frozen 16-key manifest.",
+        "restart_trigger": "New readable authorized raw carrier"
+      },
+      "B": {
+        "head": "38859f37e4d49aa2bc743a6ff1127b7ad85c455b",
+        "latest_guard_run": 35685970366,
+        "guard_conclusion": "success_consistency_only_not_data_pass",
+        "status": "WAITING_AUTHORITATIVE_FINAL_SCORER_OR_IO_PAIR",
+        "action": "No replay or guessed normalization, clipping, combination, or 4% mapping.",
+        "external_minimum": "Authoritative final scorer or same-date I/O pair.",
+        "restart_trigger": "Authoritative carrier"
+      },
+      "C": {
+        "head": "f788de38b9c93d5641f4db6db4fbbc31b418c760",
+        "latest_guard_run": 37762917325,
+        "latest_preflight_run": 37762917104,
+        "guard_conclusion": "success_consistency_only_not_series_pass",
+        "status": "BLOCKED_SECTOR_SERIES_UNBOUND",
+        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; three 801020.SI direct raw closes unresolved",
+        "drift": "HEAD still contains post-freeze public/proxy probe work; no admissible supplier original close was added.",
+        "corrective_action": "Stop public, proxy, and derived-migration probes; preserve evidence; do not change admission semantics.",
+        "external_minimum": "Traceable supplier original same-day OHLC for 801020.SI on 20210806, 20211008, 20211022 plus neighbor rows.",
+        "restart_trigger": "New supplier raw file only"
+      },
+      "D": {
+        "head": "2a7056ffd61885046e34dc1494bc668143d96793",
+        "latest_guard_run": 35499069982,
+        "guard_conclusion": "success",
+        "status": "FROZEN_CANDIDATE",
+        "action": "Consistency only",
+        "restart_trigger": "New commit, Guard failure, or checkpoint mismatch"
+      },
+      "E": {
+        "head": "230da3f090c59ef6c7bc4c0056c516d519741d2c",
+        "latest_guard_run": 35688396944,
+        "guard_conclusion": "success_fail_closed_contract_only",
+        "status": "FAIL_CLOSED_ON_A_TO_D",
+        "action": "Dependency check only",
+        "restart_trigger": "All required A-D verified checkpoints"
+      },
+      "F": {
+        "head": "61c076d2fcdc2de456bbad0161a942814cf82e0d",
+        "latest_guard_run": 35688399818,
+        "guard_conclusion": "success_fail_closed_contract_only",
+        "status": "FAIL_CLOSED_ON_E",
+        "action": "No Model Freeze or OOS",
+        "restart_trigger": "Verified E checkpoint"
+      }
+    }
+  },
+  "drift_checks": {
+    "model_or_agent_promoted": false,
+    "weights_changed": false,
+    "portfolio_or_brokerage_mutated": false,
+    "forecast_fabricated": false,
+    "historical_recovery_used_for_live_shadow": false,
+    "ci_success_treated_as_data_pass": false,
+    "derived_close_admitted": false,
+    "public_route_repeated_after_frozen_restart_condition": true
+  }
+}
