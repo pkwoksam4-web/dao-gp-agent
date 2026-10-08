@@ -1,0 +1,155 @@
+name: DAO2 C Investing SYWGMI Exact-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-investing-sywgmi-exact-gap-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q httpx pandas
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Probe Investing TVC search/history for SYWGMI
+        run: |
+          python - <<'PY'
+          import csv, gzip, hashlib, json, time, uuid
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import httpx
+
+          OUT=Path('artifact_investing_sywgmi'); RAW=OUT/'raw'; RAW.mkdir(parents=True,exist_ok=True)
+          headers={
+            'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+            'Referer':'https://tvc-invdn-com.investing.com/',
+            'Content-Type':'application/json',
+          }
+          wanted=['20210805','20210806','20210809','20210930','20211008','20211011','20211021','20211022','20211025']
+          targets={'20210806','20211008','20211022'}
+          neighbors=set(wanted)-targets
+
+          def tvc(endpoint,params):
+              url=f'https://tvc6.investing.com/{uuid.uuid4().hex}/0/0/0/0/{endpoint}'
+              r=httpx.get(url,params=params,headers=headers,timeout=60,follow_redirects=True)
+              return r
+
+          searches=[]; candidates=[]
+          for q in ['SYWGMI','SYWG Mining','申万采掘','801020']:
+              r=tvc('search',{'query':q,'limit':20,'type':'Index','exchange':''})
+              b=r.content; (RAW/f'search_{len(searches)}.json').write_bytes(b)
+              try: obj=r.json()
+              except Exception: obj=None
+              searches.append({'query':q,'http_status':r.status_code,'sha256':hashlib.sha256(b).hexdigest(),'response':obj})
+              if isinstance(obj,list):
+                  for x in obj:
+                      if not isinstance(x,dict): continue
+                      text=' '.join(str(x.get(k,'')) for k in x)
+                      if any(t.lower() in text.lower() for t in ['sywgmi','sywg mining','申万采掘','801020']):
+                          candidates.append(x)
+
+          # dedupe IDs from common Investing search-result fields
+          ids=[]
+          for x in candidates:
+              for k in ['ticker','id','pair_ID','pairId','instrument_id','instrumentId','symbol']:
+                  v=x.get(k)
+                  try:
+                      iv=int(str(v))
+                      if iv>0 and iv not in ids: ids.append(iv)
+                  except Exception: pass
+
+          # Also inspect public page HTML for embedded numeric IDs.
+          page_url='https://cn.investing.com/indices/sywg-mining-historical-data'
+          page=httpx.get(page_url,headers={'User-Agent':headers['User-Agent']},timeout=60,follow_redirects=True)
+          pb=page.content; (RAW/'historical_page.html').write_bytes(pb)
+          import re
+          text=pb.decode('utf-8','ignore')
+          for pat in [r'"instrumentId"\s*:\s*"?(\d+)',r'"pair_ID"\s*:\s*"?(\d+)',r'data-pair-id=["\'](\d+)',r'"pairId"\s*:\s*"?(\d+)']:
+              for m in re.finditer(pat,text):
+                  iv=int(m.group(1))
+                  if iv not in ids: ids.append(iv)
+
+          # Read frozen neighbors.
+          with gzip.open('series-base/sector_close_formal.csv.gz','rt',encoding='utf-8',newline='') as f:
+              base=list(csv.DictReader(f))
+          base_map={(str(x['industry_code']),str(x['trade_date']).replace('-','')):float(x['close']) for x in base}
+
+          histories=[]
+          start=int(datetime(2021,8,1,tzinfo=timezone.utc).timestamp())
+          end=int(datetime(2021,10,31,tzinfo=timezone.utc).timestamp())
+          for iid in ids[:20]:
+              r=tvc('history',{'symbol':iid,'from':start,'to':end,'resolution':'D'})
+              b=r.content; (RAW/f'history_{iid}.json').write_bytes(b)
+              try: obj=r.json()
+              except Exception: obj=None
+              rec={'investing_id':iid,'http_status':r.status_code,'sha256':hashlib.sha256(b).hexdigest(),'api_status':obj.get('s') if isinstance(obj,dict) else None,'wanted':{}}
+              if isinstance(obj,dict) and obj.get('s')=='ok':
+                  ts=obj.get('t',[]); closes=obj.get('c',[]); opens=obj.get('o',[]); highs=obj.get('h',[]); lows=obj.get('l',[]); vols=obj.get('v',[])
+                  for j,t in enumerate(ts):
+                      d=datetime.fromtimestamp(t,tz=timezone.utc).strftime('%Y%m%d')
+                      if d in wanted:
+                          rec['wanted'][d]={
+                            'open':opens[j] if j<len(opens) else None,
+                            'high':highs[j] if j<len(highs) else None,
+                            'low':lows[j] if j<len(lows) else None,
+                            'close':closes[j] if j<len(closes) else None,
+                            'volume':vols[j] if j<len(vols) else None,
+                          }
+              histories.append(rec)
+
+          viable=[]
+          for h in histories:
+              w=h['wanted']
+              overlap=[]
+              for d in sorted(neighbors):
+                  src=w.get(d,{}).get('close') if isinstance(w.get(d),dict) else None
+                  ref=base_map.get(('801020.SI',d))
+                  overlap.append({'trade_date':d,'source_close':src,'frozen_close':ref,'match_2dp':bool(src is not None and ref is not None and round(float(src),2)==round(ref,2))})
+              target_hits={d:w.get(d) for d in sorted(targets)}
+              all_neighbors=all(x['match_2dp'] for x in overlap)
+              all_targets=all(isinstance(target_hits[d],dict) and target_hits[d].get('close') is not None for d in targets)
+              if all_neighbors or all_targets:
+                  viable.append({'investing_id':h['investing_id'],'all_six_neighbor_2dp_match':all_neighbors,'all_three_targets_present':all_targets,'neighbor_overlap':overlap,'target_hits':target_hits})
+
+          result={
+            'artifact':'DAO2_C_INVESTING_SYWGMI_EXACT_GAP_PROBE_V1',
+            'version':'1.0',
+            'source_page':page_url,
+            'page_http_status':page.status_code,
+            'page_sha256':hashlib.sha256(pb).hexdigest(),
+            'searches':searches,
+            'candidate_objects':candidates,
+            'candidate_ids':ids,
+            'histories':histories,
+            'viable_candidates':viable,
+            'admission_allowed':False,
+            'note':'Evidence-only. Admission requires exact six-neighbor identity and all three same-day target rows from a stable, auditable source carrier.'
+          }
+          OUT.mkdir(exist_ok=True)
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({'candidate_ids':ids,'viable_candidates':viable,'page_http_status':page.status_code},ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-investing-sywgmi-exact-gap-probe-v1
+          path: artifact_investing_sywgmi/
+          if-no-files-found: error
+          retention-days: 30
