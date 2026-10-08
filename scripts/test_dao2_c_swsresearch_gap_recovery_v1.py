@@ -36,6 +36,15 @@ def test_extract_gap_rows_uses_schema_not_positions():
     ]
 
 
+def test_extract_gap_rows_normalizes_iso_trade_dates_to_compact_keys():
+    ledger = {
+        "row_schema": ["sector_code", "trade_date", "candidate_close_2dp"],
+        "rows": [["801010.SI", "2021-08-06", 3185.66]],
+    }
+    rows = extract_gap_rows(ledger)
+    assert rows[0]["trade_date"] == "20210806"
+
+
 def test_normalize_trend_rows_keeps_direct_ohlc_and_code_identity():
     payload = {
         "data": [
