@@ -1,0 +1,64 @@
+{
+  "artifact": "DAO2_C_SECTOR_SWSRESEARCH_301_GAP_AUDIT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_SOURCE_IDENTITY_ALL_301_TARGET_KEYS_ABSENT",
+  "checked_at_utc": "2026-10-08T07:14:53.389770+00:00",
+  "source": {
+    "provider_contract_name": "AKShare index_hist_sw",
+    "upstream": "SWSResearch official index_publish/trend",
+    "endpoint": "https://www.swsresearch.com/institute-sw/api/index_publish/trend/",
+    "source_type": "OFFICIAL_PUBLIC_DIRECT_OHLC"
+  },
+  "workflow": {
+    "name": "DAO2 C SWSResearch 301-Gap Recovery V1",
+    "run_id": 37741977868,
+    "head_sha": "68608770bb018f551757023619ba66cf6f48755f",
+    "artifact_id": 11533954421,
+    "artifact_digest": "sha256:e32005ee366ae87c9bc948a8e29808bccd871a0c3517522ed16f9aa31e57827a",
+    "red_run_id": 37741866318,
+    "red_case": "ISO ledger date YYYY-MM-DD did not match normalized API date YYYYMMDD",
+    "red_to_green_fix": "Normalize ledger trade_date to compact YYYYMMDD before exact-key matching",
+    "unit_contract_tests_after_fix": "PASS"
+  },
+  "input": {
+    "gap_ledger": "data/dao2/modules/C_301_GAP_LEDGER_V1.json",
+    "gap_ledger_sha256": "316b1a9469dae721dedfad54b57779d6321c883694c8f6342cb4119e4a8e1e02",
+    "gap_rows": 301,
+    "unique_gap_keys": 301,
+    "unique_sector_codes": 32
+  },
+  "source_identity_audit": {
+    "frozen_base_rows_for_probed_codes": 42783,
+    "source_intersection_rows": 42783,
+    "matched_close_2dp": 42783,
+    "mismatched_close_2dp": 0,
+    "source_missing_for_frozen_rows": 0,
+    "match_rate_on_intersection": 1.0,
+    "transport_failures": 0,
+    "decision": "PASS_EXACT_SOURCE_IDENTITY"
+  },
+  "gap_recovery": {
+    "recovered_rows": 0,
+    "unique_recovered_keys": 0,
+    "missing_rows": 301,
+    "candidate_derived_rows": 298,
+    "candidate_rows_found_in_official_public_source": 0,
+    "direct_801020_target_rows_found": 0,
+    "all_301_gap_keys_absent_from_current_official_public_history": true,
+    "interpretation": "The current SWSResearch public history is identity-compatible with every one of the 42,783 frozen admissible keys but omits all 301 ledger gaps. This establishes an upstream public-history absence boundary; it does not establish that the historical index values never existed in other authoritative carriers."
+  },
+  "governance": {
+    "admitted_rows": 0,
+    "admitted_derived_close_rows": 0,
+    "admissible_coverage_before": "42783/43084",
+    "admissible_coverage_after": "42783/43084",
+    "series_checkpoint_changed_to_pass": false,
+    "breadth_gate_open": false,
+    "frozen_42783_rewritten": false,
+    "source_absence_is_not_permission_to_derive_or_forward_fill": true
+  },
+  "decision": "CLOSE_SWSRESEARCH_CURRENT_PUBLIC_HISTORY_AS_RECOVERY_ROUTE",
+  "resume_condition": "Do not repeat the same current SWSResearch index_publish/trend route unless upstream history changes. Continue only with a distinct traceable same-day raw carrier such as Tushare sw_daily legacy/raw cache, entitled Tushare sw_daily, Wind/iFind/RQData/Founder DataCube export, or another independently validated direct source."
+}
