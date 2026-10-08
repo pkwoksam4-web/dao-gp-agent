@@ -1,0 +1,57 @@
+{
+  "artifact": "DAO2_C_SECTOR_TUSHARE_OFFICIAL_ENTITLEMENT_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "recorded_at_utc": "2026-10-08T05:50:40Z",
+  "status": "EVIDENCE_ONLY_BLOCKER_UNCHANGED",
+  "official_source": {
+    "provider": "Tushare Pro",
+    "sw_daily_document": "https://tushare.pro/document/2?doc_id=327",
+    "sw_daily_api": "sw_daily",
+    "sw_daily_description": "Shenwan industry daily quotation; default Shenwan 2021 edition",
+    "sw_daily_limit_rows_per_call": 4000,
+    "sw_daily_documented_access_requirement_points": 5000,
+    "sw_daily_update_time": "18:30 on trading days",
+    "index_daily_document": "https://tushare.pro/document/1?doc_id=95",
+    "index_daily_is_valid_substitute": false,
+    "index_daily_exclusion_reason": "Official documentation explicitly states that index_daily does not include Shenwan industry index quotation data."
+  },
+  "current_account_probe": {
+    "evidence": "data/dao2/modules/C_SECTOR_TUSHARE_SW_DAILY_ENTITLEMENT_RECHECK_V1.json",
+    "token_present": true,
+    "sw_daily_entitlement_available": false,
+    "provider_error_class": "INTERFACE_ACCESS_DENIED",
+    "provider_message": "抱歉，您没有接口(sw_daily)访问权限",
+    "successful_sw_daily_calls": 0,
+    "raw_rows_recovered": 0,
+    "admitted_rows": 0
+  },
+  "direct_priority": {
+    "target_code": "801020.SI",
+    "target_dates": [
+      "20210806",
+      "20211008",
+      "20211022"
+    ],
+    "required_neighbor_dates": [
+      "20210805",
+      "20210809",
+      "20210930",
+      "20211011",
+      "20211021",
+      "20211025"
+    ]
+  },
+  "decision": {
+    "tushare_route": "BLOCKED_UNTIL_SW_DAILY_PERMISSION_ENABLED",
+    "index_daily_fallback": "CLOSED_OFFICIAL_EXCLUSION",
+    "public_search_resumed": false,
+    "derived_close_admitted": 0,
+    "series_checkpoint_changed_to_pass": false,
+    "breadth_gate_open": false,
+    "manual_intervention_required": true,
+    "manual_intervention_type": "ENABLE_TUSHARE_SW_DAILY_OR_SUPPLY_AUTHORITATIVE_VENDOR_EXPORT"
+  },
+  "resume_condition": "After sw_daily permission is enabled, rerun the existing exact-gap probe and require exact target+neighbor raw OHLC validation before admitting any row; alternatively ingest an authoritative Wind/iFind/RQData/Founder DataCube export under the same validation contract."
+}
