@@ -1,0 +1,76 @@
+{
+  "schema": "agent-brain-core13-pit-manifest/v1",
+  "trade_date_cn": "2026-10-08",
+  "retrieved_at": "2026-10-08T09:54:56Z",
+  "universe_id": "WAT-core13-observation-v1",
+  "market_closed": true,
+  "trading_day_verified": true,
+  "live_shadow_eligible": true,
+  "symbols": [
+    {
+      "symbol": "000636.SZ",
+      "bar": {"raw": {"close":"50.4","open":"50.5","low":"49.9","high":"52.65","volume":875214,"turnover":"4470769497.83","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"000636.SZ","last_done":"50.4","prev_close":"49.61","open":"50.5","high":"52.65","low":"49.9","timestamp":"2026-10-08T07:00:00Z","volume":875214,"turnover":"4470769497.83","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":50.4,"prev_close":49.61,"open":50.5,"high":52.65,"low":49.9,"volume":875214,"turnover":4470769497.83}}
+    },
+    {
+      "symbol": "002138.SZ",
+      "bar": {"raw": {"close":"48.09","open":"48.68","low":"47.48","high":"50.78","volume":273331,"turnover":"1337711296.39","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"002138.SZ","last_done":"48.09","prev_close":"48.24","open":"48.68","high":"50.78","low":"47.48","timestamp":"2026-10-08T07:00:00Z","volume":273331,"turnover":"1337711296.39","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":48.09,"prev_close":48.24,"open":48.68,"high":50.78,"low":47.48,"volume":273331,"turnover":1337711296.39}}
+    },
+    {
+      "symbol": "002156.SZ",
+      "bar": {"raw": {"close":"55.93","open":"57.71","low":"55.38","high":"58.13","volume":513233,"turnover":"2920248210.39","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"002156.SZ","last_done":"55.93","prev_close":"56.9","open":"57.71","high":"58.13","low":"55.38","timestamp":"2026-10-08T07:00:00Z","volume":513233,"turnover":"2920248210.39","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":55.93,"prev_close":56.9,"open":57.71,"high":58.13,"low":55.38,"volume":513233,"turnover":2920248210.39}}
+    },
+    {
+      "symbol": "600392.SH",
+      "bar": {"raw": {"close":"19.7","open":"20.16","low":"19.5","high":"20.26","volume":308776,"turnover":"612848850","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"600392.SH","last_done":"19.7","prev_close":"20.17","open":"20.16","high":"20.26","low":"19.5","timestamp":"2026-10-08T07:00:00Z","volume":308776,"turnover":"612848850","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":19.7,"prev_close":20.17,"open":20.16,"high":20.26,"low":19.5,"volume":308776,"turnover":612848850}}
+    },
+    {
+      "symbol": "600487.SH",
+      "bar": {"raw": {"close":"52.7","open":"54.5","low":"52.35","high":"55.49","volume":1129991,"turnover":"6057116676","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"600487.SH","last_done":"52.7","prev_close":"54.86","open":"54.5","high":"55.49","low":"52.35","timestamp":"2026-10-08T07:00:00Z","volume":1129990,"turnover":"6057116676","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":52.7,"prev_close":54.86,"open":54.5,"high":55.49,"low":52.35,"volume":1129990,"turnover":6057116676}}
+    },
+    {
+      "symbol": "600522.SH",
+      "bar": {"raw": {"close":"30.49","open":"31.21","low":"30.31","high":"31.78","volume":965425,"turnover":"2990322311","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"600522.SH","last_done":"30.49","prev_close":"31.13","open":"31.21","high":"31.78","low":"30.31","timestamp":"2026-10-08T07:00:00Z","volume":965425,"turnover":"2990322311","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":30.49,"prev_close":31.13,"open":31.21,"high":31.78,"low":30.31,"volume":965425,"turnover":2990322311}}
+    },
+    {
+      "symbol": "600667.SH",
+      "bar": {"raw": {"close":"16.55","open":"17.28","low":"16.41","high":"17.5","volume":1060200,"turnover":"1793610494","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"600667.SH","last_done":"16.55","prev_close":"17.29","open":"17.28","high":"17.5","low":"16.41","timestamp":"2026-10-08T07:00:00Z","volume":1060199,"turnover":"1793610494","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":16.55,"prev_close":17.29,"open":17.28,"high":17.5,"low":16.41,"volume":1060199,"turnover":1793610494}}
+    },
+    {
+      "symbol": "600703.SH",
+      "bar": {"raw": {"close":"11.88","open":"12.1","low":"11.79","high":"12.6","volume":1371709,"turnover":"1673246181","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"600703.SH","last_done":"11.88","prev_close":"11.48","open":"12.1","high":"12.6","low":"11.79","timestamp":"2026-10-08T07:00:00Z","volume":1371708,"turnover":"1673246181","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":11.88,"prev_close":11.48,"open":12.1,"high":12.6,"low":11.79,"volume":1371708,"turnover":1673246181}}
+    },
+    {
+      "symbol": "601991.SH",
+      "bar": {"raw": {"close":"5.35","open":"5.32","low":"5.3","high":"5.38","volume":1217069,"turnover":"649837158","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"601991.SH","last_done":"5.35","prev_close":"5.31","open":"5.32","high":"5.38","low":"5.3","timestamp":"2026-10-08T07:00:00Z","volume":1217068,"turnover":"649837158","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":5.35,"prev_close":5.31,"open":5.32,"high":5.38,"low":5.3,"volume":1217068,"turnover":649837158}}
+    },
+    {
+      "symbol": "605358.SH",
+      "bar": {"raw": {"close":"42.67","open":"45.41","low":"42.13","high":"46.59","volume":353860,"turnover":"1556912856","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"605358.SH","last_done":"42.67","prev_close":"45.36","open":"45.41","high":"46.59","low":"42.13","timestamp":"2026-10-08T07:00:00Z","volume":353860,"turnover":"1556912856","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":42.67,"prev_close":45.36,"open":45.41,"high":46.59,"low":42.13,"volume":353860,"turnover":1556912856}}
+    },
+    {
+      "symbol": "000977.SZ",
+      "bar": {"raw": {"close":"64.56","open":"66","low":"64","high":"66.77","volume":331577,"turnover":"2167795136.04","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"000977.SZ","last_done":"64.56","prev_close":"65.93","open":"66","high":"66.77","low":"64","timestamp":"2026-10-08T07:00:00Z","volume":331577,"turnover":"2167795136.04","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":64.56,"prev_close":65.93,"open":66,"high":66.77,"low":64,"volume":331577,"turnover":2167795136.04}}
+    },
+    {
+      "symbol": "000938.SZ",
+      "bar": {"raw": {"close":"30.24","open":"31.2","low":"29.98","high":"31.42","volume":771322,"turnover":"2361365502.64","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"000938.SZ","last_done":"30.24","prev_close":"31.02","open":"31.2","high":"31.42","low":"29.98","timestamp":"2026-10-08T07:00:00Z","volume":771322,"turnover":"2361365502.64","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":30.24,"prev_close":31.02,"open":31.2,"high":31.42,"low":29.98,"volume":771322,"turnover":2361365502.64}}
+    },
+    {
+      "symbol": "000063.SZ",
+      "bar": {"raw": {"close":"29.32","open":"30.6","low":"29.16","high":"30.67","volume":817434,"turnover":"2436154017.81","timestamp":"2026-10-07T16:00:00Z","trade_session":"Intraday","open_updated":true}},
+      "quote": {"raw": {"symbol":"000063.SZ","last_done":"29.32","prev_close":"30.58","open":"30.6","high":"30.67","low":"29.16","timestamp":"2026-10-08T07:00:00Z","volume":817434,"turnover":"2436154017.81","trade_status":"Normal"}, "normalized": {"as_of":"2026-10-08T07:00:00Z","last":29.32,"prev_close":30.58,"open":30.6,"high":30.67,"low":29.16,"volume":817434,"turnover":2436154017.81}}
+    }
+  ]
+}
