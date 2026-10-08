@@ -1,0 +1,93 @@
+{
+  "artifact": "A_MAIN_NET_FLOW_CURRENT_ROUTE_V1",
+  "version": "1.0",
+  "module": "A_MAIN_NET_FLOW",
+  "as_of": "2026-10-08",
+  "status": "BLOCKED_EXTERNAL_RAW_OR_PERMISSION_UNLOCK_REQUIRED",
+  "owned_blocker": "MAIN_NET_FLOW_UNBOUND",
+  "formal_expected_rows": 1011607,
+  "resolved_rows": 1011591,
+  "unresolved_rows": 16,
+  "checkpoint": null,
+  "authoritative_key_scope": {
+    "source_ledger": "data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
+    "key_manifest": "data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json",
+    "key_set_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+    "handwritten_or_chat_key_lists_allowed": false
+  },
+  "frozen_identity_gate": {
+    "control_scope": "data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json",
+    "control_rows": 8,
+    "exact_field_comparisons": 32,
+    "required_pass": "32/32_EXACT_AND_MISMATCH_0",
+    "control_set_mutation_after_new_carrier_observation_allowed": false
+  },
+  "current_routes": {
+    "public_indexed_search": {
+      "status": "PUBLIC_INDEXED_SEARCH_EVIDENCE_EXHAUSTED_FROZEN",
+      "restart_allowed_only_if": "NEW_PREVIOUSLY_UNSEEN_RAW_CARRIER_EXPLICITLY_COVERS_A_RESIDUAL_DATE",
+      "generic_github_search_allowed": false,
+      "exact_key_sweep_allowed": false,
+      "readme_or_code_only_search_allowed": false,
+      "schema_only_carrier_search_allowed": false,
+      "processed_factor_search_allowed": false,
+      "recent_snapshot_search_allowed": false
+    },
+    "ifind": {
+      "status": "FROZEN_NO_NEW_REAL_HISTORICAL_READABILITY_SIGNAL",
+      "run_allowed_only_if": "HISTORICAL_EXACT_AGGREGATE_IS_ACTUALLY_READABLE",
+      "repeat_unauthorized_probe_allowed": false,
+      "schema_guessing_allowed": false,
+      "plaintext_token_request_allowed": false,
+      "permission_expansion_allowed": false
+    },
+    "alphat01": {
+      "status": "RAW_GATED_403_AWAITING_AUTHOR_REVIEW",
+      "raw_processing_allowed_only_if": "TARGET_RAW_BYTES_ARE_ACTUALLY_READABLE",
+      "repeat_download_attempts_while_gated_allowed": false,
+      "repeat_application_allowed": false
+    },
+    "targeted_l2_vendor": {
+      "status": "WAITING_FOR_REAL_RAW_OR_SAMPLE",
+      "processing_order": [
+        "persist raw bytes",
+        "raw SHA256",
+        "provider/API/file provenance",
+        "run frozen Jessica controls",
+        "require 32/32 exact and mismatch=0",
+        "process only ledger/manifest-derived residual keys"
+      ]
+    }
+  },
+  "unlock_conditions": [
+    "IFIND_HISTORICAL_EXACT_AGGREGATE_REAL_READABILITY",
+    "ALPHAT01_RAW_AUTHORIZATION",
+    "TARGETED_L2_VENDOR_RAW_OR_SAMPLE",
+    "NEW_AUTHORITATIVE_EXACT_CARRIER_EXPLICITLY_COVERING_A_RESIDUAL_DATE"
+  ],
+  "partial_admission_contract": [
+    "persist raw",
+    "raw SHA256",
+    "provenance",
+    "frozen control identity evidence",
+    "update residual ledger for exactly one admitted key",
+    "resolved_rows += 1",
+    "unresolved_rows -= 1",
+    "run Module A Guard",
+    "continue to next key without waiting for 16/16"
+  ],
+  "prohibited": [
+    "modify frozen control rows after observing a new carrier",
+    "retune L2 harness/buckets/mapping/tolerance after residual observation",
+    "proxy reconstruction",
+    "zero fill",
+    "forward fill",
+    "close by source absence",
+    "fabricate checkpoint",
+    "close MAIN_NET_FLOW_UNBOUND before unresolved_rows reaches 0 and final Guard passes"
+  ],
+  "historical_source_scan": {
+    "path": "data/dao2/modules/A_MAIN_NET_FLOW_SOURCE_SCAN_V1.json",
+    "role": "HISTORICAL_EVIDENCE_ONLY_CURRENT_ROUTE_FIELDS_SUPERSEDED_BY_THIS_ARTIFACT"
+  }
+}
