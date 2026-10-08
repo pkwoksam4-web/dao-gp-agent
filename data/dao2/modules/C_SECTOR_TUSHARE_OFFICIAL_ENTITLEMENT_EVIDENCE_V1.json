@@ -13,6 +13,9 @@
     "sw_daily_limit_rows_per_call": 4000,
     "sw_daily_documented_access_requirement_points": 5000,
     "sw_daily_update_time": "18:30 on trading days",
+    "permissions_document": "https://tushare.pro/document/2?doc_id=290",
+    "documented_5000_points_price_rmb_per_year_individual": 500,
+    "permissions_note": "Official permissions table lists 5000+ points at RMB 500/year for individual users; institutional pricing is documented separately by the provider.",
     "index_daily_document": "https://tushare.pro/document/1?doc_id=95",
     "index_daily_is_valid_substitute": false,
     "index_daily_exclusion_reason": "Official documentation explicitly states that index_daily does not include Shenwan industry index quotation data."
