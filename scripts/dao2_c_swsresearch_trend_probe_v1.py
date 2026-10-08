@@ -13,6 +13,7 @@ import requests
 import urllib3
 
 URL = "https://www.swsresearch.com/institute-sw/api/index_publish/trend/"
+ANALYSIS_URL = "https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/"
 SYMBOL = "801020"
 TARGET_DATES = ["20210806", "20211008", "20211022"]
 NEIGHBOR_DATES = ["20210805", "20210809", "20210930", "20211011", "20211021", "20211025"]
@@ -85,6 +86,36 @@ def normalize_trend_rows(raw: bytes) -> list[dict]:
     return out
 
 
+def normalize_analysis_rows(raw: bytes) -> list[dict]:
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return []
+    data = payload.get("data") if isinstance(payload, dict) else None
+    results = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(results, list):
+        return []
+    out: list[dict] = []
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        code = str(r.get("swindexcode") or "").strip()
+        date = norm_date(r.get("bargaindate"))
+        close = positive(r.get("closeindex"))
+        if code != SYMBOL or not date or close is None:
+            continue
+        out.append(
+            {
+                "industry_code": code + ".SI",
+                "trade_date": date,
+                "close": close,
+                "volume": finite(r.get("bargainamount")),
+                "markup": finite(r.get("markup")),
+            }
+        )
+    return out
+
+
 def validate_neighbor_overlap(source_rows: list[dict], base: dict[tuple[str, str], float]) -> dict:
     src = {(r["industry_code"], r["trade_date"]): float(r["close"]) for r in source_rows}
     details = []
@@ -118,6 +149,33 @@ def load_base(path: Path) -> dict[tuple[str, str], float]:
     return {(r.industry_code, r.trade_date): float(r.close) for r in df.itertuples() if pd.notna(r.close)}
 
 
+def official_http_meta(r: requests.Response, raw: bytes) -> dict:
+    host = (urlparse(r.url).hostname or "").lower()
+    official = host == "swsresearch.com" or host.endswith(".swsresearch.com")
+    return {
+        "status": int(r.status_code),
+        "final_url": r.url,
+        "final_host": host,
+        "official_host": official,
+        "content_type": r.headers.get("Content-Type"),
+        "raw_bytes": len(raw),
+        "raw_sha256": sha256(raw),
+    }
+
+
+def analysis_params(date: str) -> dict:
+    d = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    return {
+        "page": "1",
+        "page_size": "100",
+        "index_type": "一级行业",
+        "start_date": d,
+        "end_date": d,
+        "type": "DAY",
+        "swindexcode": "all",
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-panel", required=True)
@@ -132,12 +190,10 @@ def main() -> int:
 
     meta = {
         "artifact": "DAO2_C_SWSRESEARCH_TREND_EXACT_GAP_PROBE_V1",
-        "version": "1.0",
+        "version": "1.1",
         "module_id": "C",
         "component": "sector_series",
         "started_at_utc": started,
-        "endpoint": URL,
-        "params": {"swindexcode": SYMBOL, "period": "DAY"},
         "source_class": "OFFICIAL_SWSRESEARCH_PUBLIC_API",
         "target_dates": TARGET_DATES,
         "neighbor_dates": NEIGHBOR_DATES,
@@ -147,29 +203,20 @@ def main() -> int:
     }
 
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json,text/plain,*/*"}
     try:
         r = requests.get(
             URL,
             params={"swindexcode": SYMBOL, "period": "DAY"},
-            headers={"User-Agent": USER_AGENT, "Accept": "application/json,text/plain,*/*"},
+            headers=headers,
             timeout=(10, 30),
             verify=False,
         )
         raw = r.content
         (raw_dir / "801020_DAY.response.bin").write_bytes(raw)
-        host = (urlparse(r.url).hostname or "").lower()
-        official = host == "swsresearch.com" or host.endswith(".swsresearch.com")
-        meta["http"] = {
-            "status": int(r.status_code),
-            "final_url": r.url,
-            "final_host": host,
-            "official_host": official,
-            "content_type": r.headers.get("Content-Type"),
-            "raw_bytes": len(raw),
-            "raw_sha256": sha256(raw),
-        }
+        meta["trend_http"] = official_http_meta(r, raw)
     except Exception as exc:
-        meta["status"] = "FAIL_TRANSPORT"
+        meta["status"] = "FAIL_TREND_TRANSPORT"
         meta["error"] = f"{type(exc).__name__}:{exc}"
         (out / "probe_result.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return 2
@@ -181,38 +228,100 @@ def main() -> int:
     (out / "801020_target_neighbor_ohlc.json").write_text(json.dumps(selected, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     base = load_base(Path(args.base_panel))
-    overlap = validate_neighbor_overlap(selected, base)
-    present = {r["trade_date"] for r in selected}
-    target_present = [d for d in TARGET_DATES if d in present]
-    neighbor_present = [d for d in NEIGHBOR_DATES if d in present]
-    unique_keys = len({(r["industry_code"], r["trade_date"]) for r in selected}) == len(selected)
-    targets_complete = len(target_present) == 3
-    neighbors_complete = len(neighbor_present) == 6
-
-    pass_candidate = (
-        meta["http"]["status"] == 200
-        and meta["http"]["official_host"]
-        and unique_keys
-        and targets_complete
-        and neighbors_complete
-        and overlap["status"] == "PASS_EXACT_NEIGHBOR_OVERLAP"
+    trend_overlap = validate_neighbor_overlap(selected, base)
+    trend_present = {r["trade_date"] for r in selected}
+    trend_targets = [d for d in TARGET_DATES if d in trend_present]
+    trend_neighbors = [d for d in NEIGHBOR_DATES if d in trend_present]
+    trend_unique = len({(r["industry_code"], r["trade_date"]) for r in selected}) == len(selected)
+    trend_candidate = (
+        meta["trend_http"]["status"] == 200
+        and meta["trend_http"]["official_host"]
+        and trend_unique
+        and len(trend_targets) == 3
+        and len(trend_neighbors) == 6
+        and trend_overlap["status"] == "PASS_EXACT_NEIGHBOR_OVERLAP"
     )
+    meta["trend"] = {
+        "endpoint": URL,
+        "params": {"swindexcode": SYMBOL, "period": "DAY"},
+        "normalized_source_rows": len(rows),
+        "selected_rows": len(selected),
+        "selected_unique_keys": trend_unique,
+        "target_presence": {"present": trend_targets, "required": TARGET_DATES, "complete": len(trend_targets) == 3},
+        "neighbor_presence": {"present": trend_neighbors, "required": NEIGHBOR_DATES, "complete": len(trend_neighbors) == 6},
+        "neighbor_overlap": trend_overlap,
+        "candidate_ready": trend_candidate,
+    }
+
+    analysis_rows: list[dict] = []
+    analysis_calls: list[dict] = []
+    for d in TARGET_DATES + NEIGHBOR_DATES:
+        params = analysis_params(d)
+        try:
+            ar = requests.get(ANALYSIS_URL, params=params, headers=headers, timeout=(10, 30), verify=False)
+            araw = ar.content
+            (raw_dir / f"analysis_{d}.response.bin").write_bytes(araw)
+            hmeta = official_http_meta(ar, araw)
+            parsed = normalize_analysis_rows(araw)
+            analysis_rows.extend([x for x in parsed if x["trade_date"] == d])
+            analysis_calls.append({"trade_date": d, "params": params, "http": hmeta, "parsed_801020_rows": len([x for x in parsed if x["trade_date"] == d])})
+        except Exception as exc:
+            analysis_calls.append({"trade_date": d, "params": params, "error": f"{type(exc).__name__}:{exc}", "parsed_801020_rows": 0})
+
+    analysis_rows.sort(key=lambda x: x["trade_date"])
+    pd.DataFrame(analysis_rows).to_csv(out / "801020_analysis_target_neighbor_close.csv", index=False)
+    (out / "801020_analysis_target_neighbor_close.json").write_text(json.dumps(analysis_rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    analysis_overlap = validate_neighbor_overlap(analysis_rows, base)
+    analysis_present = {r["trade_date"] for r in analysis_rows}
+    analysis_targets = [d for d in TARGET_DATES if d in analysis_present]
+    analysis_neighbors = [d for d in NEIGHBOR_DATES if d in analysis_present]
+    analysis_unique = len({(r["industry_code"], r["trade_date"]) for r in analysis_rows}) == len(analysis_rows)
+    analysis_http_ok = all(c.get("http", {}).get("status") == 200 and c.get("http", {}).get("official_host") for c in analysis_calls)
+    analysis_candidate = (
+        analysis_http_ok
+        and analysis_unique
+        and len(analysis_targets) == 3
+        and len(analysis_neighbors) == 6
+        and analysis_overlap["status"] == "PASS_EXACT_NEIGHBOR_OVERLAP"
+    )
+    meta["analysis"] = {
+        "endpoint": ANALYSIS_URL,
+        "index_type": "一级行业",
+        "calls": analysis_calls,
+        "selected_rows": len(analysis_rows),
+        "selected_unique_keys": analysis_unique,
+        "target_presence": {"present": analysis_targets, "required": TARGET_DATES, "complete": len(analysis_targets) == 3},
+        "neighbor_presence": {"present": analysis_neighbors, "required": NEIGHBOR_DATES, "complete": len(analysis_neighbors) == 6},
+        "neighbor_overlap": analysis_overlap,
+        "candidate_ready": analysis_candidate,
+        "provenance_note": "Official same-day closeindex carrier; not admitted by this probe and current provider contract must be reviewed separately before any Series change.",
+    }
+
+    if trend_candidate:
+        status = "PASS_TREND_RAW_DIRECT_CANDIDATE_NOT_ADMITTED"
+        decision = "TREND_AUTHORITATIVE_DIRECT_RAW_CANDIDATE_READY_FOR_SEPARATE_ADMISSION"
+        rc = 0
+    elif analysis_candidate:
+        status = "PASS_ANALYSIS_DIRECT_CLOSE_CANDIDATE_NOT_ADMITTED"
+        decision = "SECONDARY_OFFICIAL_DIRECT_CLOSE_CARRIER_READY_FOR_GOVERNANCE_REVIEW"
+        rc = 0
+    else:
+        status = "FAIL_NO_DIRECT_TARGET_CARRIER"
+        decision = "DO_NOT_ADMIT"
+        rc = 3
+
     meta.update(
         {
-            "normalized_source_rows": len(rows),
-            "selected_rows": len(selected),
-            "selected_unique_keys": unique_keys,
-            "target_presence": {"present": target_present, "required": TARGET_DATES, "complete": targets_complete},
-            "neighbor_presence": {"present": neighbor_present, "required": NEIGHBOR_DATES, "complete": neighbors_complete},
-            "neighbor_overlap": overlap,
-            "status": "PASS_RAW_DIRECT_CANDIDATE_NOT_ADMITTED" if pass_candidate else "FAIL_NOT_ADMISSIBLE",
-            "decision": "AUTHORITATIVE_DIRECT_RAW_CANDIDATE_READY_FOR_SEPARATE_ADMISSION" if pass_candidate else "DO_NOT_ADMIT",
+            "status": status,
+            "decision": decision,
             "admitted_rows": 0,
+            "series_checkpoint_changed_to_pass": False,
+            "breadth_gate_open": False,
             "completed_at_utc": now_utc(),
         }
     )
     (out / "probe_result.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return 0 if pass_candidate else 3
+    return rc
 
 
 if __name__ == "__main__":
