@@ -4,6 +4,7 @@ from dao2_c_swsresearch_trend_probe_v1 import (
     TARGET_DATES,
     NEIGHBOR_DATES,
     normalize_trend_rows,
+    normalize_analysis_rows,
     validate_neighbor_overlap,
 )
 
@@ -34,6 +35,33 @@ def test_normalize_trend_rows_extracts_official_ohlc():
             "close": 3240.44,
             "volume": 123.0,
             "amount": 456.0,
+        }
+    ]
+
+
+def test_normalize_analysis_rows_extracts_direct_same_day_close():
+    payload = {
+        "data": {
+            "count": 1,
+            "results": [
+                {
+                    "swindexcode": "801020",
+                    "bargaindate": "2021-08-06",
+                    "closeindex": "3240.44",
+                    "bargainamount": "123",
+                    "markup": "1.25",
+                }
+            ],
+        }
+    }
+    rows = normalize_analysis_rows(json.dumps(payload).encode())
+    assert rows == [
+        {
+            "industry_code": "801020.SI",
+            "trade_date": "20210806",
+            "close": 3240.44,
+            "volume": 123.0,
+            "markup": 1.25,
         }
     ]
 
