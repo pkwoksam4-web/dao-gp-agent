@@ -64,7 +64,12 @@ def extract_gap_rows(ledger: dict) -> list[dict]:
     for raw in raw_rows:
         if not isinstance(raw, list) or len(raw) != len(schema):
             raise ValueError("gap ledger row does not match row_schema")
-        out.append(dict(zip(schema, raw)))
+        row = dict(zip(schema, raw))
+        trade_date = norm_date(row.get("trade_date"))
+        if not trade_date:
+            raise ValueError("gap ledger row has invalid trade_date")
+        row["trade_date"] = trade_date
+        out.append(row)
     return out
 
 
