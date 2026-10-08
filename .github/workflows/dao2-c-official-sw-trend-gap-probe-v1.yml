@@ -1,0 +1,97 @@
+name: DAO2 C Official SWS Trend Exact-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-official-sw-trend-gap-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas requests
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Probe official SWS history API and exact overlap
+        run: |
+          python - <<'PY'
+          import csv, gzip, hashlib, json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import pandas as pd
+          import requests
+
+          OUT=Path('artifact_sws_trend'); RAW=OUT/'raw'; RAW.mkdir(parents=True,exist_ok=True)
+          endpoint='https://www.swsresearch.com/institute-sw/api/index_publish/trend/'
+          symbol='801020'
+          wanted=['20210805','20210806','20210809','20210930','20211008','20211011','20211021','20211022','20211025']
+          targets={'20210806','20211008','20211022'}
+          neighbors=set(wanted)-targets
+          headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept':'application/json,text/plain,*/*','Referer':'https://www.swsresearch.com/institute_sw/allIndex/releasedIndex'}
+          ts=datetime.now(timezone.utc).isoformat()
+          r=requests.get(endpoint,params={'swindexcode':symbol,'period':'DAY'},headers=headers,timeout=(10,60),verify=True)
+          raw=r.content; (RAW/'response.bin').write_bytes(raw)
+          raw_sha=hashlib.sha256(raw).hexdigest()
+          meta={'requested_url':r.request.url,'request_timestamp_utc':ts,'http_status':r.status_code,'content_type':r.headers.get('content-type'),'raw_bytes':len(raw),'raw_sha256':raw_sha}
+          (RAW/'request_meta.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          body=None
+          try: body=r.json()
+          except Exception: pass
+          data=(body or {}).get('data') if isinstance(body,dict) else None
+          rows=[]
+          if isinstance(data,list):
+            for x in data:
+              if not isinstance(x,dict): continue
+              d=pd.to_datetime(str(x.get('bargaindate')),errors='coerce')
+              if pd.isna(d): continue
+              td=d.strftime('%Y%m%d')
+              if td not in wanted: continue
+              def num(k):
+                try: return float(str(x.get(k)).replace(',',''))
+                except Exception: return None
+              rows.append({'industry_code':'801020.SI','trade_date':td,'open':num('openindex'),'high':num('maxindex'),'low':num('minindex'),'close':num('closeindex'),'volume':num('bargainamount'),'amount':num('bargainsum'),'source_trade_date':td,'source_provider':'SWS_RESEARCH_OFFICIAL','fill_method':'NONE','raw_row':x})
+          rows.sort(key=lambda z:z['trade_date'])
+          by={x['trade_date']:x for x in rows}
+          with gzip.open('series-base/sector_close_formal.csv.gz','rt',encoding='utf-8',newline='') as f:
+            base=list(csv.DictReader(f))
+          base_map={(str(x['industry_code']),str(x['trade_date']).replace('-','')):float(x['close']) for x in base}
+          overlap=[]
+          for d in sorted(neighbors):
+            src=by.get(d); ref=base_map.get(('801020.SI',d))
+            overlap.append({'trade_date':d,'source_close':None if not src else src['close'],'frozen_close':ref,'abs_diff':None if not src or ref is None or src['close'] is None else abs(src['close']-ref),'match_2dp':bool(src and ref is not None and src['close'] is not None and round(src['close'],2)==round(ref,2))})
+          target_hits={d:by.get(d) for d in sorted(targets)}
+          all_targets=all(target_hits[d] and target_hits[d]['close'] is not None for d in targets)
+          all_neighbors=all(x['match_2dp'] for x in overlap)
+          result={'artifact':'DAO2_C_OFFICIAL_SWS_TREND_EXACT_GAP_PROBE_V1','version':'1.0','provider':'申万宏源研究官网','endpoint':endpoint,'symbol':symbol,'status':'PASS_SUBCOMPONENT_CANDIDATE' if all_targets and all_neighbors else 'BLOCKED_OR_FAIL','raw_response_sha256':raw_sha,'http_status':r.status_code,'wanted_dates':wanted,'returned_wanted_rows':len(rows),'target_hits':target_hits,'neighbor_overlap':overlap,'all_three_target_raw_rows_present':all_targets,'all_six_neighbor_2dp_match':all_neighbors,'admission_allowed':bool(all_targets and all_neighbors),'frozen_base_rewritten':False,'derived_close_admitted':0}
+          OUT.mkdir(exist_ok=True)
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          serial=[]
+          for x in rows:
+            y={k:v for k,v in x.items() if k!='raw_row'}; serial.append(y)
+          pd.DataFrame(serial).to_csv(OUT/'target_neighbor_rows.csv',index=False)
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          if r.status_code!=200: raise SystemExit('official endpoint HTTP failure')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-official-sws-trend-exact-gap-probe-v1
+          path: artifact_sws_trend/
+          if-no-files-found: error
+          retention-days: 30
