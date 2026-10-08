@@ -31,12 +31,13 @@ jobs:
       - name: Probe official SWS history API and exact overlap
         run: |
           python - <<'PY'
-          import csv, gzip, hashlib, json
+          import csv, gzip, hashlib, json, urllib3
           from datetime import datetime, timezone
           from pathlib import Path
           import pandas as pd
           import requests
 
+          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
           OUT=Path('artifact_sws_trend'); RAW=OUT/'raw'; RAW.mkdir(parents=True,exist_ok=True)
           endpoint='https://www.swsresearch.com/institute-sw/api/index_publish/trend/'
           symbol='801020'
@@ -45,10 +46,10 @@ jobs:
           neighbors=set(wanted)-targets
           headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept':'application/json,text/plain,*/*','Referer':'https://www.swsresearch.com/institute_sw/allIndex/releasedIndex'}
           ts=datetime.now(timezone.utc).isoformat()
-          r=requests.get(endpoint,params={'swindexcode':symbol,'period':'DAY'},headers=headers,timeout=(10,60),verify=True)
+          r=requests.get(endpoint,params={'swindexcode':symbol,'period':'DAY'},headers=headers,timeout=(10,60),verify=False)
           raw=r.content; (RAW/'response.bin').write_bytes(raw)
           raw_sha=hashlib.sha256(raw).hexdigest()
-          meta={'requested_url':r.request.url,'request_timestamp_utc':ts,'http_status':r.status_code,'content_type':r.headers.get('content-type'),'raw_bytes':len(raw),'raw_sha256':raw_sha}
+          meta={'requested_url':r.request.url,'request_timestamp_utc':ts,'http_status':r.status_code,'content_type':r.headers.get('content-type'),'raw_bytes':len(raw),'raw_sha256':raw_sha,'tls_verify':False,'tls_note':'Aligned with current AKShare index_hist_sw implementation because SWS certificate chain is not trusted by GitHub runner CA bundle.'}
           (RAW/'request_meta.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           body=None
           try: body=r.json()
