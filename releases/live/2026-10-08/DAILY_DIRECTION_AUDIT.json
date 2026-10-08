@@ -1,0 +1,120 @@
+{
+  "schema": "daily-direction-audit/v2",
+  "record_date_cn": "2026-10-08",
+  "observed_at": "2026-10-08T16:32:53+08:00",
+  "direction": "DRIFT_DETECTED",
+  "direction_reason": "Agent Brain target remains aligned but the first required 2026-10-08 prospective link is absent after the 16:18 gate; DAO2 C also continued public SWS endpoint variants after the approved action had narrowed to new supplier raw files. Both affected routes are stopped fail-closed.",
+  "repository": {
+    "full_name": "pkwoksam4-web/dao-gp-agent",
+    "main_head_before_archive": "715637a5863ce76fe165d485cf6d92f04e950c1b"
+  },
+  "agent_brain": {
+    "direction": "ALIGNED",
+    "status": "STALLED_REQUIRES_ACTION",
+    "verified_target": {
+      "core10": "WAT-core10-final-v1 count=10 FROZEN_UNCHANGED",
+      "core13": "WAT-core13-observation-v1 count=13 PROSPECTIVE_OBSERVATION_ONLY",
+      "probability": "PROBABILITY_V1_6_EXECUTABLE_MISSING; generation remains prohibited",
+      "historical_recovery": "HISTORICAL_RECOVERY_NON_LIVE remains excluded from LIVE_SHADOW and scoring"
+    },
+    "trade_date_cn": "2026-10-08",
+    "gate_time_cn": "16:18",
+    "first_real_breakpoint": {
+      "stage": "Longbridge collection -> immutable GitHub manifest",
+      "expected_branch": "runtime/pit-2026-10-08",
+      "expected_path": "runtime/pit_manifests/2026-10-08.json",
+      "observed_branch": "ABSENT",
+      "observed_path": "ABSENT_ON_MAIN",
+      "downstream_effect": "Live PIT Manifest Ingest has no trigger input; no 2026-10-08 13/13 ingest or live-cloud readback can be claimed.",
+      "checked_via": [
+        "GitHub branch search",
+        "GitHub contents API",
+        "GitHub Actions recent runs"
+      ],
+      "error": "PIT_MANIFEST_NOT_CREATED_AFTER_16_18_GATE"
+    },
+    "current_action": {
+      "object": "2026-10-08 Core13 prospective collection",
+      "prerequisite": "Real same-day Longbridge completed daily bars for all 13 symbols with immutable retrieval provenance",
+      "artifact_location": "runtime/pit_manifests/2026-10-08.json on runtime/pit-2026-10-08",
+      "measurable_acceptance": [
+        "manifest exists with 13 symbols and same-day post-close retrieved_at",
+        "Live PIT Manifest Ingest SUCCESS",
+        "logs contain LIVE_PIT_INGEST_PASS",
+        "core13_bars=13",
+        "core13_features=13",
+        "protected_shadow_forecast_unchanged=true"
+      ],
+      "execution_result": "WAITING_EXTERNAL_COLLECTION_SURFACE; NOT BACKFILLED",
+      "failure_route": "If prospective collection cannot be completed same-day under the frozen freshness contract, recover bars only as HISTORICAL_RECOVERY_NON_LIVE and never create a past LIVE_SHADOW."
+    },
+    "settlement": "No settlement action until a real prospective ranking run exists and future completed China trading days mature.",
+    "scheduler_control_plane": "UNVERIFIED_FROM_GITHUB",
+    "user_action": "NONE_NOW"
+  },
+  "dao2_master": {
+    "direction": "DRIFT_DETECTED",
+    "modules": {
+      "A": {
+        "head": "9dd592798bfc7171a459b7b96a4f89a58b6453b1",
+        "status": "STALLED_REQUIRES_ACTION",
+        "action": "Wait for readable iFinD/targeted L2/original carrier; Jessica four-field exact identity before residual testing.",
+        "restart_trigger": "New authorized raw carrier bytes"
+      },
+      "B": {
+        "head": "38859f37e4d49aa2bc743a6ff1127b7ad85c455b",
+        "status": "WAITING_AUTHORITATIVE_FINAL_SCORER_OR_IO_PAIR",
+        "action": "No replay or guessed transform.",
+        "restart_trigger": "Authoritative scorer or same-date I/O pair"
+      },
+      "C": {
+        "head": "637901c2037b365d1dca5a05c91c0cc64398e79d",
+        "status": "BLOCKED_SECTOR_SERIES_UNBOUND",
+        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; three 801020 direct raw closes unresolved",
+        "drift": "Seven commits after 1acd98b probed additional public SWS trend/analysis variants despite the frozen next action requiring a new supplier raw file.",
+        "latest_runs": [
+          37749705132,
+          37749989142,
+          37750231088
+        ],
+        "latest_artifacts": [
+          11537810071,
+          11537690945,
+          11538040657
+        ],
+        "result": "All official variants returned zero target rows; admitted_rows=0; coverage unchanged.",
+        "corrective_action": "Stop further public SWS probes; retain evidence; keep last verified blocked checkpoint semantics.",
+        "external_minimum": "Traceable supplier original same-day OHLC for 801020.SI on 20210806, 20211008, 20211022 plus neighbor rows.",
+        "restart_trigger": "New supplier raw file only"
+      },
+      "D": {
+        "head": "2a7056ffd61885046e34dc1494bc668143d96793",
+        "status": "FROZEN_CANDIDATE",
+        "action": "Consistency only",
+        "restart_trigger": "New commit, Guard failure, or checkpoint mismatch"
+      },
+      "E": {
+        "head": "230da3f090c59ef6c7bc4c0056c516d519741d2c",
+        "status": "FAIL_CLOSED_ON_A_TO_D",
+        "action": "Dependency check only",
+        "restart_trigger": "All required A-D verified checkpoints"
+      },
+      "F": {
+        "head": "61c076d2fcdc2de456bbad0161a942814cf82e0d",
+        "status": "FAIL_CLOSED_ON_E",
+        "action": "No Model Freeze/OOS",
+        "restart_trigger": "Verified E checkpoint"
+      }
+    }
+  },
+  "drift_checks": {
+    "model_or_agent_promoted": false,
+    "weights_changed": false,
+    "portfolio_or_brokerage_mutated": false,
+    "forecast_fabricated": false,
+    "historical_recovery_used_for_live_shadow": false,
+    "ci_success_treated_as_data_pass": false,
+    "derived_close_admitted": false,
+    "public_route_repeated_after_frozen_restart_condition": true
+  }
+}
