@@ -137,9 +137,10 @@ jobs:
           w=csv.DictWriter(csv_buf,fieldnames=fields,extrasaction='ignore')
           w.writeheader(); w.writerows(combined)
           raw=csv_buf.getvalue().encode('utf-8')
-          with gzip.open(OUT/'sector_close_formal_43081.csv.gz','wb',mtime=0) as gz:
+          out_gz=OUT/'sector_close_formal_43081.csv.gz'
+          with gzip.GzipFile(filename=str(out_gz), mode='wb', mtime=0) as gz:
               gz.write(raw)
-          combined_sha=hashlib.sha256((OUT/'sector_close_formal_43081.csv.gz').read_bytes()).hexdigest()
+          combined_sha=hashlib.sha256(out_gz.read_bytes()).hexdigest()
 
           audit={
               'artifact':'DAO2_C_DERIVED_CLOSE_MIGRATION_AUDIT_V1',
