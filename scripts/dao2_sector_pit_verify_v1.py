@@ -10,12 +10,29 @@ from typing import Iterable
 SW2014_LAST = "20211210"
 SW2021_FIRST = "20211213"
 
+DERIVED_SOURCE_PROVIDER = "WIND_ASWSINDEXEOD_DERIVED_CLOSE"
+DERIVED_METHOD = "PREV_ACCEPTED_CLOSE_X_SAME_DAY_WIND_RETURN"
+DERIVED_SOURCE_REPOSITORY = "z15114664687-dot/fund-holdings"
+DERIVED_SOURCE_COMMIT = "92864a330e5bad393315cb6664fe626370e9c92d"
+DERIVED_SOURCE_BLOB_SHA = "45550d4d621ba0e6be39dc3e39b150576784b83c"
+DERIVED_SOURCE_SHA256 = "97410eb4acf16fd14b16b0a60f4bbe45b3da071f078fdb5dea7c3044120f1786"
+DERIVED_NEXT_DAY_USAGE = "AUDIT_ONLY_NOT_VALUE_PRODUCTION"
+
 
 def _date(value: object) -> str:
     text = str(value or "").replace("-", "").strip()
     if len(text) != 8 or not text.isdigit():
         raise ValueError(f"invalid date: {value!r}")
     return text
+
+
+def _bool_text(value: object) -> bool | None:
+    text = str(value or "").strip().lower()
+    if text in {"true", "1", "yes"}:
+        return True
+    if text in {"false", "0", "no"}:
+        return False
+    return None
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -129,6 +146,45 @@ def required_sector_keys(
     return keys
 
 
+def _validate_derived_close_row(row: dict[str, str], trade_date: str) -> list[str]:
+    errors: list[str] = []
+
+    exact = {
+        "source_provider": DERIVED_SOURCE_PROVIDER,
+        "derivation_method": DERIVED_METHOD,
+        "derivation_source_repository": DERIVED_SOURCE_REPOSITORY,
+        "derivation_source_commit": DERIVED_SOURCE_COMMIT,
+        "derivation_source_blob_sha": DERIVED_SOURCE_BLOB_SHA,
+        "derivation_source_sha256": DERIVED_SOURCE_SHA256,
+        "next_day_anchor_usage": DERIVED_NEXT_DAY_USAGE,
+    }
+    for field, expected in exact.items():
+        observed = str(row.get(field) or "").strip()
+        if observed != expected:
+            errors.append(f"derived_close_{field}_mismatch")
+
+    try:
+        same_day_return_date = _date(row.get("same_day_return_trade_date"))
+        if same_day_return_date != trade_date:
+            errors.append("derived_close_return_not_same_day")
+    except ValueError:
+        errors.append("derived_close_invalid_same_day_return_date")
+
+    try:
+        previous_anchor_date = _date(row.get("previous_anchor_trade_date"))
+        if previous_anchor_date >= trade_date:
+            errors.append("derived_close_previous_anchor_not_prior")
+    except ValueError:
+        errors.append("derived_close_invalid_previous_anchor_date")
+
+    if _bool_text(row.get("production_uses_future_data")) is not False:
+        errors.append("derived_close_future_data_not_forbidden")
+    if _bool_text(row.get("two_sided_unique_2dp")) is not True:
+        errors.append("derived_close_two_sided_uniqueness_not_proven")
+
+    return errors
+
+
 def validate_series(
     rows: list[dict[str, str]],
     expected_keys: set[tuple[str, str]],
@@ -143,6 +199,8 @@ def validate_series(
         "source_trade_date",
         "fill_method",
     }
+    derived_admitted = 0
+    derived_rejected = 0
 
     if not expected_keys:
         errors.append("expected_sector_keys_empty")
@@ -176,7 +234,19 @@ def validate_series(
 
         provenance_type = str(row.get("provenance_type") or "").strip().upper()
         if provenance_type == "DERIVED_CLOSE":
-            errors.append(f"row_{index}:derived_close_not_admitted")
+            derived_errors = _validate_derived_close_row(row, trade_date)
+            # General series constraints remain binding for derived rows too.
+            if source_trade_date != trade_date:
+                derived_errors.append("derived_close_source_trade_date_mismatch")
+            if str(row["fill_method"]).strip().upper() != "NONE":
+                derived_errors.append("derived_close_fill_method_not_none")
+            if not math.isfinite(close) or close <= 0:
+                derived_errors.append("derived_close_invalid_close")
+            if derived_errors:
+                derived_rejected += 1
+                errors.extend(f"row_{index}:{err}" for err in sorted(set(derived_errors)))
+            else:
+                derived_admitted += 1
         elif provenance_type and provenance_type != "RAW_CLOSE":
             errors.append(f"row_{index}:unknown_provenance_type:{provenance_type}")
 
@@ -195,8 +265,9 @@ def validate_series(
             for code, date in missing_keys[:20]
         ],
         "no_forward_fill_proven": not any("fill_method" in err or "source_trade_date" in err for err in errors),
-        "derived_close_admitted": False,
-        "derived_close_rows_rejected": sum("derived_close_not_admitted" in err for err in errors),
+        "derived_close_admitted": derived_admitted > 0 and derived_rejected == 0,
+        "derived_close_rows_admitted": derived_admitted,
+        "derived_close_rows_rejected": derived_rejected,
         "full_coverage": not missing_keys,
         "errors": errors,
     }
