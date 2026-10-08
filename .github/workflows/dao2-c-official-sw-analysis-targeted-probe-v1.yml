@@ -1,0 +1,68 @@
+name: DAO2 C Official SWS Analysis Targeted Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-official-sw-analysis-targeted-probe-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q requests
+      - name: Probe exact 801020 parameter variants
+        run: |
+          python - <<'PY'
+          import hashlib,json,urllib3
+          from datetime import datetime,timezone
+          from pathlib import Path
+          import requests
+          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+          out=Path('artifact_sws_analysis_targeted'); rawdir=out/'raw'; rawdir.mkdir(parents=True,exist_ok=True)
+          url='https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/'
+          dates=['20210805','20210806','20211008','20211022']
+          variants=[
+            ('l1_targeted',{'index_type':'一级行业','type':'DAY','swindexcode':'801020'}),
+            ('blank_type_targeted',{'index_type':'','type':'DAY','swindexcode':'801020'}),
+            ('no_index_type_targeted',{'type':'DAY','swindexcode':'801020'})
+          ]
+          headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept':'application/json,text/plain,*/*'}
+          results=[]
+          for d in dates:
+            ds=f'{d[:4]}-{d[4:6]}-{d[6:]}'
+            for name,base in variants:
+              params={'page':'1','page_size':'200','start_date':ds,'end_date':ds,**base}
+              r=requests.get(url,params=params,headers=headers,timeout=(10,45),verify=False)
+              b=r.content; sha=hashlib.sha256(b).hexdigest(); (rawdir/f'{d}_{name}.bin').write_bytes(b)
+              body=None
+              try: body=r.json()
+              except Exception: pass
+              data=(body or {}).get('data') if isinstance(body,dict) else None
+              rr=(data or {}).get('results') if isinstance(data,dict) else None
+              count=(data or {}).get('count') if isinstance(data,dict) else None
+              exact=[]
+              if isinstance(rr,list):
+                exact=[x for x in rr if isinstance(x,dict) and str(x.get('swindexcode'))=='801020']
+              results.append({'trade_date':d,'variant':name,'http_status':r.status_code,'data_count':count,'returned_results':len(rr) if isinstance(rr,list) else None,'exact_801020_rows':exact,'raw_sha256':sha,'requested_url':r.request.url})
+          target_dates={'20210806','20211008','20211022'}
+          target_hits=[x for x in results if x['trade_date'] in target_dates and x['exact_801020_rows']]
+          known_neighbor_hits=[x for x in results if x['trade_date']=='20210805' and x['exact_801020_rows']]
+          result={'artifact':'DAO2_C_OFFICIAL_SWS_ANALYSIS_TARGETED_PROBE_V1','provider':'申万宏源研究官网','endpoint':url,'results':results,'target_exact_hit_count':len(target_hits),'known_neighbor_801020_hit_count':len(known_neighbor_hits),'route_closes_gap':bool(target_hits)}
+          (out/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-official-sws-analysis-targeted-probe-v1
+          path: artifact_sws_analysis_targeted/
+          if-no-files-found: error
+          retention-days: 30
