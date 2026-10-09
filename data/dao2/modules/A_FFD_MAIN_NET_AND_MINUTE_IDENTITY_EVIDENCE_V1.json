@@ -1,0 +1,130 @@
+{
+  "artifact": "DAO2_A_FFD_MAIN_NET_AND_MINUTE_IDENTITY_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "A",
+  "component": "main_net_flow",
+  "status": "PASS_RECOVERY_VALUE_EXISTS_BUT_IDENTITY_REJECTED_NOT_ADMITTED",
+  "formal_target": {
+    "formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
+    "unit": "CNY",
+    "resolved_rows_before": 1011591,
+    "unresolved_rows_before": 16,
+    "formal_admission_changed": false
+  },
+  "public_order_size_flow": {
+    "definition_id": "ffd.public_order_size_flow.v1",
+    "definition_version": "1.2.0",
+    "result": "REJECT_NO_REQUIRED_HISTORICAL_COVERAGE",
+    "historical_coverage_start": "2026-05-26",
+    "evidence_path": "data/dao2/modules/A_FFD_ORDER_SIZE_FLOW_COVERAGE_EVIDENCE_V1.json"
+  },
+  "public_main_net": {
+    "definition_id": "ffd.public_main_net.v1",
+    "definition_version": "1.1.0",
+    "historical_coverage_start": "2021-07-15",
+    "coverage_probe": {
+      "workflow_run_id": 37901012920,
+      "artifact_id": 11602327807,
+      "artifact_digest": "sha256:673885fc4a75c83b28e664083be73b5f4ab22c9fdbf651092f6f5cbc15b0499d",
+      "residual_rows_with_confirmed_coverage": 13,
+      "residual_rows_outside_coverage_start": 3,
+      "covered_residual_dates": ["2021-09-23", "2021-09-24", "2021-11-25", "2022-05-06", "2023-03-20", "2023-05-22"],
+      "outside_coverage_dates": ["2020-06-08", "2020-11-04", "2021-02-24"]
+    },
+    "identity_probe": {
+      "workflow_run_id": 37901438280,
+      "artifact_id": 11602772325,
+      "artifact_digest": "sha256:9dc7fccd8796056d9be019e9e6ec5cf1aa7e55f75eb2458258e3eb3a8a676b84",
+      "controls_tested": 4,
+      "exact_controls": 0,
+      "comparisons": [
+        {"ts_code": "300673.SZ", "trade_date": "2021-09-24", "jessica_main_net_flow_cny": "1481900.00", "ffd_public_main_net_cny": "825854.2", "exact": false},
+        {"ts_code": "600711.SH", "trade_date": "2021-09-24", "jessica_main_net_flow_cny": "175949800.00", "ffd_public_main_net_cny": "207201940", "exact": false},
+        {"ts_code": "002819.SZ", "trade_date": "2022-05-06", "jessica_main_net_flow_cny": "8309600.00", "ffd_public_main_net_cny": "5364256", "exact": false},
+        {"ts_code": "601669.SH", "trade_date": "2022-05-06", "jessica_main_net_flow_cny": "-141548600.00", "ffd_public_main_net_cny": "-164726245", "exact": false}
+      ],
+      "result": "REJECT_SEMANTIC_IDENTITY_FAIL_0_OF_4_EXACT"
+    }
+  },
+  "licensed_main_net": {
+    "definition_id": "ffd.licensed_main_net.v1",
+    "definition_version_observed": "1.1.0",
+    "historical_coverage_start": "2021-07-15",
+    "result": "NO_RESIDUAL_RECOVERY_IN_OBSERVED_EXACT_KEY_COVERAGE",
+    "observed_missing_examples": [
+      "002618.SZ/2021-09-23",
+      "002684.SZ/2021-11-25",
+      "600112.SH/2022-05-06",
+      "000564.SZ/2023-03-20",
+      "001337.SZ/2023-03-20",
+      "002118.SZ/2023-05-22",
+      "002157.SZ/2023-05-22",
+      "002503.SZ/2023-05-22",
+      "002504.SZ/2023-05-22"
+    ]
+  },
+  "native_minute_order_flow": {
+    "definition_id": "ffd.native_minute_order_flow.v1",
+    "historical_readability": "PROVEN_FOR_2021_AND_2023_SAMPLE_DATES",
+    "native_fields_present": [
+      "large_active_buy_amount",
+      "large_active_sell_amount",
+      "extra_large_active_buy_amount",
+      "extra_large_active_sell_amount"
+    ],
+    "contract_limitations": {
+      "amount_unit_verified": false,
+      "classification_threshold_verified": false,
+      "historical_coverage_guaranteed": false,
+      "continuous_auction_minutes_only": true,
+      "revision_locked": false
+    },
+    "history_probe": {
+      "workflow_run_id": 37901871034,
+      "artifact_id": 11602648567,
+      "artifact_digest": "sha256:f63ae270613d01d677b3852967497984516274a74027f8928371c117967e4379",
+      "samples_readable": ["300673.SZ/2021-09-24", "000695.SZ/2023-05-22"]
+    },
+    "control_identity_probe": {
+      "workflow_run_id": 37902044839,
+      "artifact_id": 11602434391,
+      "artifact_digest": "sha256:479f9da529036b87d60a706a0903c4309b6696dace8cc0d5e1903c2cbdb40e76",
+      "interval_minutes": 5,
+      "controls_tested": 2,
+      "exact_controls": 0,
+      "scale_candidates_tested": ["1", "0.0001", "10000"],
+      "comparison_summary": [
+        {
+          "ts_code": "300673.SZ",
+          "trade_date": "2021-09-24",
+          "ffd_sums_raw": {"large_active_buy": "2324538.5", "extra_large_active_buy": "1115818.6", "large_active_sell": "1652021.4", "extra_large_active_sell": "0.0"},
+          "jessica_10k_cny": {"buy_lg": "712.83", "buy_elg": "0.00", "sell_lg": "327.73", "sell_elg": "236.91"},
+          "exact_under_tested_global_scales": false
+        },
+        {
+          "ts_code": "000695.SZ",
+          "trade_date": "2023-05-22",
+          "ffd_sums_raw": {"large_active_buy": "10518139.0", "extra_large_active_buy": "0.0", "large_active_sell": "3144415.0", "extra_large_active_sell": "0.0"},
+          "jessica_10k_cny": {"buy_lg": "1889.46", "buy_elg": "192.95", "sell_lg": "1599.99", "sell_elg": "155.35"},
+          "exact_under_tested_global_scales": false
+        }
+      ],
+      "result": "REJECT_FOUR_FIELD_IDENTITY_FAIL"
+    }
+  },
+  "decision": {
+    "ffd_can_return_historical_moneyflow_like_data": true,
+    "ffd_can_return_13_of_16_residual_public_main_net_scalars": true,
+    "ffd_formal_a_semantics_proven": false,
+    "ffd_residual_rows_admitted": 0,
+    "MAIN_NET_FLOW_UNBOUND": "OPEN",
+    "reopen_condition": "A new FFD definition or revised contract proves exact Tushare-equivalent four-field semantics and passes the frozen Jessica control gate before residual processing."
+  },
+  "governance": {
+    "proxy_used": false,
+    "tolerance_used": false,
+    "zero_fill_used": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
