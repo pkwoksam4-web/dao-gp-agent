@@ -32,7 +32,7 @@ jobs:
       - name: Ingest live PIT manifest
         env:
           PIT_MANIFEST_PATH: ${{ steps.manifest.outputs.path }}
-        run: python scripts/live_pit_ingest.py
+        run: python scripts/live_pit_ingest_compat_runner.py
       - if: always()
         uses: actions/upload-artifact@v4
         with:
