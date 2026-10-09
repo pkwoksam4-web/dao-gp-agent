@@ -1,117 +1,140 @@
 {
   "schema": "daily-direction-audit/v2",
   "record_date_cn": "2026-10-09",
-  "observed_at": "2026-10-09T15:55:15+08:00",
+  "observed_at": "2026-10-09T17:12:00+08:00",
   "direction": "ALIGNED",
-  "direction_reason": "Agent Brain remains aligned and is waiting for the 2026-10-09 post-close prospective gate. One-time FFD evidence checks were completed fail-closed: A has no historical coverage for its frozen controls, while C returned the three target OHLC rows but failed the frozen authoritative-provider binding and admitted zero rows. Automatic FFD re-query is disabled.",
+  "direction_reason": "The 2026-10-09 prospective Core13 PIT manifest and GitHub-to-Neon ingest passed the frozen 13/13 gate with the protected forecast unchanged. The next real breakpoint is the not-yet-observed ranking/observation shadow request and attestation. DAO2 A direct iFinD execution is still blocked because IFIND_REFRESH_TOKEN is absent; workflow success is only fail-closed execution, not data admission.",
   "repository": {
     "full_name": "pkwoksam4-web/dao-gp-agent",
-    "main_head_before_archive": "41096974016f0661364c1b28f32914f806346515",
-    "new_workflow_runs_after_previous_archive": 8
+    "main_head_before_archive": "f1f2b3e1c6279caa197ce9f3e2dba14daa405384",
+    "runtime_manifest_head": "c1e810fa5e798247c7eff8e185eb06b0408c25be"
   },
   "daily_actual_increment": {
-    "prospective_samples_added_this_audit": 0,
+    "prospective_pit_dates_added_this_audit": 1,
+    "prospective_shadow_dates_added_this_audit": 0,
     "admissible_dao2_rows_added_this_audit": 0,
-    "head_transitions_since_previous_archive": 2,
-    "note": "A/C FFD evidence reduced source uncertainty but added no prospective sample or admissible DAO2 row; CI success is not treated as data/model progress."
+    "note": "2026-10-09 added one immutable live-eligible Core13 PIT date and 13 bars/features. No 2026-10-09 ranking/observation attestation is yet evidenced, so it is not counted as a completed shadow sample."
   },
   "agent_brain": {
     "direction": "ALIGNED",
-    "status": "PRE_MARKET_WAITING_2026_10_09_GATE",
+    "status": "PIT_INGEST_VERIFIED_AWAITING_SHADOW_REQUEST",
     "verified_baseline": {
       "core10": "WAT-core10-final-v1 count=10 FROZEN_UNCHANGED",
       "core13": "WAT-core13-observation-v1 count=13 PROSPECTIVE_OBSERVATION_ONLY",
-      "eligible_prospective_dates": [
+      "completed_shadow_dates_before_current_date": [
         "2026-09-28",
         "2026-09-30",
         "2026-10-08"
       ],
-      "latest_verified_manifest_commit": "12c099b3ae59fb5dca90c137cbcd328a2d5a49b0",
-      "latest_ingest_run": 37760184154,
-      "latest_shadow_request_commit": "7f31392de49cfd0efa14134af413932497a8bedf",
-      "latest_shadow_run": 37760281530,
+      "current_pit_eligible_date": "2026-10-09",
       "probability": "PROBABILITY_V1_6_EXECUTABLE_MISSING; probability forecast generation prohibited",
       "historical_recovery": "HISTORICAL_RECOVERY_NON_LIVE excluded from LIVE_SHADOW and scoring"
     },
     "current_trade_date_cn": "2026-10-09",
-    "trading_day_calendar_status": "EXPECTED_TRADING_DAY; 16:18 prospective gate not reached at observation time",
-    "current_action": "After 16:18 verify immutable 13-symbol manifest and ingest markers; after shadow dispatch verify ranking, observation, attestation, and unchanged forecast tables.",
-    "settlement": {
-      "last_verified_run": 37760235793,
-      "pending_checked": 2,
-      "settled_now": 0,
-      "still_pending": 2,
-      "note": "The last check preceded the 2026-10-08 shadow write. Current aggregate including that run remains unverified until a later readback or settlement check; no maturity is inferred."
+    "trading_day_calendar_status": "TRADING_DAY_VERIFIED_BY_MANIFEST; market_closed=true",
+    "manifest": {
+      "branch": "runtime/pit-2026-10-09",
+      "commit": "c1e810fa5e798247c7eff8e185eb06b0408c25be",
+      "blob_sha": "9dc0d971c14da01b7412a3f46a23ada740d285a9",
+      "retrieved_at": "2026-10-09T09:09:21.529008525Z",
+      "symbol_count": 13,
+      "live_shadow_eligible": true
     },
-    "scheduler_control_plane": "UNVERIFIED_FROM_GITHUB_FOR_ENABLED_TIMEZONE_NEXT_RUN",
-    "first_breakpoint_if_gate_fails": "Longbridge collection -> immutable GitHub manifest",
+    "ingest": {
+      "run": 37909587799,
+      "conclusion": "success",
+      "markers": {
+        "LIVE_PIT_INGEST_PASS": true,
+        "core13_bars": 13,
+        "core13_features": 13,
+        "protected_shadow_forecast_unchanged": true
+      },
+      "inserted": {
+        "bars": 13,
+        "features": 13,
+        "flows": 0,
+        "quotes": 13,
+        "sources": 26
+      },
+      "artifact_id": 11605654266,
+      "artifact_digest": "sha256:0d40ba33f5abc21ccbe921ff074d668cca28196716d8d6585df3d7dadea832d4"
+    },
+    "settlement": {
+      "run": 37909632595,
+      "marker": "RANKING_SETTLEMENT_CHECK_PASS",
+      "pending_checked": 3,
+      "settled_now": 0,
+      "still_pending": 3,
+      "automatic_promotion": false,
+      "artifact_id": 11605594122,
+      "artifact_digest": "sha256:6dba6d31b12b3e8b42d755168d5003f9565a083dbc5f995bfdda4f85de0bd9e8",
+      "note": "Future-only maturity check passed; no sample matured in this run."
+    },
+    "first_breakpoint": {
+      "stage": "shadow request -> ranking/observation attestation",
+      "error": "No 2026-10-09 shadow request/run/attestation is visible after the successful ingest at observation time.",
+      "next_action": "Wait for the normal post-ingest shadow dispatch, then require Core10 ranking, three-symbol observation-only output, attestation, and unchanged forecast tables. Do not backfill if the dispatch window is missed."
+    },
     "user_action": "NONE_NOW"
   },
   "dao2_master": {
     "direction": "ALIGNED",
     "modules": {
       "A": {
-        "head": "151c5eae495d7a052d26efa6eb19a7f33bf2aca1",
-        "latest_guard_run": 37901734016,
+        "head": "747028d0070dcdbd258f039b72c5dc2a985f6679",
+        "latest_guard_run": 37908761824,
         "guard_conclusion": "success_consistency_only_status_blocked",
         "status": "STALLED_REQUIRES_ACTION",
-        "action": "FFD order-size-flow route closed: published historical coverage starts 2026-05-26, after all frozen controls and residual dates. Do not spend quota or re-query unless coverage expands backward; otherwise wait for readable iFinD, targeted L2, or another original carrier and require Jessica 32/32 exact identity.",
-        "external_minimum": "Authorized original carrier bytes covering the frozen 16-key manifest.",
-        "restart_trigger": "New readable authorized raw carrier, or FFD contract publishes exact locked definition with coverage reaching the frozen residual window.",
-        "ffd_evidence_path": "data/dao2/modules/A_FFD_ORDER_SIZE_FLOW_COVERAGE_EVIDENCE_V1.json",
-        "ffd_latest_run": 37901733987,
-        "ffd_latest_artifact_id": 11602159473,
-        "ffd_latest_artifact_digest": "sha256:070c26ebc602e00f610cf13afae4a117aa53682b52446926a7cd46284aa26381"
+        "ifind_probe": {
+          "run": 37908242401,
+          "artifact_id": 11605726092,
+          "artifact_digest": "sha256:c6e6bb6eeb669d126109da755cfadefc7b4e3a7b605a14e5270727adf9485db6",
+          "result": "IFIND_DIRECT_BLOCKED_ENTITLEMENT_OR_HISTORY",
+          "refresh_token_present": false,
+          "identity_gate_pass": false,
+          "resolved_target_count": 0
+        },
+        "contract_test": {
+          "run": 37908242434,
+          "result": "5 passed",
+          "meaning": "Harness/workflow contract only; not provider-data PASS."
+        },
+        "action": "Do not repeat the probe until IFIND_REFRESH_TOKEN is configured or another authorized raw carrier becomes readable. When available, require the frozen Jessica 32/32 exact four-field gate before reading the 16 residual targets.",
+        "external_minimum": "Repository Actions secret IFIND_REFRESH_TOKEN with historical quotation entitlement, or authorized original carrier bytes covering the frozen 16-key manifest.",
+        "restart_trigger": "Refresh token plus readable historical entitlement, or a new authorized original carrier."
       },
       "B": {
         "head": "38859f37e4d49aa2bc743a6ff1127b7ad85c455b",
         "latest_guard_run": 35685970366,
-        "guard_conclusion": "success_consistency_only_not_data_pass",
         "status": "WAITING_AUTHORITATIVE_FINAL_SCORER_OR_IO_PAIR",
         "action": "No replay or guessed normalization, clipping, combination, or 4% mapping.",
-        "external_minimum": "Authoritative final scorer or same-date I/O pair.",
-        "restart_trigger": "Authoritative carrier"
+        "restart_trigger": "Authoritative final scorer or same-date I/O pair."
       },
       "C": {
         "head": "09fa7bdf80cd1d1ba1a3cbb6041e4c6bdc3acdc1",
         "latest_guard_run": 37900046313,
         "latest_preflight_run": 37900046356,
-        "guard_conclusion": "success_fail_closed_consistency_only_not_series_pass",
         "status": "BLOCKED_SECTOR_SERIES_UNBOUND",
-        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; FFD found all three 801020.SI target OHLC rows plus six exact neighbor anchors, but provider/taxonomy binding failed and FFD rows admitted=0.",
-        "drift": "NONE_CURRENT: FFD evidence retained as crosscheck only; frozen provider set and admission contract unchanged; automatic FFD re-query disabled.",
-        "corrective_action": "Keep FFD evidence fail-closed. Re-open admission only if immutable source/provider evidence binds FFD to an already-qualified authoritative historical provider without changing the frozen standard.",
-        "external_minimum": "Traceable authoritative supplier original same-day OHLC, or qualifying immutable source binding for the preserved FFD raw responses.",
-        "restart_trigger": "New supplier raw file or qualifying provider-source binding only",
-        "preflight_artifact_id": 11601699204,
-        "preflight_artifact_digest": "sha256:a6aed22714cac418a9c32f92a376d84656b1c2ae575ba1076492ff4177f58826",
-        "ffd_probe_run": 37897977466,
-        "ffd_probe_artifact_id": 11600713150,
-        "ffd_binding_decision": "FAIL_BINDING"
+        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; FFD returned the three 801020.SI targets and six neighbor anchors but failed authoritative provider/taxonomy binding, so admitted=0.",
+        "restart_trigger": "New traceable authoritative supplier original same-day OHLC or qualifying immutable provider-source binding."
       },
       "D": {
         "head": "2a7056ffd61885046e34dc1494bc668143d96793",
         "latest_guard_run": 35499069982,
-        "guard_conclusion": "success",
         "status": "FROZEN_CANDIDATE",
-        "action": "Consistency only",
-        "restart_trigger": "New commit, Guard failure, or checkpoint mismatch"
+        "action": "Consistency only."
       },
       "E": {
         "head": "230da3f090c59ef6c7bc4c0056c516d519741d2c",
         "latest_guard_run": 35688396944,
-        "guard_conclusion": "success_fail_closed_contract_only",
         "status": "FAIL_CLOSED_ON_A_TO_D",
-        "action": "Dependency check only",
-        "restart_trigger": "All required A-D verified checkpoints"
+        "action": "Dependency check only."
       },
       "F": {
         "head": "61c076d2fcdc2de456bbad0161a942814cf82e0d",
         "latest_guard_run": 35688399818,
-        "guard_conclusion": "success_fail_closed_contract_only",
         "status": "FAIL_CLOSED_ON_E",
-        "action": "No Model Freeze or OOS",
-        "restart_trigger": "Verified E checkpoint"
+        "action": "No Model Freeze or OOS."
       }
     }
   },
@@ -123,10 +146,7 @@
     "historical_recovery_used_for_live_shadow": false,
     "ci_success_treated_as_data_pass": false,
     "derived_close_admitted": false,
-    "public_route_repeated_after_frozen_restart_condition": true,
-    "drift_corrected_at_current_head": true,
-    "derived_close_migration_workflow_present": false,
     "ffd_rows_admitted": false,
-    "ffd_automatic_requery_enabled": false
+    "ifind_contract_success_treated_as_data_pass": false
   }
 }
