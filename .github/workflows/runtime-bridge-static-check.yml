@@ -4,12 +4,14 @@ on:
   push:
     paths:
       - "scripts/live_pit_ingest.py"
+      - "scripts/live_pit_ingest_compat_runner.py"
       - "scripts/shadow_ranking_observation.py"
       - "scripts/pit_gap_recovery.py"
       - "scripts/core13_runtime_patch.py"
       - "scripts/neon_sql_bridge.py"
       - "scripts/feature_formula_audit.py"
       - "scripts/ranking_shadow_settlement.py"
+      - ".github/workflows/live-pit-manifest-ingest.yml"
       - ".github/workflows/runtime-bridge-static-check.yml"
   workflow_dispatch:
 
@@ -29,6 +31,7 @@ jobs:
         run: |
           python -m py_compile \
             scripts/live_pit_ingest.py \
+            scripts/live_pit_ingest_compat_runner.py \
             scripts/shadow_ranking_observation.py \
             scripts/pit_gap_recovery.py \
             scripts/core13_runtime_patch.py \
