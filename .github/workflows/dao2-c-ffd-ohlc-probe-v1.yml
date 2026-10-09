@@ -6,6 +6,11 @@ on:
       - gp/dao2-c-sector-pit
     paths:
       - '.github/workflows/dao2-c-ffd-ohlc-probe-v1.yml'
+  pull_request:
+    branches:
+      - gp/dao2-migration-20260920
+    paths:
+      - '.github/workflows/dao2-c-ffd-ohlc-probe-v1.yml'
   workflow_dispatch:
 
 permissions:
@@ -107,7 +112,6 @@ jobs:
                       req_entry['error'] = f'{type(e).__name__}: {e}'
                   result['requests'].append(req_entry)
 
-              # Extract date-bearing records without assuming a private response schema.
               extracted = []
               date_keys = {'date','trade_date','datetime','time','timestamp'}
               def walk(obj):
