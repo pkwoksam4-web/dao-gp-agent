@@ -1,0 +1,192 @@
+name: DAO2 C HF Tushare SW2021 Probe V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-hf-tushare-sw2021-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install read-only probe dependencies
+        run: python -m pip install --quiet 'huggingface_hub>=1.5.0' pyarrow
+      - name: Inspect public HF bucket and exact 801020.SI rows
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import json
+          from pathlib import Path
+
+          import pyarrow.parquet as pq
+          from huggingface_hub import download_bucket_files, list_bucket_tree
+
+          BUCKET = 'q1232990/Quant_DataLake-bucket'
+          DAILY_PREFIX = '01_Raw_Data/index_data/daily_quotes/year=2021'
+          BASIC_PREFIX = '01_Raw_Data/index_data/basic_list'
+          TARGET_CODE = '801020.SI'
+          WANTED = {
+              '20210805': {'role': 'neighbor', 'expected_close': 2954.25},
+              '20210806': {'role': 'target', 'ffd_close': 3037.61},
+              '20210809': {'role': 'neighbor', 'expected_close': 3048.39},
+              '20210930': {'role': 'neighbor', 'expected_close': 3976.45},
+              '20211008': {'role': 'target', 'ffd_close': 3913.73},
+              '20211011': {'role': 'neighbor', 'expected_close': 3971.72},
+              '20211021': {'role': 'neighbor', 'expected_close': 3886.69},
+              '20211022': {'role': 'target', 'ffd_close': 3702.52},
+              '20211025': {'role': 'neighbor', 'expected_close': 3804.92},
+          }
+          OUT = Path('artifact_hf_tushare_c_801020')
+          OUT.mkdir(exist_ok=True)
+          DL = OUT / 'downloaded'
+          DL.mkdir(exist_ok=True)
+
+          def meta(item):
+              return {
+                  'type': getattr(item, 'type', None),
+                  'path': getattr(item, 'path', None),
+                  'size': getattr(item, 'size', None),
+                  'xet_hash': getattr(item, 'xet_hash', None),
+                  'mtime': str(getattr(item, 'mtime', None)) if getattr(item, 'mtime', None) is not None else None,
+              }
+
+          result = {
+              'artifact': 'DAO2_C_HF_TUSHARE_SW2021_PROBE_V1',
+              'bucket': BUCKET,
+              'declared_source_semantics': 'public bucket README labels 01_Raw_Data as Bronze raw Tushare pulls; probe does not independently elevate that declaration to authoritative admission',
+              'daily_prefix': DAILY_PREFIX,
+              'basic_prefix': BASIC_PREFIX,
+              'target_code': TARGET_CODE,
+              'wanted_dates': WANTED,
+              'formal_admission_changed': False,
+              'breadth_derivation_allowed': False,
+          }
+
+          try:
+              daily_items = [x for x in list_bucket_tree(BUCKET, prefix=DAILY_PREFIX, recursive=True, token=False) if getattr(x, 'type', None) == 'file']
+              basic_items = [x for x in list_bucket_tree(BUCKET, prefix=BASIC_PREFIX, recursive=True, token=False) if getattr(x, 'type', None) == 'file']
+              result['daily_listing'] = [meta(x) for x in daily_items]
+              result['basic_listing'] = [meta(x) for x in basic_items]
+
+              daily_parquet = [x for x in daily_items if str(getattr(x, 'path', '')).lower().endswith(('.parquet', '.pq'))]
+              basic_readable = [x for x in basic_items if str(getattr(x, 'path', '')).lower().endswith(('.parquet', '.pq', '.csv'))]
+              result['daily_parquet_count'] = len(daily_parquet)
+              result['daily_parquet_total_bytes'] = sum(int(getattr(x, 'size', 0) or 0) for x in daily_parquet)
+
+              # Bound the read-only probe so a malformed prefix cannot download the whole lake.
+              if result['daily_parquet_total_bytes'] > 1_000_000_000:
+                  raise RuntimeError(f"2021 daily parquet scope too large: {result['daily_parquet_total_bytes']} bytes")
+              if not daily_parquet:
+                  raise RuntimeError('no parquet files under 2021 index daily prefix')
+
+              download_pairs = []
+              local_map = {}
+              for item in daily_parquet + basic_readable:
+                  remote = str(item.path)
+                  local = DL / remote.replace('/', '__')
+                  download_pairs.append((item, str(local)))
+                  local_map[remote] = local
+              download_bucket_files(BUCKET, files=download_pairs, token=False)
+
+              file_hashes = []
+              for remote, local in local_map.items():
+                  b = local.read_bytes()
+                  file_hashes.append({'remote_path': remote, 'local_file': local.name, 'sha256': hashlib.sha256(b).hexdigest(), 'bytes': len(b)})
+              result['downloaded_file_hashes'] = file_hashes
+
+              exact_rows = []
+              observed_code_rows = 0
+              schemas = []
+              for item in daily_parquet:
+                  remote = str(item.path)
+                  local = local_map[remote]
+                  table = pq.read_table(local)
+                  schemas.append({'remote_path': remote, 'columns': table.column_names, 'rows': table.num_rows})
+                  cols = set(table.column_names)
+                  if 'ts_code' not in cols or 'trade_date' not in cols or 'close' not in cols:
+                      continue
+                  select_cols = [c for c in ['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol','amount'] if c in cols]
+                  data = table.select(select_cols).to_pylist()
+                  for row in data:
+                      code = str(row.get('ts_code') or '').strip()
+                      if code != TARGET_CODE:
+                          continue
+                      observed_code_rows += 1
+                      date = ''.join(ch for ch in str(row.get('trade_date') or '') if ch.isdigit())[:8]
+                      if date in WANTED:
+                          clean = {k: row.get(k) for k in select_cols}
+                          clean['trade_date_normalized'] = date
+                          clean['role'] = WANTED[date]['role']
+                          if 'expected_close' in WANTED[date]:
+                              clean['neighbor_exact'] = abs(float(row['close']) - float(WANTED[date]['expected_close'])) < 1e-9
+                          if 'ffd_close' in WANTED[date]:
+                              clean['ffd_target_exact'] = abs(float(row['close']) - float(WANTED[date]['ffd_close'])) < 1e-9
+                          exact_rows.append(clean)
+              result['daily_schemas'] = schemas
+              result['observed_801020_rows_in_2021'] = observed_code_rows
+              exact_rows.sort(key=lambda x: x['trade_date_normalized'])
+              result['exact_rows'] = exact_rows
+              result['exact_wanted_dates_found'] = sorted({r['trade_date_normalized'] for r in exact_rows})
+              result['neighbor_exact_count'] = sum(1 for r in exact_rows if r.get('neighbor_exact') is True)
+              result['target_ffd_exact_count'] = sum(1 for r in exact_rows if r.get('ffd_target_exact') is True)
+
+              identity_rows = []
+              for item in basic_readable:
+                  remote = str(item.path)
+                  local = local_map[remote]
+                  if local.suffix.lower() in {'.parquet', '.pq'}:
+                      table = pq.read_table(local)
+                      rows = table.to_pylist()
+                  else:
+                      import csv
+                      with local.open('r', encoding='utf-8-sig', newline='') as fh:
+                          rows = list(csv.DictReader(fh))
+                  for row in rows:
+                      if str(row.get('ts_code') or row.get('code') or '').strip() == TARGET_CODE:
+                          identity_rows.append(row)
+              result['basic_identity_rows'] = identity_rows[:20]
+
+              if len(result['exact_wanted_dates_found']) == len(WANTED) and result['neighbor_exact_count'] == 6 and result['target_ffd_exact_count'] == 3:
+                  result['status'] = 'PASS_SECOND_CARRIER_NUMERIC_IDENTITY_REVIEW_PROVENANCE'
+              elif observed_code_rows:
+                  result['status'] = 'PARTIAL_801020_PRESENT_TARGET_OR_ANCHOR_MISMATCH'
+              else:
+                  result['status'] = 'CLOSED_NO_801020_IN_2021_INDEX_DAILY'
+          except Exception as exc:
+              result['status'] = 'PROBE_ERROR'
+              result['error'] = f'{type(exc).__name__}: {exc}'
+
+          canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(',', ':'), default=str)
+          result['content_sha256_without_hash_field'] = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+          (OUT / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': result['status'],
+              'daily_parquet_count': result.get('daily_parquet_count'),
+              'daily_parquet_total_bytes': result.get('daily_parquet_total_bytes'),
+              'observed_801020_rows_in_2021': result.get('observed_801020_rows_in_2021'),
+              'exact_wanted_dates_found': result.get('exact_wanted_dates_found'),
+              'neighbor_exact_count': result.get('neighbor_exact_count'),
+              'target_ffd_exact_count': result.get('target_ffd_exact_count'),
+              'error': result.get('error'),
+              'result_sha256': result['content_sha256_without_hash_field'],
+          }, ensure_ascii=False))
+          PY
+      - name: Upload immutable probe output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-hf-tushare-sw2021-probe-v1
+          path: artifact_hf_tushare_c_801020/result.json
+          if-no-files-found: error
+          retention-days: 30
