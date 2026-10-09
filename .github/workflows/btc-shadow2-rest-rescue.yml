@@ -1,0 +1,56 @@
+name: BTC Shadow2 REST Rescue
+
+on:
+  push:
+    branches:
+      - btc-shadow2-rest-rescue-20261009
+    paths:
+      - "runtime/btc_shadow2_rest_rescue/**"
+      - ".github/workflows/btc-shadow2-rest-rescue.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rescue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify frozen collector tests
+        working-directory: runtime/btc_shadow2_rest_rescue
+        run: python -m unittest -v test_rescue.py
+
+      - name: Capture frozen public REST evidence
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/btc-shadow2-rest-rescue
+          python runtime/btc_shadow2_rest_rescue/rescue.py \
+            --out artifacts/btc-shadow2-rest-rescue
+          rc=$?
+          printf '%s\n' "$rc" > artifacts/btc-shadow2-rest-rescue/collector_exit_code.txt
+          exit 0
+
+      - name: Upload REST evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-shadow2-rest-rescue-${{ github.run_id }}
+          path: artifacts/btc-shadow2-rest-rescue/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Propagate collector status
+        if: always()
+        shell: bash
+        run: |
+          test -f artifacts/btc-shadow2-rest-rescue/collector_exit_code.txt
+          rc="$(cat artifacts/btc-shadow2-rest-rescue/collector_exit_code.txt)"
+          exit "$rc"
