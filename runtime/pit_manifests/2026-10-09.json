@@ -1,0 +1,154 @@
+{
+  "schema": "agent-brain-core13-pit-manifest/v1",
+  "trade_date_cn": "2026-10-09",
+  "retrieved_at": "2026-10-09T09:09:21.529008525Z",
+  "universe_id": "WAT-core13-observation-v1",
+  "market_closed": true,
+  "trading_day_verified": true,
+  "live_shadow_eligible": true,
+  "symbols": [
+    {
+      "symbol": "000636.SZ",
+      "bar": {
+        "raw": {"close":"47.17","open":"49.03","low":"45.36","high":"49.42","volume":"1144287","turnover":"5312150310.97","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"000636.SZ","last_done":"47.17","prev_close":"50.4","open":"49.03","high":"49.42","low":"45.36","timestamp":"2026-10-09T07:00:00Z","volume":"1144287","turnover":"5312150310.97","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":47.17,"prev_close":50.4,"open":49.03,"high":49.42,"low":45.36,"volume":1144287,"turnover":5312150310.97}
+      }
+    },
+    {
+      "symbol": "002138.SZ",
+      "bar": {
+        "raw": {"close":"45.6","open":"47.14","low":"43.81","high":"47.25","volume":"290770","turnover":"1320402423.37","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"002138.SZ","last_done":"45.6","prev_close":"48.09","open":"47.14","high":"47.25","low":"43.81","timestamp":"2026-10-09T07:00:00Z","volume":"290770","turnover":"1320402423.37","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":45.6,"prev_close":48.09,"open":47.14,"high":47.25,"low":43.81,"volume":290770,"turnover":1320402423.37}
+      }
+    },
+    {
+      "symbol": "002156.SZ",
+      "bar": {
+        "raw": {"close":"55.55","open":"55","low":"52.9","high":"55.99","volume":"649994","turnover":"3539301220.43","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"002156.SZ","last_done":"55.55","prev_close":"55.93","open":"55","high":"55.99","low":"52.9","timestamp":"2026-10-09T07:00:00Z","volume":"649994","turnover":"3539301220.43","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":55.55,"prev_close":55.93,"open":55.0,"high":55.99,"low":52.9,"volume":649994,"turnover":3539301220.43}
+      }
+    },
+    {
+      "symbol": "600392.SH",
+      "bar": {
+        "raw": {"close":"19.84","open":"19.63","low":"18.88","high":"19.91","volume":"388662","turnover":"755713647","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"600392.SH","last_done":"19.84","prev_close":"19.7","open":"19.63","high":"19.91","low":"18.88","timestamp":"2026-10-09T07:00:00Z","volume":"388662","turnover":"755713647","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":19.84,"prev_close":19.7,"open":19.63,"high":19.91,"low":18.88,"volume":388662,"turnover":755713647}
+      }
+    },
+    {
+      "symbol": "600487.SH",
+      "bar": {
+        "raw": {"close":"52.95","open":"51.88","low":"49.63","high":"53.25","volume":"1435746","turnover":"7392176815","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"600487.SH","last_done":"52.95","prev_close":"52.7","open":"51.88","high":"53.25","low":"49.63","timestamp":"2026-10-09T07:00:00Z","volume":"1435745","turnover":"7392176815","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":52.95,"prev_close":52.7,"open":51.88,"high":53.25,"low":49.63,"volume":1435745,"turnover":7392176815}
+      }
+    },
+    {
+      "symbol": "600522.SH",
+      "bar": {
+        "raw": {"close":"30.09","open":"30","low":"28.48","high":"30.34","volume":"1490512","turnover":"4382802445","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"600522.SH","last_done":"30.09","prev_close":"30.49","open":"30","high":"30.34","low":"28.48","timestamp":"2026-10-09T07:00:00Z","volume":"1490511","turnover":"4382802445","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":30.09,"prev_close":30.49,"open":30.0,"high":30.34,"low":28.48,"volume":1490511,"turnover":4382802445}
+      }
+    },
+    {
+      "symbol": "600667.SH",
+      "bar": {
+        "raw": {"close":"16.32","open":"16.51","low":"15.27","high":"16.52","volume":"1357941","turnover":"2155007895","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"600667.SH","last_done":"16.32","prev_close":"16.55","open":"16.51","high":"16.52","low":"15.27","timestamp":"2026-10-09T07:00:00Z","volume":"1357941","turnover":"2155007895","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":16.32,"prev_close":16.55,"open":16.51,"high":16.52,"low":15.27,"volume":1357941,"turnover":2155007895}
+      }
+    },
+    {
+      "symbol": "600703.SH",
+      "bar": {
+        "raw": {"close":"11.78","open":"11.8","low":"11.24","high":"11.82","volume":"936619","turnover":"1077530094","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"600703.SH","last_done":"11.78","prev_close":"11.88","open":"11.8","high":"11.82","low":"11.24","timestamp":"2026-10-09T07:00:00Z","volume":"936618","turnover":"1077530094","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":11.78,"prev_close":11.88,"open":11.8,"high":11.82,"low":11.24,"volume":936618,"turnover":1077530094}
+      }
+    },
+    {
+      "symbol": "601991.SH",
+      "bar": {
+        "raw": {"close":"5.34","open":"5.33","low":"5.22","high":"5.36","volume":"1368749","turnover":"723159602","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"601991.SH","last_done":"5.34","prev_close":"5.35","open":"5.33","high":"5.36","low":"5.22","timestamp":"2026-10-09T07:00:00Z","volume":"1368749","turnover":"723159602","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":5.34,"prev_close":5.35,"open":5.33,"high":5.36,"low":5.22,"volume":1368749,"turnover":723159602}
+      }
+    },
+    {
+      "symbol": "605358.SH",
+      "bar": {
+        "raw": {"close":"40.64","open":"41.61","low":"38.69","high":"42.46","volume":"395813","turnover":"1596469765","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"605358.SH","last_done":"40.64","prev_close":"42.67","open":"41.61","high":"42.46","low":"38.69","timestamp":"2026-10-09T07:00:00Z","volume":"395813","turnover":"1596469765","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":40.64,"prev_close":42.67,"open":41.61,"high":42.46,"low":38.69,"volume":395813,"turnover":1596469765}
+      }
+    },
+    {
+      "symbol": "000977.SZ",
+      "bar": {
+        "raw": {"close":"64.69","open":"64.03","low":"61.92","high":"64.89","volume":"468264","turnover":"2963584595.07","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"000977.SZ","last_done":"64.69","prev_close":"64.56","open":"64.03","high":"64.89","low":"61.92","timestamp":"2026-10-09T07:00:00Z","volume":"468264","turnover":"2963584595.07","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":64.69,"prev_close":64.56,"open":64.03,"high":64.89,"low":61.92,"volume":468264,"turnover":2963584595.07}
+      }
+    },
+    {
+      "symbol": "000938.SZ",
+      "bar": {
+        "raw": {"close":"30.41","open":"30.36","low":"29.15","high":"30.6","volume":"973222","turnover":"2908714958.96","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"000938.SZ","last_done":"30.41","prev_close":"30.24","open":"30.36","high":"30.6","low":"29.15","timestamp":"2026-10-09T07:00:00Z","volume":"973222","turnover":"2908714958.96","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":30.41,"prev_close":30.24,"open":30.36,"high":30.6,"low":29.15,"volume":973222,"turnover":2908714958.96}
+      }
+    },
+    {
+      "symbol": "000063.SZ",
+      "bar": {
+        "raw": {"close":"29.03","open":"29","low":"28.13","high":"29.16","volume":"868044","turnover":"2485259700","timestamp":"2026-10-08T16:00:00Z","trade_session":"Intraday"},
+        "completion_evidence": {"method":"MARKET_CLOSED_AND_EOD_QUOTE_OHLC_IDENTITY","market_status":"Closed","market_status_at":"2026-10-09T09:06:01Z","market_status_source":"Longbridge.market_status","trading_day_source":"Longbridge.trading_days"}
+      },
+      "quote": {
+        "raw": {"symbol":"000063.SZ","last_done":"29.03","prev_close":"29.32","open":"29","high":"29.16","low":"28.13","timestamp":"2026-10-09T07:00:00Z","volume":"868044","turnover":"2485259700","trade_status":"Normal"},
+        "normalized": {"as_of":"2026-10-09T07:00:00Z","last":29.03,"prev_close":29.32,"open":29.0,"high":29.16,"low":28.13,"volume":868044,"turnover":2485259700}
+      }
+    }
+  ]
+}
