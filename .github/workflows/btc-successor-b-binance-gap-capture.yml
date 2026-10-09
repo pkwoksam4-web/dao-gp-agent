@@ -1,0 +1,26 @@
+name: BTC Successor-B Binance Gap Capture
+
+on:
+  push:
+    branches:
+      - btc-successor-b-okx-gap-20261009
+    paths:
+      - "runtime/btc_successor_b_binance_gap_capture/**"
+      - ".github/workflows/btc-successor-b-binance-gap-capture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: RED - successor-B Binance gap wrapper tests
+        working-directory: runtime/btc_successor_b_binance_gap_capture
+        run: python -m unittest -v test_binance_gap_capture.py
