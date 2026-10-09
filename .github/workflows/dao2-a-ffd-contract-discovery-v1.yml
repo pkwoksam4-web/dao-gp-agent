@@ -1,0 +1,116 @@
+name: DAO2 A FFD Contract Discovery V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - '.github/workflows/dao2-a-ffd-contract-discovery-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
+    steps:
+      - name: Discover public FFD order-size-flow contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, urllib.request
+          from pathlib import Path
+
+          OUT = Path('artifact_ffd_contract')
+          OUT.mkdir(exist_ok=True)
+          api_key = os.environ.get('FFD_API_KEY', '').strip()
+          url = 'https://ffd.findesk.cn/api/v1/catalog/public-capabilities'
+          result = {
+              'artifact': 'DAO2_A_FFD_CONTRACT_DISCOVERY_V1',
+              'status': 'INIT',
+              'secret_present': bool(api_key),
+              'catalog_url': url,
+              'target_asset': 'ffd.public_order_size_flow.v1@1.2.0',
+              'matches': [],
+          }
+
+          try:
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      'Accept': 'application/json',
+                      'User-Agent': 'dao2-ffd-contract-discovery-v1',
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  raw = resp.read()
+                  result['catalog_http_status'] = resp.status
+              result['catalog_sha256'] = hashlib.sha256(raw).hexdigest()
+              (OUT / 'public-capabilities.json').write_bytes(raw)
+              catalog = json.loads(raw.decode('utf-8'))
+
+              target = result['target_asset']
+              def contains_target(obj):
+                  if isinstance(obj, str):
+                      return target in obj or 'public_order_size_flow' in obj
+                  if isinstance(obj, dict):
+                      return any(contains_target(k) or contains_target(v) for k, v in obj.items())
+                  if isinstance(obj, list):
+                      return any(contains_target(v) for v in obj)
+                  return False
+
+              def walk(obj, path='$'):
+                  if isinstance(obj, dict):
+                      if contains_target(obj):
+                          result['matches'].append({'path': path, 'object': obj})
+                      for k, v in obj.items():
+                          if isinstance(v, (dict, list)):
+                              walk(v, f'{path}.{k}')
+                  elif isinstance(obj, list):
+                      for i, v in enumerate(obj):
+                          if isinstance(v, (dict, list)):
+                              walk(v, f'{path}[{i}]')
+
+              walk(catalog)
+              # Keep only the smallest useful matching objects to avoid huge duplicate nesting.
+              dedup = []
+              seen = set()
+              for item in sorted(result['matches'], key=lambda x: len(json.dumps(x['object'], ensure_ascii=False))):
+                  blob = json.dumps(item['object'], ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+                  h = hashlib.sha256(blob.encode('utf-8')).hexdigest()
+                  if h in seen:
+                      continue
+                  seen.add(h)
+                  dedup.append(item)
+                  if len(dedup) >= 20:
+                      break
+              result['matches'] = dedup
+              result['match_count'] = len(dedup)
+              result['status'] = 'PASS_PUBLIC_CONTRACT_MATCH_FOUND' if dedup else 'NO_PUBLIC_CONTRACT_MATCH'
+          except Exception as e:
+              result['status'] = 'ERROR_PUBLIC_CONTRACT_FETCH'
+              result['error'] = f'{type(e).__name__}: {e}'
+
+          canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+          result['content_sha256_without_hash_field'] = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+          (OUT / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': result['status'],
+              'secret_present': result['secret_present'],
+              'match_count': result.get('match_count', 0),
+              'catalog_sha256': result.get('catalog_sha256'),
+              'result_sha256': result['content_sha256_without_hash_field'],
+          }, ensure_ascii=False))
+          PY
+
+      - name: Upload discovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-ffd-contract-discovery-v1
+          path: artifact_ffd_contract/
+          if-no-files-found: error
+          retention-days: 30
