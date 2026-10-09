@@ -25,11 +25,11 @@
   ],
   "checkpoint": {
     "verified": true,
-    "kind": "PREFLIGHT_BLOCKED_STATE",
-    "path": "data/dao2/modules/C_SECTOR_PIT_PREFLIGHT_CHECKPOINT_V1.json",
-    "workflow_run_id": 35498836988,
-    "artifact_id": 10600914594,
-    "note": "Preflight verified the frozen calendar and fail-closed contracts; it does not close any of the three sector blockers."
+    "kind": "SERIES_PASS_BREADTH_BLOCKED_STATE",
+    "path": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
+    "workflow_run_id": 37914902681,
+    "artifact_id": 11609296558,
+    "note": "Membership and Series are PASS_SUBCOMPONENT. Only SECTOR_BREADTH_UNBOUND remains open; no model freeze or OOS is authorized."
   },
   "governance": {
     "fail_closed": true,
@@ -61,8 +61,8 @@
       "synthetic": false,
       "finite_positive_close": true,
       "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
-      "workflow_run_id": 35575797301,
-      "manual_blocker": "The three direct 801020.SI rows are admitted through FFD PASS_BINDING. Remaining blocker is 298 DERIVED_CLOSE evidence-only rows, admitted_rows=0 under contract v1.2.",
+      "workflow_run_id": 37914902681,
+      "manual_blocker": "NONE: all 301 former gap keys now have admitted same-day FFD RAW_CLOSE provenance; DERIVED_CLOSE remains evidence-only and admitted_rows=0.",
       "infoway_targeted_probe": {
         "status": "CLOSED_UNSUPPORTED",
         "decision": "INFOWAY_SW_INDEX_UNSUPPORTED",
@@ -113,7 +113,7 @@
       "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
       "admitted_derived_close_rows": 0,
       "evidence_only_derived_close_rows": 298,
-      "potential_coverage_after_future_governance_migration": "43084/43084",
+      "potential_coverage_after_future_governance_migration": "NOT_REQUIRED_FOR_SERIES_PASS",
       "manual_intervention_required": false,
       "manual_intervention_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
       "manual_intervention_status": "NOT_REQUIRED_SERIES_PASS",
@@ -121,7 +121,7 @@
       "admitted_direct_recovery_rows": 301,
       "resume_condition": "Series PASS_SUBCOMPONENT; proceed only to breadth identity/formula recovery.",
       "gap_ledger_v1": {
-        "status": "PASS_LEDGER_COMPLETE_SERIES_STILL_BLOCKED",
+        "status": "PASS_LEDGER_CLOSED_BY_301_DIRECT_RAW_ADMISSIONS",
         "ledger_path": "data/dao2/modules/C_301_GAP_LEDGER_V1.json",
         "ledger_sha256": "316b1a9469dae721dedfad54b57779d6321c883694c8f6342cb4119e4a8e1e02",
         "vendor_scope_path": "data/dao2/modules/C_301_GAP_VENDOR_SCOPE_V1.csv",
@@ -133,8 +133,8 @@
         "direct_raw_required": 3,
         "admitted_derived_close_rows": 0,
         "coverage_changed": true,
-        "admitted_direct_rows": 3,
-        "remaining_missing_after_direct_admission": 298
+        "admitted_direct_rows": 301,
+        "remaining_missing_after_direct_admission": 0
       },
       "ffd_direct_recovery": {
         "status": "PASS_BINDING_PARTIAL_ADMISSION",
@@ -180,13 +180,13 @@
     "candidate_materialization": {
       "tushare_token_available_in_pr_actions": true,
       "tushare_sw_daily_entitlement_available": false,
-      "status": "BLOCKED_VENDOR_ENTITLEMENT_REQUIRED",
+      "status": "CLOSED_NOT_REQUIRED_FOR_SERIES_PASS",
       "evidence": "data/dao2/modules/C_SECTOR_TUSHARE_SW_DAILY_ENTITLEMENT_RECHECK_V1.json",
       "workflow_run_id": 35586731646,
       "run_attempt": 2,
       "artifact_id": 11527860144,
       "admitted_rows": 0,
-      "note": "Current Tushare token is present, but sw_daily access is denied. Series remains blocked pending authoritative vendor raw OHLC."
+      "note": "Tushare sw_daily entitlement remains unavailable, but it is no longer a Series blocker because all 301 former gaps were closed by bound FFD same-day RAW_CLOSE rows."
     },
     "latest_subcomponent_checkpoint": {
       "component": "sector_series",
