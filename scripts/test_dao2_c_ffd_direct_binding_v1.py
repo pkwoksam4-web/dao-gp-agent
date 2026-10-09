@@ -1,3 +1,4 @@
+import csv
 import json
 import unittest
 from pathlib import Path
@@ -53,10 +54,11 @@ class FFDDirectBindingTests(unittest.TestCase):
         self.assertEqual(target_identity["historical_name"], "采掘")
         self.assertEqual(target_identity["sw2014_valid_through"], "20211210")
 
-        # The binding audit is the single decision gate. This assertion is RED
-        # until existing-contract evidence is sufficient to bind FFD as FFD.
         self.assertEqual(audit["decision"], "PASS_BINDING")
         self.assertEqual(audit["formal_status"], "FFD_DIRECT_OHLC_PASS_BINDING")
+        self.assertFalse(audit["governance"]["contract_lowered"])
+        self.assertFalse(audit["governance"]["verifier_modified_for_ffd"])
+        self.assertFalse(audit["governance"]["derived_close_migrated"])
 
     def test_three_ffd_direct_rows_pass_existing_series_row_semantics(self):
         ffd = load("C_SECTOR_FFD_801020_DIRECT_OHLC_EVIDENCE_V1.json")
@@ -78,6 +80,44 @@ class FFDDirectBindingTests(unittest.TestCase):
         self.assertEqual(got["status"], "PASS")
         self.assertTrue(got["full_coverage"])
         self.assertEqual(got["derived_close_rows_rejected"], 0)
+
+    def test_partial_admission_accounts_only_three_direct_rows_and_keeps_breadth_closed(self):
+        series = load("C_SECTOR_SERIES_CHECKPOINT_V1.json")
+        state = load("C_SECTOR_PIT_STATE_V1.json")
+        checkpoint = load("C_SECTOR_FFD_801020_BINDING_CHECKPOINT_V1.json")
+        patch_path = BASE / "C_SECTOR_FFD_801020_DIRECT_PATCH_V1.csv"
+        with patch_path.open("r", encoding="utf-8-sig", newline="") as fh:
+            patch_rows = list(csv.DictReader(fh))
+
+        self.assertEqual(len(patch_rows), 3)
+        self.assertEqual({r["trade_date"] for r in patch_rows}, {"20210806", "20211008", "20211022"})
+        self.assertTrue(all(r["source_provider"] == "FFD / FinDesk" for r in patch_rows))
+        self.assertTrue(all(r["source_trade_date"] == r["trade_date"] for r in patch_rows))
+        self.assertTrue(all(r["fill_method"] == "NONE" for r in patch_rows))
+        self.assertTrue(all(r["provenance_type"] == "RAW_CLOSE" for r in patch_rows))
+
+        self.assertEqual(checkpoint["status"], "PASS_BINDING_PARTIAL_ADMISSION")
+        self.assertEqual(checkpoint["admission"]["admitted_direct_rows"], 3)
+        self.assertEqual(checkpoint["admission"]["admitted_derived_rows"], 0)
+        self.assertEqual(checkpoint["admission"]["admissible_before"], 42783)
+        self.assertEqual(checkpoint["admission"]["admissible_after"], 42786)
+        self.assertEqual(checkpoint["admission"]["missing_after"], 298)
+        self.assertFalse(checkpoint["admission"]["series_pass"])
+        self.assertFalse(checkpoint["admission"]["breadth_derivation_allowed"])
+
+        self.assertEqual(series["validation"]["admissible_coverage"], "42786/43084")
+        self.assertEqual(series["validation"]["missing_required_keys"], 298)
+        self.assertEqual(series["validation"]["admitted_direct_recovery_rows"], 3)
+        self.assertEqual(series["validation"]["admitted_derived_close_rows"], 0)
+        self.assertFalse(series["validation"]["full_formal_coverage_proven"])
+
+        ss = state["progress"]["sector_series"]
+        self.assertEqual(ss["admissible_coverage"], "42786/43084")
+        self.assertEqual(ss["missing_required_keys"], 298)
+        self.assertEqual(ss["admitted_direct_recovery_rows"], 3)
+        self.assertEqual(ss["admitted_derived_close_rows"], 0)
+        self.assertEqual(ss["unresolved_direct_keys"], [])
+        self.assertFalse(state["progress"]["sector_breadth"]["derivation_allowed"])
 
 
 if __name__ == "__main__":
