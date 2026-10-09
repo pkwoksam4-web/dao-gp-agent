@@ -100,67 +100,24 @@ class SeriesTests(unittest.TestCase):
         self.assertEqual(got["status"], "FAIL")
         self.assertEqual(got["missing_required_keys"], 1)
 
-    def _strict_derived_row(self):
-        return {
-            "industry_code": "801010.SI",
-            "trade_date": "20210806",
-            "close": "3185.66",
-            "source_provider": "WIND_ASWSINDEXEOD_DERIVED_CLOSE",
-            "source_trade_date": "20210806",
-            "fill_method": "NONE",
-            "provenance_type": "DERIVED_CLOSE",
-            "derivation_method": "PREV_ACCEPTED_CLOSE_X_SAME_DAY_WIND_RETURN",
-            "derivation_source_repository": "z15114664687-dot/fund-holdings",
-            "derivation_source_commit": "92864a330e5bad393315cb6664fe626370e9c92d",
-            "derivation_source_blob_sha": "45550d4d621ba0e6be39dc3e39b150576784b83c",
-            "derivation_source_sha256": "97410eb4acf16fd14b16b0a60f4bbe45b3da071f078fdb5dea7c3044120f1786",
-            "previous_anchor_trade_date": "20210805",
-            "same_day_return_trade_date": "20210806",
-            "production_uses_future_data": "false",
-            "next_day_anchor_usage": "AUDIT_ONLY_NOT_VALUE_PRODUCTION",
-            "two_sided_unique_2dp": "true",
-        }
-
-    def test_strict_derived_close_passes_after_governance_migration(self):
-        expected = {("801010.SI", "20210806")}
-        got = validate_series([self._strict_derived_row()], expected)
-        self.assertEqual(got["status"], "PASS")
-        self.assertTrue(got["derived_close_admitted"])
-        self.assertEqual(got["derived_close_rows_admitted"], 1)
-        self.assertEqual(got["derived_close_rows_rejected"], 0)
-
-    def test_derived_close_missing_migration_fields_fails_closed(self):
-        expected = {("801010.SI", "20210806")}
-        row = self._strict_derived_row()
-        del row["derivation_source_sha256"]
-        got = validate_series([row], expected)
+    def test_derived_close_is_rejected_before_governance_migration(self):
+        expected = {("801010.SI", "20200102")}
+        rows = [
+            {
+                "industry_code": "801010.SI",
+                "trade_date": "20200102",
+                "close": "100.00",
+                "source_provider": "WIND_DERIVED",
+                "source_trade_date": "20200102",
+                "fill_method": "NONE",
+                "provenance_type": "DERIVED_CLOSE",
+            }
+        ]
+        got = validate_series(rows, expected)
         self.assertEqual(got["status"], "FAIL")
-        self.assertGreaterEqual(got["derived_close_rows_rejected"], 1)
+        self.assertEqual(got["derived_close_rows_rejected"], 1)
+        self.assertIn("row_1:derived_close_not_admitted", got["errors"])
         self.assertFalse(got["derived_close_admitted"])
-
-    def test_derived_close_wrong_source_hash_fails_closed(self):
-        expected = {("801010.SI", "20210806")}
-        row = self._strict_derived_row()
-        row["derivation_source_sha256"] = "0" * 64
-        got = validate_series([row], expected)
-        self.assertEqual(got["status"], "FAIL")
-        self.assertGreaterEqual(got["derived_close_rows_rejected"], 1)
-
-    def test_derived_close_cannot_use_future_data_for_production(self):
-        expected = {("801010.SI", "20210806")}
-        row = self._strict_derived_row()
-        row["production_uses_future_data"] = "true"
-        got = validate_series([row], expected)
-        self.assertEqual(got["status"], "FAIL")
-        self.assertGreaterEqual(got["derived_close_rows_rejected"], 1)
-
-    def test_derived_close_requires_same_day_return_date(self):
-        expected = {("801010.SI", "20210806")}
-        row = self._strict_derived_row()
-        row["same_day_return_trade_date"] = "20210809"
-        got = validate_series([row], expected)
-        self.assertEqual(got["status"], "FAIL")
-        self.assertGreaterEqual(got["derived_close_rows_rejected"], 1)
 
     def test_forward_fill_or_date_proxy_fails(self):
         expected = {("801010.SI", "20200103")}
