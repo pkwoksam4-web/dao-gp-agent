@@ -1,9 +1,9 @@
 {
   "schema": "daily-direction-audit/v2",
   "record_date_cn": "2026-10-09",
-  "observed_at": "2026-10-09T17:12:00+08:00",
-  "direction": "ALIGNED",
-  "direction_reason": "The 2026-10-09 prospective Core13 PIT manifest and GitHub-to-Neon ingest passed the frozen 13/13 gate with the protected forecast unchanged. The next real breakpoint is the not-yet-observed ranking/observation shadow request and attestation. DAO2 A direct iFinD execution is still blocked because IFIND_REFRESH_TOKEN is absent; workflow success is only fail-closed execution, not data admission.",
+  "observed_at": "2026-10-09T18:18:30+08:00",
+  "direction": "DRIFT_DETECTED",
+  "direction_reason": "Agent Brain completed the 2026-10-09 immutable PIT->13/13 ingest->ranking/observation attestation chain without probability forecast generation. Independently, DAO2 C drifted by relabeling unbound FFD rows as direct authoritative provenance and prematurely setting Series PASS; the route was stopped and control-plane files were restored to the last verified fail-closed checkpoint.",
   "repository": {
     "full_name": "pkwoksam4-web/dao-gp-agent",
     "main_head_before_archive": "f1f2b3e1c6279caa197ce9f3e2dba14daa405384",
@@ -11,13 +11,13 @@
   },
   "daily_actual_increment": {
     "prospective_pit_dates_added_this_audit": 1,
-    "prospective_shadow_dates_added_this_audit": 0,
+    "prospective_shadow_dates_added_this_audit": 1,
     "admissible_dao2_rows_added_this_audit": 0,
-    "note": "2026-10-09 added one immutable live-eligible Core13 PIT date and 13 bars/features. No 2026-10-09 ranking/observation attestation is yet evidenced, so it is not counted as a completed shadow sample."
+    "note": "2026-10-09 now has one complete prospective ranking/observation Shadow sample. DAO2 C produced no admissible row: its premature 301-row FFD admission was reverted."
   },
   "agent_brain": {
     "direction": "ALIGNED",
-    "status": "PIT_INGEST_VERIFIED_AWAITING_SHADOW_REQUEST",
+    "status": "PROSPECTIVE_CHAIN_PASS_THROUGH_ATTESTATION",
     "verified_baseline": {
       "core10": "WAT-core10-final-v1 count=10 FROZEN_UNCHANGED",
       "core13": "WAT-core13-observation-v1 count=13 PROSPECTIVE_OBSERVATION_ONLY",
@@ -71,14 +71,28 @@
       "note": "Future-only maturity check passed; no sample matured in this run."
     },
     "first_breakpoint": {
-      "stage": "shadow request -> ranking/observation attestation",
-      "error": "No 2026-10-09 shadow request/run/attestation is visible after the successful ingest at observation time.",
-      "next_action": "Wait for the normal post-ingest shadow dispatch, then require Core10 ranking, three-symbol observation-only output, attestation, and unchanged forecast tables. Do not backfill if the dispatch window is missed."
+      "stage": "maturity/settlement",
+      "error": "No error. The 2026-10-09 sample is newly written and not yet mature for 5D/20D settlement.",
+      "next_action": "Future-only settlement on completed China trading days; do not count historical recovery or infer maturity early."
     },
-    "user_action": "NONE_NOW"
+    "user_action": "NONE_NOW",
+    "shadow": {
+      "request_commit": "56138e4657d4f164d747f62178abb30a51348d1b",
+      "request_time": "2026-10-09T10:00:57.602Z",
+      "run": 37914965144,
+      "marker": "SHADOW_RANKING_OBSERVATION_PASS",
+      "ranking_candidate_written": true,
+      "core13_observation_written": true,
+      "ranking_attestation_written": true,
+      "probability_forecast_generated": false,
+      "probability_blocker": "PROBABILITY_V1_6_EXECUTABLE_MISSING",
+      "forecast_tables_unchanged": true,
+      "artifact_id": 11609426449,
+      "artifact_digest": "sha256:823e81b68388530c4eb8470a2770fcc567371897caf9310690c1cfd609c7feb3"
+    }
   },
   "dao2_master": {
-    "direction": "ALIGNED",
+    "direction": "DRIFT_DETECTED",
     "modules": {
       "A": {
         "head": "747028d0070dcdbd258f039b72c5dc2a985f6679",
@@ -111,12 +125,18 @@
         "restart_trigger": "Authoritative final scorer or same-date I/O pair."
       },
       "C": {
-        "head": "09fa7bdf80cd1d1ba1a3cbb6041e4c6bdc3acdc1",
-        "latest_guard_run": 37900046313,
-        "latest_preflight_run": 37900046356,
+        "head": "1eceaf97fdfc403d6ed947f0a4386919fdc71f22",
+        "latest_guard_run": 37916694738,
+        "latest_preflight_run": 37916694721,
+        "guard_conclusion": "success_after_fail_closed_restoration",
+        "preflight_conclusion": "success_after_fail_closed_restoration",
         "status": "BLOCKED_SECTOR_SERIES_UNBOUND",
-        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; FFD returned the three 801020.SI targets and six neighbor anchors but failed authoritative provider/taxonomy binding, so admitted=0.",
-        "restart_trigger": "New traceable authoritative supplier original same-day OHLC or qualifying immutable provider-source binding."
+        "current_evidence": "required=43084; admissible=42783; missing=301; DERIVED_CLOSE admitted=0; FFD binding decision=FAIL_BINDING; FFD rows admitted=0.",
+        "drift": "DETECTED_AND_CORRECTED: 30 commits after the verified 09fa7bdf checkpoint relabeled 301 FFD-generated rows as direct provenance, set Series PASS and enabled breadth work despite the preserved FAIL_BINDING evidence.",
+        "corrective_action": "Deleted the new self-mutating/admission workflows and invalid PASS checkpoints/patches, restored preflight plus Series/PIT/Breadth/binding state files from 09fa7bdf, retained raw/crosscheck evidence, and verified Guard+Preflight success.",
+        "external_minimum": "Traceable authoritative supplier original same-day OHLC, or qualifying immutable provider-source binding without expanding the frozen provider standard.",
+        "restart_trigger": "New supplier raw file or qualifying provider-source binding only",
+        "last_verified_source_checkpoint": "09fa7bdf80cd1d1ba1a3cbb6041e4c6bdc3acdc1"
       },
       "D": {
         "head": "2a7056ffd61885046e34dc1494bc668143d96793",
@@ -147,6 +167,9 @@
     "ci_success_treated_as_data_pass": false,
     "derived_close_admitted": false,
     "ffd_rows_admitted": false,
-    "ifind_contract_success_treated_as_data_pass": false
+    "ifind_contract_success_treated_as_data_pass": false,
+    "dao2_c_unverified_ffd_admission_detected": true,
+    "dao2_c_unverified_ffd_admission_reverted": true,
+    "dao2_c_control_plane_restored": true
   }
 }
