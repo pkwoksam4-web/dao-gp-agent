@@ -1,0 +1,104 @@
+name: DAO2 A FFD Moneyflow Coverage V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - '.github/workflows/dao2-a-ffd-moneyflow-coverage-v1.yml'
+  pull_request:
+    branches:
+      - gp/dao2-migration-20260920
+    paths:
+      - '.github/workflows/dao2-a-ffd-moneyflow-coverage-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe zero-charge coverage for frozen Jessica controls
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, urllib.error, urllib.request
+          from pathlib import Path
+
+          OUT=Path('artifact_ffd_moneyflow_coverage'); OUT.mkdir(exist_ok=True)
+          endpoint='https://ffd.findesk.cn/api/query'
+          token=os.environ.get('FFD_API_KEY','').strip()
+          controls=json.loads(Path('data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json').read_text(encoding='utf-8'))['controls']
+          by_date={}
+          for r in controls:
+              by_date.setdefault(r['trade_date'], []).append(r['ts_code'])
+
+          result={
+              'artifact':'DAO2_A_FFD_MONEYFLOW_COVERAGE_V1',
+              'secret_present':bool(token),
+              'definition_id':'ffd.public_order_size_flow.v1',
+              'expected_definition_version':'1.2.0',
+              'control_scope_path':'data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json',
+              'control_count':len(controls),
+              'required_exact_comparisons':32,
+              'mode':'coverage',
+              'coverage_policy':'strict',
+              'requests':[],
+              'formal_admission_changed':False,
+          }
+          if not token:
+              result['status']='NO_FFD_API_KEY_SECRET'
+          else:
+              headers={'Authorization':f'Bearer {token}','Content-Type':'application/json','Accept':'application/json'}
+              for idx,(date,codes) in enumerate(sorted(by_date.items()),1):
+                  payload={
+                      'function':'ffd_money_flow',
+                      'scope':'stock',
+                      'codes':','.join(sorted(codes)),
+                      'trade_date':date,
+                      'detail':True,
+                      'definition_id':'ffd.public_order_size_flow.v1',
+                      'coverage_policy':'strict',
+                      'mode':'coverage',
+                      'output_mode':'raw',
+                      'format':'json',
+                  }
+                  entry={'trade_date':date,'codes':sorted(codes),'payload':payload}
+                  try:
+                      req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
+                      with urllib.request.urlopen(req,timeout=60) as resp:
+                          raw=resp.read(); entry['http_status']=resp.status
+                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest()
+                      fn=f'coverage_{idx}.json'; (OUT/fn).write_bytes(raw); entry['raw_file']=fn
+                      try: entry['response']=json.loads(raw.decode('utf-8'))
+                      except Exception: entry['response_text_prefix']=raw[:4000].decode('utf-8',errors='replace')
+                  except urllib.error.HTTPError as e:
+                      body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
+                  except Exception as e:
+                      entry['error']=f'{type(e).__name__}: {e}'
+                  result['requests'].append(entry)
+
+              result['status']='COVERAGE_PROBE_COMPLETE'
+          canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'))
+          result['content_sha256_without_hash_field']=hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({
+              'status':result['status'],
+              'secret_present':result['secret_present'],
+              'request_count':len(result.get('requests',[])),
+              'http_statuses':[r.get('http_status') for r in result.get('requests',[])],
+              'result_sha256':result['content_sha256_without_hash_field'],
+          },ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-ffd-moneyflow-coverage-v1
+          path: artifact_ffd_moneyflow_coverage/
+          if-no-files-found: error
+          retention-days: 30
