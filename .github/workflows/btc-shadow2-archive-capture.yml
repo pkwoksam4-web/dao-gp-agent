@@ -1,0 +1,57 @@
+name: BTC Shadow2 Archive Capture
+
+on:
+  push:
+    branches:
+      - btc-shadow2-rest-rescue-20261009
+    paths:
+      - "runtime/btc_shadow2_archive_capture/**"
+      - ".github/workflows/btc-shadow2-archive-capture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify frozen archive collector tests
+        working-directory: runtime/btc_shadow2_archive_capture
+        run: python -m unittest -v test_archive_capture.py
+
+      - name: Capture 212 ZIP plus 212 official checksum objects
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/btc-shadow2-archives
+          python runtime/btc_shadow2_archive_capture/archive_capture.py \
+            --out artifacts/btc-shadow2-archives \
+            --workers 8
+          rc=$?
+          printf '%s\n' "$rc" > artifacts/btc-shadow2-archives/collector_exit_code.txt
+          exit 0
+
+      - name: Upload frozen archive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-shadow2-archives-${{ github.run_id }}
+          path: artifacts/btc-shadow2-archives/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Propagate collector status
+        if: always()
+        shell: bash
+        run: |
+          test -f artifacts/btc-shadow2-archives/collector_exit_code.txt
+          rc="$(cat artifacts/btc-shadow2-archives/collector_exit_code.txt)"
+          exit "$rc"
