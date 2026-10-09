@@ -1,0 +1,55 @@
+name: BTC Shadow2 Funding Archive Probe
+
+on:
+  push:
+    branches:
+      - btc-shadow2-rest-rescue-20261009
+    paths:
+      - ".github/workflows/btc-shadow2-funding-archive-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe frozen official Binance funding archives
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifact
+          cd artifact
+          : > probe-metadata.txt
+          for month in 2026-08 2026-09 2026-10; do
+            name="BTCUSDT-fundingRate-${month}.zip"
+            base="https://data.binance.vision/data/futures/um/monthly/fundingRate/BTCUSDT/${name}"
+            cs_status="$(curl --location --silent --show-error --output "${name}.CHECKSUM" --write-out '%{http_code}' "${base}.CHECKSUM")"
+            cs_rc=$?
+            zip_status="$(curl --location --silent --show-error --output "$name" --write-out '%{http_code}' "$base")"
+            zip_rc=$?
+            printf '%s\n' \
+              "month=${month}" \
+              "checksum_http_status=${cs_status}" \
+              "checksum_curl_rc=${cs_rc}" \
+              "zip_http_status=${zip_status}" \
+              "zip_curl_rc=${zip_rc}" \
+              "zip_sha256=$(sha256sum "$name" 2>/dev/null | cut -d' ' -f1)" \
+              >> probe-metadata.txt
+            if [ "$cs_status" = "200" ] && [ "$zip_status" = "200" ] && [ "$cs_rc" = "0" ] && [ "$zip_rc" = "0" ]; then
+              sha256sum -c "${name}.CHECKSUM" > "${month}-checksum-verify.txt" 2>&1
+              unzip -t "$name" > "${month}-zip-test.txt" 2>&1
+            fi
+          done
+          printf '%s\n' "retrieved_at_utc=$(date --utc +'%Y-%m-%dT%H:%M:%SZ')" >> probe-metadata.txt
+          exit 0
+
+      - name: Upload funding archive probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-shadow2-funding-archive-probe-${{ github.run_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
