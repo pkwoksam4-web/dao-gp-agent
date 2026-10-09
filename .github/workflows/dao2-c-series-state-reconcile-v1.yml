@@ -1,0 +1,82 @@
+name: DAO2 C Series State Reconcile V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-series-state-reconcile-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gp/dao2-c-sector-pit
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reconcile state narrative to verified Series PASS
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/dao2/modules/C_SECTOR_PIT_STATE_V1.json')
+          x=json.loads(p.read_text(encoding='utf-8'))
+          s=x['progress']['sector_series']
+          assert s['status']=='PASS_SUBCOMPONENT'
+          assert s['observed_required_keys']==43084
+          assert s['missing_required_keys']==0
+          assert s['admitted_direct_recovery_rows']==301
+          assert s['admitted_derived_close_rows']==0
+          s['workflow_run_id']=37914902681
+          s['manual_blocker']='NONE: all 301 former gap keys now have admitted same-day FFD RAW_CLOSE provenance; DERIVED_CLOSE remains evidence-only and admitted_rows=0.'
+          s['potential_coverage_after_future_governance_migration']='NOT_REQUIRED_FOR_SERIES_PASS'
+          gl=s['gap_ledger_v1']
+          gl['status']='PASS_LEDGER_CLOSED_BY_301_DIRECT_RAW_ADMISSIONS'
+          gl['admitted_direct_rows']=301
+          gl['remaining_missing_after_direct_admission']=0
+          gl['coverage_changed']=True
+          s['ffd_direct_recovery']['remaining_direct_rows']=0
+          cm=x['progress']['candidate_materialization']
+          cm['status']='CLOSED_NOT_REQUIRED_FOR_SERIES_PASS'
+          cm['note']='Tushare sw_daily entitlement remains unavailable, but it is no longer a Series blocker because all 301 former gaps were closed by bound FFD same-day RAW_CLOSE rows.'
+          x['checkpoint']={
+              'verified':True,
+              'kind':'SERIES_PASS_BREADTH_BLOCKED_STATE',
+              'path':'data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json',
+              'workflow_run_id':37914902681,
+              'artifact_id':11609296558,
+              'note':'Membership and Series are PASS_SUBCOMPONENT. Only SECTOR_BREADTH_UNBOUND remains open; no model freeze or OOS is authorized.'
+          }
+          p.write_text(json.dumps(x,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps({
+              'series':s['status'], 'coverage':s['admissible_coverage'],
+              'direct_admitted':s['admitted_direct_recovery_rows'],
+              'derived_admitted':s['admitted_derived_close_rows'],
+              'open_blockers':x['open_blockers']
+          },ensure_ascii=False))
+          PY
+      - name: Verify governance and module state
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/dao2_c_sector_governance_guard_v1.py
+          python scripts/dao2_module_state_guard_v1.py data/dao2/modules/C_SECTOR_PIT_STATE_V1.json
+      - name: Commit reconciled state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/dao2/modules/C_SECTOR_PIT_STATE_V1.json
+          git commit -m 'state(dao2-c): reconcile Series PASS narrative'
+          git push origin HEAD:gp/dao2-c-sector-pit
