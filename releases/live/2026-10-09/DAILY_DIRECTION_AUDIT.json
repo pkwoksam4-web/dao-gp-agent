@@ -1,19 +1,19 @@
 {
   "schema": "daily-direction-audit/v2",
   "record_date_cn": "2026-10-09",
-  "observed_at": "2026-10-09T14:54:04+08:00",
+  "observed_at": "2026-10-09T15:55:15+08:00",
   "direction": "ALIGNED",
-  "direction_reason": "Agent Brain remains aligned and is waiting for the 2026-10-09 post-close prospective gate. DAO2 C corrected the previously detected drift: the derived-close migration workflow was removed, fail-closed contracts/verifiers/checkpoint were restored, and no derived or public-return row was admitted.",
+  "direction_reason": "Agent Brain remains aligned and is waiting for the 2026-10-09 post-close prospective gate. One-time FFD evidence checks were completed fail-closed: A has no historical coverage for its frozen controls, while C returned the three target OHLC rows but failed the frozen authoritative-provider binding and admitted zero rows. Automatic FFD re-query is disabled.",
   "repository": {
     "full_name": "pkwoksam4-web/dao-gp-agent",
-    "main_head_before_archive": "f3af5e7bce228170dcc00347d8dee69598e871c6",
-    "new_workflow_runs_after_previous_archive": 5
+    "main_head_before_archive": "41096974016f0661364c1b28f32914f806346515",
+    "new_workflow_runs_after_previous_archive": 8
   },
   "daily_actual_increment": {
     "prospective_samples_added_this_audit": 0,
     "admissible_dao2_rows_added_this_audit": 0,
-    "head_transitions_since_previous_archive": 1,
-    "note": "C control-plane correction only; no prospective sample or admissible DAO2 row was added, and CI success is not counted as data/model progress."
+    "head_transitions_since_previous_archive": 2,
+    "note": "A/C FFD evidence reduced source uncertainty but added no prospective sample or admissible DAO2 row; CI success is not treated as data/model progress."
   },
   "agent_brain": {
     "direction": "ALIGNED",
@@ -51,13 +51,17 @@
     "direction": "ALIGNED",
     "modules": {
       "A": {
-        "head": "9dd592798bfc7171a459b7b96a4f89a58b6453b1",
-        "latest_guard_run": 37725191768,
-        "guard_conclusion": "success_consistency_only_not_data_pass",
+        "head": "151c5eae495d7a052d26efa6eb19a7f33bf2aca1",
+        "latest_guard_run": 37901734016,
+        "guard_conclusion": "success_consistency_only_status_blocked",
         "status": "STALLED_REQUIRES_ACTION",
-        "action": "Wait for readable iFinD, targeted L2, or original carrier; require Jessica four-field exact identity before residual admission.",
+        "action": "FFD order-size-flow route closed: published historical coverage starts 2026-05-26, after all frozen controls and residual dates. Do not spend quota or re-query unless coverage expands backward; otherwise wait for readable iFinD, targeted L2, or another original carrier and require Jessica 32/32 exact identity.",
         "external_minimum": "Authorized original carrier bytes covering the frozen 16-key manifest.",
-        "restart_trigger": "New readable authorized raw carrier"
+        "restart_trigger": "New readable authorized raw carrier, or FFD contract publishes exact locked definition with coverage reaching the frozen residual window.",
+        "ffd_evidence_path": "data/dao2/modules/A_FFD_ORDER_SIZE_FLOW_COVERAGE_EVIDENCE_V1.json",
+        "ffd_latest_run": 37901733987,
+        "ffd_latest_artifact_id": 11602159473,
+        "ffd_latest_artifact_digest": "sha256:070c26ebc602e00f610cf13afae4a117aa53682b52446926a7cd46284aa26381"
       },
       "B": {
         "head": "38859f37e4d49aa2bc743a6ff1127b7ad85c455b",
@@ -69,18 +73,21 @@
         "restart_trigger": "Authoritative carrier"
       },
       "C": {
-        "head": "32e77cb41abdcc35ca714cfe44932a64a5c161a4",
-        "latest_guard_run": 37894325210,
-        "latest_preflight_run": 37894325235,
+        "head": "09fa7bdf80cd1d1ba1a3cbb6041e4c6bdc3acdc1",
+        "latest_guard_run": 37900046313,
+        "latest_preflight_run": 37900046356,
         "guard_conclusion": "success_fail_closed_consistency_only_not_series_pass",
         "status": "BLOCKED_SECTOR_SERIES_UNBOUND",
-        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; three 801020.SI direct raw closes unresolved",
-        "drift": "PREVIOUS_DRIFT_CORRECTED_AT_CURRENT_HEAD; public-return reconstruction was rejected for admission and the derived-close migration workflow was removed.",
-        "corrective_action": "COMPLETED: restored frozen derived admission contract, module state, rebuild contract, fail-closed guard/verifier/tests, and series checkpoint; disabled derived-close migration workflow.",
-        "external_minimum": "Traceable supplier original same-day OHLC for 801020.SI on 20210806, 20211008, 20211022 plus neighbor rows.",
-        "restart_trigger": "New supplier raw file only",
-        "preflight_artifact_id": 11598698965,
-        "preflight_artifact_digest": "sha256:bf1b1d8096a4a6c0ede1606c0c96b8fdd5d11fd0775d0d581806e9b0de4a5650"
+        "current_evidence": "required=43084; admissible=42783; missing=301; derived admitted=0; FFD found all three 801020.SI target OHLC rows plus six exact neighbor anchors, but provider/taxonomy binding failed and FFD rows admitted=0.",
+        "drift": "NONE_CURRENT: FFD evidence retained as crosscheck only; frozen provider set and admission contract unchanged; automatic FFD re-query disabled.",
+        "corrective_action": "Keep FFD evidence fail-closed. Re-open admission only if immutable source/provider evidence binds FFD to an already-qualified authoritative historical provider without changing the frozen standard.",
+        "external_minimum": "Traceable authoritative supplier original same-day OHLC, or qualifying immutable source binding for the preserved FFD raw responses.",
+        "restart_trigger": "New supplier raw file or qualifying provider-source binding only",
+        "preflight_artifact_id": 11601699204,
+        "preflight_artifact_digest": "sha256:a6aed22714cac418a9c32f92a376d84656b1c2ae575ba1076492ff4177f58826",
+        "ffd_probe_run": 37897977466,
+        "ffd_probe_artifact_id": 11600713150,
+        "ffd_binding_decision": "FAIL_BINDING"
       },
       "D": {
         "head": "2a7056ffd61885046e34dc1494bc668143d96793",
@@ -118,6 +125,8 @@
     "derived_close_admitted": false,
     "public_route_repeated_after_frozen_restart_condition": true,
     "drift_corrected_at_current_head": true,
-    "derived_close_migration_workflow_present": false
+    "derived_close_migration_workflow_present": false,
+    "ffd_rows_admitted": false,
+    "ffd_automatic_requery_enabled": false
   }
 }
