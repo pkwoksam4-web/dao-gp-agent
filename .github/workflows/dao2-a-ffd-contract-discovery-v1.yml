@@ -6,6 +6,11 @@ on:
       - gp/dao2-a-main-net-flow
     paths:
       - '.github/workflows/dao2-a-ffd-contract-discovery-v1.yml'
+  pull_request:
+    branches:
+      - gp/dao2-migration-20260920
+    paths:
+      - '.github/workflows/dao2-a-ffd-contract-discovery-v1.yml'
   workflow_dispatch:
 
 permissions:
@@ -76,7 +81,6 @@ jobs:
                               walk(v, f'{path}[{i}]')
 
               walk(catalog)
-              # Keep only the smallest useful matching objects to avoid huge duplicate nesting.
               dedup = []
               seen = set()
               for item in sorted(result['matches'], key=lambda x: len(json.dumps(x['object'], ensure_ascii=False))):
