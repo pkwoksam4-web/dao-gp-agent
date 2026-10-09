@@ -1,0 +1,239 @@
+name: DAO2 C FFD 298 Direct Close Recovery V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-ffd-298-direct-close-recovery-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Query only the 298 remaining exact close cells
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib, json, os, urllib.error, urllib.request
+          from collections import defaultdict
+          from pathlib import Path
+
+          OUT = Path('artifact_ffd_c_298')
+          OUT.mkdir(exist_ok=True)
+          endpoint = 'https://ffd.findesk.cn/api/query'
+          api_key = os.environ.get('FFD_API_KEY', '').strip()
+          ledger = json.loads(Path('data/dao2/modules/C_301_GAP_LEDGER_V1.json').read_text(encoding='utf-8'))
+          schema = ledger['row_schema']
+          rows = [dict(zip(schema, r)) for r in ledger['rows']]
+          already_bound = {
+              ('801020.SI', '20210806'),
+              ('801020.SI', '20211008'),
+              ('801020.SI', '20211022'),
+          }
+          targets = []
+          for r in rows:
+              key = (str(r['sector_code']), str(r['trade_date']))
+              if key in already_bound:
+                  continue
+              if r.get('gap_class') == 'DERIVED_CLOSE_EVIDENCE_ONLY' and r.get('current_provenance_type') == 'DERIVED_CLOSE':
+                  targets.append(r)
+
+          assert len(targets) == 298, len(targets)
+          assert len({(r['sector_code'], r['trade_date']) for r in targets}) == 298
+          assert not already_bound.intersection({(r['sector_code'], r['trade_date']) for r in targets})
+          # One field per missing key; fail before any API request if the scope unexpectedly grows.
+          expected_requested_cells = len(targets)
+          assert expected_requested_cells <= 300
+
+          by_date = defaultdict(list)
+          for r in targets:
+              by_date[str(r['trade_date'])].append(r)
+
+          result = {
+              'artifact': 'DAO2_C_FFD_298_DIRECT_CLOSE_RECOVERY_V1',
+              'provider': 'FFD / FinDesk',
+              'endpoint': endpoint,
+              'vendor_binding_checkpoint': 'data/dao2/modules/C_SECTOR_FFD_801020_BINDING_CHECKPOINT_V1.json',
+              'query_scope': {
+                  'target_rows': 298,
+                  'requested_fields_per_row': 1,
+                  'field': 'close',
+                  'expected_requested_cells': expected_requested_cells,
+                  'excluded_already_bound_keys': sorted([list(x) for x in already_bound]),
+                  'group_count': len(by_date),
+                  'dates': sorted(by_date),
+              },
+              'requests': [],
+              'formal_admission_changed': False,
+              'derived_close_admitted': False,
+              'breadth_derivation_allowed': False,
+          }
+
+          if not api_key:
+              raise RuntimeError('FFD_API_KEY secret absent')
+
+          auth = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json', 'Accept': 'application/json'}
+          returned = {}
+
+          def norm_date(x):
+              s = ''.join(ch for ch in str(x or '') if ch.isdigit())
+              return s[:8]
+
+          def extract_rows(obj):
+              out = []
+              if isinstance(obj, dict):
+                  # FFD structured array form: time/code/close parallel arrays.
+                  times = obj.get('time') or obj.get('date') or obj.get('trade_date')
+                  codes = obj.get('code') or obj.get('codes') or obj.get('ts_code')
+                  closes = obj.get('close')
+                  if isinstance(times, list) and isinstance(codes, list) and isinstance(closes, list):
+                      n = min(len(times), len(codes), len(closes))
+                      for i in range(n):
+                          out.append({'code': str(codes[i]), 'trade_date': norm_date(times[i]), 'close': closes[i]})
+                  elif any(k in obj for k in ('date','trade_date','time')) and any(k in obj for k in ('code','ts_code')) and 'close' in obj and not isinstance(obj.get('close'), (list, dict)):
+                      out.append({
+                          'code': str(obj.get('code') or obj.get('ts_code')),
+                          'trade_date': norm_date(obj.get('trade_date') or obj.get('date') or obj.get('time')),
+                          'close': obj.get('close'),
+                      })
+                  for v in obj.values():
+                      out.extend(extract_rows(v))
+              elif isinstance(obj, list):
+                  for v in obj:
+                      out.extend(extract_rows(v))
+              return out
+
+          for idx, trade_date in enumerate(sorted(by_date), 1):
+              req_rows = sorted(by_date[trade_date], key=lambda r: r['sector_code'])
+              codes = [str(r['sector_code']) for r in req_rows]
+              payload = {
+                  'function': 'history',
+                  'codes': ','.join(codes),
+                  'indicators': 'close',
+                  'start_date': f'{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}',
+                  'end_date': f'{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}',
+                  'options': 'CPS:1',
+                  'coverage_policy': 'return_available_cells',
+              }
+              ent = {'trade_date': trade_date, 'requested_codes': codes, 'requested_code_count': len(codes), 'payload': payload}
+              req = urllib.request.Request(endpoint, data=json.dumps(payload).encode('utf-8'), headers=auth, method='POST')
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as resp:
+                      raw = resp.read(); ent['http_status'] = resp.status
+              except urllib.error.HTTPError as exc:
+                  body = exc.read()
+                  ent['http_status'] = exc.code
+                  ent['error_body_prefix'] = body[:4000].decode('utf-8', errors='replace')
+                  result['requests'].append(ent)
+                  continue
+              raw_name = f'response_{idx:02d}_{trade_date}.json'
+              (OUT / raw_name).write_bytes(raw)
+              ent['raw_file'] = raw_name
+              ent['raw_sha256'] = hashlib.sha256(raw).hexdigest()
+              ent['raw_bytes'] = len(raw)
+              obj = json.loads(raw.decode('utf-8'))
+              adj = obj.get('adjustment_execution') or {}
+              cov = obj.get('coverage') or {}
+              ent['adjustment_effective'] = adj.get('effective')
+              ent['conversion_or_recalculation_by_ffd'] = adj.get('conversion_or_recalculation_by_ffd')
+              ent['coverage_status'] = cov.get('status')
+              ent['missing_cell_count'] = cov.get('missing_cell_count')
+              ent['delivered_points'] = cov.get('delivered_points')
+              ent['customer_billed_points'] = cov.get('customer_billed_points')
+              extracted = extract_rows(obj.get('data'))
+              # Dedupe exact code/date/close triples from recursive extraction.
+              seen = set(); clean = []
+              for r in extracted:
+                  try:
+                      key3 = (str(r['code']), str(r['trade_date']), float(r['close']))
+                  except Exception:
+                      continue
+                  if key3 in seen:
+                      continue
+                  seen.add(key3)
+                  clean.append({'code': key3[0], 'trade_date': key3[1], 'close': key3[2]})
+              ent['extracted_rows'] = clean
+              ent['extracted_count'] = len(clean)
+              for r in clean:
+                  key = (r['code'], r['trade_date'])
+                  if key in returned and returned[key] != r['close']:
+                      raise AssertionError(f'conflicting FFD close for {key}: {returned[key]} vs {r["close"]}')
+                  returned[key] = r['close']
+              result['requests'].append(ent)
+
+          expected = {(str(r['sector_code']), str(r['trade_date'])): r for r in targets}
+          found_keys = set(returned).intersection(expected)
+          missing_keys = sorted(set(expected) - set(returned))
+          extra_keys = sorted(set(returned) - set(expected))
+          comparisons = []
+          exact_2dp = 0
+          mismatch = 0
+          for key in sorted(found_keys):
+              cand = expected[key].get('candidate_close_2dp')
+              ffd_close = returned[key]
+              is_exact = cand is not None and round(float(ffd_close), 2) == round(float(cand), 2)
+              exact_2dp += int(is_exact)
+              mismatch += int(not is_exact)
+              comparisons.append({
+                  'sector_code': key[0], 'trade_date': key[1], 'ffd_close': ffd_close,
+                  'derived_evidence_close_2dp': cand, 'exact_2dp': is_exact,
+              })
+
+          result['recovery'] = {
+              'expected_rows': 298,
+              'found_rows': len(found_keys),
+              'missing_rows': len(missing_keys),
+              'extra_rows': len(extra_keys),
+              'missing_keys': [list(x) for x in missing_keys],
+              'extra_keys': [list(x) for x in extra_keys],
+              'derived_evidence_exact_2dp_rows': exact_2dp,
+              'derived_evidence_mismatch_rows': mismatch,
+              'comparisons': comparisons,
+              'all_http_200': all(x.get('http_status') == 200 for x in result['requests']),
+              'all_no_recalculation': all(x.get('conversion_or_recalculation_by_ffd') is False for x in result['requests']),
+              'all_unadjusted': all(x.get('adjustment_effective') in (None, 'none') for x in result['requests']),
+              'reported_customer_billed_points_sum': sum(int(x.get('customer_billed_points') or 0) for x in result['requests']),
+              'reported_delivered_points_sum': sum(int(x.get('delivered_points') or 0) for x in result['requests']),
+          }
+          if len(found_keys) == 298 and not missing_keys and mismatch == 0 and result['recovery']['all_http_200'] and result['recovery']['all_no_recalculation'] and result['recovery']['all_unadjusted']:
+              result['status'] = 'PASS_298_DIRECT_CLOSE_RECOVERY_NOT_YET_ADMITTED'
+          elif found_keys:
+              result['status'] = 'PARTIAL_DIRECT_CLOSE_RECOVERY_NOT_YET_ADMITTED'
+          else:
+              result['status'] = 'NO_DIRECT_CLOSE_RECOVERY'
+
+          canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+          result['content_sha256_without_hash_field'] = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+          (OUT / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': result['status'],
+              'group_count': result['query_scope']['group_count'],
+              'expected_requested_cells': expected_requested_cells,
+              'found_rows': result['recovery']['found_rows'],
+              'missing_rows': result['recovery']['missing_rows'],
+              'exact_2dp_rows': exact_2dp,
+              'mismatch_rows': mismatch,
+              'reported_customer_billed_points_sum': result['recovery']['reported_customer_billed_points_sum'],
+              'hash': result['content_sha256_without_hash_field'],
+          }, ensure_ascii=False))
+          PY
+      - name: Upload immutable recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-ffd-298-direct-close-recovery-v1
+          path: artifact_ffd_c_298/
+          if-no-files-found: error
+          retention-days: 30
