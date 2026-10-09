@@ -1,0 +1,48 @@
+name: BTC Shadow2 Funding Daily Probe
+
+on:
+  push:
+    branches:
+      - btc-shadow2-rest-rescue-20261009
+    paths:
+      - ".github/workflows/btc-shadow2-funding-daily-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe official Data Vision daily funding paths
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifact
+          : > artifact/probe-metadata.txt
+          for day in 2026-10-01 2026-10-02 2026-10-03 2026-10-04; do
+            name="BTCUSDT-fundingRate-${day}.zip"
+            base="https://data.binance.vision/data/futures/um/daily/fundingRate/BTCUSDT/${name}"
+            cs_status="$(curl --location --silent --show-error --output "artifact/${name}.CHECKSUM" --write-out '%{http_code}' "${base}.CHECKSUM")"
+            cs_rc=$?
+            zip_status="$(curl --location --silent --show-error --output "artifact/${name}" --write-out '%{http_code}' "$base")"
+            zip_rc=$?
+            printf '%s\n' \
+              "day=${day}" \
+              "checksum_http_status=${cs_status}" \
+              "checksum_curl_rc=${cs_rc}" \
+              "zip_http_status=${zip_status}" \
+              "zip_curl_rc=${zip_rc}" \
+              >> artifact/probe-metadata.txt
+          done
+          printf '%s\n' "retrieved_at_utc=$(date --utc +'%Y-%m-%dT%H:%M:%SZ')" >> artifact/probe-metadata.txt
+
+      - name: Upload daily funding probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-shadow2-funding-daily-probe-${{ github.run_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
