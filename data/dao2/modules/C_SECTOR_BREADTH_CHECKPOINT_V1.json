@@ -4,7 +4,7 @@
   "module_id": "C",
   "component": "sector_breadth",
   "blocker": "SECTOR_BREADTH_UNBOUND",
-  "status": "BLOCKED_DEPENDENCIES_AND_FORMULA",
+  "status": "BLOCKED_FORMULA_UNBOUND",
   "blocker_closed_within_module": false,
   "derivation_allowed": false,
   "dependencies": {
@@ -12,7 +12,7 @@
     "sector_series_required_status": "PASS_SUBCOMPONENT",
     "sector_membership_checkpoint": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
     "sector_membership_required_status": "PASS_SUBCOMPONENT",
-    "dependencies_satisfied": false
+    "dependencies_satisfied": true
   },
   "historical_recovery": {
     "factor_identity_confirmed": true,
@@ -29,7 +29,6 @@
     "note": "The outer five-session mapping does not define the underlying same-day sector_breadth_ratio numerator/denominator."
   },
   "blockers": [
-    "SECTOR_SERIES_UNBOUND",
     "exact same-day sector breadth ratio definition remains unrecovered"
   ],
   "safety": {

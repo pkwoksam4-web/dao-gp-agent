@@ -1,0 +1,52 @@
+{
+  "artifact": "DAO2_C_FFD_FULL_SERIES_ADMISSION_AUDIT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_SUBCOMPONENT",
+  "inputs": {
+    "frozen_base_run_id": 35575797301,
+    "frozen_base_rows": 42783,
+    "ffd_801020_direct_rows": 3,
+    "ffd_298_direct_rows": 298,
+    "ffd_direct_rows_total": 301,
+    "derived_close_rows_admitted": 0,
+    "required_membership_run_id": 35575433267,
+    "required_keys": 43084
+  },
+  "set_audit": {
+    "base_patch3_overlap": 0,
+    "base_patch298_overlap": 0,
+    "patch3_patch298_overlap": 0,
+    "union_keys": 43084,
+    "missing_keys": 0,
+    "extra_keys": 0
+  },
+  "frozen_verifier": {
+    "status": "PASS",
+    "rows": 43084,
+    "required_keys": 43084,
+    "observed_keys": 43084,
+    "missing_required_keys": 0,
+    "missing_required_key_sample": [],
+    "no_forward_fill_proven": true,
+    "derived_close_admitted": false,
+    "derived_close_rows_rejected": 0,
+    "full_coverage": true,
+    "errors": []
+  },
+  "output": {
+    "member": "sector_close_formal_ffd_bound.csv.gz",
+    "sha256": "f579ac35c0009e516ab92be0f4c6d36531a7026bde7ccd00e013590e8ea13b70",
+    "rows": 43084
+  },
+  "governance": {
+    "contract_lowered": false,
+    "verifier_modified_for_ffd": false,
+    "derived_close_migrated": false,
+    "forward_fill": false,
+    "synthetic": false,
+    "same_day_direct": true,
+    "breadth_derivation_authorized_by_this_audit": false
+  }
+}

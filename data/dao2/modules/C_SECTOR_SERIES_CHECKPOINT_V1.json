@@ -4,30 +4,22 @@
   "module_id": "C",
   "component": "sector_series",
   "blocker": "SECTOR_SERIES_UNBOUND",
-  "status": "BLOCKED",
-  "blocker_closed_within_module": false,
+  "status": "PASS_SUBCOMPONENT",
+  "blocker_closed_within_module": true,
   "historical_gp_v11_sector_series_recovered": false,
   "candidate_only": true,
   "exact_audit": {
-    "workflow_run_id": 35575797301,
-    "workflow_job_id": 106257284111,
-    "head_sha": "8b002379793ab4a7652fbcce2ec5c98e5633e84c",
-    "status": "BLOCKED",
+    "workflow_run_id": 37914902681,
+    "workflow_job_id": 113768595346,
+    "head_sha": "e23f39a4662d9cc03eaf302cd2b287cb02322ecd",
+    "status": "PASS_SUBCOMPONENT",
     "membership_source_run_id": 35575433267,
     "membership_artifact_id": 10628585296,
     "required_sector_date_keys": 43084,
-    "observed_required_keys": 42786,
-    "missing_required_keys": 298,
+    "observed_required_keys": 43084,
+    "missing_required_keys": 0,
     "duplicate_required_keys": 0,
-    "gap_dates": [
-      "20220303",
-      "20220323",
-      "20220331",
-      "20220414",
-      "20220505",
-      "20220509",
-      "20230908"
-    ],
+    "gap_dates": [],
     "base_provider": "AKShare index_hist_sw / official SW trend",
     "base_missing_keys": 301,
     "official_analysis_patch_rows": 0,
@@ -111,7 +103,7 @@
     },
     "frozen_observed_required_keys": 42783,
     "admitted_derived_close_rows": 0,
-    "logical_observed_required_keys": 42786,
+    "logical_observed_required_keys": 43084,
     "direct_unresolved_keys": [],
     "direct_close_search_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
     "evidence_only_derived_close_rows": 298,
@@ -140,8 +132,8 @@
       "direct_raw_required": 3,
       "admitted_derived_close_rows": 0,
       "coverage_changed": true,
-      "admitted_direct_rows": 3,
-      "remaining_missing_after_direct_admission": 298
+      "admitted_direct_rows": 301,
+      "remaining_missing_after_direct_admission": 0
     },
     "tushare_entitlement_recheck_20261008": {
       "status": "BLOCKED_VENDOR_ENTITLEMENT_REQUIRED",
@@ -176,13 +168,37 @@
       "admitted_rows": 0,
       "route_closed": true,
       "note": "Date-key normalization defect was regression-tested and fixed. After correction, the official source exactly reproduces every frozen row at 2dp but contains none of the 301 missing sector-date keys; no direct close was recovered."
+    },
+    "ffd_298_direct_recovery": {
+      "status": "PASS_BINDING_DIRECT_298_ADMISSION",
+      "binding_checkpoint": "data/dao2/modules/C_SECTOR_FFD_298_DIRECT_BINDING_CHECKPOINT_V1.json",
+      "patch": "data/dao2/modules/C_SECTOR_FFD_298_DIRECT_PATCH_V1.csv",
+      "workflow_run_id": 37907353461,
+      "artifact_id": 11605290540,
+      "admitted_raw_close_rows": 298,
+      "derived_close_rows_admitted": 0,
+      "crosscheck_exact_2dp_rows": 298,
+      "crosscheck_mismatch_rows": 0
+    },
+    "full_series_admission_audit": {
+      "status": "PASS_SUBCOMPONENT",
+      "workflow_run_id": 37914902681,
+      "workflow_job_id": 113768595346,
+      "artifact_id": 11609296558,
+      "artifact_digest": "sha256:7b095dcaa082dac06aeeeb6e8b42b8bfbdddb4a588e09df688067b2a3fb994ea",
+      "evidence_path": "data/dao2/modules/C_SECTOR_FFD_FULL_SERIES_ADMISSION_AUDIT_V1.json",
+      "output_member": "sector_close_formal_ffd_bound.csv.gz",
+      "output_sha256": "f579ac35c0009e516ab92be0f4c6d36531a7026bde7ccd00e013590e8ea13b70",
+      "rows": 43084,
+      "missing": 0,
+      "derived_close_rows_admitted": 0
     }
   },
   "validation": {
     "exact_required_keys_from_pass_membership": true,
     "required_key_count": 43084,
-    "exact_required_key_coverage": "42786/43084",
-    "missing_required_keys": 298,
+    "exact_required_key_coverage": "43084/43084",
+    "missing_required_keys": 0,
     "duplicate_required_keys": 0,
     "same_date_provenance": true,
     "fill_method": "NONE",
@@ -192,17 +208,12 @@
     "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
     "price_basis_binding_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
     "price_basis_unresolved": false,
-    "full_formal_coverage_proven": false,
-    "admissible_coverage": "42786/43084",
+    "full_formal_coverage_proven": true,
+    "admissible_coverage": "43084/43084",
     "admitted_derived_close_rows": 0,
-    "admitted_direct_recovery_rows": 3
+    "admitted_direct_recovery_rows": 301
   },
-  "blockers": [
-    "298 exact Membership-required sector-date close rows remain absent from the admissible series.",
-    "All remaining 298 rows have PASS_EVIDENCE_ONLY_NOT_ADMITTED DERIVED_CLOSE evidence, but contract v1.2 and verifier explicitly reject DERIVED_CLOSE admission.",
-    "FFD PASS_BINDING resolved the three direct historical SW2014 801020.SI gaps without changing the frozen admission gate.",
-    "Series remains BLOCKED until the remaining 298 rows are supplied as admissible direct rows or a separately authorized governance migration occurs."
-  ],
+  "blockers": [],
   "evidence_boundary": {
     "akshare_and_official_sw_trend_same_gap_pattern": true,
     "no_forward_fill": true,
@@ -221,8 +232,9 @@
     "swsresearch_frozen_overlap_exact_42783": true,
     "swsresearch_gap_rows_admitted": 0,
     "ffd_direct_binding_pass": true,
-    "ffd_direct_rows_admitted": 3,
-    "ffd_not_equated_to_upstream_brand": true
+    "ffd_direct_rows_admitted": 301,
+    "ffd_not_equated_to_upstream_brand": true,
+    "ffd_298_direct_binding_pass": true
   },
   "safety": {
     "candidate_only": true,

@@ -48,12 +48,12 @@
       "historical_sector_package_recovered": false
     },
     "sector_series": {
-      "status": "BLOCKED_298_DERIVED_CLOSE_EVIDENCE_ONLY",
+      "status": "PASS_SUBCOMPONENT",
       "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
-      "full_formal_coverage_proven": false,
+      "full_formal_coverage_proven": true,
       "required_sector_date_keys": 43084,
-      "observed_required_keys": 42786,
-      "missing_required_keys": 298,
+      "observed_required_keys": 43084,
+      "missing_required_keys": 0,
       "duplicate_required_keys": 0,
       "same_date_provenance": true,
       "fill_method": "NONE",
@@ -116,10 +116,10 @@
       "potential_coverage_after_future_governance_migration": "43084/43084",
       "manual_intervention_required": false,
       "manual_intervention_evidence": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
-      "manual_intervention_status": "DIRECT_GAPS_RESOLVED_REMAINING_298_NOT_ADMITTED",
-      "admissible_coverage": "42786/43084",
-      "admitted_direct_recovery_rows": 3,
-      "resume_condition": "Obtain admissible direct rows for the remaining 298 keys or separately authorize and verify a DERIVED_CLOSE governance migration.",
+      "manual_intervention_status": "NOT_REQUIRED_SERIES_PASS",
+      "admissible_coverage": "43084/43084",
+      "admitted_direct_recovery_rows": 301,
+      "resume_condition": "Series PASS_SUBCOMPONENT; proceed only to breadth identity/formula recovery.",
       "gap_ledger_v1": {
         "status": "PASS_LEDGER_COMPLETE_SERIES_STILL_BLOCKED",
         "ledger_path": "data/dao2/modules/C_301_GAP_LEDGER_V1.json",
@@ -143,6 +143,12 @@
         "patch": "data/dao2/modules/C_SECTOR_FFD_801020_DIRECT_PATCH_V1.csv",
         "admitted_rows": 3,
         "remaining_direct_rows": 0
+      },
+      "ffd_298_direct_recovery": {
+        "status": "PASS_BINDING_DIRECT_298_ADMISSION",
+        "admitted_rows": 298,
+        "binding_checkpoint": "data/dao2/modules/C_SECTOR_FFD_298_DIRECT_BINDING_CHECKPOINT_V1.json",
+        "full_series_audit": "data/dao2/modules/C_SECTOR_FFD_FULL_SERIES_ADMISSION_AUDIT_V1.json"
       }
     },
     "sector_membership_pit": {
@@ -157,11 +163,11 @@
       "artifact_id": 10628585296
     },
     "sector_breadth": {
-      "status": "BLOCKED_PENDING_SERIES_PASS",
+      "status": "BLOCKED_FORMULA_UNBOUND",
       "checkpoint": "data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json",
       "derivation_allowed": false,
       "membership_dependency_closed": true,
-      "series_dependency_closed": false
+      "series_dependency_closed": true
     },
     "verifier": {
       "path": "scripts/dao2_sector_pit_verify_v1.py",
@@ -183,18 +189,18 @@
       "note": "Current Tushare token is present, but sw_daily access is denied. Series remains blocked pending authoritative vendor raw OHLC."
     },
     "latest_subcomponent_checkpoint": {
-      "component": "sector_membership_pit",
+      "component": "sector_series",
       "status": "PASS_SUBCOMPONENT",
-      "path": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json",
-      "workflow_run_id": 35575433267,
-      "artifact_id": 10628585296
+      "path": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json",
+      "workflow_run_id": 37914902681,
+      "artifact_id": 11609296558
     }
   },
   "open_blockers": [
-    "SECTOR_SERIES_UNBOUND",
     "SECTOR_BREADTH_UNBOUND"
   ],
   "closed_blockers": [
-    "SECTOR_MEMBERSHIP_PIT_UNBOUND"
+    "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+    "SECTOR_SERIES_UNBOUND"
   ]
 }
