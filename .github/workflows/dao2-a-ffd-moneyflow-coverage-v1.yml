@@ -24,88 +24,95 @@ jobs:
       FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - name: Probe zero-charge coverage for FFD main-net definitions
+      - name: Validate FFD public main-net on frozen controls
         shell: bash
         run: |
           python - <<'PY'
-          import concurrent.futures, hashlib, json, os, urllib.error, urllib.request
+          import hashlib, json, os, time, urllib.error, urllib.request
+          from decimal import Decimal
           from pathlib import Path
 
           OUT=Path('artifact_ffd_moneyflow_coverage'); OUT.mkdir(exist_ok=True)
           endpoint='https://ffd.findesk.cn/api/query'
           token=os.environ.get('FFD_API_KEY','').strip()
           controls_doc=json.loads(Path('data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json').read_text(encoding='utf-8'))
-          manifest=json.loads(Path('data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json').read_text(encoding='utf-8'))
-          controls=controls_doc['controls']
+          definition_id='ffd.public_main_net.v1'
+          selected_dates={'2021-09-24','2022-05-06'}
+          controls=[r for r in controls_doc['controls'] if r['trade_date'] in selected_dates]
 
-          by_date={}
-          for r in controls:
-              by_date.setdefault(r['trade_date'], set()).add(r['ts_code'])
-          for line in manifest['serialized_payload'].splitlines():
-              code,date=line.split(',',1)
-              by_date.setdefault(date, set()).add(code)
+          def expected_main(r):
+              n=r['normalized_row']
+              return (Decimal(n['buy_lg_amount'])+Decimal(n['buy_elg_amount'])-Decimal(n['sell_lg_amount'])-Decimal(n['sell_elg_amount']))*Decimal('10000')
 
-          definitions=['ffd.public_main_net.v1','ffd.licensed_main_net.v1']
           result={
-              'artifact':'DAO2_A_FFD_MAIN_NET_COVERAGE_V1',
+              'artifact':'DAO2_A_FFD_PUBLIC_MAIN_NET_IDENTITY_V1',
               'secret_present':bool(token),
-              'definitions':definitions,
+              'definition_id':definition_id,
               'control_scope_path':'data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json',
               'control_set_sha256':controls_doc['control_set_sha256'],
-              'residual_manifest_path':'data/dao2/modules/A_16_KEY_SET_HASH_MANIFEST_20261007.json',
-              'residual_key_set_sha256':manifest['key_set_sha256'],
-              'probe_dates':sorted(by_date),
-              'mode':'coverage',
-              'coverage_policy':'strict',
+              'selected_control_count':len(controls),
+              'expected':[
+                  {'ts_code':r['ts_code'],'trade_date':r['trade_date'],'expected_main_net_flow_cny':str(expected_main(r).quantize(Decimal('0.01')))}
+                  for r in controls
+              ],
               'requests':[],
+              'coverage_retry_2023':[],
               'formal_admission_changed':False,
           }
           if not token:
               result['status']='NO_FFD_API_KEY_SECRET'
           else:
               headers={'Authorization':f'Bearer {token}','Content-Type':'application/json','Accept':'application/json'}
-              work=[]
-              for definition_id in definitions:
-                  for date,codes in sorted(by_date.items()):
-                      work.append((definition_id,date,sorted(codes)))
 
-              def one(args):
-                  definition_id,date,codes=args
+              by_date={}
+              for r in controls:
+                  by_date.setdefault(r['trade_date'],[]).append(r['ts_code'])
+              idx=0
+              for date,codes in sorted(by_date.items()):
+                  idx+=1
                   payload={
-                      'function':'ffd_money_flow',
-                      'scope':'stock',
-                      'codes':','.join(codes),
-                      'trade_date':date,
-                      'detail':False,
-                      'definition_id':definition_id,
-                      'coverage_policy':'strict',
-                      'mode':'coverage',
-                      'output_mode':'raw',
-                      'format':'json',
+                      'function':'ffd_money_flow','scope':'stock','codes':','.join(sorted(codes)),
+                      'trade_date':date,'detail':False,'definition_id':definition_id,
+                      'coverage_policy':'strict','mode':'data','output_mode':'raw','format':'json'
                   }
-                  entry={'definition_id':definition_id,'trade_date':date,'codes':codes,'payload':payload}
+                  entry={'kind':'identity_data','trade_date':date,'codes':sorted(codes),'payload':payload}
                   try:
                       req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
-                      with urllib.request.urlopen(req,timeout=20) as resp:
+                      with urllib.request.urlopen(req,timeout=30) as resp:
                           raw=resp.read(); entry['http_status']=resp.status
-                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest()
-                      try: entry['response']=json.loads(raw.decode('utf-8'))
-                      except Exception: entry['response_text_prefix']=raw[:6000].decode('utf-8',errors='replace')
+                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest(); (OUT/f'identity_{idx}.json').write_bytes(raw)
+                      entry['response']=json.loads(raw.decode('utf-8'))
                   except urllib.error.HTTPError as e:
                       body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
                   except Exception as e:
                       entry['error']=f'{type(e).__name__}: {e}'
-                  return entry
+                  result['requests'].append(entry)
+                  time.sleep(2.5)
 
-              with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-                  entries=list(ex.map(one,work))
-              entries.sort(key=lambda x:(x['definition_id'],x['trade_date']))
-              for idx,entry in enumerate(entries,1):
-                  raw=json.dumps(entry.get('response',{}),ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8') if 'response' in entry else b''
-                  if raw:
-                      fn=f'coverage_{idx:02d}.json'; (OUT/fn).write_bytes(raw); entry['normalized_raw_file']=fn
-              result['requests']=entries
-              result['status']='COVERAGE_PROBE_COMPLETE'
+              retry_dates={
+                  '2023-03-20':['000564.SZ','001337.SZ'],
+                  '2023-05-22':['002118.SZ','002157.SZ','002503.SZ','002504.SZ'],
+              }
+              for date,codes in retry_dates.items():
+                  payload={
+                      'function':'ffd_money_flow','scope':'stock','codes':','.join(codes),
+                      'trade_date':date,'detail':False,'definition_id':definition_id,
+                      'coverage_policy':'strict','mode':'coverage','output_mode':'raw','format':'json'
+                  }
+                  entry={'kind':'coverage_retry','trade_date':date,'codes':codes,'payload':payload}
+                  try:
+                      req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
+                      with urllib.request.urlopen(req,timeout=30) as resp:
+                          raw=resp.read(); entry['http_status']=resp.status
+                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest(); entry['response']=json.loads(raw.decode('utf-8'))
+                  except urllib.error.HTTPError as e:
+                      body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
+                  except Exception as e:
+                      entry['error']=f'{type(e).__name__}: {e}'
+                  result['coverage_retry_2023'].append(entry)
+                  time.sleep(2.5)
+
+              result['status']='IDENTITY_AND_2023_COVERAGE_PROBE_COMPLETE'
 
           canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'))
           result['content_sha256_without_hash_field']=hashlib.sha256(canonical.encode('utf-8')).hexdigest()
@@ -113,10 +120,9 @@ jobs:
           print(json.dumps({
               'status':result['status'],
               'secret_present':result['secret_present'],
-              'definitions':definitions,
-              'probe_dates':result['probe_dates'],
-              'request_count':len(result.get('requests',[])),
-              'http_statuses':[r.get('http_status') for r in result.get('requests',[])],
+              'selected_control_count':result['selected_control_count'],
+              'data_http_statuses':[r.get('http_status') for r in result.get('requests',[])],
+              'coverage_2023_http_statuses':[r.get('http_status') for r in result.get('coverage_retry_2023',[])],
               'result_sha256':result['content_sha256_without_hash_field'],
           },ensure_ascii=False))
           PY
