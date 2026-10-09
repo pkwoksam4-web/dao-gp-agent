@@ -22,24 +22,13 @@
     "neighbor_exact_matches": 6,
     "neighbor_mismatches": 0,
     "contract_lowered": false,
-    "verifier_modified_for_ffd": false
+    "verifier_modified_for_ffd": false,
+    "upstream_brand_equivalence_claimed": false
   },
   "targets": [
-    {
-      "industry_code": "801020.SI",
-      "trade_date": "20210806",
-      "close": 3037.61
-    },
-    {
-      "industry_code": "801020.SI",
-      "trade_date": "20211008",
-      "close": 3913.73
-    },
-    {
-      "industry_code": "801020.SI",
-      "trade_date": "20211022",
-      "close": 3702.52
-    }
+    {"industry_code": "801020.SI", "trade_date": "20210806", "close": 3037.61},
+    {"industry_code": "801020.SI", "trade_date": "20211008", "close": 3913.73},
+    {"industry_code": "801020.SI", "trade_date": "20211022", "close": 3702.52}
   ],
   "admission": {
     "direct_patch": "data/dao2/modules/C_SECTOR_FFD_801020_DIRECT_PATCH_V1.csv",
@@ -56,6 +45,14 @@
   "test_provenance": {
     "red_workflow_run_id": 37906615315,
     "red_expected_failure": "FAIL_BINDING != PASS_BINDING",
+    "green_apply_workflow_run_id": 37907024810,
+    "green_apply_commit": "e8fd4adec63cd01849448fbe66d3bed05f9b7504",
+    "green_tests": {
+      "ffd_direct_binding": "3/3 PASS",
+      "sector_governance_guard_tests": "3/3 PASS",
+      "sector_governance_guard": "PASS derived_close_admitted=false, missing=298",
+      "module_state_guard": "PASS status=BLOCKED"
+    },
     "test_path": "scripts/test_dao2_c_ffd_direct_binding_v1.py"
   }
 }
