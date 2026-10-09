@@ -1,0 +1,182 @@
+{
+  "artifact": "DAO2_C_SECTOR_FFD_298_DIRECT_BINDING_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_BINDING_DIRECT_298_NOT_DERIVED",
+  "binding": {
+    "vendor_identity": "FFD / FinDesk",
+    "vendor_contract_version": "0.8.15-consensus-estimates-20261008-r2",
+    "vendor_contract_raw_sha256": "274630e658eab0025e437543fddbe2a1db09d03da07bb830288816472a9dc05a",
+    "binding_checkpoint_801020": "data/dao2/modules/C_SECTOR_FFD_801020_BINDING_CHECKPOINT_V1.json",
+    "public_contract_evidence": "data/dao2/modules/C_SECTOR_FFD_PUBLIC_HISTORY_CONTRACT_EVIDENCE_V1.json",
+    "same_interface_semantics_as_bound_801020": true,
+    "upstream_brand_equivalence_claimed": false
+  },
+  "source": {
+    "workflow_run_id": 37907353461,
+    "workflow_job_id": 113743921185,
+    "artifact_id": 11605290540,
+    "artifact_digest": "sha256:7a54393f8495fda174c7ff1a376f4c4f0d8173fd6feb088af785b898da21f569",
+    "result_content_sha256": "617283bd986e1ba0d0ddb27c457a1088c39d246374cc022de9731563da14bc61",
+    "raw_response_manifest": [
+      {
+        "trade_date": "20210806",
+        "requested_code_count": 27,
+        "extracted_count": 27,
+        "raw_file": "response_01_20210806.json",
+        "raw_sha256": "98e9e7027f350f6c11d215099188f18ff24e16dc6871673db5158f236136c5f2",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20211008",
+        "requested_code_count": 27,
+        "extracted_count": 27,
+        "raw_file": "response_02_20211008.json",
+        "raw_sha256": "f78a86ff1d58f3d898090b304f59749a562b212259cdbe3e0c8289c604153991",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20211022",
+        "requested_code_count": 27,
+        "extracted_count": 27,
+        "raw_file": "response_03_20211022.json",
+        "raw_sha256": "baf8769766b507fe238c8c6c31add49cd4aac941b85002cd885f71e983ad0269",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20220303",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_04_20220303.json",
+        "raw_sha256": "7466b9dcfb196dab61d7554d735c509d44e93ae92ba7b831b82216c5584f7464",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20220323",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_05_20220323.json",
+        "raw_sha256": "3d504ef1931e5a0ad5445c9b45ec35a404decadcdec939ac061e3afbc05fd3ea",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20220331",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_06_20220331.json",
+        "raw_sha256": "d5f5541ac4d3bd4a775c8f38bbb05ce40c5be714f274d0065b899feca02a791d",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20220414",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_07_20220414.json",
+        "raw_sha256": "c5b8f9a6944745ca208bd205a5611968f03870d250dc782b3a2ead78fa155f53",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20220505",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_08_20220505.json",
+        "raw_sha256": "c959c6df9ae3ebb47cd325be47c69cf800d7a9f6720157b5e11d223eff4b0400",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20220509",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_09_20220509.json",
+        "raw_sha256": "a53c6b156b7bac5f9aa45defc9cf639c4b47c948df20331bfb12ba463a30c64a",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      },
+      {
+        "trade_date": "20230908",
+        "requested_code_count": 31,
+        "extracted_count": 31,
+        "raw_file": "response_10_20230908.json",
+        "raw_sha256": "9a4c7479c97774ee5c357e27ab1f701854baae815de132c99c43360897b85f1d",
+        "http_status": 200,
+        "coverage_status": "complete",
+        "missing_cell_count": 0,
+        "adjustment_effective": "none",
+        "conversion_or_recalculation_by_ffd": false
+      }
+    ]
+  },
+  "validation": {
+    "expected_rows": 298,
+    "found_rows": 298,
+    "missing_rows": 0,
+    "extra_rows": 0,
+    "unique_key_rows": 298,
+    "crosscheck_only_reference": "Wind DERIVED_CLOSE evidence; not used as source provenance",
+    "crosscheck_exact_2dp_rows": 298,
+    "crosscheck_mismatch_rows": 0,
+    "all_http_200": true,
+    "all_unadjusted": true,
+    "all_no_recalculation": true,
+    "same_day_direct_source": true,
+    "fill_method": "NONE",
+    "provenance_type": "RAW_CLOSE"
+  },
+  "admission": {
+    "patch": "data/dao2/modules/C_SECTOR_FFD_298_DIRECT_PATCH_V1.csv",
+    "patch_sha256": "7451e07e81c36bded31e5bb463c247bf96d115952216a3101756d77ddf2c45d1",
+    "admitted_direct_rows": 298,
+    "admitted_derived_rows": 0,
+    "admissible_before": 42786,
+    "admissible_after": 43084,
+    "required": 43084,
+    "missing_before": 298,
+    "missing_after": 0,
+    "series_pass_requires_full_panel_verifier": true,
+    "breadth_reopened": false
+  },
+  "governance": {
+    "contract_lowered": false,
+    "verifier_modified_for_ffd": false,
+    "derived_close_migrated": false,
+    "neighbor_or_derived_match_used_as_provenance_substitute": false,
+    "frozen_42783_rewritten": false,
+    "breadth_reopened": false
+  }
+}
