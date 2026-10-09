@@ -23,108 +23,61 @@ jobs:
     env:
       FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate FFD public main-net on frozen controls
+      - name: Probe historical minute large/extra-large order flow
         shell: bash
         run: |
           python - <<'PY'
           import hashlib, json, os, time, urllib.error, urllib.request
-          from decimal import Decimal
           from pathlib import Path
 
           OUT=Path('artifact_ffd_moneyflow_coverage'); OUT.mkdir(exist_ok=True)
-          endpoint='https://ffd.findesk.cn/api/query'
           token=os.environ.get('FFD_API_KEY','').strip()
-          controls_doc=json.loads(Path('data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json').read_text(encoding='utf-8'))
-          definition_id='ffd.public_main_net.v1'
-          selected_dates={'2021-09-24','2022-05-06'}
-          controls=[r for r in controls_doc['controls'] if r['trade_date'] in selected_dates]
-
-          def expected_main(r):
-              n=r['normalized_row']
-              return (Decimal(n['buy_lg_amount'])+Decimal(n['buy_elg_amount'])-Decimal(n['sell_lg_amount'])-Decimal(n['sell_elg_amount']))*Decimal('10000')
-
-          result={
-              'artifact':'DAO2_A_FFD_PUBLIC_MAIN_NET_IDENTITY_V1',
-              'secret_present':bool(token),
-              'definition_id':definition_id,
-              'control_scope_path':'data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json',
-              'control_set_sha256':controls_doc['control_set_sha256'],
-              'selected_control_count':len(controls),
-              'expected':[
-                  {'ts_code':r['ts_code'],'trade_date':r['trade_date'],'expected_main_net_flow_cny':str(expected_main(r).quantize(Decimal('0.01')))}
-                  for r in controls
-              ],
-              'requests':[],
-              'coverage_retry_2023':[],
-              'formal_admission_changed':False,
-          }
+          base='https://ffd.findesk.cn'
+          headers={'Authorization':f'Bearer {token}','Content-Type':'application/json','Accept':'application/json'}
+          result={'artifact':'DAO2_A_FFD_MINUTE_ORDER_FLOW_HISTORY_PROBE_V1','secret_present':bool(token),'requests':[],'formal_admission_changed':False}
           if not token:
               result['status']='NO_FFD_API_KEY_SECRET'
           else:
-              headers={'Authorization':f'Bearer {token}','Content-Type':'application/json','Accept':'application/json'}
+              try:
+                  req=urllib.request.Request(base+'/api/v1/market/money-flow-minute/catalog',headers={'Accept':'application/json','User-Agent':'dao2-ffd-minute-probe-v1'})
+                  with urllib.request.urlopen(req,timeout=30) as resp:
+                      raw=resp.read(); result['catalog_http_status']=resp.status
+                  result['catalog_sha256']=hashlib.sha256(raw).hexdigest(); (OUT/'catalog.json').write_bytes(raw)
+                  result['catalog']=json.loads(raw.decode('utf-8'))
+              except Exception as e:
+                  result['catalog_error']=f'{type(e).__name__}: {e}'
 
-              by_date={}
-              for r in controls:
-                  by_date.setdefault(r['trade_date'],[]).append(r['ts_code'])
-              idx=0
-              for date,codes in sorted(by_date.items()):
-                  idx+=1
+              probes=[
+                  ('300673.SZ','2021-09-24'),
+                  ('000695.SZ','2023-05-22'),
+              ]
+              for idx,(code,date) in enumerate(probes,1):
                   payload={
-                      'function':'ffd_money_flow','scope':'stock','codes':','.join(sorted(codes)),
-                      'trade_date':date,'detail':False,'definition_id':definition_id,
-                      'coverage_policy':'strict','mode':'data','output_mode':'raw','format':'json'
+                      'codes':[code],
+                      'mode':'range',
+                      'start_date':date+' 09:31:00',
+                      'end_date':date+' 09:31:00',
+                      'buckets':['large','extra_large'],
                   }
-                  entry={'kind':'identity_data','trade_date':date,'codes':sorted(codes),'payload':payload}
+                  entry={'code':code,'trade_date':date,'payload':payload}
                   try:
-                      req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
+                      req=urllib.request.Request(base+'/api/v1/market/money-flow-minute',data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
                       with urllib.request.urlopen(req,timeout=30) as resp:
                           raw=resp.read(); entry['http_status']=resp.status
-                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest(); (OUT/f'identity_{idx}.json').write_bytes(raw)
+                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest(); (OUT/f'minute_{idx}.json').write_bytes(raw)
                       entry['response']=json.loads(raw.decode('utf-8'))
                   except urllib.error.HTTPError as e:
-                      body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
+                      body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:8000].decode('utf-8',errors='replace')
                   except Exception as e:
                       entry['error']=f'{type(e).__name__}: {e}'
                   result['requests'].append(entry)
                   time.sleep(2.5)
-
-              retry_dates={
-                  '2023-03-20':['000564.SZ','001337.SZ'],
-                  '2023-05-22':['002118.SZ','002157.SZ','002503.SZ','002504.SZ'],
-              }
-              for date,codes in retry_dates.items():
-                  payload={
-                      'function':'ffd_money_flow','scope':'stock','codes':','.join(codes),
-                      'trade_date':date,'detail':False,'definition_id':definition_id,
-                      'coverage_policy':'strict','mode':'coverage','output_mode':'raw','format':'json'
-                  }
-                  entry={'kind':'coverage_retry','trade_date':date,'codes':codes,'payload':payload}
-                  try:
-                      req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
-                      with urllib.request.urlopen(req,timeout=30) as resp:
-                          raw=resp.read(); entry['http_status']=resp.status
-                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest(); entry['response']=json.loads(raw.decode('utf-8'))
-                  except urllib.error.HTTPError as e:
-                      body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
-                  except Exception as e:
-                      entry['error']=f'{type(e).__name__}: {e}'
-                  result['coverage_retry_2023'].append(entry)
-                  time.sleep(2.5)
-
-              result['status']='IDENTITY_AND_2023_COVERAGE_PROBE_COMPLETE'
+              result['status']='MINUTE_HISTORY_PROBE_COMPLETE'
 
           canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'))
           result['content_sha256_without_hash_field']=hashlib.sha256(canonical.encode('utf-8')).hexdigest()
           (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-          print(json.dumps({
-              'status':result['status'],
-              'secret_present':result['secret_present'],
-              'selected_control_count':result['selected_control_count'],
-              'data_http_statuses':[r.get('http_status') for r in result.get('requests',[])],
-              'coverage_2023_http_statuses':[r.get('http_status') for r in result.get('coverage_retry_2023',[])],
-              'result_sha256':result['content_sha256_without_hash_field'],
-          },ensure_ascii=False))
+          print(json.dumps({'status':result['status'],'secret_present':result['secret_present'],'http_statuses':[r.get('http_status') for r in result.get('requests',[])],'result_sha256':result['content_sha256_without_hash_field']},ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@v4
         with:
