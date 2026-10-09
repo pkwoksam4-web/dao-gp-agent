@@ -1,9 +1,15 @@
 {
   "artifact": "DAO2_C_SECTOR_FFD_801020_DIRECT_OHLC_EVIDENCE_V1",
-  "version": "1.0",
+  "version": "1.1",
   "module_id": "C",
   "component": "sector_series",
-  "status": "PASS_DIRECT_OHLC_EVIDENCE_NOT_ADMITTED_PROVIDER_CONTRACT_UNBOUND",
+  "status": "PASS_CROSSCHECK_EVIDENCE_NOT_ADMITTED",
+  "binding_audit": {
+    "path": "data/dao2/modules/C_SECTOR_FFD_801020_BINDING_AUDIT_V1.json",
+    "decision": "FAIL_BINDING",
+    "contract_lowered": false,
+    "provider_set_expanded": false
+  },
   "probe": {
     "workflow": "DAO2 C FFD 801020 OHLC Probe V1",
     "workflow_run_id": 37897977466,
@@ -39,13 +45,16 @@
     "neighbor_anchor_exact_matches": 6,
     "neighbor_anchor_mismatches": 0,
     "direct_close_inference_used": false,
-    "rounded_return_used": false
+    "rounded_return_used": false,
+    "price_basis_unadjusted": true,
+    "same_day_ohlc": true,
+    "raw_response_bytes_preserved": true
   },
   "admission_decision": {
     "admitted_rows": 0,
     "formal_series_coverage_changed": false,
-    "reason": "Frozen direct-close recovery contract requires a bound authoritative vendor/source identity. C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1 lists Wind/iFind, RiceQuant RQData, Founder Securities DataCube, and sufficiently entitled Tushare sw_daily as acceptable authoritative providers. FFD is not currently bound in that frozen provider contract, and the delivered public response intentionally does not expose a qualifying upstream provider identity. Do not relax the contract solely to consume this probe.",
-    "required_before_admission": "Independent governance decision or existing-contract evidence that FFD itself qualifies as an authoritative direct-close vendor identity without changing the frozen admission standard.",
+    "reason": "FFD passes the numeric, same-day, unadjusted, raw-byte and neighbor-overlap checks, but fails the frozen authoritative source/vendor binding gate. The public FFD contract does not expose a qualifying upstream authoritative provider/taxonomy identity for this series, and the frozen accepted provider set does not include FFD. Neighbor exactness cannot substitute for provenance, and the contract is not expanded for this probe.",
+    "required_before_admission": "An immutable/provider-source contract or other existing-contract evidence must bind FFD's 801020.SI history to a qualifying authoritative direct historical source without changing the frozen admission standard.",
     "series_status": "BLOCKED",
     "admissible_coverage": "42783/43084",
     "missing_required_keys": 301,
@@ -55,6 +64,7 @@
   "safety": {
     "frozen_42783_rewritten": false,
     "derived_close_admitted": false,
+    "ffd_direct_rows_admitted": 0,
     "breadth_derivation_allowed": false,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
