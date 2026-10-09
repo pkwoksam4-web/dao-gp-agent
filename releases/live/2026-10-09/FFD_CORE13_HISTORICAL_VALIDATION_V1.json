@@ -1,0 +1,62 @@
+{
+  "schema": "agent-brain-ffd-historical-ranking-validation/v1",
+  "status": "HISTORICAL_VALIDATED_CANDIDATE_ONLY",
+  "source": {
+    "provider": "FFD",
+    "workflow_run_id": 37907523735,
+    "artifact_id": 11605765248,
+    "artifact_zip_sha256": "840817307d24fdab29ef543aeec566df4a03c4c7994ac58663bbc7a37b13eb62",
+    "normalized_csv_sha256": "1b6a8cd4e38494a5b9470034f3cb15b6fc73f9ccd9021f9cf372cb968a45abff",
+    "normalized_json_sha256": "2dc179fb23e7b4c9687693ceadad5f4fa0889a072ba4563f7b7332af15fac378",
+    "data_window": ["2026-02-26", "2026-10-08"],
+    "common_trading_days": 150,
+    "rows": 1950,
+    "symbols": 13,
+    "fields": ["open", "high", "low", "close", "volume", "amount"],
+    "ffd_options": "CPS:1"
+  },
+  "ranking_contract": {
+    "universe": "WAT-core10-final-v1",
+    "candidate_version": "core10-stable-reversion-lowvol-candidate-v1",
+    "weight_version": "RWV-STABLE4-CORE10-CAND-V1",
+    "factors": ["return_5d", "return_20d", "return_30d", "realized_vol_20d"],
+    "candidate_score": "-0.25 * sum(Core10 average percent ranks)",
+    "settlement": "20th completed common trading session strictly after anchor",
+    "top_bottom": "top3 mean 20D forward return minus bottom3 mean 20D forward return",
+    "rank_ic": "Spearman with average ranks"
+  },
+  "available_fully_settled_cohorts": {
+    "count": 100,
+    "anchor_first": "2026-04-10",
+    "anchor_last": "2026-09-02",
+    "target_last": "2026-10-08"
+  },
+  "canonical_60_historical_cohorts": {
+    "selection": "latest 60 fully settled cohorts",
+    "anchor_first": "2026-06-10",
+    "anchor_last": "2026-09-02",
+    "target_first": "2026-07-09",
+    "target_last": "2026-10-08",
+    "count": 60,
+    "mean_rank_ic": 0.21307562191941987,
+    "median_rank_ic": 0.25876016233642096,
+    "positive_rank_ic_share": 0.7666666666666667,
+    "mean_top_bottom_spread": 0.07073657072047208,
+    "median_top_bottom_spread": 0.07442630500740921,
+    "positive_spread_share": 0.75
+  },
+  "normalization": {
+    "prices": "FFD raw unadjusted CPS:1 values",
+    "volume_shares": "FFD native share count",
+    "volume_longbridge_compatibility": "round(FFD volume / 100)",
+    "amount_cny": "FFD native CNY amount with decimal precision"
+  },
+  "governance": {
+    "live_shadow_eligible": false,
+    "prospective_evidence": false,
+    "automatic_promotion": false,
+    "production_ranking_use": false,
+    "overlap_warning": "20D cohorts overlap materially and are not independent observations",
+    "prospective_requirement_unchanged": true
+  }
+}
