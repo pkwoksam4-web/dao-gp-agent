@@ -1,10 +1,10 @@
 {
   "artifact": "DAO2_C_SECTOR_BREADTH_CHECKPOINT_V1",
-  "version": "1.0",
+  "version": "1.1",
   "module_id": "C",
   "component": "sector_breadth",
   "blocker": "SECTOR_BREADTH_UNBOUND",
-  "status": "BLOCKED_FORMULA_UNBOUND",
+  "status": "EVIDENCE_EXHAUSTED_EXACT_FORMULA_CARRIER_MISSING",
   "blocker_closed_within_module": false,
   "derivation_allowed": false,
   "dependencies": {
@@ -16,24 +16,65 @@
   },
   "historical_recovery": {
     "factor_identity_confirmed": true,
+    "weight_pct_confirmed": 8,
     "exact_numerator_denominator_recovered": false,
     "threshold_recovered": false,
     "normalization_recovered": false,
     "clipping_recovered": false,
-    "executable_formula_recovered": false
+    "executable_formula_recovered": false,
+    "crosswalk_evidence": "data/GP12_CANDIDATE_HISTORICAL_CROSSWALK_V482.json",
+    "historical_archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "historical_archive_materialization_status": "UNAVAILABLE_NO_AUTHORIZED_RAW_BYTE_PATH"
   },
   "gp12_candidate_outer_formula": {
     "formula": "2*mean(sector_breadth_ratio[-5:])-1",
     "status": "UNAPPROVED_NEW_PROPOSAL",
     "ratio_definition_recovered": false,
-    "note": "The outer five-session mapping does not define the underlying same-day sector_breadth_ratio numerator/denominator."
+    "historical_adoption_forbidden": true,
+    "note": "The outer five-session mapping does not define the underlying same-day sector_breadth_ratio numerator/denominator and is not recovered GP V1.1 authority."
+  },
+  "evidence_exhaustion": {
+    "as_of": "2026-10-09",
+    "series_dependency_now_closed": true,
+    "membership_dependency_now_closed": true,
+    "searched_surfaces": [
+      "DAO2 repository and gp/strategy-asset-recovery-v482 factor/crosswalk evidence",
+      "PR #8 changed-file recovery layer",
+      "pinned Jessica-Zhangyj/dlquant commit 6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+      "Project and personal Library indexed historical files",
+      "historical v11_offline_backtest_v3_10.zip Library carrier",
+      "connected Google Drive exact-name searches for v11_offline_backtest and run_panel_backtest",
+      "Replit FruitfulStormySign and AgedCapitalDeclaration read-only inspection attempts",
+      "targeted public source-code search for sector breadth/citic_l1 implementation"
+    ],
+    "negative_findings": [
+      "No authoritative GP V1.1 Sector Breadth numerator/denominator implementation recovered.",
+      "No historical same-day sector_breadth_ratio definition recovered.",
+      "No authoritative threshold, five-session aggregation adoption, signed mapping, normalization or clipping recovered.",
+      "Historical ZIP identity exists but raw bytes remain non-materializable in the current Project access path.",
+      "Replit agents returned unrelated stale build context and no auditable historical source identity.",
+      "Public implementations describe generic sector breadth only and cannot be bound to GP V1.1."
+    ],
+    "forbidden_retries": [
+      "Do not enumerate or fit candidate numerator/denominator formulas.",
+      "Do not adopt 2*mean(last5)-1 as historical solely because it is the GP12 candidate proposal.",
+      "Do not infer the formula from factor weight or downstream performance.",
+      "Do not repeat broad public searches, Drive exact-name searches, or Replit inspection without a new carrier signal.",
+      "Do not reopen Membership or Series; both are PASS_SUBCOMPONENT."
+    ],
+    "restart_conditions": [
+      "Authoritative historical source/executable containing the Sector Breadth computation becomes readable.",
+      "The existing v11_offline_backtest_v3_10.zip gains an authorized raw-byte materialization path.",
+      "A file-backed historical same-date input/output pair binds stock-level sector membership and moves to the historical Sector Breadth component.",
+      "Multiple authoritative historical component observations uniquely identify the same numerator/denominator and mapping without outcome fitting."
+    ]
   },
   "blockers": [
-    "exact same-day sector breadth ratio definition remains unrecovered"
+    "Exact historical same-day Sector Breadth ratio definition and final mapping remain unrecovered."
   ],
   "safety": {
     "candidate_only": true,
-    "derivation_before_dependencies_forbidden": true,
+    "derivation_before_formula_identity_forbidden": true,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false
   }
