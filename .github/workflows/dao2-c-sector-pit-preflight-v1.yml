@@ -58,7 +58,7 @@ jobs:
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/10628585296/zip" \
             -o /tmp/dao2-c-membership-pass.zip
           test -s /tmp/dao2-c-membership-pass.zip
-      - name: Verify bound Formal calendar and blocked component checkpoints
+      - name: Verify bound Formal calendar and component checkpoints
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
         run: |
@@ -101,7 +101,13 @@ jobs:
           assert membership["blocker_closed_within_module"] is True, membership
           assert membership["validation"]["unresolved_rows_zero"] is True, membership
           assert membership["validation"]["full_formal_symbol_date_coverage_proven"] is True, membership
-          assert series["blocker_closed_within_module"] is False, series
+          assert series["status"] in {"BLOCKED","PASS_SUBCOMPONENT"}, series
+          if series["status"]=="PASS_SUBCOMPONENT":
+              assert series["blocker_closed_within_module"] is True, series
+              assert series["validation"]["missing_required_keys"]==0, series
+              assert series["validation"]["full_formal_coverage_proven"] is True, series
+          else:
+              assert series["blocker_closed_within_module"] is False, series
           series_forward_fill = series["validation"].get("forward_fill", series["validation"].get("forward_fill_allowed"))
           assert series_forward_fill is False, series
           assert breadth["blocker_closed_within_module"] is False, breadth
@@ -114,7 +120,8 @@ jobs:
               open_blockers.append("SECTOR_SERIES_UNBOUND")
           if not breadth["blocker_closed_within_module"]:
               open_blockers.append("SECTOR_BREADTH_UNBOUND")
-          assert open_blockers==["SECTOR_SERIES_UNBOUND","SECTOR_BREADTH_UNBOUND"], open_blockers
+          expected_open=["SECTOR_BREADTH_UNBOUND"] if series["blocker_closed_within_module"] else ["SECTOR_SERIES_UNBOUND","SECTOR_BREADTH_UNBOUND"]
+          assert open_blockers==expected_open, open_blockers
 
           out={
               "artifact":"DAO2_C_SECTOR_PIT_PREFLIGHT_V1",
@@ -136,7 +143,7 @@ jobs:
               "historical_gp_v11_sector_package_recovered":False,
               "tushare_token_available":bool(os.environ.get("TUSHARE_TOKEN")),
               "candidate_materialization_note":"Token presence is capability-only evidence. No provider bytes are accepted by this preflight.",
-              "closed_blockers":["SECTOR_MEMBERSHIP_PIT_UNBOUND"],
+              "closed_blockers":["SECTOR_MEMBERSHIP_PIT_UNBOUND"] + (["SECTOR_SERIES_UNBOUND"] if series["blocker_closed_within_module"] else []),
               "blockers":open_blockers,
               "model_freeze_allowed":False,
               "oos_metrics_allowed":False
