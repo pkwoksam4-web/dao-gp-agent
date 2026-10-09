@@ -1,0 +1,74 @@
+{
+  "artifact": "DAO2_A_FFD_ORDER_SIZE_FLOW_COVERAGE_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "A",
+  "component": "main_net_flow",
+  "status": "CLOSED_NO_REQUIRED_HISTORICAL_COVERAGE",
+  "probe": {
+    "workflow": "DAO2 A FFD Moneyflow Coverage V1",
+    "workflow_run_id": 37898590748,
+    "head_sha": "8cfdb863cd051a4c03cb0de02793e99deba9b477",
+    "artifact_id": 11601651554,
+    "artifact_digest": "sha256:c6f99932a7e0db08507706feaee5487bad275029f3958204dfd60e4dec74d6ad",
+    "result_sha256_without_hash_field": "1af2ca879f04b1c551cf2dd3865d02841cb3e84f77206317dc58cb1e58c31b93",
+    "api_function": "ffd_money_flow",
+    "scope": "stock",
+    "definition_id": "ffd.public_order_size_flow.v1",
+    "definition_version": "1.2.0",
+    "detail": true,
+    "mode": "coverage",
+    "coverage_policy": "strict",
+    "customer_points_charged": 0
+  },
+  "public_contract": {
+    "source_workflow": "DAO2 A FFD Contract Discovery V1",
+    "workflow_run_id": 37897938406,
+    "artifact_id": 11600229232,
+    "artifact_digest": "sha256:19735f91e5000f6d0ba3cac84e17a7678ad439264136b0dda08fcfe85dcffe3c",
+    "definition_locked": true,
+    "fallback_to_other_definition": false,
+    "unit": "CNY",
+    "scale": 1,
+    "value_origin": "observed_native_order_size_legs",
+    "source_dataset": "stock_order_size_flow"
+  },
+  "frozen_controls": {
+    "path": "data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json",
+    "control_count": 8,
+    "required_exact_comparisons": 32,
+    "control_set_sha256": "cfd220523c16f042326ae9cde6f931589b06d42ab9f961765b615ccbcdebb242",
+    "control_dates": ["2020-06-08", "2021-09-24", "2022-05-06", "2023-05-22"]
+  },
+  "coverage_results": [
+    {"trade_date":"2020-06-08","http_status":200,"coverage_status":"not_published","returned_rows":0,"quota_used":0,"raw_sha256":"31bfb29d3e90f2a9d048c39952225fd78c73d7c5d63c8222d6490eab8498d3f8"},
+    {"trade_date":"2021-09-24","http_status":200,"coverage_status":"not_published","returned_rows":0,"quota_used":0,"raw_sha256":"674e1cba67f3456d8433267572dc6668c3abec661160e69b32f1cd562fdfa647"},
+    {"trade_date":"2022-05-06","http_status":200,"coverage_status":"not_published","returned_rows":0,"quota_used":0,"raw_sha256":"613049ed84433f273445dd9912c94b46331ea17ed728a073cc83fb95dce00ccb"},
+    {"trade_date":"2023-05-22","http_status":200,"coverage_status":"not_published","returned_rows":0,"quota_used":0,"raw_sha256":"da4bb16abf9405073dcd51fcebe0910aa89ea7cbcb3387ad52d1bb6853d466bc"}
+  ],
+  "coverage_contract_observed": {
+    "historical_coverage_start": "2026-05-26",
+    "historical_coverage_end": "2026-10-08",
+    "manifest_status": "not_published",
+    "provider_identity_disclosed": false,
+    "zero_fill": false
+  },
+  "decision": {
+    "identity_gate_executed": false,
+    "reason_identity_gate_not_executed": "All four frozen control dates predate the published historical coverage start, so no financial values exist to compare. Running data mode would consume quota without a possible 32/32 identity pass.",
+    "residual_query_executed": false,
+    "residual_rows_admitted": 0,
+    "formal_resolved_rows_changed": false,
+    "route_result": "REJECT_FFD_ORDER_SIZE_FLOW_FOR_A_FORMAL_WINDOW_NO_HISTORICAL_COVERAGE",
+    "reopen_condition": "FFD publishes the exact locked order-size definition for dates at or before the A residual window and coverage mode confirms the frozen control dates before any paid data query."
+  },
+  "governance": {
+    "proxy_used": false,
+    "definition_fallback_used": false,
+    "zero_fill_used": false,
+    "tolerance_used": false,
+    "MAIN_NET_FLOW_UNBOUND": "OPEN",
+    "checkpoint": null,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
