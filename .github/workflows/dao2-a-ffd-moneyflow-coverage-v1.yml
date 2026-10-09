@@ -23,51 +23,88 @@ jobs:
     env:
       FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
     steps:
-      - name: Retry historical minute large/extra-large order flow with backoff
+      - uses: actions/checkout@v4
+      - name: Compare historical minute large/extra-large legs to Jessica controls
         shell: bash
         run: |
           python - <<'PY'
           import hashlib, json, os, random, time, urllib.error, urllib.request
+          from decimal import Decimal
           from pathlib import Path
 
           OUT=Path('artifact_ffd_moneyflow_coverage'); OUT.mkdir(exist_ok=True)
           token=os.environ.get('FFD_API_KEY','').strip()
-          base='https://ffd.findesk.cn'
+          endpoint='https://ffd.findesk.cn/api/v1/market/money-flow-minute'
           headers={'Authorization':f'Bearer {token}','Content-Type':'application/json','Accept':'application/json'}
-          result={'artifact':'DAO2_A_FFD_MINUTE_ORDER_FLOW_HISTORY_PROBE_V1_1','secret_present':bool(token),'requests':[],'formal_admission_changed':False}
+          controls_doc=json.loads(Path('data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json').read_text(encoding='utf-8'))
+          controls={(r['ts_code'],r['trade_date']):r for r in controls_doc['controls']}
+          selected=[('300673.SZ','2021-09-24'),('000695.SZ','2023-05-22')]
+          result={'artifact':'DAO2_A_FFD_MINUTE_ORDER_FLOW_CONTROL_IDENTITY_V1','secret_present':bool(token),'selected':selected,'requests':[],'formal_admission_changed':False}
+
+          def dec(x): return Decimal(str(x)) if x not in (None,'') else Decimal('0')
           if not token:
               result['status']='NO_FFD_API_KEY_SECRET'
           else:
-              probes=[('300673.SZ','2021-09-24'),('000695.SZ','2023-05-22')]
               time.sleep(5)
-              for idx,(code,date) in enumerate(probes,1):
-                  payload={'codes':[code],'mode':'range','start_date':date+' 09:31:00','end_date':date+' 09:31:00','buckets':['large','extra_large']}
+              for idx,(code,date) in enumerate(selected,1):
+                  payload={
+                      'codes':[code],
+                      'mode':'range',
+                      'start_date':date+' 09:31:00',
+                      'end_date':date+' 15:00:00',
+                      'interval':5,
+                      'buckets':['large','extra_large']
+                  }
                   entry={'code':code,'trade_date':date,'payload':payload,'attempts':[]}
                   for attempt in range(1,5):
-                      attempt_rec={'attempt':attempt}
+                      rec={'attempt':attempt}
                       try:
-                          req=urllib.request.Request(base+'/api/v1/market/money-flow-minute',data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
-                          with urllib.request.urlopen(req,timeout=45) as resp:
-                              raw=resp.read(); attempt_rec['http_status']=resp.status
-                          attempt_rec['raw_sha256']=hashlib.sha256(raw).hexdigest(); attempt_rec['response']=json.loads(raw.decode('utf-8'))
-                          (OUT/f'minute_{idx}.json').write_bytes(raw)
-                          entry['attempts'].append(attempt_rec)
+                          req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
+                          with urllib.request.urlopen(req,timeout=60) as resp:
+                              raw=resp.read(); rec['http_status']=resp.status
+                          rec['raw_sha256']=hashlib.sha256(raw).hexdigest(); rec['response']=json.loads(raw.decode('utf-8'))
+                          (OUT/f'control_{idx}.json').write_bytes(raw)
+                          entry['attempts'].append(rec)
                           break
                       except urllib.error.HTTPError as e:
-                          body=e.read(); attempt_rec['http_status']=e.code; attempt_rec['error_body_prefix']=body[:8000].decode('utf-8',errors='replace')
-                          entry['attempts'].append(attempt_rec)
-                          if e.code != 429: break
-                          time.sleep(4*attempt + random.random())
+                          body=e.read(); rec['http_status']=e.code; rec['error_body_prefix']=body[:8000].decode('utf-8',errors='replace'); entry['attempts'].append(rec)
+                          if e.code!=429: break
+                          time.sleep(4*attempt+random.random())
                       except Exception as e:
-                          attempt_rec['error']=f'{type(e).__name__}: {e}'; entry['attempts'].append(attempt_rec); break
+                          rec['error']=f'{type(e).__name__}: {e}'; entry['attempts'].append(rec); break
+                  good=next((a.get('response') for a in entry['attempts'] if a.get('http_status')==200 and a.get('response')),None)
+                  if good:
+                      rows=((good.get('data') or {}).get('rows') or [])
+                      sums={
+                          'large_active_buy_amount':sum((dec(r.get('large_active_buy_amount')) for r in rows),Decimal('0')),
+                          'extra_large_active_buy_amount':sum((dec(r.get('extra_large_active_buy_amount')) for r in rows),Decimal('0')),
+                          'large_active_sell_amount':sum((dec(r.get('large_active_sell_amount')) for r in rows),Decimal('0')),
+                          'extra_large_active_sell_amount':sum((dec(r.get('extra_large_active_sell_amount')) for r in rows),Decimal('0')),
+                      }
+                      c=controls[(code,date)]['normalized_row']
+                      expected={
+                          'large_active_buy_amount':Decimal(c['buy_lg_amount']),
+                          'extra_large_active_buy_amount':Decimal(c['buy_elg_amount']),
+                          'large_active_sell_amount':Decimal(c['sell_lg_amount']),
+                          'extra_large_active_sell_amount':Decimal(c['sell_elg_amount']),
+                      }
+                      entry['row_count']=len(rows)
+                      entry['sums_raw']={k:str(v) for k,v in sums.items()}
+                      entry['jessica_expected_10k_cny']={k:str(v) for k,v in expected.items()}
+                      scales=[Decimal('1'),Decimal('0.0001'),Decimal('10000')]
+                      entry['scale_tests']=[]
+                      for scale in scales:
+                          diffs={k:str(sums[k]*scale-expected[k]) for k in sums}
+                          exact=all(sums[k]*scale==expected[k] for k in sums)
+                          entry['scale_tests'].append({'ffd_raw_to_jessica_10k_scale':str(scale),'exact_4_of_4':exact,'diffs':diffs})
                   result['requests'].append(entry)
                   time.sleep(6)
-              result['status']='MINUTE_HISTORY_RETRY_COMPLETE'
+              result['status']='CONTROL_IDENTITY_PROBE_COMPLETE'
 
-          canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'))
+          canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'),default=str)
           result['content_sha256_without_hash_field']=hashlib.sha256(canonical.encode('utf-8')).hexdigest()
-          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-          print(json.dumps({'status':result['status'],'secret_present':result['secret_present'],'attempt_statuses':[[a.get('http_status') for a in r.get('attempts',[])] for r in result.get('requests',[])],'result_sha256':result['content_sha256_without_hash_field']},ensure_ascii=False))
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2,default=str)+'\n',encoding='utf-8')
+          print(json.dumps({'status':result['status'],'secret_present':result['secret_present'],'comparisons':[{'code':r['code'],'date':r['trade_date'],'row_count':r.get('row_count'),'exact_scales':[x['ffd_raw_to_jessica_10k_scale'] for x in r.get('scale_tests',[]) if x['exact_4_of_4']]} for r in result.get('requests',[])],'result_sha256':result['content_sha256_without_hash_field']},ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@v4
         with:
