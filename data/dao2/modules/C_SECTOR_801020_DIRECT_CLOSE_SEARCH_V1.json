@@ -3,7 +3,7 @@
   "version": "1.0",
   "module_id": "C",
   "component": "sector_series",
-  "status": "FFD_DIRECT_BINDING_ADMITTED_PARTIAL_SERIES_STILL_BLOCKED",
+  "status": "MANUAL_VENDOR_EXPORT_REQUIRED",
   "target_identity": {
     "candidate_code": "801020.SI",
     "alternate_vendor_code": "801020.INDX",
@@ -317,33 +317,66 @@
   ],
   "governance": {
     "series_checkpoint_remains": "BLOCKED",
-    "admissible_coverage": "42786/43084",
+    "admissible_coverage": "42783/43084",
     "frozen_base_rows": 42783,
     "admitted_derived_close_rows": 0,
     "evidence_only_derived_close_rows": 298,
-    "potential_coverage_after_future_governance_migration": "43084/43084",
-    "remaining_direct_rows": 0,
+    "potential_coverage_after_future_governance_migration": "43081/43084",
+    "remaining_direct_rows": 3,
     "breadth_derivation_allowed": false,
     "model_freeze_allowed": false,
     "oos_metrics_allowed": false,
-    "invariant": "DERIVED_CLOSE evidence MUST NOT expand admissible coverage until C_SECTOR_REBUILD_CONTRACT_V1, verifier, tests and governance guard are explicitly migrated.",
-    "admitted_direct_rows": 3
+    "invariant": "DERIVED_CLOSE evidence MUST NOT expand admissible coverage until C_SECTOR_REBUILD_CONTRACT_V1, verifier, tests and governance guard are explicitly migrated."
   },
   "manual_intervention": {
-    "required": false,
-    "reason": "The three direct 801020.SI gaps are resolved by a PASS_BINDING FFD direct carrier. No additional vendor export is required for these three keys.",
-    "status": "DIRECT_GAPS_RESOLVED",
-    "target_rows": [],
-    "preserve_original_bytes": true
+    "required": true,
+    "reason": "All currently accessible public/connected raw-close routes are exhausted or lack target-date coverage. Remaining authoritative carriers require an authorized vendor login/export.",
+    "acceptable_providers": [
+      "Wind",
+      "iFind",
+      "RiceQuant RQData",
+      "Founder Securities DataCube",
+      "Tushare sw_daily with sufficient entitlement"
+    ],
+    "minimum_export_dates": [
+      "20210805",
+      "20210806",
+      "20210809",
+      "20210930",
+      "20211008",
+      "20211011",
+      "20211021",
+      "20211022",
+      "20211025"
+    ],
+    "required_fields": [
+      "code",
+      "trade_date",
+      "open",
+      "high",
+      "low",
+      "close"
+    ],
+    "optional_fields": [
+      "pre_close"
+    ],
+    "preserve_original_bytes": true,
+    "target_rows": [
+      "801020.SI/20210806",
+      "801020.SI/20211008",
+      "801020.SI/20211022"
+    ],
+    "status": "MANUAL_VENDOR_EXPORT_REQUIRED",
+    "do_not_resume_public_search": true,
+    "resume_condition": "Receive one original authoritative vendor export covering the required neighbor+target dates."
   },
   "authoritative_access_resolution": {
-    "current_environment_entitlement_available": true,
+    "current_environment_entitlement_available": false,
     "checked_paths": {
       "Wind/iFind": "NO_DIRECT_CONNECTOR_IN_CURRENT_CHAT",
       "RiceQuant RQData": "NO_CONNECTED_PLUGIN_OR_CREDENTIAL",
       "Founder Securities DataCube": "NO_TOKEN_OR_REPO_CONFIGURATION_FOUND",
-      "Tushare sw_daily": "NO_SUFFICIENT_PERMISSION_ALREADY_PROVEN_DO_NOT_RETRY",
-      "FFD / FinDesk": "PASS_BINDING_DIRECT_OHLC_ADMITTED_3"
+      "Tushare sw_daily": "NO_SUFFICIENT_PERMISSION_ALREADY_PROVEN_DO_NOT_RETRY"
     },
     "public_unconstrained_search_stopped": true,
     "repeated_dead_routes_forbidden": [
@@ -353,13 +386,5 @@
       "Tushare sw_daily without sufficient permission",
       "public news rounded-return reverse engineering"
     ]
-  },
-  "resolved_direct_carrier": {
-    "provider": "FFD / FinDesk",
-    "status": "PASS_BINDING_PARTIAL_ADMISSION",
-    "binding_checkpoint": "data/dao2/modules/C_SECTOR_FFD_801020_BINDING_CHECKPOINT_V1.json",
-    "patch": "data/dao2/modules/C_SECTOR_FFD_801020_DIRECT_PATCH_V1.csv",
-    "admitted_rows": 3,
-    "remaining_direct_rows": 0
   }
 }
