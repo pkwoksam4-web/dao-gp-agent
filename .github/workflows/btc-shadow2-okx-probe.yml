@@ -1,0 +1,61 @@
+name: BTC Shadow2 OKX Probe
+
+on:
+  push:
+    branches:
+      - btc-shadow2-rest-rescue-20261009
+    paths:
+      - ".github/workflows/btc-shadow2-okx-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe frozen OKX BTC-USDT-SWAP 5m history
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifact
+          url='https://www.okx.com/api/v5/market/history-candles?instId=BTC-USDT-SWAP&bar=5m&after=1791158400000&limit=100'
+          status="$(curl --location --silent --show-error --output artifact/raw-page.json --write-out '%{http_code}' "$url")"
+          rc=$?
+          printf '%s\n' \
+            "retrieved_at_utc=$(date --utc +'%Y-%m-%dT%H:%M:%SZ')" \
+            "request_url=${url}" \
+            "http_status=${status}" \
+            "curl_rc=${rc}" \
+            "response_sha256=$(sha256sum artifact/raw-page.json 2>/dev/null | cut -d' ' -f1)" \
+            > artifact/probe-metadata.txt
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifact/raw-page.json')
+          out={'json_valid':False,'code':None,'msg':None,'rows':None,'first_ts':None,'last_ts':None,'all_closed':None}
+          try:
+              o=json.loads(p.read_text())
+              out['json_valid']=True
+              out['code']=o.get('code'); out['msg']=o.get('msg')
+              rows=o.get('data') or []
+              out['rows']=len(rows)
+              if rows:
+                  ts=[int(r[0]) for r in rows]
+                  out['first_ts']=ts[0]; out['last_ts']=ts[-1]
+                  out['all_closed']=all(len(r)>=9 and str(r[8])=='1' for r in rows)
+          except Exception as e:
+              out['error']=f'{type(e).__name__}: {e}'
+          Path('artifact/probe-summary.json').write_text(json.dumps(out,indent=2,sort_keys=True))
+          PY
+          exit 0
+
+      - name: Upload OKX probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-shadow2-okx-probe-${{ github.run_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
