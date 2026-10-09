@@ -1,0 +1,63 @@
+name: DAO2 C FFD Public Contract Audit V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-ffd-public-contract-audit-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch public catalog without API key
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib,json,re,urllib.request
+          from pathlib import Path
+          OUT=Path('artifact_ffd_public_contract'); OUT.mkdir(exist_ok=True)
+          url='https://ffd.findesk.cn/api/v1/catalog/public-capabilities'
+          result={'artifact':'DAO2_C_FFD_PUBLIC_CONTRACT_AUDIT_V1','url':url,'credential_used':False,'formal_admission_changed':False}
+          try:
+            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'application/json'})
+            with urllib.request.urlopen(req,timeout=30) as r: raw=r.read(); result['http_status']=r.status
+            (OUT/'public_capabilities.json').write_bytes(raw); result['raw_sha256']=hashlib.sha256(raw).hexdigest(); result['raw_bytes']=len(raw)
+            obj=json.loads(raw.decode('utf-8'))
+            text=json.dumps(obj,ensure_ascii=False)
+            # recursively collect dicts that look relevant to generic history/index/OHLC capability
+            hits=[]
+            needles=('history','historical','ohlc','open','high','low','close','index','指数','历史','行情')
+            def walk(x,path='$'):
+              if isinstance(x,dict):
+                blob=json.dumps(x,ensure_ascii=False).lower()
+                if any(n.lower() in blob for n in needles):
+                  # keep bounded dict excerpts and provenance/source-like fields
+                  keys={k:v for k,v in x.items() if str(k).lower() in {'id','name','function','endpoint','path','version','source','sources','provider','providers','upstream','lineage','provenance','dataset','asset','description','status','coverage','fields','notes','title'}}
+                  if keys: hits.append({'path':path,'selected':keys})
+                for k,v in x.items(): walk(v,path+'.'+str(k))
+              elif isinstance(x,list):
+                for i,v in enumerate(x): walk(v,path+f'[{i}]')
+            walk(obj)
+            result['relevant_entries']=hits[:300]
+            # exact textual evidence for authority-provider names anywhere in contract
+            names=['Wind','万得','iFind','同花顺','Tushare','RiceQuant','RQData','DataCube','方正','申万','SWS','upstream','provider','source','provenance','lineage']
+            result['authority_tokens_present']={n:(n.lower() in text.lower()) for n in names}
+            result['status']='PASS_PUBLIC_CONTRACT_FETCHED'
+          except Exception as e:
+            result['status']='PUBLIC_CONTRACT_FETCH_ERROR'; result['error']=f'{type(e).__name__}: {e}'
+          can=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'),default=str); result['content_sha256_without_hash_field']=hashlib.sha256(can.encode()).hexdigest(); (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2,default=str)+'\n',encoding='utf-8')
+          print(json.dumps({'status':result['status'],'http_status':result.get('http_status'),'raw_sha256':result.get('raw_sha256'),'entries':len(result.get('relevant_entries',[])),'authority_tokens_present':result.get('authority_tokens_present'),'hash':result['content_sha256_without_hash_field']},ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-ffd-public-contract-audit-v1
+          path: artifact_ffd_public_contract/
+          if-no-files-found: error
+          retention-days: 30
