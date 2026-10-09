@@ -1,0 +1,69 @@
+{
+  "schema": "agent-brain-ffd-historical-robustness/v1",
+  "status": "HISTORICAL_ROBUSTNESS_PASS_DESCRIPTIVE_ONLY",
+  "source_evidence": "releases/live/2026-10-09/FFD_CORE13_HISTORICAL_VALIDATION_V1.json",
+  "source_branch": "agent-brain/ffd-core13-history-v1",
+  "source_workflow_run_id": 37907523735,
+  "source_artifact_id": 11605765248,
+  "candidate_version": "core10-stable-reversion-lowvol-candidate-v1",
+  "weight_version": "RWV-STABLE4-CORE10-CAND-V1",
+  "canonical_sample": {
+    "type": "latest_60_fully_settled_historical_cohorts",
+    "anchor_first": "2026-06-10",
+    "anchor_last": "2026-09-02",
+    "count": 60,
+    "forward_horizon_completed_sessions": 20,
+    "overlap_warning": "Adjacent 20D cohorts overlap materially and are not independent observations."
+  },
+  "newey_west_lag19": {
+    "rank_ic": {
+      "mean": 0.21307562191941987,
+      "se": 0.08508765819034994,
+      "t_stat": 2.504189519974184,
+      "ci95": [0.04630687633747943, 0.3798443675013603]
+    },
+    "top3_bottom3_spread": {
+      "mean": 0.07073657072047208,
+      "se": 0.01969784799360984,
+      "t_stat": 3.591081154825627,
+      "ci95": [0.03212949808005223, 0.10934364336089195]
+    }
+  },
+  "moving_block_bootstrap": {
+    "block_length": 20,
+    "replications": 20000,
+    "seed": 20261009,
+    "rank_ic_mean_ci95": [0.0725525378408242, 0.42815094260694764],
+    "top3_bottom3_spread_mean_ci95": [0.03825741853325951, 0.1051835693442971],
+    "interpretation": "Descriptive robustness only; overlapping horizons and one historical period prohibit treating the bootstrap as prospective qualification."
+  },
+  "window_sensitivity": {
+    "latest_40": {"mean_rank_ic": 0.2291182588, "positive_rank_ic_share": 0.725, "mean_spread": 0.0596159833, "positive_spread_share": 0.725},
+    "latest_60": {"mean_rank_ic": 0.21307562191941987, "positive_rank_ic_share": 0.7666666666666667, "mean_spread": 0.07073657072047208, "positive_spread_share": 0.75},
+    "latest_80": {"mean_rank_ic": 0.1917652251, "positive_rank_ic_share": 0.7375, "mean_spread": 0.0535494630, "positive_spread_share": 0.675},
+    "latest_100": {"mean_rank_ic": 0.1792363362, "positive_rank_ic_share": 0.73, "mean_spread": 0.0598213025, "positive_spread_share": 0.69}
+  },
+  "canonical_60_three_equal_blocks": [
+    {"anchor_first": "2026-06-10", "anchor_last": "2026-07-08", "n": 20, "mean_rank_ic": 0.1809903482, "positive_rank_ic_share": 0.85, "mean_spread": 0.0929777455, "positive_spread_share": 0.80},
+    {"anchor_first": "2026-07-09", "anchor_last": "2026-08-05", "n": 20, "mean_rank_ic": 0.2505957853, "positive_rank_ic_share": 0.75, "mean_spread": 0.07528622945, "positive_spread_share": 0.80},
+    {"anchor_first": "2026-08-06", "anchor_last": "2026-09-02", "n": 20, "mean_rank_ic": 0.2076407322, "positive_rank_ic_share": 0.70, "mean_spread": 0.04394573720, "positive_spread_share": 0.65}
+  ],
+  "pre_anchor_regime_slices": {
+    "equal_weight_core10_prior20_return_positive": {"n": 34, "mean_rank_ic": 0.1337189470, "positive_rank_ic_share": 0.7647, "mean_spread": 0.06532784182, "positive_spread_share": 0.7059},
+    "equal_weight_core10_prior20_return_nonpositive": {"n": 26, "mean_rank_ic": 0.3168497352, "positive_rank_ic_share": 0.7692, "mean_spread": 0.07780952390, "positive_spread_share": 0.8077},
+    "pre_anchor_avg_realized_vol20_at_or_below_median": {"median_threshold": 0.9133620036818777, "n": 30, "mean_rank_ic": 0.1814899527, "positive_rank_ic_share": 0.8, "mean_spread": 0.07368056680, "positive_spread_share": 0.7667},
+    "pre_anchor_avg_realized_vol20_above_median": {"median_threshold": 0.9133620036818777, "n": 30, "mean_rank_ic": 0.2446612911, "positive_rank_ic_share": 0.7333, "mean_spread": 0.06779257465, "positive_spread_share": 0.7333}
+  },
+  "governance": {
+    "historical_only": true,
+    "live_shadow_eligible": false,
+    "prospective_evidence": false,
+    "automatic_promotion": false,
+    "production_ranking_use": false,
+    "production_verification": false,
+    "probability_forecast_generated": false,
+    "prospective_requirement_unchanged": true
+  },
+  "direction": "ALIGNED",
+  "direction_reason": "The frozen ranking contract remains positive across 40/60/80/100 historical windows, all three 20-cohort blocks, and pre-anchor return/volatility slices; overlap-aware uncertainty intervals remain positive for the canonical 60 sample. This is supporting historical evidence only and does not replace prospective Shadow qualification."
+}
