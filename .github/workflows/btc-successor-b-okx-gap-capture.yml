@@ -1,0 +1,57 @@
+name: BTC Successor-B OKX Gap Capture
+
+on:
+  push:
+    branches:
+      - btc-successor-b-okx-gap-20261009
+    paths:
+      - "runtime/btc_successor_b_okx_gap_capture/**"
+      - ".github/workflows/btc-successor-b-okx-gap-capture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify frozen Successor-B OKX gap collector tests
+        working-directory: runtime/btc_successor_b_okx_gap_capture
+        run: python -m unittest -v test_okx_gap_capture.py
+
+      - name: Capture fixed OKX five-day prefix for Successor-B
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/btc-successor-b-okx-gap
+          python runtime/btc_successor_b_okx_gap_capture/okx_gap_capture.py \
+            --out artifacts/btc-successor-b-okx-gap
+          rc=$?
+          printf '%s\n' "$rc" > artifacts/btc-successor-b-okx-gap/collector_exit_code.txt
+          exit 0
+
+      - name: Upload Successor-B OKX gap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-successor-b-okx-gap-${{ github.run_id }}
+          path: artifacts/btc-successor-b-okx-gap/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
+
+      - name: Propagate collector status
+        if: always()
+        shell: bash
+        run: |
+          test -f artifacts/btc-successor-b-okx-gap/collector_exit_code.txt
+          rc="$(cat artifacts/btc-successor-b-okx-gap/collector_exit_code.txt)"
+          exit "$rc"
