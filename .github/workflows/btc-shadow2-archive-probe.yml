@@ -1,0 +1,63 @@
+name: BTC Shadow2 Archive Probe
+
+on:
+  push:
+    branches:
+      - btc-shadow2-rest-rescue-20261009
+    paths:
+      - ".github/workflows/btc-shadow2-archive-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch one frozen official archive and checksum
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifact
+          cd artifact
+          base="https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/5m/BTCUSDT-5m-2026-10-04.zip"
+          checksum_status="$(curl --location --silent --show-error --output BTCUSDT-5m-2026-10-04.zip.CHECKSUM --write-out '%{http_code}' "${base}.CHECKSUM")"
+          checksum_rc=$?
+          zip_status="$(curl --location --silent --show-error --output BTCUSDT-5m-2026-10-04.zip --write-out '%{http_code}' "$base")"
+          zip_rc=$?
+          actual_sha="$(sha256sum BTCUSDT-5m-2026-10-04.zip 2>/dev/null | cut -d' ' -f1)"
+          printf '%s\n' \
+            "retrieved_at_utc=$(date --utc +'%Y-%m-%dT%H:%M:%SZ')" \
+            "checksum_http_status=${checksum_status}" \
+            "checksum_curl_rc=${checksum_rc}" \
+            "zip_http_status=${zip_status}" \
+            "zip_curl_rc=${zip_rc}" \
+            "zip_sha256=${actual_sha}" \
+            > probe-metadata.txt
+          ok=0
+          if [ "$checksum_status" = "200" ] && [ "$zip_status" = "200" ] && [ "$checksum_rc" = "0" ] && [ "$zip_rc" = "0" ]; then
+            sha256sum -c BTCUSDT-5m-2026-10-04.zip.CHECKSUM > checksum-verify.txt 2>&1
+            sha_rc=$?
+            unzip -t BTCUSDT-5m-2026-10-04.zip > zip-test.txt 2>&1
+            unzip_rc=$?
+            if [ "$sha_rc" = "0" ] && [ "$unzip_rc" = "0" ]; then ok=1; fi
+          fi
+          printf '%s\n' "$ok" > probe_ok.txt
+          exit 0
+
+      - name: Upload archive probe artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-shadow2-archive-probe-${{ github.run_id }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Propagate probe status
+        if: always()
+        shell: bash
+        run: |
+          test "$(cat artifact/probe_ok.txt)" = "1"
