@@ -19,7 +19,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     env:
       FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
     steps:
@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import hashlib, json, os, urllib.error, urllib.request
+          import concurrent.futures, hashlib, json, os, urllib.error, urllib.request
           from pathlib import Path
 
           OUT=Path('artifact_ffd_moneyflow_coverage'); OUT.mkdir(exist_ok=True)
@@ -45,10 +45,7 @@ jobs:
               code,date=line.split(',',1)
               by_date.setdefault(date, set()).add(code)
 
-          definitions=[
-              'ffd.public_main_net.v1',
-              'ffd.licensed_main_net.v1',
-          ]
+          definitions=['ffd.public_main_net.v1','ffd.licensed_main_net.v1']
           result={
               'artifact':'DAO2_A_FFD_MAIN_NET_COVERAGE_V1',
               'secret_present':bool(token),
@@ -67,36 +64,47 @@ jobs:
               result['status']='NO_FFD_API_KEY_SECRET'
           else:
               headers={'Authorization':f'Bearer {token}','Content-Type':'application/json','Accept':'application/json'}
-              idx=0
+              work=[]
               for definition_id in definitions:
                   for date,codes in sorted(by_date.items()):
-                      idx += 1
-                      payload={
-                          'function':'ffd_money_flow',
-                          'scope':'stock',
-                          'codes':','.join(sorted(codes)),
-                          'trade_date':date,
-                          'detail':False,
-                          'definition_id':definition_id,
-                          'coverage_policy':'strict',
-                          'mode':'coverage',
-                          'output_mode':'raw',
-                          'format':'json',
-                      }
-                      entry={'definition_id':definition_id,'trade_date':date,'codes':sorted(codes),'payload':payload}
-                      try:
-                          req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
-                          with urllib.request.urlopen(req,timeout=60) as resp:
-                              raw=resp.read(); entry['http_status']=resp.status
-                          entry['raw_sha256']=hashlib.sha256(raw).hexdigest()
-                          fn=f'coverage_{idx:02d}.json'; (OUT/fn).write_bytes(raw); entry['raw_file']=fn
-                          try: entry['response']=json.loads(raw.decode('utf-8'))
-                          except Exception: entry['response_text_prefix']=raw[:6000].decode('utf-8',errors='replace')
-                      except urllib.error.HTTPError as e:
-                          body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
-                      except Exception as e:
-                          entry['error']=f'{type(e).__name__}: {e}'
-                      result['requests'].append(entry)
+                      work.append((definition_id,date,sorted(codes)))
+
+              def one(args):
+                  definition_id,date,codes=args
+                  payload={
+                      'function':'ffd_money_flow',
+                      'scope':'stock',
+                      'codes':','.join(codes),
+                      'trade_date':date,
+                      'detail':False,
+                      'definition_id':definition_id,
+                      'coverage_policy':'strict',
+                      'mode':'coverage',
+                      'output_mode':'raw',
+                      'format':'json',
+                  }
+                  entry={'definition_id':definition_id,'trade_date':date,'codes':codes,'payload':payload}
+                  try:
+                      req=urllib.request.Request(endpoint,data=json.dumps(payload).encode('utf-8'),headers=headers,method='POST')
+                      with urllib.request.urlopen(req,timeout=20) as resp:
+                          raw=resp.read(); entry['http_status']=resp.status
+                      entry['raw_sha256']=hashlib.sha256(raw).hexdigest()
+                      try: entry['response']=json.loads(raw.decode('utf-8'))
+                      except Exception: entry['response_text_prefix']=raw[:6000].decode('utf-8',errors='replace')
+                  except urllib.error.HTTPError as e:
+                      body=e.read(); entry['http_status']=e.code; entry['error']=f'HTTPError: {e}'; entry['error_body_prefix']=body[:6000].decode('utf-8',errors='replace')
+                  except Exception as e:
+                      entry['error']=f'{type(e).__name__}: {e}'
+                  return entry
+
+              with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                  entries=list(ex.map(one,work))
+              entries.sort(key=lambda x:(x['definition_id'],x['trade_date']))
+              for idx,entry in enumerate(entries,1):
+                  raw=json.dumps(entry.get('response',{}),ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8') if 'response' in entry else b''
+                  if raw:
+                      fn=f'coverage_{idx:02d}.json'; (OUT/fn).write_bytes(raw); entry['normalized_raw_file']=fn
+              result['requests']=entries
               result['status']='COVERAGE_PROBE_COMPLETE'
 
           canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(',',':'))
