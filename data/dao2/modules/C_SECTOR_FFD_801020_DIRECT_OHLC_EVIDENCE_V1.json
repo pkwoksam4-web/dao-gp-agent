@@ -1,0 +1,62 @@
+{
+  "artifact": "DAO2_C_SECTOR_FFD_801020_DIRECT_OHLC_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_DIRECT_OHLC_EVIDENCE_NOT_ADMITTED_PROVIDER_CONTRACT_UNBOUND",
+  "probe": {
+    "workflow": "DAO2 C FFD 801020 OHLC Probe V1",
+    "workflow_run_id": 37897977466,
+    "head_sha": "db7ff1a54809b999c8f195d0b71b0cb281ea4286",
+    "artifact_id": 11600713150,
+    "artifact_digest": "sha256:f58ced5ecec4a1a36da6a4d199d3dc29f21dd18abc3b0edff040abbf80bd70b8",
+    "result_sha256_without_hash_field": "18f9210fceaf6602212a7679e855b18d2678e6f0bf587fc673b7e03c21317df4",
+    "query_code": "801020.SI",
+    "price_adjustment": "none",
+    "conversion_or_recalculation_by_ffd": false,
+    "coverage_complete": true,
+    "missing_cells": 0
+  },
+  "raw_response_hashes": {
+    "20210805_20210809": "5e3bc15811276c7d132b77aeb7379c0617e7e4abd1a9d99c433f5b03cfc4e6d2",
+    "20210930_20211011": "24671c53f532ac45b0373b1374f21ca27bf1102a9e3e4171c93a9e3b1eaf4d10",
+    "20211021_20211025": "fd0d33506ee991ac872a2b13559fca83c60a87f1e4096a920ede978626658bd7"
+  },
+  "rows": [
+    {"code":"801020.SI","trade_date":"20210805","open":2952.48,"high":3001.76,"low":2943.09,"close":2954.25,"role":"neighbor","anchor_exact":true},
+    {"code":"801020.SI","trade_date":"20210806","open":2961.26,"high":3040.45,"low":2957.00,"close":3037.61,"role":"target"},
+    {"code":"801020.SI","trade_date":"20210809","open":3068.38,"high":3068.38,"low":3014.31,"close":3048.39,"role":"neighbor","anchor_exact":true},
+    {"code":"801020.SI","trade_date":"20210930","open":3850.43,"high":3976.45,"low":3830.38,"close":3976.45,"role":"neighbor","anchor_exact":true},
+    {"code":"801020.SI","trade_date":"20211008","open":4095.68,"high":4095.68,"low":3869.03,"close":3913.73,"role":"target"},
+    {"code":"801020.SI","trade_date":"20211011","open":3943.97,"high":3977.39,"low":3851.41,"close":3971.72,"role":"neighbor","anchor_exact":true},
+    {"code":"801020.SI","trade_date":"20211021","open":3775.27,"high":3951.30,"low":3775.27,"close":3886.69,"role":"neighbor","anchor_exact":true},
+    {"code":"801020.SI","trade_date":"20211022","open":3850.39,"high":3876.04,"low":3695.16,"close":3702.52,"role":"target"},
+    {"code":"801020.SI","trade_date":"20211025","open":3732.21,"high":3834.31,"low":3675.91,"close":3804.92,"role":"neighbor","anchor_exact":true}
+  ],
+  "validation": {
+    "target_rows_found": 3,
+    "neighbor_rows_found": 6,
+    "neighbor_anchor_exact_matches": 6,
+    "neighbor_anchor_mismatches": 0,
+    "direct_close_inference_used": false,
+    "rounded_return_used": false
+  },
+  "admission_decision": {
+    "admitted_rows": 0,
+    "formal_series_coverage_changed": false,
+    "reason": "Frozen direct-close recovery contract requires a bound authoritative vendor/source identity. C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1 lists Wind/iFind, RiceQuant RQData, Founder Securities DataCube, and sufficiently entitled Tushare sw_daily as acceptable authoritative providers. FFD is not currently bound in that frozen provider contract, and the delivered public response intentionally does not expose a qualifying upstream provider identity. Do not relax the contract solely to consume this probe.",
+    "required_before_admission": "Independent governance decision or existing-contract evidence that FFD itself qualifies as an authoritative direct-close vendor identity without changing the frozen admission standard.",
+    "series_status": "BLOCKED",
+    "admissible_coverage": "42783/43084",
+    "missing_required_keys": 301,
+    "direct_raw_required_under_frozen_contract": 3,
+    "derived_close_evidence_only": 298
+  },
+  "safety": {
+    "frozen_42783_rewritten": false,
+    "derived_close_admitted": false,
+    "breadth_derivation_allowed": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}
