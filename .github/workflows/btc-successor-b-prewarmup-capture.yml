@@ -13,14 +13,45 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: RED - successor-B extended warmup capture tests
+
+      - name: Verify successor-B extended warmup tests
         working-directory: runtime/btc_successor_b_prewarmup_capture
         run: python -m unittest -v test_prewarmup_capture.py
+
+      - name: Capture fixed Binance and OKX extended warmup
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/btc-successor-b-prewarmup
+          python runtime/btc_successor_b_prewarmup_capture/prewarmup_capture.py \
+            --out artifacts/btc-successor-b-prewarmup \
+            --workers 8
+          rc=$?
+          printf '%s\n' "$rc" > artifacts/btc-successor-b-prewarmup/collector_exit_code.txt
+          exit 0
+
+      - name: Upload Successor-B extended warmup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btc-successor-b-prewarmup-${{ github.run_id }}
+          path: artifacts/btc-successor-b-prewarmup/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
+
+      - name: Propagate collector status
+        if: always()
+        shell: bash
+        run: |
+          test -f artifacts/btc-successor-b-prewarmup/collector_exit_code.txt
+          rc="$(cat artifacts/btc-successor-b-prewarmup/collector_exit_code.txt)"
+          exit "$rc"
