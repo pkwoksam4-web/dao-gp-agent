@@ -90,7 +90,10 @@ jobs:
           val['admitted_derived_close_rows']=0
           val['admitted_direct_recovery_rows']=301
           val['same_date_provenance']=True
-          val['fill_method']='NONE'; val['forward_fill']=False; val['synthetic']=False; val['finite_positive_close']=True
+          val['fill_method']='NONE'
+          val['forward_fill']=False
+          val['synthetic']=False
+          val['finite_positive_close']=True
           series['blockers']=[]
           series['evidence_boundary']['ffd_direct_rows_admitted']=301
           series['evidence_boundary']['ffd_298_direct_binding_pass']=True
@@ -141,14 +144,6 @@ jobs:
           state['open_blockers']=['SECTOR_BREADTH_UNBOUND']
           state['closed_blockers']=['SECTOR_MEMBERSHIP_PIT_UNBOUND','SECTOR_SERIES_UNBOUND']
           (B/'C_SECTOR_PIT_STATE_V1.json').write_text(json.dumps(state,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-
-          # Preflight must accept either blocked or PASS Series while keeping Breadth fail-closed.
-          p=Path('.github/workflows/dao2-c-sector-pit-preflight-v1.yml')
-          text=p.read_text(encoding='utf-8')
-          text=text.replace('          assert series["blocker_closed_within_module"] is False, series\n', '          assert series["status"] in {"BLOCKED","PASS_SUBCOMPONENT"}, series\n          if series["status"]=="PASS_SUBCOMPONENT":\n              assert series["blocker_closed_within_module"] is True, series\n              assert series["validation"]["missing_required_keys"]==0, series\n              assert series["validation"]["full_formal_coverage_proven"] is True, series\n          else:\n              assert series["blocker_closed_within_module"] is False, series\n')
-          text=text.replace('          assert open_blockers==["SECTOR_SERIES_UNBOUND","SECTOR_BREADTH_UNBOUND"], open_blockers\n', '          expected_open=["SECTOR_BREADTH_UNBOUND"] if series["blocker_closed_within_module"] else ["SECTOR_SERIES_UNBOUND","SECTOR_BREADTH_UNBOUND"]\n          assert open_blockers==expected_open, open_blockers\n')
-          text=text.replace('              "closed_blockers":["SECTOR_MEMBERSHIP_PIT_UNBOUND"],\n', '              "closed_blockers":["SECTOR_MEMBERSHIP_PIT_UNBOUND"] + (["SECTOR_SERIES_UNBOUND"] if series["blocker_closed_within_module"] else []),\n')
-          p.write_text(text,encoding='utf-8')
           print(json.dumps({'series':'PASS_SUBCOMPONENT','coverage':'43084/43084','derived_admitted':0,'breadth':'BLOCKED_FORMULA_UNBOUND'},ensure_ascii=False))
           PY
       - name: Verify guards before commit
@@ -168,7 +163,6 @@ jobs:
           git add data/dao2/modules/C_SECTOR_FFD_FULL_SERIES_ADMISSION_AUDIT_V1.json \
                   data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json \
                   data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json \
-                  data/dao2/modules/C_SECTOR_PIT_STATE_V1.json \
-                  .github/workflows/dao2-c-sector-pit-preflight-v1.yml
+                  data/dao2/modules/C_SECTOR_PIT_STATE_V1.json
           git commit -m 'state(dao2-c): close Series with 43084 direct-provenance rows'
           git push origin HEAD:gp/dao2-c-sector-pit
