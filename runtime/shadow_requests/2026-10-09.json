@@ -1,0 +1,12 @@
+{
+  "schema": "agent-brain-shadow-request/v1",
+  "trade_date_cn": "2026-10-09",
+  "requested_at": "2026-10-09T10:00:57.602Z",
+  "pit_manifest_path": "runtime/pit_manifests/2026-10-09.json",
+  "modes": [
+    "CORE10_RANKING_ONLY",
+    "CORE13_OBSERVATION_ONLY"
+  ],
+  "probability_forecast_allowed": false,
+  "probability_blocker": "PROBABILITY_V1_6_EXECUTABLE_MISSING"
+}
