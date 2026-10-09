@@ -1,23 +1,32 @@
 name: DAO2 C FFD 801020 OHLC Probe V1
 
 on:
-  push:
-    branches:
-      - gp/dao2-c-sector-pit
-    paths:
-      - '.github/workflows/dao2-c-ffd-ohlc-probe-v1.yml'
-  pull_request:
-    branches:
-      - gp/dao2-migration-20260920
-    paths:
-      - '.github/workflows/dao2-c-ffd-ohlc-probe-v1.yml'
   workflow_dispatch:
+    inputs:
+      confirm_requery:
+        description: 'Explicitly allow a fresh FFD API query. Leave false when existing raw evidence is sufficient.'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  no_requery_guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce explicit re-query opt-in
+        shell: bash
+        run: |
+          if [ "${{ inputs.confirm_requery }}" = "true" ]; then
+            echo "Explicit FFD re-query authorized for this manual run."
+          else
+            echo "FFD re-query disabled. Reuse preserved evidence from run 37897977466 / artifact 11600713150."
+          fi
+
   probe:
+    if: ${{ inputs.confirm_requery == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
