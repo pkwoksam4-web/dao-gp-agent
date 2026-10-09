@@ -1,0 +1,180 @@
+name: FFD Agent Brain Core13 History V1
+
+on:
+  push:
+    branches:
+      - agent-brain/ffd-core13-history-v1
+    paths:
+      - '.github/workflows/ffd-agent-brain-core13-history-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch Core13 history from FFD
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv, hashlib, json, os, time, urllib.request
+          from pathlib import Path
+
+          OUT=Path('artifact_ffd_agent_brain_core13_history_v1')
+          RAW=OUT/'raw'
+          OUT.mkdir(exist_ok=True); RAW.mkdir(exist_ok=True)
+          symbols=['000636.SZ','002138.SZ','002156.SZ','600392.SH','600487.SH','600522.SH','600667.SH','600703.SH','601991.SH','605358.SH','000977.SZ','000938.SZ','000063.SZ']
+          token=os.environ.get('FFD_API_KEY','').strip()
+          if not token:
+              raise RuntimeError('FFD_API_KEY missing')
+
+          start_date='2026-01-01'
+          end_date='2026-10-08'
+          fields=['open','high','low','close','volume','amount']
+          all_rows={}
+          requests=[]
+
+          for idx,s in enumerate(symbols,1):
+              payload={
+                  'function':'history',
+                  'codes':s,
+                  'indicators':','.join(fields),
+                  'start_date':start_date,
+                  'end_date':end_date,
+                  'options':'CPS:1'
+              }
+              req=urllib.request.Request(
+                  'https://ffd.findesk.cn/api/query',
+                  data=json.dumps(payload).encode('utf-8'),
+                  headers={
+                      'Authorization':f'Bearer {token}',
+                      'Content-Type':'application/json',
+                      'Accept':'application/json',
+                      'User-Agent':'dao-agent-brain-core13-history-v1'
+                  },
+                  method='POST'
+              )
+              with urllib.request.urlopen(req,timeout=90) as resp:
+                  raw=resp.read(); http_status=resp.status
+              (RAW/f'{idx:02d}_{s.replace(".","-")}.json').write_bytes(raw)
+              body=json.loads(raw.decode('utf-8'))
+              coverage=body.get('coverage',{})
+              if http_status!=200 or coverage.get('status')!='complete' or coverage.get('partial'):
+                  raise RuntimeError(f'{s}: incomplete FFD coverage: http={http_status} coverage={coverage}')
+              data=body.get('data',{})
+              times=data.get('time',[])
+              rows={}
+              for i,d in enumerate(times):
+                  row={'trade_date':str(d),'symbol':s}
+                  for f in fields:
+                      vals=data.get(f,[])
+                      row[f]=vals[i] if i < len(vals) else None
+                  if any(row[f] is None for f in fields):
+                      raise RuntimeError(f'{s} {d}: missing requested field')
+                  rows[str(d)]=row
+              all_rows[s]=rows
+              requests.append({
+                  'symbol':s,
+                  'http_status':http_status,
+                  'row_count':len(rows),
+                  'coverage_status':coverage.get('status'),
+                  'partial':coverage.get('partial'),
+                  'quota_used':body.get('quota_used'),
+                  'balance_remaining':body.get('balance_remaining'),
+                  'raw_sha256':hashlib.sha256(raw).hexdigest(),
+              })
+              time.sleep(0.25)
+
+          common=set.intersection(*(set(all_rows[s]) for s in symbols))
+          common_dates=sorted(common)
+          if len(common_dates) < 150:
+              raise RuntimeError(f'Only {len(common_dates)} common dates; need >=150')
+          selected=common_dates[-150:]
+
+          consolidated=[]
+          for d in selected:
+              for s in symbols:
+                  src=all_rows[s][d]
+                  consolidated.append({
+                      'trade_date':d,
+                      'symbol':s,
+                      'open':float(src['open']),
+                      'high':float(src['high']),
+                      'low':float(src['low']),
+                      'close':float(src['close']),
+                      'volume_shares':float(src['volume']),
+                      'volume_100shares_rounded':round(float(src['volume'])/100),
+                      'amount_cny':float(src['amount']),
+                  })
+
+          if len(consolidated) != 150*13:
+              raise RuntimeError(f'Unexpected consolidated rows: {len(consolidated)}')
+
+          csv_path=OUT/'core13_ffd_150_common_trading_days.csv'
+          with csv_path.open('w',newline='',encoding='utf-8') as f:
+              w=csv.DictWriter(f,fieldnames=list(consolidated[0].keys()))
+              w.writeheader(); w.writerows(consolidated)
+
+          json_path=OUT/'core13_ffd_150_common_trading_days.json'
+          json_path.write_text(json.dumps(consolidated,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          manifest={
+              'artifact':'FFD_AGENT_BRAIN_CORE13_HISTORY_V1',
+              'purpose':'HISTORICAL_VALIDATION_ONLY',
+              'live_shadow_eligible':False,
+              'prospective_evidence':False,
+              'universe_id':'WAT-core13-observation-v1',
+              'symbols':symbols,
+              'requested_fields':fields,
+              'ffd_options':'CPS:1',
+              'query_start_date':start_date,
+              'query_end_date':end_date,
+              'common_date_count_total':len(common_dates),
+              'selected_common_trading_days':150,
+              'selected_first_date':selected[0],
+              'selected_last_date':selected[-1],
+              'row_count':len(consolidated),
+              'feature_warmup_requirement_days':30,
+              'historical_cohort_target':60,
+              'forward_settlement_horizon_days':20,
+              'minimum_required_common_days_for_60_settled_cohorts':110,
+              'requests':requests,
+              'normalization':{
+                  'prices':'FFD raw unadjusted CPS:1 values',
+                  'volume_shares':'FFD native share count',
+                  'volume_100shares_rounded':'round(volume_shares/100) for Longbridge compatibility only',
+                  'amount_cny':'FFD native CNY amount; preserve decimal precision'
+              }
+          }
+          manifest['csv_sha256']=hashlib.sha256(csv_path.read_bytes()).hexdigest()
+          manifest['json_sha256']=hashlib.sha256(json_path.read_bytes()).hexdigest()
+          (OUT/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+
+          print(json.dumps({
+              'status':'PASS',
+              'symbols':len(symbols),
+              'common_date_count_total':len(common_dates),
+              'selected_common_trading_days':150,
+              'selected_first_date':selected[0],
+              'selected_last_date':selected[-1],
+              'row_count':len(consolidated),
+              'total_quota_used_reported':sum((r.get('quota_used') or 0) for r in requests),
+              'last_balance_remaining':requests[-1].get('balance_remaining'),
+              'csv_sha256':manifest['csv_sha256'],
+              'json_sha256':manifest['json_sha256'],
+          },ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffd-agent-brain-core13-history-v1
+          path: artifact_ffd_agent_brain_core13_history_v1/
+          if-no-files-found: error
+          retention-days: 30
