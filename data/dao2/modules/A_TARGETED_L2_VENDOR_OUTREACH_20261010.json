@@ -1,0 +1,55 @@
+{
+  "artifact": "DAO2_A_TARGETED_L2_VENDOR_OUTREACH_20261010",
+  "version": "1.0",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "TARGETED_L2_VENDOR_RAW_OR_SAMPLE",
+  "as_of": "2026-10-10",
+  "request_contract": "data/dao2/modules/A_TARGETED_L2_VENDOR_REQUEST_V1.json",
+  "control_sample_requested": {
+    "ts_code": "000001.SZ",
+    "trade_date": "20210924",
+    "required_files": [
+      "逐笔委托",
+      "逐笔成交"
+    ],
+    "aggregation_or_minute_proxy_accepted": false
+  },
+  "vendors": {
+    "CnOpenData": {
+      "initial_outreach_date": "2026-09-30",
+      "reply_received_before_followup": false,
+      "followup_date": "2026-10-10",
+      "followup_status": "SENT_VERIFIED_IN_EXISTING_THREAD",
+      "requested_after_control_pass": "13 specified symbol-date records only",
+      "requested_quote": true,
+      "purchase_commitment_made": false
+    },
+    "submato_ashare_l2": {
+      "initial_outreach_date": "2026-09-30",
+      "reply_received_before_followup": false,
+      "followup_date": "2026-10-10",
+      "followup_status": "SENT_VERIFIED_IN_EXISTING_THREAD",
+      "requested_after_control_pass": "13 specified symbol-date records only",
+      "requested_quote": true,
+      "purchase_commitment_made": false
+    }
+  },
+  "formal_effect": {
+    "raw_or_sample_received": false,
+    "identity_gate_executed": false,
+    "admitted_rows": 0,
+    "resolved_delta": 0,
+    "unresolved_delta": 0,
+    "checkpoint_created": false,
+    "main_net_flow_unbound_closed": false
+  },
+  "governance": {
+    "no_payment_performed": true,
+    "no_purchase_committed": true,
+    "no_algorithm_changes": true,
+    "no_frozen_control_changes": true,
+    "no_proxy": true,
+    "no_imputation": true
+  },
+  "next_gate": "REAL_VENDOR_REPLY_WITH_RAW_CONTROL_SAMPLE_OR_ACTIONABLE_QUOTE"
+}
