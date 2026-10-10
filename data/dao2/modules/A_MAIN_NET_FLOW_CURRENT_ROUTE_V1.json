@@ -59,8 +59,9 @@
       "repeat_application_allowed": false
     },
     "targeted_l2_vendor": {
-      "status": "WAITING_FOR_REAL_RAW_OR_SAMPLE",
+      "status": "FOLLOWUP_SENT_WAITING_FOR_REAL_RAW_OR_SAMPLE_OR_QUOTE",
       "request_contract": "data/dao2/modules/A_TARGETED_L2_VENDOR_REQUEST_V1.json",
+      "latest_outreach_evidence": "data/dao2/modules/A_TARGETED_L2_VENDOR_OUTREACH_20261010.json",
       "processing_order": [
         "persist raw bytes",
         "raw SHA256",
