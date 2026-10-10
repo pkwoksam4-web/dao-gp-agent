@@ -1,0 +1,52 @@
+{
+  "schema": "agent-brain-prospective-integrity-quarantine/v1",
+  "status": "EVIDENCE_QUARANTINE",
+  "subject": {
+    "trade_date": "2026-09-30",
+    "strategy_run_id": "SSR-CORE10-STABLE4-20260930",
+    "attestation_id": "LSA-CORE10-STABLE4-20260930"
+  },
+  "finding": "The 2026-09-30 prospective feature snapshot was computed before the 2026-09-29 Core13 historical bars were actually inserted into production market_bars. The frozen row-position feature engine therefore silently skipped the required 2026-09-29 trading session.",
+  "root_cause": {
+    "feature_engine": "scripts/live_pit_ingest.py",
+    "behavior": "rolling features use the last N existing database rows without an expected-previous-session continuity gate",
+    "feature_created_at": "2026-09-30T09:09:57.489905+00:00",
+    "missing_session": "2026-09-29",
+    "missing_session_recovery_run": 37327209113,
+    "missing_session_recovery_db_time": "2026-10-05T14:45:04.816705+00:00"
+  },
+  "cross_source_proof": {
+    "provider": "FFD",
+    "research_branch": "agent-brain/ffd-core13-history-v1",
+    "research_commit": "d037963160bccf43edbe7fbf9d99b2e3e182d006",
+    "audit_path": "releases/research/ffd/2026-10-10/FFD_20260930_FEATURE_INTEGRITY_AUDIT_V1.json",
+    "ffd_workflow_run": 37907523735,
+    "ffd_artifact_id": 11605765248,
+    "ffd_20260929_vs_recovered_longbridge": "13/13 OHLC exact; 13/13 amount exact; 13/13 volume unit mapping exact",
+    "production_reproduction": "Removing 2026-09-29 from FFD history reproduces the immutable production 2026-09-30 price-derived features, amount ratio and realized volatility; including it materially changes the frozen features.",
+    "provider_native_continuity_check": "2026-09-30 quote.prev_close mismatches the then-latest 2026-09-28 database close for 13/13 symbols and matches the recovered 2026-09-29 close for 13/13 symbols. 2026-10-08 and 2026-10-09 pass the same prior-close identity check 13/13."
+  },
+  "ranking_impact": {
+    "top3_set_unchanged": true,
+    "bottom3_set_changed": true,
+    "full_ranking_contract_correct": false
+  },
+  "governance": {
+    "preserve_original_prospective_rows": true,
+    "preserve_original_attestation": true,
+    "do_not_rewrite_20260930_as_live": true,
+    "do_not_count_as_clean_qualification_sample": true,
+    "do_not_settle_as_clean_qualification_sample_until_settlement_guard_is_patched": true,
+    "clean_prospective_qualification_candidates_after_quarantine": 3,
+    "clean_dates": ["2026-09-28", "2026-10-08", "2026-10-09"],
+    "quarantined_date": "2026-09-30",
+    "forecast_tables_unchanged": true,
+    "automatic_promotion": false,
+    "production_weight_change": false
+  },
+  "next_fix_design": {
+    "future_ingest_gate": "Before inserting the current daily bar, compare manifest quote.normalized.prev_close with the latest prior Longbridge daily-bar close for every Core13 symbol; missing prior bar, missing prev_close, or any mismatch fails closed before feature computation.",
+    "existing_20260930_guard": "Settlement must consume an additive integrity quarantine registry/evidence layer so the immutable 2026-09-30 run is preserved but cannot be included in clean qualification statistics.",
+    "db_schema_change_required": false
+  }
+}
