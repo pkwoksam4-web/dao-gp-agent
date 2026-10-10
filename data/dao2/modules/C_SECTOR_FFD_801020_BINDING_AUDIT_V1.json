@@ -1,0 +1,200 @@
+{
+  "artifact": "DAO2_C_SECTOR_FFD_801020_BINDING_AUDIT_V1",
+  "version": "1.1",
+  "module_id": "C",
+  "component": "sector_series",
+  "audit_date": "2026-10-10",
+  "decision": "FAIL_BINDING",
+  "formal_status": "FFD_DIRECT_OHLC = PASS_STRONG_CROSSCHECK_EVIDENCE_NOT_ADMITTED",
+  "authoritative_head_before_audit": "1eceaf97fdfc403d6ed947f0a4386919fdc71f22",
+  "scope": {
+    "code": "801020.SI",
+    "exact_historical_index_name": "采掘",
+    "taxonomy_generation": "SW2014",
+    "publisher_expected": "申万",
+    "sw2014_valid_through": "20211210",
+    "sw2021_first_trade_date": "20211213",
+    "target_dates": ["20210806", "20211008", "20211022"],
+    "neighbor_dates": ["20210805", "20210809", "20210930", "20211011", "20211021", "20211025"]
+  },
+  "frozen_contract": {
+    "direct_close_search": "data/dao2/modules/C_SECTOR_801020_DIRECT_CLOSE_SEARCH_V1.json",
+    "rebuild_contract": "data/dao2/modules/C_SECTOR_REBUILD_CONTRACT_V1.json",
+    "price_basis_binding": "data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json",
+    "source_repo_or_vendor_identity_required": true,
+    "neighboring_overlap_exact_match_required": true,
+    "raw_or_direct_historical_close_only": true,
+    "rounded_return_not_accepted": true,
+    "frozen_42783_rewrite_forbidden": true,
+    "acceptable_direct_recovery_providers": ["Wind", "iFind", "RiceQuant RQData", "Founder Securities DataCube", "Tushare sw_daily with sufficient entitlement"],
+    "provider_set_expansion_forbidden_in_this_audit": true
+  },
+  "ffd_probe": {
+    "evidence_path": "data/dao2/modules/C_SECTOR_FFD_801020_DIRECT_OHLC_EVIDENCE_V1.json",
+    "workflow": "DAO2 C FFD 801020 OHLC Probe V1",
+    "workflow_run_id": 37897977466,
+    "artifact_id": 11600713150,
+    "artifact_created_at": "2026-10-09T07:15:33Z",
+    "artifact_zip_sha256": "f58ced5ecec4a1a36da6a4d199d3dc29f21dd18abc3b0edff040abbf80bd70b8",
+    "result_content_sha256_without_hash_field": "18f9210fceaf6602212a7679e855b18d2678e6f0bf587fc673b7e03c21317df4",
+    "raw_response_hashes_reverified_20261010": {
+      "response_1.json": "5e3bc15811276c7d132b77aeb7379c0617e7e4abd1a9d99c433f5b03cfc4e6d2",
+      "response_2.json": "24671c53f532ac45b0373b1374f21ca27bf1102a9e3e4171c93a9e3b1eaf4d10",
+      "response_3.json": "fd0d33506ee991ac872a2b13559fca83c60a87f1e4096a920ede978626658bd7"
+    },
+    "query": {
+      "endpoint": "https://ffd.findesk.cn/api/query",
+      "function": "history",
+      "codes": "801020.SI",
+      "indicators": "open,high,low,close",
+      "options": "CPS:1",
+      "repeated_for_binding_audit": false
+    },
+    "raw_result_metadata": {
+      "provider": "FFD",
+      "source": null,
+      "definition": null,
+      "revision": null,
+      "taxonomy": null,
+      "observed_at": null,
+      "provider_actual_points": 0,
+      "upstream_lease_ids": [],
+      "cache_status_values": ["complete_structured_asset_hit", "not_cached_as_complete_request"],
+      "identity_proof_values": ["structured_asset_code_date_field_key", "single_code_physical_shards"]
+    }
+  },
+  "public_contract_evidence": {
+    "start_guide": "https://www.findesk.cn/start",
+    "about": "https://www.findesk.cn/about",
+    "capability_catalog": "https://www.findesk.cn/financial-data-api/capabilities",
+    "history_endpoint_and_unadjusted_example_publicly_documented": true,
+    "ffd_history_public_contract_versioned": true,
+    "public_contract_evidence_path": "data/dao2/modules/C_SECTOR_FFD_PUBLIC_HISTORY_CONTRACT_EVIDENCE_V1.json",
+    "public_contract_vendor_identity": "FFD / FinDesk",
+    "public_contract_does_not_claim_upstream_brand": true,
+    "restricted_third_party_or_internal_upstream_publicly_disclosed": false,
+    "historical_value_revision_or_asof_pin_for_801020_series": false,
+    "boundary": "FFD publicly documents a stable history surface and unadjusted CPS:1 semantics. Public product pages explicitly do not expose restricted third-party/internal operating information, so the public contract cannot bind these rows to Wind/iFind/RQData/DataCube/Tushare or another frozen-authority upstream carrier."
+  },
+  "gate_results": {
+    "1_security_identity": {
+      "result": "FAIL_BINDING",
+      "expected": {
+        "code": "801020.SI",
+        "name": "采掘",
+        "taxonomy": "SW2014",
+        "publisher": "申万",
+        "date_effective": "targets are before 20211213 SW2021 switch"
+      },
+      "observed_in_ffd_raw": {
+        "code": "801020.SI",
+        "name": null,
+        "taxonomy": null,
+        "publisher": null,
+        "date_effective_classification_metadata": null
+      },
+      "detail": "Project-side identity is strong, but FFD raw bytes do not independently bind the returned code to the exact historical SW2014 instrument master."
+    },
+    "2_provider_source_identity": {
+      "result": "FAIL_BINDING",
+      "operator_identified": "FFD / FinDesk",
+      "underlying_provider_named": false,
+      "response_source_metadata_present": false,
+      "provider_actual_points": 0,
+      "upstream_lease_ids": [],
+      "detail": "FFD is identifiable as delivery operator/vendor, but the preserved response and public contract do not name or bind a qualifying frozen authoritative upstream source. Treating FFD itself as a newly accepted authority would expand the provider binding and is outside this audit."
+    },
+    "3_price_basis": {
+      "result": "PASS",
+      "requested": "none",
+      "requested_raw": "CPS:1",
+      "effective": "none",
+      "provider_parameter_omitted_for_unadjusted": true,
+      "conversion_or_recalculation_by_ffd": false,
+      "detail": "Unadjusted direct OHLC delivery is explicitly represented in preserved raw responses."
+    },
+    "4_temporal_semantics": {
+      "result": "PARTIAL_PASS_NOT_BINDING",
+      "same_date_rows": true,
+      "target_trade_dates_present": true,
+      "daily_history_function": true,
+      "explicit_timezone_metadata": false,
+      "explicit_official_session_close_flag": false,
+      "detail": "Rows are keyed to the requested CN trading dates and match frozen neighbors, but the raw response does not expose a separate exchange-session/timezone provenance field. This is not the primary failure because provider/source identity already fails."
+    },
+    "5_historical_revision": {
+      "result": "FAIL_BINDING",
+      "interface_contract_version_exists": true,
+      "row_revision_id": null,
+      "row_asof": null,
+      "historical_series_version": null,
+      "immutable_value_revision_pin": false,
+      "detail": "The interface/catalog is versioned, but the delivered 801020 historical values are not tied to an immutable row revision/as-of/version. Cached asset status does not establish immutable historical-source revision semantics."
+    },
+    "6_raw_evidence_completeness": {
+      "result": "PARTIAL_PASS_NOT_BINDING",
+      "exact_request_payloads_preserved": true,
+      "exact_raw_response_files_preserved": true,
+      "raw_response_sha256_reverified": true,
+      "artifact_zip_sha256_reverified": true,
+      "artifact_capture_timestamp_available": true,
+      "raw_response_observed_at_present": false,
+      "definition_or_series_version_in_raw_present": false,
+      "target_and_neighbor_rows_present": true,
+      "detail": "Raw bytes and hashes are complete enough for reproducible crosscheck evidence, but raw observed_at/definition/revision provenance is incomplete for authoritative binding."
+    },
+    "7_overlap": {
+      "result": "PASS",
+      "matches": 6,
+      "mismatches": 0,
+      "tolerance_used": false,
+      "detail": "All six neighbor close anchors match exactly; this is strong identity crosscheck evidence but is not a substitute for source/vendor provenance."
+    }
+  },
+  "targets": [
+    {"code":"801020.SI","trade_date":"20210806","open":2961.26,"high":3040.45,"low":2957.00,"close":3037.61},
+    {"code":"801020.SI","trade_date":"20211008","open":4095.68,"high":4095.68,"low":3869.03,"close":3913.73},
+    {"code":"801020.SI","trade_date":"20211022","open":3850.39,"high":3876.04,"low":3695.16,"close":3702.52}
+  ],
+  "neighbor_exact_close": {
+    "20210805": 2954.25,
+    "20210809": 3048.39,
+    "20210930": 3976.45,
+    "20211011": 3971.72,
+    "20211021": 3886.69,
+    "20211025": 3804.92
+  },
+  "admission_effect": {
+    "ffd_direct_rows_admitted": 0,
+    "derived_close_rows_admitted": 0,
+    "admissible_before": 42783,
+    "admissible_after": 42783,
+    "required": 43084,
+    "missing_before": 301,
+    "missing_after": 301,
+    "series_blocker": "SECTOR_SERIES_UNBOUND",
+    "series_status": "BLOCKED",
+    "breadth_status": "BLOCKED_PENDING_SERIES_PASS"
+  },
+  "authoritative_vendor_recovery": {
+    "next_priority": ["iFind direct historical SW index OHLC", "Wind original export", "RiceQuant RQData", "Founder Securities DataCube", "Tushare sw_daily with sufficient entitlement"],
+    "minimum_dates": ["20210805", "20210806", "20210809", "20210930", "20211008", "20211011", "20211021", "20211022", "20211025"],
+    "minimum_fields": ["code", "trade_date", "open", "high", "low", "close"],
+    "optional_fields": ["pre_close"],
+    "current_environment_direct_connector_found": false,
+    "public_unconstrained_search_forbidden": true,
+    "partial_admission_allowed_per_target_row": true
+  },
+  "restart_condition": "Re-open FFD admission only if new immutable evidence binds the preserved FFD rows to a qualifying authoritative historical source under the existing frozen contract. Do not re-query the same OHLC values. Otherwise resume only on a new original authoritative vendor export.",
+  "governance": {
+    "contract_lowered": false,
+    "verifier_modified_for_ffd": false,
+    "provider_set_expanded": false,
+    "neighbor_match_used_as_provenance_substitute": false,
+    "series_checkpoint_modified": false,
+    "gap_ledger_modified": false,
+    "state_modified": false,
+    "derived_close_migrated": false,
+    "breadth_reopened": false
+  }
+}

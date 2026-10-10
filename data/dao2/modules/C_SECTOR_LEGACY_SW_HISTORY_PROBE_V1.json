@@ -1,0 +1,175 @@
+{
+  "artifact": "DAO2_C_LEGACY_SW_HISTORY_EXACT_GAP_PROBE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "LEGACY_SW_HISTORY_ROUTE_CLOSED_TRANSPORT_UNAVAILABLE",
+  "workflow_evidence": {
+    "head_sha": "8340a60c61a3c2c06bd841ab87cea8e209280325",
+    "workflow": "DAO2 C Legacy SW History Exact-Gap Probe V1",
+    "run_id": 35583461060,
+    "job_id": 106281312223,
+    "workflow_conclusion": "success",
+    "artifact_id": 10631811203,
+    "artifact_digest": "sha256:4878cfac0bad6047ed4bb356632d269fbb33c1bbd3f97afd12826f2ee676b1ac"
+  },
+  "frozen_inputs": {
+    "required_sector_date_keys": 43084,
+    "frozen_observed_base": 42783,
+    "exact_missing": 301,
+    "frozen_base_rewritten": false,
+    "price_basis_status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION"
+  },
+  "targeted_keys_verified_missing": [
+    [
+      "801020.SI",
+      "20210806"
+    ],
+    [
+      "801960.SI",
+      "20220303"
+    ],
+    [
+      "801010.SI",
+      "20230908"
+    ],
+    [
+      "801030.SI",
+      "20220303"
+    ],
+    [
+      "801040.SI",
+      "20211022"
+    ]
+  ],
+  "historical_implementation_provenance": [
+    [
+      "PKUJohnson/OpenData",
+      "e9488201d0d14741cc247f780dcfa6141018a0d8",
+      "opendatatools/swindex/swindex_agent.py"
+    ],
+    [
+      "DTShare/dtshare",
+      "6274c0bf14a4eaa3da33c56b4d4d293261025686",
+      "dtshare/index/index_sw.py"
+    ],
+    [
+      "kingofhawks/stocktrace",
+      "963fb79651d698ed65d0330e206dc3c0535b9259",
+      "market/sw.py"
+    ],
+    [
+      "venyowong/V.ClassLibrary",
+      "6d39cb584393018d491ff96ebdee6df448442184",
+      "V.Finance/Services/IndexService.cs"
+    ],
+    [
+      "epsimatic88/myData",
+      "ef07e833d4200da6f47d08c133c4fc7f773f0399",
+      "R/MarketIndex/fromSW_industry_index.R"
+    ]
+  ],
+  "endpoint_families": {
+    "A_HANDLER_SWINDEXHISTORY": {
+      "https": {
+        "status": "CONNECT_TIMEOUT",
+        "attempt_hashes": [
+          "a089bddf71dce8932b92b8d6963eeb3b225c57ac88d04048a6e9c1badcc2d01e",
+          "0122c1e5bcb634499732941c5e698a286ff0785fd58994ed256d474a817d8b6d"
+        ]
+      },
+      "http": {
+        "status": "CONNECT_TIMEOUT",
+        "attempt_hashes": [
+          "0dd2f95a3e6422a82cb92c01cc2391bf6bb0f7b16a3858eaa156aac6f4a46110",
+          "7267372a857b3382ed05ef6c0201b17c872a302e4f62b03f9fbfefbd1937819d"
+        ]
+      }
+    },
+    "B_EXCEL2_SWINDEXHISTORY": {
+      "https": {
+        "status": "CONNECT_TIMEOUT",
+        "attempt_hashes": [
+          "9c60a78f84da632416904354725901ad544f2631d6c573a1da627e8e83d943f7",
+          "95af21a8c363c7c0f06deea9f6e8b609efb07ed85f832e27a86026b90460ec66"
+        ]
+      },
+      "http": {
+        "status": "CONNECT_TIMEOUT",
+        "attempt_hashes": [
+          "8530ffd11f9791bdd6cf3d8658c519d83ed9bd1a31e66171541457eafb8da564",
+          "ebd4f93cfa0913ff618f991cf3a06c89fd4c2abdefdfc8cd18e0f03be88e63b7"
+        ]
+      }
+    },
+    "C_HANDLER_V_REPORT_DAY": {
+      "https": {
+        "status": "CONNECT_TIMEOUT",
+        "attempt_hashes": [
+          "94d1f17039e81596b977e48ae537c1f161f7d160f08f1e78914b62edb2947589",
+          "cd0ebd8a252d3859a1fd7ea32243ec9da74267e32280dbee0073478cafb161ff"
+        ]
+      },
+      "http": {
+        "status": "CONNECT_TIMEOUT",
+        "attempt_hashes": [
+          "7ddd8dba5a96ef5e6d63145e55545787af3b6ca31db5d59905733216ac9e0ffc",
+          "bd69262e1ba75fc566834b1d8fa9d959503781041c2a6dfe1cbc109d75797160"
+        ]
+      }
+    }
+  },
+  "transport_audit": {
+    "host": "www.swsindex.com",
+    "http_80_tested": true,
+    "https_443_tested": true,
+    "http_responses_received": 0,
+    "redirects_observed": 0,
+    "browser_user_agent_and_referer_used": true,
+    "official_redirect_allowlist_enforced": true,
+    "repeated_connect_timeout_across_all_endpoint_families": true,
+    "circuit_breaker_after_two_transport_failures_per_family_scheme": true,
+    "later_selected_targets_skipped_after_circuit": [
+      [
+        "801010.SI",
+        "20230908"
+      ],
+      [
+        "801030.SI",
+        "20220303"
+      ],
+      [
+        "801040.SI",
+        "20211022"
+      ]
+    ]
+  },
+  "field_validation": {
+    "executable": false,
+    "reason": "No HTTP response was received, so no SwIndexCode/BargainDate/CloseIndex row could be parsed or admitted."
+  },
+  "overlap_validation": {
+    "executable": false,
+    "status": "NOT_EXECUTABLE_AFTER_CAPABILITY_TRANSPORT_FAIL"
+  },
+  "recovery": {
+    "executable": false,
+    "admitted_rows": 0,
+    "frozen_base_rows_rewritten": 0
+  },
+  "decision": {
+    "workflow_code": "LEGACY_SW_HISTORY_ROUTE_CLOSED_OR_EMPTY",
+    "normalized_route_status": "LEGACY_SW_HISTORY_ROUTE_CLOSED_TRANSPORT_UNAVAILABLE",
+    "route_closed": true,
+    "recovery_allowed": false,
+    "repeat_public_probe": false
+  },
+  "safety": {
+    "no_nonofficial_mirror_admitted": true,
+    "no_previous_day_fill": true,
+    "no_nearest_date_substitution": true,
+    "no_interpolation": true,
+    "no_synthetic_rows": true,
+    "breadth_gate_open": false
+  }
+}

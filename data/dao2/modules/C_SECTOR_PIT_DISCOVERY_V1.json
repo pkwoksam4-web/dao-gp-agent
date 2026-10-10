@@ -1,0 +1,104 @@
+{
+  "artifact": "DAO2_C_SECTOR_PIT_DISCOVERY_V1",
+  "version": "1.1",
+  "module_id": "C",
+  "as_of": "2026-09-20",
+  "historical_gp_v11": {
+    "recovery_matrix": {
+      "source_pr": 8,
+      "source_branch": "gp/strategy-asset-recovery-v482",
+      "path": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
+      "blob_sha": "40b13cd87066ff2eb78e8f566bc980f79f0f550f"
+    },
+    "archive": {
+      "name": "v11_offline_backtest_v3_10.zip",
+      "library_path": "/倒/v11_offline_backtest_v3_10.zip",
+      "file_id": "file_0000000027d4820683c9a38a9886d045",
+      "library_file_id": "libfile_229217ed61b081919d9ab4476920d08f",
+      "size_bytes": 1301865,
+      "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+      "currently_listed_in_library": true,
+      "raw_bytes_currently_materializable_in_project": false
+    },
+    "silver_sector_adapter": {
+      "columns": [
+        "citic_l1",
+        "citic_l3"
+      ],
+      "prepare_datalake_silver_sha256": "4e41c7f0da2de74f3243b3ab433c94c87fe38fc344eb4f87834d898afdbb2175",
+      "normalize_silver_sha256": "913988b740fe64f5bf406e2689afa4ca165dc5959dccbb444a760168f5f1c797",
+      "proof_scope": "ROW_LEVEL_PASSTHROUGH_ONLY_NOT_PIT_MEMBERSHIP_PROOF"
+    },
+    "pit_membership_recovered": false,
+    "sector_series_recovered": false,
+    "sector_breadth_formula_recovered": false
+  },
+  "candidate_source": {
+    "repository": "Jessica-Zhangyj/dlquant",
+    "pinned_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "generator_path": "xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py",
+    "generator_blob_sha": "f00fed00a969a39a73a71152fb3031e1631c3476",
+    "source_manifest_blob_sha": "3828eb381e60cbcc0af725b538235e041c4485ca",
+    "taxonomy_manifest_blob_sha": "4e00b89478581e85bf37938a8b935bdbb21a0875",
+    "source_window": [
+      "2016-01-04",
+      "2026-05-18"
+    ],
+    "required_industry_code_count": 32,
+    "providers": [
+      "akshare",
+      "tushare"
+    ]
+  },
+  "taxonomy": {
+    "sw2014_last_trade_date": "2021-12-10",
+    "sw2021_first_trade_date": "2021-12-13",
+    "pre_switch_method": "Project SW2021 member intervals to SW2014 L1 using explicit L3 migration bridge.",
+    "pre_switch_is_direct_official_sw2014_history": false,
+    "published_effective_rows": 12162,
+    "published_unresolved_pre_switch_rows": 7,
+    "published_unresolved_l3_codes": [
+      "859622.SI"
+    ]
+  },
+  "backing_entities": {
+    "candidate_membership_parquet_committed_in_public_source": false,
+    "candidate_sector_series_committed_in_public_source": false,
+    "historical_archive_currently_raw_materializable_in_project": false
+  },
+  "formal_contract": {
+    "start": "2020-06-01",
+    "end": "2026-04-17",
+    "expected_trading_days": 1426,
+    "calendar_sha256": "5a872a47cf7a338cc48aa628b8de46053fddc3ed161a2617550199d0607efae7",
+    "missing_behavior": "Reject; no forward fill, substitution, or proxy inputs"
+  },
+  "risk_findings": [
+    "Historical citic_l1/citic_l3 passthrough is not PIT membership proof.",
+    "Pinned candidate pre-switch membership is projected from SW2021 intervals, not direct historical SW2014 authority.",
+    "Seven unresolved pre-switch rows remain fail-closed until exact backing rows can be audited and resolved.",
+    "Pinned public repository does not carry the generated membership parquet bytes.",
+    "Pinned public repository does not carry the materialized 801xxx.SI sector series bytes.",
+    "Published source manifest records missing expected dates for multiple industry series.",
+    "GP12 calls the F3/F4 input sector_adjusted_close, while the pinned provider evidence exposes an industry index close level; price-basis equivalence is not proven.",
+    "Sector breadth ratio numerator/denominator remains undefined; the outer five-session F5 mapping is insufficient to derive it."
+  ],
+  "subcomponents": {
+    "sector_series": {
+      "status": "BLOCKED_FULL_FORMAL_COVERAGE_NOT_PROVEN",
+      "checkpoint": "data/dao2/modules/C_SECTOR_SERIES_CHECKPOINT_V1.json"
+    },
+    "sector_membership_pit": {
+      "status": "BLOCKED_HISTORICAL_PIT_NOT_RECOVERED",
+      "checkpoint": "data/dao2/modules/C_SECTOR_MEMBERSHIP_PIT_CHECKPOINT_V1.json"
+    },
+    "sector_breadth": {
+      "status": "BLOCKED_DEPENDENCIES_AND_FORMULA",
+      "checkpoint": "data/dao2/modules/C_SECTOR_BREADTH_CHECKPOINT_V1.json"
+    }
+  },
+  "verifier": "scripts/dao2_sector_pit_verify_v1.py",
+  "sector_package_ready": false,
+  "historical_recovery_claim_allowed": false,
+  "candidate_admission_allowed": false
+}

@@ -1,0 +1,90 @@
+name: DAO2 C Official SWS Analysis Exact-Date Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-official-sw-analysis-gap-probe-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas requests
+      - name: Download frozen Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Probe official SWS daily analysis endpoint
+        run: |
+          python - <<'PY'
+          import csv,gzip,hashlib,json,urllib3
+          from datetime import datetime,timezone
+          from pathlib import Path
+          import requests
+          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+          OUT=Path('artifact_sws_analysis'); RAW=OUT/'raw'; RAW.mkdir(parents=True,exist_ok=True)
+          endpoint='https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/'
+          dates=['20210805','20210806','20210809','20210930','20211008','20211011','20211021','20211022','20211025']
+          targets={'20210806','20211008','20211022'}
+          headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept':'application/json,text/plain,*/*','Referer':'https://www.swsresearch.com/institute_sw/allIndex/analysisIndex'}
+          with gzip.open('series-base/sector_close_formal.csv.gz','rt',encoding='utf-8',newline='') as f:
+            base=list(csv.DictReader(f))
+          base_map={(str(x['industry_code']),str(x['trade_date']).replace('-','')):float(x['close']) for x in base}
+          hits={}; raw_meta=[]
+          for d in dates:
+            ds=f'{d[:4]}-{d[4:6]}-{d[6:]}'
+            params={'page':'1','page_size':'200','index_type':'一级行业','start_date':ds,'end_date':ds,'type':'DAY','swindexcode':'all'}
+            ts=datetime.now(timezone.utc).isoformat()
+            r=requests.get(endpoint,params=params,headers=headers,timeout=(10,60),verify=False)
+            raw=r.content; sha=hashlib.sha256(raw).hexdigest()
+            (RAW/f'{d}.bin').write_bytes(raw)
+            raw_meta.append({'trade_date':d,'requested_url':r.request.url,'request_timestamp_utc':ts,'http_status':r.status_code,'raw_bytes':len(raw),'raw_sha256':sha,'tls_verify':False})
+            body=None
+            try: body=r.json()
+            except Exception: pass
+            data=(body or {}).get('data') if isinstance(body,dict) else None
+            results=(data or {}).get('results') if isinstance(data,dict) else None
+            exact=[]
+            if isinstance(results,list):
+              for x in results:
+                if not isinstance(x,dict): continue
+                code=str(x.get('swindexcode') or '').strip()
+                bd=str(x.get('bargaindate') or '').replace('-','')[:8]
+                if code=='801020' and bd==d:
+                  try: close=float(str(x.get('closeindex')).replace(',',''))
+                  except Exception: close=None
+                  exact.append({'industry_code':'801020.SI','trade_date':d,'close':close,'source_provider':'SWS_RESEARCH_OFFICIAL_ANALYSIS','source_trade_date':d,'fill_method':'NONE','raw_row':x})
+            hits[d]=exact
+          neighbor=[]
+          for d in dates:
+            if d in targets: continue
+            row=hits[d][0] if len(hits[d])==1 else None
+            ref=base_map.get(('801020.SI',d))
+            neighbor.append({'trade_date':d,'source_close':None if not row else row['close'],'frozen_close':ref,'match_2dp':bool(row and ref is not None and row['close'] is not None and round(row['close'],2)==round(ref,2))})
+          target_hits={d:hits[d] for d in sorted(targets)}
+          targets_unique=all(len(target_hits[d])==1 and target_hits[d][0]['close'] is not None for d in targets)
+          neighbors_pass=all(x['match_2dp'] for x in neighbor)
+          result={'artifact':'DAO2_C_OFFICIAL_SWS_ANALYSIS_EXACT_DATE_PROBE_V1','version':'1.0','provider':'申万宏源研究官网','endpoint':endpoint,'status':'PASS_SUBCOMPONENT_CANDIDATE' if targets_unique and neighbors_pass else 'BLOCKED_OR_FAIL','target_hits':target_hits,'neighbor_overlap':neighbor,'all_three_target_unique_raw_close_present':targets_unique,'all_six_neighbor_2dp_match':neighbors_pass,'admission_candidate':bool(targets_unique and neighbors_pass),'same_date_source':True,'fill_method':'NONE','frozen_base_rewritten':False,'raw_requests':raw_meta}
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          (OUT/'raw'/'requests.json').write_text(json.dumps(raw_meta,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-official-sws-analysis-exact-date-probe-v1
+          path: artifact_sws_analysis/
+          if-no-files-found: error
+          retention-days: 30

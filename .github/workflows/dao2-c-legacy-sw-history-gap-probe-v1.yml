@@ -1,0 +1,51 @@
+name: DAO2 C Legacy SW History Exact-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'scripts/dao2_c_legacy_sw_history_gap_probe_v1.py'
+      - '.github/workflows/dao2-c-legacy-sw-history-gap-probe-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas requests lxml
+      - name: Download PASS Membership exact required keys
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-backing-materialize-v1
+          path: membership-pass
+          run-id: 35575433267
+          github-token: ${{ github.token }}
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Run legacy official SW targeted capability / overlap / recovery gates
+        run: |
+          python scripts/dao2_c_legacy_sw_history_gap_probe_v1.py \
+            --required-keys membership-pass/membership_out/formal_required_sector_keys.csv.gz \
+            --base-panel series-base/sector_close_formal.csv.gz \
+            --price-basis data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json \
+            --out artifact_legacy_sw
+      - name: Upload complete official raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-legacy-sw-history-exact-gap-probe-v1
+          path: artifact_legacy_sw/
+          if-no-files-found: error
+          retention-days: 30

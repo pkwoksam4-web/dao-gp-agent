@@ -1,0 +1,45 @@
+{
+  "artifact": "DAO2_C_SECTOR_OFFICIAL_SWS_ANALYSIS_GAP_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_SOURCE_ABSENCE_EVIDENCE_NOT_ADMISSION",
+  "workflow": {
+    "name": "DAO2 C Official SWS Analysis Exact-Date Probe V1",
+    "workflow_run_id": 37749989142,
+    "head_sha": "daa9cf37c21f86a84b6e2b19462c9e687e7b00ac",
+    "artifact_id": 11537690945,
+    "artifact_digest": "sha256:d27c20f5c8654dfbd48f8e98f5b0adc1d96167288de217f79036add1adff8da7"
+  },
+  "source": {
+    "provider": "申万宏源研究官网",
+    "endpoint": "https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/",
+    "index_type": "一级行业",
+    "type": "DAY",
+    "swindexcode": "all"
+  },
+  "target_observation": {
+    "20210806": {"http_status":200,"raw_bytes":89,"raw_sha256":"8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240","data_count":0},
+    "20211008": {"http_status":200,"raw_bytes":89,"raw_sha256":"8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240","data_count":0},
+    "20211022": {"http_status":200,"raw_bytes":89,"raw_sha256":"8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240","data_count":0}
+  },
+  "neighbor_observation": {
+    "20210805": {"http_status":200,"raw_bytes":8872,"data_count":27},
+    "20210809": {"http_status":200,"raw_bytes":8858,"data_count":27},
+    "20210930": {"http_status":200,"raw_bytes":8852,"data_count":27},
+    "20211011": {"http_status":200,"raw_bytes":8864,"data_count":27},
+    "20211021": {"http_status":200,"raw_bytes":8865,"data_count":27},
+    "20211025": {"http_status":200,"raw_bytes":8859,"data_count":27}
+  },
+  "801020_observation": {
+    "present_in_neighbor_l1_analysis_universe": false,
+    "note": "The 27-code L1 analysis response on known-good neighbor dates does not include legacy code 801020, so this all-code analysis route cannot establish source identity for 801020. A separate targeted swindexcode=801020 parameter probe is required before closing the route."
+  },
+  "governance": {
+    "admitted_rows":0,
+    "series_checkpoint_changed_to_pass":false,
+    "coverage_changed":false,
+    "derived_close_admitted":0,
+    "breadth_gate_open":false
+  }
+}

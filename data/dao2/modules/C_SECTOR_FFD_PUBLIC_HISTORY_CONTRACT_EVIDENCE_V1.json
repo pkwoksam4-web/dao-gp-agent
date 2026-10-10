@@ -1,0 +1,65 @@
+{
+  "artifact": "DAO2_C_SECTOR_FFD_PUBLIC_HISTORY_CONTRACT_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "source": {
+    "operator": "FFD / FinDesk",
+    "url": "https://ffd.findesk.cn/api/v1/catalog/public-capabilities",
+    "retrieved_via": "unauthenticated public HTTP GET",
+    "credential_used": false,
+    "workflow_run_id": 37906027305,
+    "workflow_job_id": 113739572005,
+    "artifact_id": 11604302702,
+    "artifact_digest": "sha256:b4241e8dfea1819658d67ba3f6516a1ec6573b587dd32977c14b2cdddbc473c3",
+    "raw_sha256": "274630e658eab0025e437543fddbe2a1db09d03da07bb830288816472a9dc05a"
+  },
+  "catalog_identity": {
+    "schema_version": "2.0",
+    "updated_at": "2026-10-07T13:06:52.683172+00:00",
+    "verified_at": "2026-07-30T05:30:52.281083+00:00",
+    "contract_version": "0.8.15-consensus-estimates-20261008-r2",
+    "mcp_server_version": "0.8.15"
+  },
+  "history_interface": {
+    "name": "ffd_quote_history",
+    "label": "历史行情",
+    "public_stable_interface": true,
+    "status": "available",
+    "status_label": "已验证可用",
+    "markets": ["cn", "hk", "us", "index"],
+    "granularity": "日线",
+    "freshness": "交易日更新",
+    "coverage_status": "stable",
+    "entitlement_conditional": false,
+    "ohlc_supported": true,
+    "adjust_modes": ["不复权", "前复权", "后复权"],
+    "default_adjust": "不复权",
+    "coverage_policies": ["complete_rows", "return_available_cells", "strict"],
+    "raw_output_supported": true
+  },
+  "observed_public_canary": {
+    "case": "rest-control-76",
+    "kind": "observed_production_canary",
+    "observed_at": "2026-10-03T09:21:14.259319+00:00",
+    "request_function": "history",
+    "request_code": "600519.SH",
+    "http_status": 200,
+    "data_freshness": "complete_cached_asset",
+    "adjustment_requested": "none",
+    "adjustment_effective": "none",
+    "conversion_or_recalculation_by_ffd": false,
+    "coverage_complete": true,
+    "identity_proof": "structured_asset_code_date_field_key",
+    "upstream_lease_ids": [],
+    "cache_status": "complete_structured_asset_hit",
+    "interpretation": "The public contract itself treats a complete cached history delivery with empty upstream_lease_ids as a successful observed production canary. Therefore empty upstream_lease_ids is not, by itself, evidence that a history row is calculated, synthetic, or invalid."
+  },
+  "binding_scope": {
+    "vendor_identity": "FFD / FinDesk",
+    "does_not_claim_upstream_brand": true,
+    "does_not_equate_ffd_to_wind_ifind_tushare": true,
+    "role": "Versioned public historical-OHLC vendor contract for FFD itself",
+    "formal_effect": "Evidence only until the dedicated FFD binding gate is adjudicated."
+  }
+}

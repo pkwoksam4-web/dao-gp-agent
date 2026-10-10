@@ -1,0 +1,45 @@
+name: DAO2 C SWSResearch Trend Exact-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'scripts/dao2_c_swsresearch_trend_probe_v1.py'
+      - 'scripts/test_dao2_c_swsresearch_trend_probe_v1.py'
+      - '.github/workflows/dao2-c-swsresearch-trend-probe-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas requests pytest
+      - name: Unit contract tests
+        run: pytest -q scripts/test_dao2_c_swsresearch_trend_probe_v1.py
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Run official SWSResearch exact-gap probe
+        run: |
+          python scripts/dao2_c_swsresearch_trend_probe_v1.py \
+            --base-panel series-base/sector_close_formal.csv.gz \
+            --out artifact_swsresearch_trend
+      - name: Upload official raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-swsresearch-trend-exact-gap-probe-v1
+          path: artifact_swsresearch_trend/
+          if-no-files-found: warn
+          retention-days: 30

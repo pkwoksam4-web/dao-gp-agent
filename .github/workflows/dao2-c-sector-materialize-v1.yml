@@ -1,0 +1,121 @@
+name: DAO2 C Sector Backing Materialize V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - 'scripts/dao2_c_sector_materialize_v1.py'
+      - '.github/workflows/dao2-c-sector-materialize-v1.yml'
+      - 'data/dao2/modules/C_SECTOR_PRICE_BASIS_BINDING_V1.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: dao2-c-sector-backing-materialize-v1
+  cancel-in-progress: true
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install sector data dependencies
+        run: pip install -q pandas pyarrow xlrd
+      - name: Download frozen Formal calendar
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Download canonical SW classification backing bytes
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sw-classification-history-probe-v1
+          path: sw-history
+          run-id: 35558312420
+          github-token: ${{ github.token }}
+      - name: Download frozen Formal RAW trade keys
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-sohu-full-raw-v482-reaudit
+          path: formal-raw
+          run-id: 34192233633
+          github-token: ${{ github.token }}
+      - name: Pin upstream generator and manifests
+        run: |
+          set -euo pipefail
+          mkdir -p upstream work membership_out series_out
+          curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/02_desktop_quant_02_code/b1_tft_experiment/scripts/download_tushare_data.py' -o upstream/download_tushare_data.py
+          curl -fsSL 'https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/6b245fa09cb628f3bcb812f0662bfef520e65fb4/xst/xst_quant_experiments_20260613/03_desktop_quant_results_light/b1_tft_download/data_provenance/industry_taxonomy_manifest.json' -o upstream/industry_taxonomy_manifest.json
+          curl -fsSL 'https://raw.githubusercontent.com/ZJU-OmniAI/Data-Copilot/c32f9dfa0ea7e9cd6316f06dab38ef2f1eb30187/SW2021_industry_L1.csv' -o upstream/SW2021_industry_L1.csv
+          curl -fsSL 'https://raw.githubusercontent.com/ZJU-OmniAI/Data-Copilot/c32f9dfa0ea7e9cd6316f06dab38ef2f1eb30187/SW2021_industry_L3.csv' -o upstream/SW2021_industry_L3.csv
+          curl -fsSL 'https://raw.githubusercontent.com/pibbo88/swcls/33519111b066bb60a20684fa65fcad0c21db4b0d/swcls_2014.csv' -o upstream/swcls_2014.csv
+          curl -fsSL 'https://raw.githubusercontent.com/pibbo88/swcls/33519111b066bb60a20684fa65fcad0c21db4b0d/swcls_2021.csv' -o upstream/swcls_2021.csv
+          curl -fsSL 'https://raw.githubusercontent.com/ramwin/china-public-data/558effa78547d3e212d95be4f3e1c43bf85422ec/sw.csv' -o upstream/sw2014_index_map.csv
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          expected={
+              "upstream/download_tushare_data.py":"f00fed00a969a39a73a71152fb3031e1631c3476",
+              "upstream/industry_taxonomy_manifest.json":"4e00b89478581e85bf37938a8b935bdbb21a0875",
+          }
+          for name,want in expected.items():
+              data=Path(name).read_bytes()
+              got=hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()
+              assert got==want,(name,got,want)
+              print(name,got)
+          PY
+      - name: Prepare exact Formal root
+        run: |
+          python scripts/dao2_c_sector_materialize_v1.py prepare             --taxonomy upstream/industry_taxonomy_manifest.json             --formal-calendar calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --root work
+      - name: Close Membership from canonical SW history
+        run: |
+          set -euo pipefail
+          test -f sw-history/StockClassifyUse_stock.xls
+          test -f formal-raw/SOHU_RAW_FULL_V482.parquet
+          python scripts/dao2_c_sector_materialize_v1.py official-membership \
+            --sw-xls sw-history/StockClassifyUse_stock.xls \
+            --formal-raw formal-raw/SOHU_RAW_FULL_V482.parquet \
+            --taxonomy upstream/industry_taxonomy_manifest.json \
+            --sw2014-hierarchy upstream/swcls_2014.csv \
+            --sw2014-index-map upstream/sw2014_index_map.csv \
+            --sw2021-hierarchy upstream/swcls_2021.csv \
+            --sw2021-l1 upstream/SW2021_industry_L1.csv \
+            --sw2021-l3 upstream/SW2021_industry_L3.csv \
+            --out membership_out
+          python - <<'PY'
+          import json
+          x=json.load(open("membership_out/membership_audit.json",encoding="utf-8"))
+          assert x["status"]=="PASS_SUBCOMPONENT",x
+          assert x["unresolved_rows"]==0,x
+          assert x["formal_membership"]["coverage_resolved_stock_date_keys"]==1011607,x
+          assert x["formal_membership"]["unresolved_stock_date_keys"]==0,x
+          assert x["formal_membership"]["duplicate_stock_date_keys"]==0,x
+          assert len(x["seven_859622_resolution"])==7,x
+          assert x["taxonomy_switch"]["pass"] is True,x
+          print(json.dumps({
+              "status":x["status"],
+              "unresolved_rows":x["unresolved_rows"],
+              "mapped_stock_date_keys":x["formal_membership"]["mapped_stock_date_keys"],
+              "explicit_no_membership_stock_date_keys":x["formal_membership"]["explicit_no_membership_stock_date_keys"],
+              "coverage_resolved_stock_date_keys":x["formal_membership"]["coverage_resolved_stock_date_keys"],
+              "required_sector_date_keys":x["formal_membership"]["required_sector_date_keys"],
+              "seven_resolved":len(x["seven_859622_resolution"]),
+              "sw_xls_sha256":x["canonical_sw_xls"]["sha256"],
+          },ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-sector-backing-materialize-v1
+          path: |
+            membership_out/
+            sw-history/StockClassifyUse_stock.xls
+            work/industry_taxonomy_manifest.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,54 @@
+{
+  "artifact": "DAO2_C_SECTOR_OFFICIAL_SWS_TREND_GAP_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_SOURCE_IDENTITY_TARGETS_ABSENT",
+  "workflow": {
+    "name": "DAO2 C Official SWS Trend Exact-Gap Probe V1",
+    "workflow_run_id": 37749705132,
+    "head_sha": "9594d4ba88b040b3075fecca3a55b5f342dd0735",
+    "artifact_id": 11537810071,
+    "artifact_digest": "sha256:31211c2076881eb6beea31fffb3490b2e43dba6b45c148e045e7d86b3669d36d"
+  },
+  "source": {
+    "provider": "申万宏源研究官网",
+    "endpoint": "https://www.swsresearch.com/institute-sw/api/index_publish/trend/",
+    "symbol": "801020",
+    "period": "DAY",
+    "http_status": 200,
+    "raw_response_sha256": "fcddfc5c449e1ec2acb8376e901b72bbc465254f63e47617e60ba051f14d328c",
+    "tls_verify": false,
+    "tls_note": "SWS certificate chain is not trusted by the GitHub-hosted Ubuntu CA bundle; current AKShare index_hist_sw implementation for the same official endpoint also uses verify=False. Raw response bytes are retained and SHA256-bound."
+  },
+  "target_keys": [
+    ["801020.SI", "20210806"],
+    ["801020.SI", "20211008"],
+    ["801020.SI", "20211022"]
+  ],
+  "target_result": {
+    "20210806": null,
+    "20211008": null,
+    "20211022": null,
+    "all_three_target_raw_rows_present": false,
+    "admitted_rows": 0
+  },
+  "neighbor_overlap": [
+    {"trade_date":"20210805","official_close":2954.25,"frozen_close":2954.25,"abs_diff":0.0,"match_2dp":true},
+    {"trade_date":"20210809","official_close":3048.39,"frozen_close":3048.39,"abs_diff":0.0,"match_2dp":true},
+    {"trade_date":"20210930","official_close":3976.45,"frozen_close":3976.45,"abs_diff":0.0,"match_2dp":true},
+    {"trade_date":"20211011","official_close":3971.72,"frozen_close":3971.72,"abs_diff":0.0,"match_2dp":true},
+    {"trade_date":"20211021","official_close":3886.69,"frozen_close":3886.69,"abs_diff":0.0,"match_2dp":true},
+    {"trade_date":"20211025","official_close":3804.92,"frozen_close":3804.92,"abs_diff":0.0,"match_2dp":true}
+  ],
+  "interpretation": {
+    "official_trend_feed_identity_to_frozen_series": "PASS_6_OF_6_NEIGHBORS_EXACT_2DP",
+    "target_absence_observed_in_official_current_history": true,
+    "proves_permanent_historical_nonexistence": false,
+    "series_checkpoint_changed_to_pass": false,
+    "coverage_changed": false,
+    "derived_close_admitted": 0,
+    "breadth_gate_open": false
+  },
+  "next_route": "Probe the separate official SWS daily index-analysis endpoint for same-date direct close rows before requiring paid/private vendor export."
+}
