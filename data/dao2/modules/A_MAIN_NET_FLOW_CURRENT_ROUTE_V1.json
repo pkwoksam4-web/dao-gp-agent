@@ -2,7 +2,7 @@
   "artifact": "A_MAIN_NET_FLOW_CURRENT_ROUTE_V1",
   "version": "1.0",
   "module": "A_MAIN_NET_FLOW",
-  "as_of": "2026-10-08",
+  "as_of": "2026-10-10",
   "status": "BLOCKED_EXTERNAL_RAW_OR_PERMISSION_UNLOCK_REQUIRED",
   "owned_blocker": "MAIN_NET_FLOW_UNBOUND",
   "formal_expected_rows": 1011607,
@@ -35,20 +35,32 @@
     },
     "ifind": {
       "status": "FROZEN_NO_NEW_REAL_HISTORICAL_READABILITY_SIGNAL",
+      "latest_runtime_evidence": "data/dao2/modules/A_IFIND_DIRECT_RUNTIME_20261010.json",
+      "latest_runtime_result": "IFIND_REFRESH_TOKEN_MISSING",
       "run_allowed_only_if": "HISTORICAL_EXACT_AGGREGATE_IS_ACTUALLY_READABLE",
       "repeat_unauthorized_probe_allowed": false,
       "schema_guessing_allowed": false,
       "plaintext_token_request_allowed": false,
       "permission_expansion_allowed": false
     },
+    "ffd": {
+      "status": "PASS_CROSSCHECK_EVIDENCE_NOT_ADMITTED",
+      "latest_contract_evidence": "data/dao2/modules/A_FFD_COMPONENT_CONTRACT_BINDING_20261010.json",
+      "formal_admission_allowed": false,
+      "restart_allowed_only_if": "NEW_SOURCE_BACKED_FIXED_COMPONENT_CONTRACT_BINDS_MISSING_SEMANTICS"
+    },
     "alphat01": {
       "status": "RAW_GATED_403_AWAITING_AUTHOR_REVIEW",
+      "latest_recheck_evidence": "data/dao2/modules/A_ALPHAT01_AUTH_RECHECK_20261010.json",
+      "latest_recheck_job": "6ac9f3a6095c5780893103a2",
+      "latest_recheck_date": "2026-10-10",
       "raw_processing_allowed_only_if": "TARGET_RAW_BYTES_ARE_ACTUALLY_READABLE",
       "repeat_download_attempts_while_gated_allowed": false,
       "repeat_application_allowed": false
     },
     "targeted_l2_vendor": {
       "status": "WAITING_FOR_REAL_RAW_OR_SAMPLE",
+      "request_contract": "data/dao2/modules/A_TARGETED_L2_VENDOR_REQUEST_V1.json",
       "processing_order": [
         "persist raw bytes",
         "raw SHA256",
