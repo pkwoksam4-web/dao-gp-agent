@@ -1,0 +1,59 @@
+{
+  "artifact": "DAO2_A_IFIND_HARNESS_READINESS_20261010",
+  "version": "1.0",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "IFIND_DIRECT_AGGREGATE_EXACT_PROBE",
+  "as_of": "2026-10-10",
+  "status": "LOCAL_HARNESS_READY_EXTERNAL_AUTH_MISSING",
+  "verified_test_commit": "746cc1f6b5c25688da7d72f7865924b63709b0d4",
+  "verified_test_check": {
+    "check_name": "test",
+    "check_run_id": 114161369071,
+    "workflow_run_id": 38034273997,
+    "status": "completed",
+    "conclusion": "success",
+    "completed_at": "2026-10-10T07:23:53Z"
+  },
+  "code_stability_to_evidence_head": {
+    "evidence_head": "de326a651e47cb466d787ff4ee2822d38409ce22",
+    "commits_ahead": 7,
+    "ifind_execution_or_test_files_changed": false,
+    "changed_paths_since_verified_test": [
+      "data/dao2/modules/A_ALPHAT01_AUTH_RECHECK_20261010.json",
+      "data/dao2/modules/A_FFD_COMPONENT_CONTRACT_BINDING_20261010.json",
+      "data/dao2/modules/A_FFD_RELEVANT_CONTRACT_DIFF_20261010.json",
+      "data/dao2/modules/A_IFIND_DIRECT_RUNTIME_20261010.json",
+      "data/dao2/modules/A_MAIN_NET_FLOW_CURRENT_ROUTE_V1.json",
+      "data/dao2/modules/A_TARGETED_L2_VENDOR_OUTREACH_20261010.json"
+    ]
+  },
+  "runtime_blocker": {
+    "source": "data/dao2/modules/A_IFIND_DIRECT_RUNTIME_20261010.json",
+    "stage": "refresh_token_presence",
+    "reason": "IFIND_REFRESH_TOKEN_MISSING",
+    "classification": "AUTHENTICATION_PREREQUISITE_MISSING_NOT_IDENTITY_FAILURE"
+  },
+  "frozen_gate": {
+    "control_count": 8,
+    "required_exact_comparisons": 32,
+    "required_result": "32/32 EXACT + mismatch=0",
+    "residual_query_before_identity_pass_allowed": false,
+    "retuning_after_residual_observation_allowed": false
+  },
+  "formal_effect": {
+    "identity_gate_executed_again": false,
+    "admitted_rows": 0,
+    "resolved_delta": 0,
+    "unresolved_delta": 0,
+    "checkpoint_created": false,
+    "main_net_flow_unbound_closed": false
+  },
+  "decision": "DO_NOT_CHANGE_ALGORITHM; WHEN_VALID_IFIND_REFRESH_TOKEN_OR_EQUIVALENT_AUTHORIZATION_SIGNAL_EXISTS, RUN_EXISTING_FROZEN_PROBE_UNCHANGED",
+  "governance": {
+    "secret_value_requested_or_persisted": false,
+    "schema_guessing_added": false,
+    "scale_search_expanded": false,
+    "frozen_controls_modified": false,
+    "proxy_or_imputation_used": false
+  }
+}

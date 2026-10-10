@@ -1,0 +1,184 @@
+{
+  "artifact": "DAO2_A_TARGETED_L2_VENDOR_REQUEST_V1",
+  "version": "1.0",
+  "as_of": "2026-09-27",
+  "module": "A_MAIN_NET_FLOW",
+  "purpose": "Minimal historical L2 carrier request for exact reconstruction of 16 unresolved Tushare classic moneyflow symbol-dates.",
+  "total_requested_symbol_dates": 25,
+  "residual_symbol_dates": 16,
+  "control_symbol_dates": 9,
+  "requested_files_per_symbol_date": [
+    "逐笔委托",
+    "逐笔成交"
+  ],
+  "optional_files": [
+    "十档行情/行情 snapshot"
+  ],
+  "required_order_fields": [
+    "自然日",
+    "万得代码/股票代码",
+    "交易所委托号",
+    "委托代码/方向",
+    "委托类型",
+    "委托价格",
+    "委托数量"
+  ],
+  "required_trade_fields": [
+    "自然日",
+    "万得代码/股票代码",
+    "成交编号",
+    "成交代码/成交类型",
+    "BS标志",
+    "成交价格",
+    "成交数量",
+    "叫卖序号",
+    "叫买序号"
+  ],
+  "targets": {
+    "20200608": [
+      "600306.SH"
+    ],
+    "20201104": [
+      "600898.SH"
+    ],
+    "20210224": [
+      "603996.SH"
+    ],
+    "20210923": [
+      "002618.SZ"
+    ],
+    "20210924": [
+      "000020.SZ",
+      "000157.SZ",
+      "000592.SZ",
+      "000753.SZ"
+    ],
+    "20211125": [
+      "002684.SZ"
+    ],
+    "20220506": [
+      "600112.SH"
+    ],
+    "20230320": [
+      "000564.SZ",
+      "001337.SZ"
+    ],
+    "20230522": [
+      "002118.SZ",
+      "002157.SZ",
+      "002503.SZ",
+      "002504.SZ"
+    ]
+  },
+  "identity_controls": {
+    "symbol": "000001.SZ",
+    "source_repo": "Jessica-Zhangyj/dlquant",
+    "source_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+    "values_unit": "10k CNY",
+    "by_date": {
+      "20200608": {
+        "sha": "6fc18088cf72cecfef2f957f1e9daf1a6aae1def",
+        "buy_lg_amount": "22706.13",
+        "buy_elg_amount": "20364.45",
+        "sell_lg_amount": "20551.98",
+        "sell_elg_amount": "15423.33"
+      },
+      "20201104": {
+        "sha": "c234d16a4a325be732437529626f74c76089469e",
+        "buy_lg_amount": "58399.3",
+        "buy_elg_amount": "70105.23",
+        "sell_lg_amount": "62053.46",
+        "sell_elg_amount": "46431.78"
+      },
+      "20210224": {
+        "sha": "ce323c342cd8b054995c33be902ffac9d1aae799",
+        "buy_lg_amount": "87818.99",
+        "buy_elg_amount": "71918.5",
+        "sell_lg_amount": "105144.61",
+        "sell_elg_amount": "60886.84"
+      },
+      "20210923": {
+        "sha": "12db52b6610c0374e2e26db489920199269d3da2",
+        "buy_lg_amount": "57906.29",
+        "buy_elg_amount": "41905.92",
+        "sell_lg_amount": "101006.09",
+        "sell_elg_amount": "40136.39"
+      },
+      "20210924": {
+        "sha": "d71055fdf356dcb68cff5d9a82b887fb0a469b44",
+        "buy_lg_amount": "51571.27",
+        "buy_elg_amount": "42858.37",
+        "sell_lg_amount": "87320.98",
+        "sell_elg_amount": "30030.38"
+      },
+      "20211125": {
+        "sha": "b566ed2ae7bb93d84318e4f09ee11c45f24e9892",
+        "buy_lg_amount": "21697.06",
+        "buy_elg_amount": "11463.59",
+        "sell_lg_amount": "36429.37",
+        "sell_elg_amount": "23850.45"
+      },
+      "20220506": {
+        "sha": "ee7321d7b6bfc8634364230f847530b127d80111",
+        "buy_lg_amount": "44452.43",
+        "buy_elg_amount": "10340.98",
+        "sell_lg_amount": "28948.56",
+        "sell_elg_amount": "17131.12"
+      },
+      "20230320": {
+        "sha": "dbdac425be07c992669858776cd082b75af47d01",
+        "buy_lg_amount": "35120.17",
+        "buy_elg_amount": "21381.88",
+        "sell_lg_amount": "41233.81",
+        "sell_elg_amount": "27595.82"
+      },
+      "20230522": {
+        "sha": "f9d0d5940679039a1c0a07ece52688c5cfdb6bb2",
+        "buy_lg_amount": "17926.47",
+        "buy_elg_amount": "13785.17",
+        "sell_lg_amount": "23147.51",
+        "sell_elg_amount": "8417.86"
+      }
+    }
+  },
+  "acceptance_gate": {
+    "pre_purchase_sample": "At least one real Shenzhen control symbol-date must be supplied before full purchase when seller permits.",
+    "exact_identity": "Reconstruction must match all four Jessica fields exactly on controls; no tolerance, no retuning after residual observation.",
+    "no_proxy": true,
+    "no_imputation": true,
+    "no_zero_fill": true,
+    "residual_visibility_rule": "Do not inspect/use reconstructed target values until control identity gate passes for the carrier."
+  },
+  "preferred_carriers": [
+    "submato/ashare-l2",
+    "CnOpenData A股上市公司股票高频交易数据",
+    "StockApi Level2历史数据",
+    "alphat01/Tick-by-Tick-Orders-China"
+  ],
+  "purchase_policy": "For L2 purchase, request only the 12 Shenzhen residuals + 600112.SH/20220506 + controls. The 3 pre-2021 Shanghai residuals must not be represented as solvable by official SSE Entrust data; obtain direct classic moneyflow values or independently proven original-order carrier.",
+  "scope_correction": {
+    "l2_reconstruction_targets": 13,
+    "direct_classic_moneyflow_only_targets": [
+      "600306.SH/20200608",
+      "600898.SH/20201104",
+      "603996.SH/20210224"
+    ],
+    "reason": "SSE official historical Entrust order stream begins 2021-04-26."
+  },
+  "shanghai_post_20210426_required_fields": [
+    "OrderNo",
+    "Price",
+    "Balance",
+    "OrderBSFlag",
+    "OrdType",
+    "OrderIndex",
+    "ChannelNo",
+    "BizIndex",
+    "TradeQty",
+    "TradeAmount",
+    "BuyNo",
+    "SellNo",
+    "TradeBSFlag",
+    "TradeIndex"
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "artifact": "DAO2_A_PUBLIC_TUSHARE_HISTORICAL_MIRROR_AUDIT_V1",
+  "version": "1.0",
+  "as_of": "2026-09-22",
+  "route": "PUBLIC_TUSHARE_MONEYFLOW_HISTORICAL_MIRROR_RECOVERY",
+  "status": "IDENTITY_PASS_MULTIPLE_CARRIERS_NO_RESIDUAL_RECOVERY_YET",
+  "admission_policy": {
+    "exact_tushare_semantics_required": true,
+    "overlap_before_residual": true,
+    "field_level_exact_match_required": "100%",
+    "proxy_allowed": false,
+    "imputation_allowed": false,
+    "partial_recovery_allowed": true
+  },
+  "verified_carriers": [
+    {
+      "repository": "Moonlit-Pages/cozeclaw-workspace",
+      "commit": "526ebbb94066bc623add892f6f8c21378d3e945a",
+      "path": "T01_回测数据_资金流向.csv",
+      "source_identity": "PASS",
+      "provenance": "same repository contains direct pro.moneyflow() acquisition/export pipeline",
+      "overlap_audit": {
+        "trade_date": "20260403",
+        "public_rows": 5183,
+        "jessica_rows": 5183,
+        "overlap_rows": 5183,
+        "mismatch_rows": 0,
+        "exact_match_rate": 1.0,
+        "fields": [
+          "ts_code",
+          "trade_date",
+          "buy_lg_amount",
+          "buy_elg_amount",
+          "sell_lg_amount",
+          "sell_elg_amount",
+          "buy_sm_amount",
+          "buy_md_amount",
+          "sell_sm_amount",
+          "sell_md_amount",
+          "net_mf_amount"
+        ]
+      },
+      "residual_hits": 0,
+      "reason": "Carrier contains only 20260403. Current and older public SQLite/ZIP snapshots inspected; no 2020-2023 residual dates found."
+    },
+    {
+      "repository": "Jiu-7131/BigDataVisualization",
+      "commit": "102c67acda5151545d54444199140bd869c49004",
+      "root": "数据集/tushare_all_interfaces/moneyflow/",
+      "source_identity": "PASS",
+      "actual_moneyflow_csv_count": 5374,
+      "schema": [
+        "ts_code",
+        "trade_date",
+        "buy_sm_vol",
+        "buy_sm_amount",
+        "sell_sm_vol",
+        "sell_sm_amount",
+        "buy_md_vol",
+        "buy_md_amount",
+        "sell_md_vol",
+        "sell_md_amount",
+        "buy_lg_vol",
+        "buy_lg_amount",
+        "sell_lg_vol",
+        "sell_lg_amount",
+        "buy_elg_vol",
+        "buy_elg_amount",
+        "sell_elg_vol",
+        "sell_elg_amount",
+        "net_mf_vol",
+        "net_mf_amount"
+      ],
+      "overlap_audit": {
+        "years": [2022, 2023, 2024, 2025],
+        "trade_dates": ["20220104", "20220509", "20230321", "20240506", "20250102"],
+        "symbols": [
+          "000001.SZ",
+          "000002.SZ",
+          "000004.SZ",
+          "000006.SZ",
+          "000007.SZ",
+          "000008.SZ",
+          "000009.SZ",
+          "000010.SZ"
+        ],
+        "compared_rows": 40,
+        "missing_candidate_rows": 0,
+        "missing_jessica_rows": 0,
+        "mismatch_rows": 0,
+        "exact_match_rows": 40,
+        "exact_match_rate": 1.0,
+        "fields": [
+          "ts_code",
+          "trade_date",
+          "buy_lg_amount",
+          "buy_elg_amount",
+          "sell_lg_amount",
+          "sell_elg_amount",
+          "buy_sm_amount",
+          "buy_md_amount",
+          "sell_sm_amount",
+          "sell_md_amount",
+          "net_mf_amount"
+        ],
+        "candidate_blob_shas": {
+          "000001_SZ.csv": "54e0cc796f6e1177de0f75471febb73f85dc82d3",
+          "000002_SZ.csv": "1d98bac5f87ef93e0993ee8bdf8cbac839a86ee4",
+          "000004_SZ.csv": "7f812f8f23e5939d5a43f82b1acff0a990b8bd15",
+          "000006_SZ.csv": "b8aa80975b7f2a12285e6cc1eb61f46ea5914412",
+          "000007_SZ.csv": "a8ec823424fbb968200b21089d0406683b838a29",
+          "000008_SZ.csv": "f42d47e6f0f09bc0e0291136feb424928d423cd4",
+          "000009_SZ.csv": "81f3b88370e239a9cd6681f7ed4bacbfab57b685",
+          "000010_SZ.csv": "b1d2f94bffa8acce18133f7e9911a5088c21c195"
+        }
+      },
+      "residual_audit": {
+        "eligible_target_keys_in_2022_2023": 7,
+        "admitted_rows": 0,
+        "details": [
+          {"key": "600112.SH/20220506", "file": "600112_SH.csv", "file_exists": false},
+          {"key": "000564.SZ/20230320", "file": "000564_SZ.csv", "file_exists": true, "blob_sha": "03546e6ca821ae4faf35766540c5e013c45b8776", "target_hit_count": 0},
+          {"key": "001337.SZ/20230320", "file": "001337_SZ.csv", "file_exists": true, "blob_sha": "0636b1df663588d3f01563f2a2a9e6d042bd1df5", "target_hit_count": 0},
+          {"key": "002118.SZ/20230522", "file": "002118_SZ.csv", "file_exists": false},
+          {"key": "002157.SZ/20230522", "file": "002157_SZ.csv", "file_exists": true, "blob_sha": "8608ad5bca63e084519829a5b79ab251903ba373", "target_hit_count": 0},
+          {"key": "002503.SZ/20230522", "file": "002503_SZ.csv", "file_exists": false},
+          {"key": "002504.SZ/20230522", "file": "002504_SZ.csv", "file_exists": false}
+        ],
+        "interpretation": "This independent public mirror exactly matches Jessica on 40 control rows but reproduces the same missing residual rows; no zero-fill or inference is permitted."
+      }
+    },
+    {
+      "repository": "PanGucheng/a-share-quant-research",
+      "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
+      "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+      "blob_sha": "e8826d3b5e82edb7c85b63ebf371a6987afaa7a5",
+      "file_size_bytes": 1082293,
+      "manifest_sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59",
+      "provenance": "REPORT.md identifies Tushare moneyflow and network_receipts.csv preserves request receipts.",
+      "coverage": {
+        "design": "48 quarterly representative trading dates from 2010 through 2021",
+        "last_moneyflow_canary_date": "20211008",
+        "target_trade_dates_present": []
+      },
+      "residual_hits": 0,
+      "reason": "Actual raw historical Tushare moneyflow carrier exists, but the sampled canary dates do not include any of the nine DAO2 residual dates."
+    }
+  ],
+  "paywalled_candidate": {
+    "provider": "tushare.indevs.in",
+    "product": "Tushare moneyflow 完整历史数据",
+    "url": "https://tushare.indevs.in/quant/trading-data/",
+    "status": "PAYWALLED_CANDIDATE_NOT_ADMITTED",
+    "vendor_claims": {
+      "interface": "moneyflow",
+      "complete_history": true,
+      "package_size": "1.21GB",
+      "file_count": 3993,
+      "record_count": 13690451,
+      "field_count": 23,
+      "sha256_provided": true,
+      "price_cny": 50,
+      "sample_filename": "moneyflow__sample_50rows.parquet"
+    },
+    "admission_status": "NOT_ADMITTED",
+    "reason": "Full package requires payment and sample bytes could not be retrieved in the current environment. Jessica overlap and target-row provenance remain mandatory after acquisition."
+  },
+  "current_result": {
+    "new_admissible_exact_rows": 0,
+    "resolved_rows": 1011591,
+    "unresolved_rows": 16,
+    "main_net_flow_unbound_closed": false
+  }
+}

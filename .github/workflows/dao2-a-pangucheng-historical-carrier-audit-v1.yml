@@ -1,0 +1,190 @@
+name: DAO2 A PanGucheng Historical Carrier Audit V1
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-pangucheng-historical-carrier-audit-v1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install parquet runtime
+        run: python -m pip install --quiet pandas pyarrow requests
+
+      - name: Audit PanGucheng public historical parquet
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, io, json, requests, pandas as pd
+          from pathlib import Path
+
+          OUT="dao2_a_pangucheng_historical_carrier_audit_v1.json"
+          SOURCE_REPO="PanGucheng/a-share-quant-research"
+          SOURCE_COMMIT="ade0db2cef9dc003d6eb5013bbc68017143cd526"
+          SOURCE_PATH="reports/historical_frontier_admission_v1/raw/moneyflow.parquet"
+          SOURCE_BLOB_SHA="e8826d3b5e82edb7c85b63ebf371a6987afaa7a5"
+          URL=f"https://raw.githubusercontent.com/{SOURCE_REPO}/{SOURCE_COMMIT}/{SOURCE_PATH}"
+          JESSICA_REPO="Jessica-Zhangyj/dlquant"
+          JESSICA_COMMIT="6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          REQUIRED=["buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount"]
+          OPTIONAL=["buy_sm_amount","buy_md_amount","sell_sm_amount","sell_md_amount","net_mf_amount"]
+          TARGETS=[
+            ("600306.SH","20200608"),("600898.SH","20201104"),("603996.SH","20210224"),("002618.SZ","20210923"),
+            ("000020.SZ","20210924"),("000157.SZ","20210924"),("000592.SZ","20210924"),("000753.SZ","20210924"),
+            ("002684.SZ","20211125"),("600112.SH","20220506"),("000564.SZ","20230320"),("001337.SZ","20230320"),
+            ("002118.SZ","20230522"),("002157.SZ","20230522"),("002503.SZ","20230522"),("002504.SZ","20230522")
+          ]
+
+          out={"artifact":"DAO2_A_PANGUCHENG_HISTORICAL_CARRIER_AUDIT_V1",
+               "source":{"repository":SOURCE_REPO,"commit":SOURCE_COMMIT,"path":SOURCE_PATH,"blob_sha":SOURCE_BLOB_SHA,"url":URL},
+               "jessica":{"repository":JESSICA_REPO,"commit":JESSICA_COMMIT},
+               "required_fields":REQUIRED,"optional_fields":OPTIONAL}
+
+          r=requests.get(URL,timeout=120); r.raise_for_status()
+          raw=r.content
+          out["source"]["raw_bytes"]=len(raw)
+          out["source"]["raw_sha256"]=hashlib.sha256(raw).hexdigest()
+          df=pd.read_parquet(io.BytesIO(raw))
+          out["row_count"]=int(len(df))
+          out["columns"]=[str(c) for c in df.columns]
+
+          missing=[c for c in ["ts_code","trade_date"]+REQUIRED if c not in df.columns]
+          out["missing_required_columns"]=missing
+          if missing:
+            out["status"]="REJECT_MISSING_EXACT_MONEYFLOW_FIELDS"
+            Path(OUT).write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+            print(json.dumps({"status":out["status"],"missing":missing},ensure_ascii=False)); raise SystemExit(0)
+
+          def nd(v):
+            if pd.isna(v): return None
+            if hasattr(v,"strftime"):
+              try: return v.strftime("%Y%m%d")
+              except Exception: pass
+            s=str(v).strip()
+            if s.endswith(".0"): s=s[:-2]
+            s=s.replace("-","").replace("/","")[:8]
+            return s if len(s)==8 and s.isdigit() else None
+
+          df=df.copy()
+          df["ts_code"]=df["ts_code"].astype(str).str.strip()
+          df["trade_date"]=df["trade_date"].map(nd)
+          df=df[df["trade_date"].notna()]
+          dates=sorted(df.trade_date.unique().tolist())
+          years=sorted({d[:4] for d in dates})
+          symbols=sorted(df.ts_code.unique().tolist())
+          out["date_range"]={"min":dates[0] if dates else None,"max":dates[-1] if dates else None,
+                             "unique_dates":len(dates),"years":years}
+          out["unique_symbols"]=len(symbols)
+
+          target_evidence=[]
+          for sym,date in TARGETS:
+            same=df[df.ts_code==sym].sort_values("trade_date")
+            hit=same[same.trade_date==date]
+            ds=same.trade_date.tolist()
+            before=[d for d in ds if d<date]
+            after=[d for d in ds if d>date]
+            target_evidence.append({
+              "ts_code":sym,"trade_date":date,
+              "same_symbol_rows":int(len(same)),
+              "same_symbol_exists":bool(len(same)),
+              "same_symbol_min":ds[0] if ds else None,
+              "same_symbol_max":ds[-1] if ds else None,
+              "coverage_spans_target":bool(ds and ds[0] < date < ds[-1]),
+              "nearest_before":before[-1] if before else None,
+              "nearest_after":after[0] if after else None,
+              "target_row_count":int(len(hit)),
+              "target_row_exists":bool(len(hit)),
+              "raw_required_fields":({f:(None if pd.isna(hit.iloc[0][f]) else float(hit.iloc[0][f])) for f in REQUIRED} if len(hit) else None)
+            })
+          out["target_evidence"]=target_evidence
+          out["target_hit_count"]=sum(1 for x in target_evidence if x["target_row_exists"])
+
+          # Identity gate: choose 5 dates spanning >=3 years; compare 5-10 rows/date, cap 50.
+          selected=[]
+          if dates:
+            ymap={}
+            for d in dates: ymap.setdefault(d[:4],[]).append(d)
+            ylist=sorted(ymap)
+            if len(ylist)>=3:
+              ys=[ylist[0],ylist[len(ylist)//2],ylist[-1]]
+            else:
+              ys=ylist
+            for y in ys:
+              ds=ymap[y]
+              for i in sorted(set([0,len(ds)//2,len(ds)-1])):
+                selected.append(ds[i])
+            selected=sorted(dict.fromkeys(selected))
+            if len(selected)<5:
+              extra=[d for d in dates if d not in selected]
+              step=max(1,len(extra)//max(1,5-len(selected)))
+              selected=(selected+extra[::step])[:5]
+            elif len(selected)>5:
+              idx=[0,len(selected)//4,len(selected)//2,(3*len(selected))//4,len(selected)-1]
+              selected=[selected[i] for i in sorted(set(idx))]
+
+          overlap=0; mismatches=[]; fetches=[]
+          compare_fields=REQUIRED+OPTIONAL
+          for d in selected:
+            ju=f"https://raw.githubusercontent.com/{JESSICA_REPO}/{JESSICA_COMMIT}/data/moneyflow/{d}.csv"
+            jr=requests.get(ju,timeout=60)
+            if jr.status_code!=200:
+              fetches.append({"trade_date":d,"http_status":jr.status_code}); continue
+            jraw=jr.content
+            jdf=pd.read_csv(io.BytesIO(jraw),dtype={"ts_code":str,"trade_date":str})
+            jdf["trade_date"]=jdf["trade_date"].astype(str).str.replace("-","",regex=False)
+            sub=df[df.trade_date==d]
+            common=sorted(set(sub.ts_code)&set(jdf.ts_code))[:10]
+            ss=sub.set_index(["ts_code","trade_date"]); js=jdf.set_index(["ts_code","trade_date"])
+            fetches.append({"trade_date":d,"http_status":200,"common_rows":len(common),
+                            "jessica_sha256":hashlib.sha256(jraw).hexdigest()})
+            for sym in common:
+              a=ss.loc[(sym,d)]; b=js.loc[(sym,d)]
+              if isinstance(a,pd.DataFrame): a=a.iloc[0]
+              if isinstance(b,pd.DataFrame): b=b.iloc[0]
+              diffs=[]
+              for f in compare_fields:
+                if f not in a.index or f not in b.index: continue
+                av=a[f]; bv=b[f]
+                if pd.isna(av) and pd.isna(bv): continue
+                try: eq=float(av)==float(bv)
+                except Exception: eq=str(av)==str(bv)
+                if not eq: diffs.append({"field":f,"carrier":None if pd.isna(av) else str(av),"jessica":None if pd.isna(bv) else str(bv)})
+              overlap+=1
+              if diffs: mismatches.append({"ts_code":sym,"trade_date":d,"diffs":diffs})
+              if overlap>=50: break
+            if overlap>=50: break
+
+          id_pass=(len(selected)>=5 and len({d[:4] for d in selected})>=3 and overlap>=20 and len(mismatches)==0)
+          out["identity_audit"]={"selected_dates":selected,"selected_year_count":len({d[:4] for d in selected}),
+                                 "overlap_rows":overlap,"mismatch_rows":len(mismatches),
+                                 "sample_mismatches":mismatches[:10],"fetches":fetches}
+          out["source_identity_pass"]=id_pass
+          if id_pass:
+            out["status"]="SOURCE_IDENTITY_PASS_WITH_TARGET_HITS" if out["target_hit_count"] else "SOURCE_IDENTITY_PASS_NO_TARGET_HITS"
+          else:
+            out["status"]="REJECT_IDENTITY_FAIL_OR_INSUFFICIENT"
+
+          canon=json.dumps(out,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          out["content_sha256_without_hash_field"]=hashlib.sha256(canon.encode()).hexdigest()
+          Path(OUT).write_text(json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+          print(json.dumps({"status":out["status"],"rows":out["row_count"],"date_range":out["date_range"],
+                            "overlap_rows":overlap,"mismatch_rows":len(mismatches),
+                            "target_hit_count":out["target_hit_count"],
+                            "result_sha256":out["content_sha256_without_hash_field"]},ensure_ascii=False))
+          PY
+
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-pangucheng-historical-carrier-audit-v1
+          path: dao2_a_pangucheng_historical_carrier_audit_v1.json
+          if-no-files-found: error
+          retention-days: 30
