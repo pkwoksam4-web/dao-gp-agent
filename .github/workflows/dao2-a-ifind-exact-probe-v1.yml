@@ -1,3 +1,4 @@
+# actual-run trigger: 2026-10-10 direct frozen probe
 name: DAO2 A iFinD Exact Probe V1
 
 on:
@@ -221,7 +222,6 @@ jobs:
                       result['selected_scale_to_tushare_wan']=win['global_scale_to_tushare_wan']
                       result['identity_evidence']={'exact_comparisons':32,'mismatch_count':0}
 
-                      # Only now read authoritative residual keys. No handwritten target list is permitted.
                       ledger=json.loads(LEDGER_PATH.read_text(encoding='utf-8'))
                       unresolved=ledger.get('unresolved_keys') or []
                       if len(unresolved)!=16:
