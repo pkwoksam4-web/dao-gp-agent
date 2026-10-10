@@ -1,0 +1,130 @@
+{
+  "schema": "agent-brain-ffd-feature-integrity-audit/v1",
+  "status": "FEATURE_WINDOW_INTEGRITY_DEFECT_CONFIRMED",
+  "scope": "2026-09-30 Core13 prospective feature snapshot and Core10 ranking",
+  "governance": {
+    "production_db_mutated": false,
+    "original_prospective_evidence_preserved": true,
+    "retrospective_live_shadow_created": false,
+    "automatic_promotion": false,
+    "production_weight_change": false,
+    "qualification_decision": "QUARANTINE_RECOMMENDED_PENDING_MAINLINE_GOVERNANCE_PATCH"
+  },
+  "source_evidence": {
+    "ffd_history_workflow_run": 37907523735,
+    "ffd_artifact_id": 11605765248,
+    "ffd_artifact_zip_sha256": "840817307d24fdab29ef543aeec566df4a03c4c7994ac58663bbc7a37b13eb62",
+    "ffd_normalized_csv_sha256": "1b6a8cd4e38494a5b9470034f3cb15b6fc73f9ccd9021f9cf372cb968a45abff",
+    "ffd_normalized_json_sha256": "2dc179fb23e7b4c9687693ceadad5f4fa0889a072ba4563f7b7332af15fac378",
+    "production_20260930_ingest_run": 36694329351,
+    "production_feature_created_at": "2026-09-30T09:09:57.489905+00:00",
+    "historical_20260929_recovery_commit": "a841178c4d497a21fc8412a93f3115dbb7f65aaf",
+    "historical_20260929_recovery_run": 37327209113,
+    "historical_20260929_recovery_db_time": "2026-10-05T14:45:04.816705+00:00",
+    "feature_engine_file": "scripts/live_pit_ingest.py",
+    "feature_engine_behavior": "select all Longbridge daily rows <= anchor ordered by trade_time, then use last row positions; no expected-trading-day continuity gate"
+  },
+  "ffd_vs_recovered_longbridge_20260929_identity": {
+    "symbols": 13,
+    "ohlc_exact_symbols": 13,
+    "amount_exact_symbols": 13,
+    "volume_mapping_pass_symbols": 13,
+    "volume_mapping": "round(FFD native shares / 100) == Longbridge stored volume",
+    "result": "PASS"
+  },
+  "causal_timeline": {
+    "20260930_feature_snapshot_created_before_20260929_db_recovery": true,
+    "feature_snapshot_created_at": "2026-09-30T09:09:57.489905+00:00",
+    "recovery_executed_at": "2026-10-05T14:45:04.816705+00:00",
+    "conclusion": "2026-09-29 rows were not present in production market_bars when 2026-09-30 features were computed"
+  },
+  "exact_reproduction_test": {
+    "method": "recompute frozen feature formulas from FFD per-symbol raw history twice: full history vs history with 2026-09-29 removed, then compare with immutable production 2026-09-30 stock_feature_snapshots",
+    "with_20260929_present": {
+      "high_30d_mismatch_symbols": 9,
+      "low_30d_mismatch_symbols": 2,
+      "drawdown_mismatch_symbols": 9,
+      "return_5d_mismatch_symbols": 13,
+      "return_20d_mismatch_symbols": 13,
+      "return_30d_mismatch_symbols": 13,
+      "volume_ratio_mismatch_symbols": 13,
+      "amount_ratio_mismatch_symbols": 13,
+      "realized_vol_20d_mismatch_symbols": 13,
+      "max_abs_return_5d_delta": 0.034262,
+      "max_abs_return_20d_delta": 0.073583,
+      "max_abs_return_30d_delta": 0.059452,
+      "max_abs_amount_ratio_delta": 0.249429,
+      "max_abs_realized_vol_20d_delta": 0.051739
+    },
+    "with_20260929_removed": {
+      "close_mismatch_symbols": 0,
+      "high_30d_mismatch_symbols": 0,
+      "low_30d_mismatch_symbols": 0,
+      "drawdown_mismatch_symbols": 0,
+      "return_5d_mismatch_symbols": 0,
+      "return_20d_mismatch_symbols": 0,
+      "return_30d_mismatch_symbols": 0,
+      "amount_ratio_mismatch_symbols": 0,
+      "realized_vol_20d_mismatch_symbols": 0,
+      "volume_ratio_only_has_rounding_scale_noise": true,
+      "max_abs_volume_ratio_delta": 0.00000055,
+      "result": "PRODUCTION_SNAPSHOT_REPRODUCED_BY_EXCLUDING_20260929"
+    }
+  },
+  "independent_continuity_evidence": {
+    "20260930_quote_prev_close_vs_20260928_db_close": "13/13 mismatch",
+    "20260930_quote_prev_close_vs_recovered_20260929_close": "13/13 exact",
+    "20261008_quote_prev_close_vs_latest_prior_db_close": "13/13 exact",
+    "20261009_quote_prev_close_vs_latest_prior_db_close": "13/13 exact",
+    "finding": "quote.prev_close provides a provider-native fail-closed continuity check without inventing a trading calendar"
+  },
+  "ranking_impact": {
+    "stored_20260930_order": [
+      "600703.SH",
+      "600392.SH",
+      "600487.SH",
+      "002156.SZ",
+      "000636.SZ",
+      "600667.SH",
+      "600522.SH",
+      "601991.SH",
+      "002138.SZ",
+      "605358.SH"
+    ],
+    "corrected_full_history_order": [
+      "600703.SH",
+      "600487.SH",
+      "600392.SH",
+      "002156.SZ",
+      "600667.SH",
+      "601991.SH",
+      "600522.SH",
+      "000636.SZ",
+      "002138.SZ",
+      "605358.SH"
+    ],
+    "stored_top3_set": ["600703.SH", "600392.SH", "600487.SH"],
+    "corrected_top3_set": ["600703.SH", "600487.SH", "600392.SH"],
+    "top3_set_unchanged": true,
+    "stored_bottom3_set": ["601991.SH", "002138.SZ", "605358.SH"],
+    "corrected_bottom3_set": ["000636.SZ", "002138.SZ", "605358.SH"],
+    "bottom3_set_changed": true,
+    "full_ranking_contract_correct": false
+  },
+  "control_test_20261008": {
+    "price_derived_feature_mismatches": 0,
+    "amount_ratio_mismatches": 0,
+    "realized_vol_20d_mismatches": 0,
+    "volume_ratio_only_has_rounding_scale_noise": true,
+    "max_abs_volume_ratio_delta": 0.0000006506,
+    "result": "PASS_CONTROL_AFTER_20260929_RECOVERY"
+  },
+  "required_follow_up": {
+    "preserve_20260930_original_rows": true,
+    "do_not_relabel_as_historical": true,
+    "do_not_settle_as_clean_qualification_sample_without_integrity_gate": true,
+    "recommended_clean_prospective_count_before_governance_patch": 3,
+    "quarantined_prospective_date": "2026-09-30",
+    "future_ingest_guard_candidate": "before current-bar insertion, compare each symbol manifest quote.normalized.prev_close with the latest prior Longbridge daily bar close; fail closed on missing or mismatch"
+  }
+}
