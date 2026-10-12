@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -40,7 +39,7 @@ def validate_prev_close_continuity(rows, latest_by_symbol):
             )
         expected = float(prior["close"])
         observed = float(observed)
-        if not math.isclose(observed, expected, rel_tol=0.0, abs_tol=1e-9):
+        if observed != expected:
             raise ContractGateError(
                 "PIT_PREV_CLOSE_CONTINUITY_FAILED: PREV_CLOSE_MISMATCH "
                 f"symbol={symbol} expected_prev_close={expected} manifest_prev_close={observed}"

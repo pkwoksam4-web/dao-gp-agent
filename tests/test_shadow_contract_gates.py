@@ -29,6 +29,12 @@ class ContractGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractGateError,"PREV_CLOSE_MISMATCH"):
             validate_prev_close_continuity(bad,latest)
 
+    def test_prev_close_sub_nanounit_mismatch_fails_closed(self):
+        latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13}
+        bad=rows(); bad[4]["quote"]["normalized"]["prev_close"]=10.0000000005
+        with self.assertRaisesRegex(ContractGateError,"PREV_CLOSE_MISMATCH"):
+            validate_prev_close_continuity(bad,latest)
+
     def test_prev_close_13_of_13_passes(self):
         latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13}
         self.assertEqual(validate_prev_close_continuity(rows(),latest)["matched"],13)
