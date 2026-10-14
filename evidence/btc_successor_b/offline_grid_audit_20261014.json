@@ -1,0 +1,114 @@
+{
+  "artifact": "BTC_SUCCESSOR_B_OFFLINE_GRID_AUDIT_20261014",
+  "version": "1.0",
+  "audit_date_cn": "2026-10-14",
+  "mode": "NON_PROMOTING_OFFLINE_STRUCTURAL_AUDIT",
+  "source_repository": "pkwoksam4-web/dao-gp-agent",
+  "source_branch": "btc-successor-b-okx-gap-20261009",
+  "captures": {
+    "mark_index_boundary": {
+      "run_id": 37919226495,
+      "artifact_id": 11611365271,
+      "artifact_sha256": "09875362b024a9faeaf620018b8ea72eba2bb5d1ac413784ca304b4e9d3407b2",
+      "files": 2,
+      "rows": 576
+    },
+    "successor_b_prewarmup": {
+      "run_id": 37918941731,
+      "artifact_id": 11610653629,
+      "artifact_sha256": "25a1d26c33d6e1e397d8488df44dbea01898d31fdd20fa383abb61d0abd5023c",
+      "binance_nested_archives": 20,
+      "binance_rows": 5760,
+      "family_counts": {
+        "indexPriceKlines": 5,
+        "klines": 5,
+        "markPriceKlines": 5,
+        "metrics": 5
+      }
+    },
+    "shadow2_funding_probe": {
+      "run_id": 37915951281,
+      "artifact_id": 11609648038,
+      "artifact_sha256": "2280f584cc2004d3bd80063d7a551934331a3df6ffcf0781e78a7cd4433667ab",
+      "archive_http_404_days": 4,
+      "checksum_http_404_days": 4
+    }
+  },
+  "artifact_store_sha256_checks": {
+    "boundary": {
+      "sha256": "09875362b024a9faeaf620018b8ea72eba2bb5d1ac413784ca304b4e9d3407b2",
+      "artifact_store_digest_match": true
+    },
+    "warmup": {
+      "sha256": "25a1d26c33d6e1e397d8488df44dbea01898d31fdd20fa383abb61d0abd5023c",
+      "artifact_store_digest_match": true
+    },
+    "funding_probe": {
+      "sha256": "2280f584cc2004d3bd80063d7a551934331a3df6ffcf0781e78a7cd4433667ab",
+      "artifact_store_digest_match": true
+    }
+  },
+  "binance_grid": {
+    "nested_archives_sha256_verified": "22/22",
+    "rows_per_archive": 288,
+    "interval_ms": 300000,
+    "duplicates": 0,
+    "gaps": 0
+  },
+  "okx_grid": {
+    "endpoint": "GET /api/v5/market/history-candles",
+    "instrument": "BTC-USDT-SWAP",
+    "bar": "5m",
+    "raw_page_count": 17,
+    "raw_rows": 1700,
+    "body_sha256_verified": "17/17",
+    "api_code_zero_closed_candles": "17/17",
+    "unique_timestamps": 1700,
+    "raw_5m_gaps": 0,
+    "requested_range_start_ms": 1785715200000,
+    "requested_range_end_exclusive_ms": 1786218900000,
+    "in_range_rows": 1679,
+    "prefetched_earlier_rows_excluded": 21,
+    "csv_exact_matches_filtered_raw_pages": true,
+    "csv_5m_gaps": 0,
+    "csv_duplicates": 0,
+    "csv_sha256": "7b710dad7385441f552d0be09c74d2806048e5a47b247a1b46afb871d407fd11",
+    "page_body_sha256": [
+      "2fca4cb382dd8dbf3612dc07d4c50b0438781ec6479d4590c8815fdb423ab6f3",
+      "f23a9c596cb5072947340e642871e1c45ae9ea490e0c3d7972321a51e22ee1d8",
+      "eb9034e3b862ba426d61d977af647f054dcf812e8cc4268b9e7021602fe791bc",
+      "1c098d43c433ba10c494d92429be727a83ada8300ce96fffd388047c4d055de4",
+      "4998a5867d3b2ed7a18693cc3016bee8ed142efc7a63f9cf1359fa5aca41df8a",
+      "2e05e237bbbddabc242c04fe07becde0bddfdbd6896c7a59688ed8f835b9cda0",
+      "2aef8c9383a6e15fae98b57cdf5ec50f08de46412d3330fe0c84f1f790dfe5a1",
+      "77c46f3639d69a108cdaa9faf5aba623a0dc857bfc21b4a6071ee5f8a916aac7",
+      "1111b9acfad55ac4f73372204697181317891c5c8a202dbacd4d147c7c2091cb",
+      "ada417bd54296e7a4d92b808834da72852cdf9bfc1008c8a5ac9178103517f6b",
+      "bd5ecadc218e8de293e034190eb52b672e1f90ae10cc058444b0781f8526a62c",
+      "6693fcefcb8665f6108fe5bfc087a9a17aa623389ad64613bdeaa62ea733a523",
+      "277dd0a29c94d583f4e97211995870fa089ea291027a54effaa1655cd5ec4c39",
+      "8edb888d1978cff500f73404ef6598f3d28a8a6892184f406cfc3c14b464242f",
+      "fe241e89890f038f0ba5929402e988245c9160b3bfc32d88d4e305e23ebb3920",
+      "e1efc20277ab1dd379923ef7c59cb4b89dc8434bdaa24c6b84ad28ecf6d58316",
+      "c0f0f41b499bf7b2b0e736951129dc2142b041a3f30c192634ebf816635315cc"
+    ]
+  },
+  "rest_semantics": {
+    "after": "returns records earlier than requested timestamp",
+    "official_source": "https://my.okx.com/docs-v5/zh/#rest-api-market-data-get-history-candlesticks",
+    "captured_cursor_chain": "moves monotonically toward older timestamps"
+  },
+  "conclusion": {
+    "offline_grid_audit": "PASS",
+    "capture_hash_integrity": "PASS",
+    "requested_interval_exact_coverage": "PASS",
+    "basis_semantics_selected": false,
+    "oi_semantics_selected": false,
+    "dataset_coverage_proven": false,
+    "flow_alpha_allowed": false,
+    "mainnet_authorized": false,
+    "production_or_paper_trading_allowed": false,
+    "status": "CAPTURE_GRID_PASS_PENDING_CANONICAL_PREREG_LEDGER_WORKER_BINDING_AND_BASIS_OI_SEMANTICS"
+  },
+  "next_action": "Bind this verified capture to canonical preregistration, ledger, archive and worker refs; use only frozen contracts to establish mark/index/basis and open-interest semantics. Keep trading and alpha promotion disabled. BTC Shadow2 must not count 2026-10-01..04 funding data; resume only on a new source archive or live-worker evidence."
+}
