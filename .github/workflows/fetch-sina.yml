@@ -1,0 +1,53 @@
+name: Fetch Sina Finance response
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch response and record metadata
+        shell: bash
+        run: |
+          mkdir -p artifact
+          : > artifact/raw-body
+          curl_metadata_file="$(mktemp)"
+
+          set +e
+          curl --location --silent --show-error \
+            --header 'User-Agent: Mozilla/5.0' \
+            --header 'Referer: https://finance.sina.com.cn/' \
+            --output artifact/raw-body \
+            --write-out '%{http_code}\n%{content_type}\n' \
+            'https://finance.sina.com.cn/realstock/company/sz300592/qfq.js' \
+            > "${curl_metadata_file}"
+          curl_exit=$?
+          set -e
+
+          touch artifact/raw-body
+          http_status="$(sed -n '1p' "${curl_metadata_file}")"
+          content_type="$(sed -n '2p' "${curl_metadata_file}")"
+          timestamp="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+          sha256="$(sha256sum artifact/raw-body | cut -d' ' -f1)"
+
+          printf '%s\n' \
+            "Curl exit code: ${curl_exit}" \
+            "HTTP status: ${http_status}" \
+            "Content-Type: ${content_type}" \
+            "Timestamp: ${timestamp}" \
+            "SHA256: ${sha256}" \
+            > artifact/metadata.txt
+
+      - name: Upload response artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sina-finance-response
+          path: artifact/
+          if-no-files-found: error
