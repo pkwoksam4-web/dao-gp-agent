@@ -1,0 +1,40 @@
+name: Fetch Sina Finance response
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch response and record metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p artifact
+          read -r http_status content_type < <(
+            curl --location --silent --show-error \
+              --output artifact/raw-body \
+              --write-out '%{http_code} %{content_type}' \
+              'https://finance.sina.com.cn/realstock/company/sz300592/qfq.js'
+          )
+          timestamp="$(date --utc +'%Y-%m-%dT%H:%M:%SZ')"
+          sha256="$(sha256sum artifact/raw-body | cut -d' ' -f1)"
+
+          printf '%s\n' \
+            "HTTP status: ${http_status}" \
+            "Content-Type: ${content_type}" \
+            "Timestamp: ${timestamp}" \
+            "SHA256: ${sha256}" \
+            > artifact/metadata.txt
+
+      - name: Upload response artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sina-finance-response
+          path: artifact/
+          if-no-files-found: error
