@@ -1,0 +1,50 @@
+{
+  "artifact": "BTC_SHADOW2_BINANCE_FUNDING_REST_CAPTURE_AUDIT_20261015",
+  "version": "1.0",
+  "audit_date_cn": "2026-10-15",
+  "mode": "EVIDENCE_ONLY_NOT_PROMOTING",
+  "repository": "pkwoksam4-web/dao-gp-agent",
+  "branch": "btc-shadow2-rest-rescue-20261009",
+  "collector_commit": "84f470f0f0d05c43e64f558a793b8eca25cb27b8",
+  "workflow_run": {
+    "id": 38710415197,
+    "url": "https://github.com/pkwoksam4-web/dao-gp-agent/actions/runs/38710415197",
+    "conclusion": "failure",
+    "job_conclusion": "failure",
+    "unit_tests": "5/5 PASS",
+    "failure_step": "Propagate capture validation status",
+    "collector_exit_code": 2
+  },
+  "workflow_artifact": {
+    "id": 11959673998,
+    "name": "btc-shadow2-funding-rest-38710415197",
+    "zip_sha256": "474857793c85f90b729708f98bf60422e21d17f34b0820f17d48646b5150c58e",
+    "artifact_store_digest_match": true
+  },
+  "capture": {
+    "source": "https://fapi.binance.com/fapi/v1/fundingRate",
+    "symbol": "BTCUSDT",
+    "range_start_utc_inclusive": "2026-10-01T00:00:00Z",
+    "range_end_utc_exclusive": "2026-10-05T00:00:00Z",
+    "retrieved_at_utc": "2026-10-15T09:05:55Z",
+    "http_status": 451,
+    "raw_bytes": 224,
+    "raw_sha256": "79c1db471a4cdc1c8565b5dfc52e0ed2d29962738ee4d28597696fcd0920e348",
+    "row_count": null,
+    "capture_validation": "FAIL",
+    "validation_errors": [
+      "HTTP_ERROR_451",
+      "RESPONSE_NOT_ARRAY"
+    ],
+    "response_reason": "Binance reports the service unavailable from the runner's restricted location under its eligibility terms."
+  },
+  "conclusion": {
+    "funding_data_obtained": false,
+    "funding_coverage_proven": false,
+    "project_status": "UNVERIFIED_NOT_PROMOTED",
+    "alpha_allowed": false,
+    "paper_trading_allowed": false,
+    "mainnet_authorized": false
+  },
+  "next_action": "Do not retry the same endpoint from the same restricted runner or bypass the provider's location restriction. Continue only through a pre-approved, policy-compliant source or authorized environment that can access the official source; preserve the same frozen interval and evidence contract. If none is available, record the funding branch as blocked pending authorized source access and keep all promotion gates closed."
+}
