@@ -11,6 +11,27 @@ Thresholds: NOT_FROZEN
 
 This branch researches the risk-control layer above the frozen stock-selection core. It does not change Core10/Core13 production weights, XH_REGIME_GATE_V0, or the MA5 exit status.
 
+## Governance now locked
+
+Two governance prerequisites are now mandatory before any promotion:
+
+1. `MODULE_PROMOTION_GOVERNANCE_V1.md`
+2. `SIMPLE_BASELINE_PREREG_V1.md`
+
+No research module may move beyond `RESEARCH_ONLY` until it has a locked baseline, primary endpoint, falsification criteria, sample-size / power plan and unused evaluation set.
+
+## Evidence grades
+
+- `E0_CONCEPTUAL`: mechanism only.
+- `E1_SINGLE_EPISODE`: one day / one episode; hypothesis-generating only.
+- `E2_REPLICATED_RESEARCH`: repeated historical research evidence, but consumed / not formal OOS.
+- `E3_PREREG_UNUSED`: preregistered genuinely unused holdout or prospective shadow evidence.
+- `E4_PROSPECTIVE_REPLICATION`: independently repeated prospective evidence across materially different regimes.
+
+A post-hoc rule repair resets the revised hypothesis to at most `E1` until independently retested.
+
+The 2026-10-15 same-day stock examples are `E1` unless separately replicated. Existing consumed historical shock / fragility cases can support at most `E2`.
+
 ## Current architecture candidate
 
 `EVENT / SHOCK SOURCE`
@@ -18,13 +39,17 @@ This branch researches the risk-control layer above the frozen stock-selection c
 → `LOCAL TRANSMISSION STATE`
 → `MARKET REGIME`
 → `INTERNAL FRAGILITY / SEVERITY`
-→ `HEDGE / CAPITAL ROTATION`
+→ `HEDGE / CAPITAL ROTATION [UNIMPLEMENTED_DATA_LAYER]`
 → `REGIME ROUTER`
 → `THEME + DISPERSION`
 → `RELATIVE STRENGTH / CATALYST`
 → `TACTICAL TIMING`
-→ `RISK / REWARD`
+→ `EVIDENCE SCORE / PAYOFF`
 → `POSITION BUDGET`
+
+`HEDGE / CAPITAL ROTATION` must not be cited as an observed live evidence layer until its required derivatives / ETF / rotation inputs are actually wired and timestamp-audited.
+
+Use `EVIDENCE SCORE`, not `win probability`, unless a future module is explicitly probability-calibrated.
 
 ## Research states retained
 
@@ -69,17 +94,19 @@ This branch researches the risk-control layer above the frozen stock-selection c
 
 ## Strongest findings so far
 
-1. **Breadth weakness alone is insufficient.** 2026-04-13 was a clear false-positive control.
-2. **Even multi-evidence internal-fragility confirmation can false-alarm.** 2026-04-15 subsequently repaired strongly; temporary profit-taking must be distinguished from persistent risk-budget withdrawal.
-3. **Leadership deterioration + small-cap stress adds information.** 2026-05-26 was materially more dangerous than breadth-only controls.
-4. **Strong cap-weighted indices can hide broad fragility.** 2026-06-25 showed concentrated technology leadership alongside weak breadth.
-5. **Shock detection is not an execution rule.** 2026-06-08 rejected `SHOCK -> SELL AT OPEN` because large gap losses can repair intraday.
-6. **Shock severity is not the same as post-close persistence.** 2026-02-02 was a severe realized shock followed by fast repair.
-7. **A realized shock can still persist.** 2026-03-19 remained weak through +1D/+3D/+5D; therefore transmission stage alone is insufficient.
-8. **Shock-source persistence must be separated from local transmission.** Ongoing geopolitical/macro drivers can keep pressure alive after local repricing begins.
-9. **Same-day severity needs pre-signal trajectory.** 2026-07-06 was labeled low severity but weakened further at +1D/+3D; the snapshot understated prior deterioration.
-10. **Repair is an eligibility state, not full normalization.** 2026-04-08 supported selective risk reopening, but +1D did not continue immediately and later horizons were event-contaminated.
-11. **Forward-event contamination must be explicit.** New events inside +3D/+5D cannot be credited to the original signal.
+1. Breadth weakness alone is insufficient.
+2. Even multi-evidence internal-fragility confirmation can false-alarm.
+3. Leadership deterioration + small-cap stress appears more informative than breadth alone.
+4. Strong cap-weighted indices can hide broad fragility.
+5. Shock detection is not an execution rule.
+6. Shock severity is not the same as post-close persistence.
+7. A realized shock can still persist.
+8. Shock-source persistence must be separated from local transmission.
+9. Same-day severity needs pre-signal trajectory.
+10. Repair is an eligibility state, not full normalization.
+11. Forward-event contamination must be explicit.
+
+These are research findings, not production rules. Their evidence grades differ and must be tracked per hypothesis.
 
 ## Rejected shortcuts
 
@@ -90,6 +117,20 @@ This branch researches the risk-control layer above the frozen stock-selection c
 - `one strong repair day -> full risk budget restored`
 - `strong theme breadth -> next-day shock cannot occur`
 - `domestic futures alone -> market is safe`
+- `single-day stock example -> permanent model rule`
+
+## Baseline requirement
+
+Every future formal comparison must include:
+
+- `BASELINE_0 = NO_REGIME_OVERLAY`
+- `BASELINE_1 = MOMENTUM_VOL_REGIME_V1`
+
+`BASELINE_1` uses CSI1000 20-session momentum plus 20-session realized volatility relative to its trailing 252-session median, with no post-hoc tuning.
+
+Primary first formal comparison horizon: 3D.
+
+The complex architecture must demonstrate incremental decision value over the simple baseline on a preregistered unused set before promotion.
 
 ## Current decision semantics candidate
 
@@ -100,17 +141,29 @@ This branch researches the risk-control layer above the frozen stock-selection c
 - REALIZED_SHOCK: do not extrapolate automatically; inspect source persistence and absorption/repair.
 - REPAIR: selectively reopen risk; full normalization requires continuing breadth/leadership acceptance.
 
-No position percentages, lookback lengths, execution times or numeric thresholds are frozen.
+These semantics remain candidate logic. No position percentages, lookback lengths, execution times or numeric thresholds are frozen.
 
 ## Validation accounting
 
 Future evaluation must separately record:
+
 - TAIL_RISK_SAVE
 - FALSE_ALARM_COST
 - MILD_WARNING
 - REPAIR_CAPTURE
+- state flip / churn count
+- data-unavailable rate
 
 Hit rate alone is not an acceptable objective.
+
+## Known governance gaps still open
+
+1. Layer conflict / veto hierarchy and state hysteresis are not yet frozen.
+2. A-share execution constraints are not yet implemented in the research comparison layer: T+1, price limits, one-word limit boards, suspension, liquidity/capacity, financing availability, fees and slippage.
+3. Portfolio-level hard limits are not yet specified: theme concentration, total beta, correlation/factor concentration, gross exposure, drawdown budget and model-independent kill switches.
+4. `HEDGE / CAPITAL ROTATION` is currently unimplemented, not an evidence-producing layer.
+
+These gaps prohibit production promotion even if predictive validation later succeeds.
 
 ## Data / access note
 
@@ -118,9 +171,9 @@ Longbridge historical-candlestick quota for this account is currently zero, so h
 
 ## Next admissible work
 
-1. Keep the preregistered field schemas fixed.
-2. Test fresh unused windows only after committing state/severity/transmission/source/trajectory labels.
-3. Prioritize one `PENDING_TRANSMISSION + SOURCE_ONGOING` case and one healthy control with strong breadth/leadership.
-4. Complete event-contamination chronology for +1D/+3D/+5D horizons.
-5. Quantify tail-risk save separately from false-alarm opportunity cost.
+1. Use the locked promotion template for every module.
+2. Implement / reproduce `BASELINE_0` and `BASELINE_1` before adding further model complexity.
+3. Freeze the state-to-`RISK_EVIDENCE_SCORE` mapping before the first unused comparison set is opened.
+4. Define the minimum-effect / power assumptions; until then `minimum_sample_required = NOT_FROZEN` and promotion is prohibited.
+5. Only after steps 1-4, specify conflict/veto/hysteresis, A-share execution constraints and portfolio hard limits.
 6. Do not promote any rule to production until a genuinely unused preregistered validation set exists.
