@@ -1,0 +1,24 @@
+name: Market Regime Baseline V1
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "research/market-regime-fragility-v0"
+    paths:
+      - "research/market_regime_fragility_v0/simple_baseline_v1.py"
+      - "research/market_regime_fragility_v0/test_simple_baseline_v1.py"
+      - "research/market_regime_fragility_v0/SIMPLE_BASELINE_EXECUTION_CONTRACT_V1.md"
+      - "research/market_regime_fragility_v0/RISK_EVIDENCE_SCORE_MAPPING_V1.md"
+      - ".github/workflows/market-regime-baseline-v1.yml"
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s research/market_regime_fragility_v0 -p "test_*.py" -v
