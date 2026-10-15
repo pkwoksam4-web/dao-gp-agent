@@ -37,7 +37,7 @@ jobs:
             --end-exclusive 2026-10-05 \
             --out artifacts/btc-shadow2-funding-rest
           rc=$?
-          printf '%s\\n' "$rc" > artifacts/btc-shadow2-funding-rest/collector_exit_code.txt
+          printf '%s\n' "$rc" > artifacts/btc-shadow2-funding-rest/collector_exit_code.txt
           exit 0
 
       - name: Upload raw funding response and metadata
