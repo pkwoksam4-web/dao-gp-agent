@@ -1,29 +1,30 @@
-# BTC Shadow2 continuation checkpoint — 2026-10-14
+# BTC Shadow2 continuation checkpoint — 2026-10-15
 
 ## Verified state
 
 - Branch: `btc-shadow2-rest-rescue-20261009`
-- Branch head at review: `271942708ea531561f6801e95625974c8f5be651`
-- Latest branch workflows: 7 total; latest completed run is 2026-10-09. No newer run or captured evidence is present.
-- REST rescue remains failed: `REST_TRANSPORT_INCOMPLETE` (`REST_MIN_ROWS_NOT_MET`, `REST_TRANSPORT_ERROR`).
-- Official Data Vision funding ZIP and checksum probes for 2026-10-01..04 returned HTTP 404. A successful probe workflow means the probe ran; it does not mean funding rows were retrieved.
-- Status stays `UNVERIFIED` / `NOT_PROMOTED`; funding coverage is not established. Do not enable alpha, paper trading, or mainnet.
+- Latest checkpoint commit: `6d53be4b7d7277a79ec859ee58c105032fdf7198`
+- Funding REST carrier was added in commit `184979e92f8ed77be1a224084d9efe03dc2e911d`; the bounded workflow and shell exit-code fix are in `84f470f0f0d05c43e64f558a793b8eca25cb27b8`.
+- Offline unit tests passed 5/5 in GitHub Actions run `38710415197`.
+- The live capture itself failed closed: official endpoint `GET /fapi/v1/fundingRate` returned HTTP 451 from the GitHub runner's restricted location. No funding rows were obtained. The failed raw response is preserved in artifact `11959673998`, ZIP SHA-256 `474857793c85f90b729708f98bf60422e21d17f34b0820f17d48646b5150c58e`; its raw response SHA-256 is `79c1db471a4cdc1c8565b5dfc52e0ed2d29962738ee4d28597696fcd0920e348`.
+- Audit record: [`BINANCE_FUNDING_REST_CAPTURE_AUDIT_20261015.json`](BINANCE_FUNDING_REST_CAPTURE_AUDIT_20261015.json).
+- Earlier official Data Vision funding ZIP/checksum probes for 2026-10-01..04 returned HTTP 404; do not count a successful probe workflow as data coverage.
+- Current state remains `UNVERIFIED` / `NOT_PROMOTED`; funding coverage is unproven. Do not enable alpha, paper trading, or mainnet.
 
-## Next action: add a read-only funding-history REST recovery carrier
+## Next action
 
-The Data Vision archive route is exhausted for the checked dates. Before repeating that probe, implement one bounded capture against Binance USDⓈ-M Futures public market-data endpoint `GET /fapi/v1/fundingRate` for symbol `BTCUSDT` and the frozen UTC interval `[2026-10-01T00:00:00Z, 2026-10-05T00:00:00Z)`.
+Do not rerun the same endpoint from the same restricted runner or bypass the provider's location restriction. Continue only through a pre-approved, policy-compliant source or authorized environment that can access the official data. Preserve the frozen interval `[2026-10-01T00:00:00Z, 2026-10-05T00:00:00Z)`, exact raw response, request metadata, UTC retrieval timestamp, and hashes. Compare exact observed event timestamps with the frozen preregistration/ledger before making any coverage claim. If there is no approved source or authorized environment, record the branch as blocked pending authorized source access; leave every promotion gate closed.
 
-1. Preserve the unmodified raw JSON response, exact request parameters, retrieval UTC timestamp, HTTP status, and SHA-256.
-2. Validate HTTP 200, JSON array shape, symbol identity, in-range `fundingTime`, unique event timestamps, and non-empty result. Preserve `fundingRate`, `markPrice`, and `rateType`; do not round or infer missing events from an assumed 8-hour cadence.
-3. Record observed timestamps and count as source evidence only. Compare them with the frozen preregistration/ledger expected event set before claiming coverage. Any missing expected timestamp or contract mismatch keeps the funding gate open.
-4. Bind the captured response hash and request metadata to the existing preregistration, ledger, archive, and worker references. Do not create a replacement ledger or change the frozen Shadow contract.
-5. Keep all downstream statuses fail-closed: Bridge `FAIL_CLOSED`; BID_DEPTH `UNVERIFIED`; QH `NOT_PROMOTED`; Crash `DATA_AUDIT_ONLY`; PAPER `NO TRADE`; Direction Audit `UNVERIFIED`.
+## Frozen status controls
 
-## Re-entry condition
+- Bridge: `FAIL_CLOSED`
+- BID_DEPTH: `UNVERIFIED`
+- QH: `NOT_PROMOTED`
+- Crash: `DATA_AUDIT_ONLY`
+- PAPER: `NO TRADE`
+- Direction Audit: `UNVERIFIED`
 
-Resume the Shadow2 evidence audit only when a new REST capture, newly available official archive, or live-worker artifact is present. Verify the raw object and hash first, then run only the matching frozen contract checks. If no new object is produced, record `NO_NEW_VERIFIABLE_EVIDENCE` and retain the statuses above; do not rerun the same failed rescue or repeat the same 404 probe.
+## Source contract
 
-## Source contract reference
-
-Official Binance USDⓈ-M Futures REST docs identify `GET /fapi/v1/fundingRate`, inclusive `startTime`/`endTime`, maximum `limit=1000`, and response fields including `symbol`, `fundingRate`, `fundingTime`, `markPrice`, and `rateType`:
+The official Binance USDⓈ-M Futures docs define `GET /fapi/v1/fundingRate`, inclusive `startTime`/`endTime`, maximum `limit=1000`, and response fields `symbol`, `fundingRate`, `fundingTime`, `markPrice`, `rateType`:
 https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data
