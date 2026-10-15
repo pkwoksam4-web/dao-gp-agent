@@ -3,7 +3,7 @@
 ## Verified state
 
 - Branch: `btc-shadow2-rest-rescue-20261009`
-- Latest checkpoint commit: `6d53be4b7d7277a79ec859ee58c105032fdf7198`
+- Funding REST audit record commit: `6d53be4b7d7277a79ec859ee58c105032fdf7198`
 - Funding REST carrier was added in commit `184979e92f8ed77be1a224084d9efe03dc2e911d`; the bounded workflow and shell exit-code fix are in `84f470f0f0d05c43e64f558a793b8eca25cb27b8`.
 - Offline unit tests passed 5/5 in GitHub Actions run `38710415197`.
 - The live capture itself failed closed: official endpoint `GET /fapi/v1/fundingRate` returned HTTP 451 from the GitHub runner's restricted location. No funding rows were obtained. The failed raw response is preserved in artifact `11959673998`, ZIP SHA-256 `474857793c85f90b729708f98bf60422e21d17f34b0820f17d48646b5150c58e`; its raw response SHA-256 is `79c1db471a4cdc1c8565b5dfc52e0ed2d29962738ee4d28597696fcd0920e348`.
