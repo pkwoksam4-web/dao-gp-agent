@@ -11,9 +11,9 @@ Thresholds: NOT_FROZEN
 
 This branch researches the risk-control layer above the frozen stock-selection core. It does not change Core10/Core13 production weights, `XH_REGIME_GATE_V0`, or the rejected standalone MA5 exit rule.
 
-## Governance documents
+## Governance / preregistration
 
-Mandatory governance / preregistration files now include:
+Mandatory files:
 
 1. `MODULE_PROMOTION_GOVERNANCE_V1.md`
 2. `SIMPLE_BASELINE_PREREG_V1.md`
@@ -21,17 +21,18 @@ Mandatory governance / preregistration files now include:
 4. `RISK_EVIDENCE_SCORE_MAPPING_V1.md`
 5. `PRIMARY_INFERENCE_PREREG_V1.md`
 6. `POWER_SAMPLE_PLAN_V1.md`
-7. `LAYER_CONFLICT_VETO_CONTRACT_V0.md`
-8. `A_SHARE_EXECUTION_CONTRACT_V0.md`
-9. `PORTFOLIO_HARD_RISK_GUARD_V0.md`
+7. `MINIMUM_EFFECT_JUSTIFICATION_STATUS_V1.md`
+8. `LAYER_CONFLICT_VETO_CONTRACT_V0.md`
+9. `A_SHARE_EXECUTION_CONTRACT_V0.md`
+10. `PORTFOLIO_HARD_RISK_GUARD_V0.md`
 
-No research module may advance to `CANDIDATE` without a genuinely unused preregistered set, a locked primary endpoint, a locked baseline, a frozen power/sample requirement and implementation parity.
+No module may advance to `CANDIDATE` without a genuinely unused preregistered set, locked primary endpoint and baseline, frozen power/sample requirement, implementation parity, and required execution/risk governance.
 
 ## Evidence grades
 
 - `E0_CONCEPTUAL`: mechanism only.
-- `E1_SINGLE_EPISODE`: one day / one episode; hypothesis-generating only.
-- `E2_REPLICATED_RESEARCH`: replicated in consumed historical research windows; not formal OOS.
+- `E1_SINGLE_EPISODE`: one day / episode; hypothesis-generating only.
+- `E2_REPLICATED_RESEARCH`: replicated in consumed historical windows; not formal OOS.
 - `E3_PREREG_UNUSED`: genuinely unused preregistered holdout / prospective shadow evidence.
 - `E4_PROSPECTIVE_REPLICATION`: repeated prospective evidence across materially different regimes.
 
@@ -55,9 +56,7 @@ Post-hoc rule repair resets the revised hypothesis to at most `E1` until indepen
 → `POSITION BUDGET`
 → `A-SHARE EXECUTION FEASIBILITY [PREREGISTERED, NOT FULLY IMPLEMENTED]`
 
-`HEDGE / CAPITAL ROTATION` cannot be cited as a live evidence layer until the required derivatives / ETF / rotation inputs are wired and timestamp-audited.
-
-Use `EVIDENCE SCORE`, not probability language, unless a future module is explicitly calibrated.
+`HEDGE / CAPITAL ROTATION` cannot be cited as a live evidence layer until its required data are actually wired and timestamp-audited. Use `EVIDENCE SCORE`, not probability language, unless a future module is explicitly calibrated.
 
 ## BASELINE_0 / BASELINE_1
 
@@ -67,7 +66,7 @@ Use `EVIDENCE SCORE`, not probability language, unless a future module is explic
 
 ### BASELINE_1
 
-`MOMENTUM_VOL_REGIME_V1` is executable in:
+`MOMENTUM_VOL_REGIME_V1` executable:
 
 `research/market_regime_fragility_v0/simple_baseline_v1.py`
 
@@ -76,32 +75,30 @@ Locked semantics:
 - CSI1000 completed daily closes only;
 - `MOM20 = close_t / close_{t-20} - 1`;
 - `RV20 = sample_stdev(latest 20 simple daily returns) * sqrt(252)`;
-- `RV20_MED252 = median(latest 252 completed RV20 observations, inclusive of t)`;
+- `RV20_MED252 = median(latest 252 completed RV20 observations, inclusive t)`;
 - minimum 272 completed closes;
 - invalid / insufficient input => `SIMPLE_UNAVAILABLE`, never imputed.
 
-Batch PIT-safe series runner:
+PIT-safe batch runner:
 
 `research/market_regime_fragility_v0/baseline_series_v1.py`
 
-It produces per-session baseline states plus deterministic input SHA256 metadata and has an explicit no-future-leakage test.
+It emits per-session baseline states, deterministic input SHA256 provenance, strict session ordering, and is tested so appending future observations cannot change prior outputs.
 
-## RISK_EVIDENCE_SCORE mapping
+## RISK_EVIDENCE_SCORE normalization
 
-Evaluation-only ordinal mapping remains:
+Evaluation-only ordinal scale:
 
 - `0 = risk acceptance / risk-on evidence`
 - `1 = normal / caution evidence`
 - `2 = restricted-risk evidence`
 - `3 = severe-risk / active-de-risking evidence`
 
-Canonical market-state mapping is frozen in `RISK_EVIDENCE_SCORE_MAPPING_V1.md`.
+Canonical mapping is frozen in `RISK_EVIDENCE_SCORE_MAPPING_V1.md`. Unresolved state => `UNAVAILABLE / null`, never NORMAL.
 
-No canonical state => `UNAVAILABLE / null`, not NORMAL.
+## Primary inference locked
 
-## Primary inference now locked
-
-Inference version:
+Version:
 
 `PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1`
 
@@ -122,8 +119,8 @@ Primary statistic:
 Locked uncertainty procedure:
 
 - paired circular block bootstrap;
-- block length = 3 sessions, matching the primary horizon;
-- default bootstrap replications = 5000;
+- block length = 3 sessions;
+- default replications = 5000;
 - deterministic seed = 20261016;
 - two-sided 95% CI for `delta_tau`;
 - one-sided primary alpha = 0.05.
@@ -132,63 +129,60 @@ This is an inference contract, not evidence that the complex model works.
 
 ## Power / sample-size status
 
-`POWER_SAMPLE_PLAN_V1.md` now fixes the planning method but intentionally does not invent an effect threshold.
-
-Locked design conventions:
+`POWER_SAMPLE_PLAN_V1.md` locks the planning method:
 
 - primary estimand = `delta_tau`;
 - alpha = 0.05;
 - target planning power = 0.80;
-- sample-size calculation must use the exact paired comparison procedure and development-only / synthetic assumptions;
-- the unused evaluation set may not be used to choose the minimum effect or required sample.
+- sample size must use the exact paired comparison procedure and development-only / synthetic assumptions;
+- unused outcomes cannot be used to choose the minimum effect or required sample.
 
-Still unfrozen:
+`MINIMUM_EFFECT_JUSTIFICATION_STATUS_V1.md` records the current objective blocker:
 
 - `minimum_effect_delta_tau = NOT_FROZEN`
 - `minimum_sample_required = NOT_FROZEN`
+
+Reason: there is no frozen numeric downstream action / exposure mapping that can yet translate a change in rank concordance into an economically meaningful tail-risk benefit net of false-alarm cost. Deriving an effect threshold from consumed historical windows or synthetic unit-test fixtures is prohibited.
 
 Therefore formal promotion testing remains blocked.
 
 ## Formal evaluation preflight
 
-Executable fail-closed preflight:
+Executable fail-closed gate:
 
 `research/market_regime_fragility_v0/formal_eval_preflight_v1.py`
 
-It rejects a formal evaluation unless the manifest has, at minimum:
+It requires exact baseline / score-mapping / inference / power-plan versions, horizon and alpha, frozen target power, positive numeric minimum effect, numeric minimum sample, classifier version/hash, completed-session cutoff policy, genuinely unused set ID/hash, definitions locked before set opening, and no collision with consumed-set IDs.
 
-- exact baseline version;
-- exact score-mapping version;
-- exact inference version;
-- exact power-plan version;
-- 3-session primary horizon and alpha;
-- frozen target power, positive minimum effect and numeric minimum sample;
-- classifier version / hash;
-- completed-session-only cutoff policy;
-- genuinely unused evaluation-set ID / hash;
-- definitions locked before set opening;
-- no collision with consumed-set IDs.
+It can authorize evaluation only and always returns `production_authorized = false`.
 
-The preflight can authorize evaluation only. It always returns `production_authorized = false`.
+Because the actual project minimum effect and sample remain unfrozen, no real formal promotion manifest is currently eligible.
 
-Because the project's actual minimum effect and minimum sample remain unfrozen, the real project cannot yet pass this preflight for formal promotion testing.
+## Categorical state-resolution / veto layer
 
-## Conflict / execution / portfolio governance
+Executable:
 
-`LAYER_CONFLICT_VETO_CONTRACT_V0.md` retains the rule that upper layers restrict eligibility / risk budget / execution permission; they do not rewrite lower-layer evidence.
+`research/market_regime_fragility_v0/state_resolution_v1.py`
 
-Examples:
+Scope is deliberately narrow: it consumes an already-resolved canonical market state and applies the preregistered categorical conflict semantics. It does **not** classify raw market evidence into a canonical state.
 
-- Theme CONFIRMED and EXTERNAL_SHOCK may coexist.
-- ACTIVE_DE_RISKING may block new high-beta attack exposure but does not imply impossible forced liquidation.
-- Strong RS does not silently convert an overheated lifecycle into `CHASE_OK`.
-- Strong company catalyst may preserve idiosyncratic eligibility but cannot override market / portfolio hard caps.
+Current executable semantics include:
 
-No arbitrary numeric hysteresis has been added. State flip / churn remains an explicit complexity cost.
+- `ACTIVE_DE_RISKING` blocks new high-beta attack exposure but never implies `force_liquidate_all`;
+- `PENDING_TRANSMISSION + SOURCE_ONGOING/SOURCE_ESCALATING` blocks new high-beta attack before local repricing;
+- `PENDING_TRANSMISSION + SOURCE_RESOLVING` does not activate that specific veto;
+- `OVERHEATED` lifecycle activates a chase veto without rewriting a confirmed theme;
+- Theme CONFIRMED and EXTERNAL_SHOCK may coexist;
+- invalid data => score null / no full-architecture approval;
+- unknown canonical state => fail closed, never coerced to NORMAL.
 
-`A_SHARE_EXECUTION_CONTRACT_V0.md` remains preregistered but not a full execution engine. T+1, suspension, price-limit accessibility, liquidity/capacity, fees, slippage and financing assumptions must be frozen identically across models before any production PnL claim.
+The still-missing component is the raw PIT evidence -> canonical market-state classifier. That remains a formal-comparison blocker.
 
-`PORTFOLIO_HARD_RISK_GUARD_V0.md` remains an `UNIMPLEMENTED_POLICY_LAYER`; no numeric single-name, theme, beta, gross/net, correlation, liquidity or drawdown limits have been invented.
+## A-share execution / hard-risk governance
+
+`A_SHARE_EXECUTION_CONTRACT_V0.md` remains preregistered but not a complete execution engine. T+1, suspension, price-limit accessibility, liquidity/capacity, fees, slippage and financing assumptions must be frozen identically across models before any production PnL claim.
+
+`PORTFOLIO_HARD_RISK_GUARD_V0.md` remains an `UNIMPLEMENTED_POLICY_LAYER`; no numeric single-name, theme, beta, gross/net, correlation, liquidity or drawdown limit has been invented.
 
 ## Verification
 
@@ -196,19 +190,20 @@ Workflow:
 
 `.github/workflows/market-regime-baseline-v1.yml`
 
-TDD evidence for the current extension:
+Relevant TDD evidence:
 
-- RED run `38832719000`: failed because the new inference / batch-series / preflight modules did not yet exist.
-- Later RED run `38832878860`: failed after adding the requirement that power assumptions must be present in the formal-evaluation manifest.
-- GREEN run `38832999991`: SUCCESS; full discovered suite ran `23 tests`, `23/23 PASS`.
+- RED `38832719000`: missing inference / batch-series / preflight implementations.
+- GREEN `38832999991`: inference + batch baseline + preflight suite successful, 23/23 tests PASS.
+- RED `38833183632`: state-resolution tests failed before `state_resolution_v1.py` existed.
+- GREEN `38833220950`: full suite successful after implementation, 30/30 tests PASS.
 
-This verifies the implementation contracts only. It is not predictive validation or OOS evidence.
+These runs verify executable contracts only. They are not predictive validation or OOS evidence.
 
 ## Current blockers
 
-1. `minimum_effect_delta_tau` is not objectively justified or frozen.
-2. `minimum_sample_required` is therefore not frozen.
-3. Complex native classifier state resolution is still not an executable PIT-auditable classifier suitable for formal comparison.
+1. `minimum_effect_delta_tau` is objectively unjustified and remains unfrozen.
+2. `minimum_sample_required` therefore remains unfrozen.
+3. Raw PIT evidence -> canonical market-state classifier is not executable / auditable yet.
 4. A-share execution numeric assumptions remain unfrozen.
 5. Portfolio hard-risk numeric limits remain unfrozen.
 6. `HEDGE / CAPITAL ROTATION` remains `UNIMPLEMENTED_DATA_LAYER`.
@@ -216,8 +211,8 @@ This verifies the implementation contracts only. It is not predictive validation
 ## Next admissible work
 
 1. Do not open a new unused formal evaluation set.
-2. Attempt to justify a minimum economically meaningful `delta_tau` from decision utility, not from unused outcomes.
-3. If a defensible effect size can be frozen, implement the versioned Monte Carlo power simulator and derive `minimum_sample_required`.
-4. In parallel, make the complex native classifier state-resolution path executable and PIT-auditable without changing its research semantics.
-5. Only after both the power gate and classifier gate are closed may a new unused / prospective formal comparison window be opened.
+2. Continue implementation parity work on raw-evidence state resolution without inventing numeric fragility / shock thresholds.
+3. Attempt minimum-effect justification only from an ex-ante decision-utility mapping or independent external benchmark; otherwise retain the blocker.
+4. If a defensible effect is frozen, version and run the Monte Carlo power simulator to derive `minimum_sample_required`.
+5. Only after both the power gate and raw-classifier gate are closed may a new unused / prospective formal comparison window be opened.
 6. Keep Core10/Core13, XH V0 and MA5 production status unchanged.
