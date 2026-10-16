@@ -28,6 +28,9 @@ on:
       - "research/market_regime_fragility_v0/PRIMARY_INFERENCE_PREREG_V1.md"
       - "research/market_regime_fragility_v0/POWER_SAMPLE_PLAN_V1.md"
       - "research/market_regime_fragility_v0/LAYER_CONFLICT_VETO_CONTRACT_V0.md"
+      - "research/market_regime_fragility_v0/A_SHARE_DATA_PIT_CONTRACT_V1.md"
+      - "research/market_regime_fragility_v0/MARKET_STRUCTURE_REGIME_CONTRACT_V1.md"
+      - "research/market_regime_fragility_v0/CURRENT_STATUS.md"
       - ".github/workflows/market-regime-baseline-v1.yml"
 permissions:
   contents: read
