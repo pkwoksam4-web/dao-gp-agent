@@ -60,13 +60,13 @@ class AShareTradabilityGateV1Tests(unittest.TestCase):
         self.assertFalse(result["rs_eligible"])
         self.assertIn("SELL_BLOCKED_PRICE_LIMIT", result["reasons"])
 
-    def test_t1_zero_sell_eligible_quantity_blocks_sell(self):
+    def test_t1_zero_sell_eligible_quantity_blocks_position_sell_but_not_market_rs(self):
         record = dict(BASE_RECORD)
         record["sell_eligible_quantity"] = 0
         result = evaluate_tradability(record)
         self.assertTrue(result["buy_eligible"])
         self.assertFalse(result["sell_eligible"])
-        self.assertFalse(result["rs_eligible"])
+        self.assertTrue(result["rs_eligible"])
         self.assertIn("SELL_BLOCKED_T1", result["reasons"])
 
     def test_missing_price_limit_rule_fails_closed(self):
