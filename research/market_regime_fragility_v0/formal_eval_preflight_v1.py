@@ -6,6 +6,7 @@ EXPECTED_INFERENCE_VERSION = "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1"
 EXPECTED_POWER_PLAN_VERSION = "POWER_SAMPLE_PLAN_V1"
 EXPECTED_ATOMIC_LEDGER_VERSION = "ATOMIC_EVIDENCE_LEDGER_V1"
 EXPECTED_TRADABILITY_POLICY_VERSION = "A_SHARE_TRADABILITY_GATE_V1"
+EXPECTED_MARKET_STRUCTURE_SCHEDULE_VERSION = "A_SHARE_MARKET_STRUCTURE_REGIME_SCHEDULE_V1"
 EXPECTED_PRIMARY_HORIZON = 3
 EXPECTED_PRIMARY_ALPHA = 0.05
 EXPECTED_DATA_CUTOFF_POLICY = "COMPLETED_SESSION_ONLY"
@@ -79,8 +80,14 @@ def check_manifest(manifest: dict) -> dict:
         reasons.append("TRADABILITY_POLICY_VERSION_MISMATCH")
     if manifest.get("tradability_filter_applied_before_ranking") is not True:
         reasons.append("TRADABILITY_FILTER_NOT_APPLIED_BEFORE_RANKING")
-    if not manifest.get("market_structure_regime_schedule_version"):
-        reasons.append("MARKET_STRUCTURE_REGIME_SCHEDULE_VERSION_MISSING")
+    if manifest.get("market_structure_regime_schedule_version") != EXPECTED_MARKET_STRUCTURE_SCHEDULE_VERSION:
+        reasons.append("MARKET_STRUCTURE_REGIME_SCHEDULE_VERSION_MISMATCH")
+    if not manifest.get("market_structure_regime_schedule_hash"):
+        reasons.append("MARKET_STRUCTURE_REGIME_SCHEDULE_HASH_MISSING")
+    if manifest.get("market_structure_schedule_pit_valid") is not True:
+        reasons.append("MARKET_STRUCTURE_SCHEDULE_NOT_PIT_VALID")
+    if manifest.get("market_structure_schedule_scope_complete") is not True:
+        reasons.append("MARKET_STRUCTURE_SCHEDULE_SCOPE_INCOMPLETE")
 
     return {
         "eligible": not reasons,
