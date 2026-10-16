@@ -17,8 +17,11 @@ VALID_MANIFEST = {
     "evaluation_set_id": "prospective-shadow-001",
     "evaluation_set_hash": "abc123",
     "definitions_locked_before_set_open": True,
-    "complex_classifier_version": "UNSET_FOR_TEST",
+    "complex_classifier_version": "CANONICAL_STATE_CLASSIFIER_V1",
     "complex_classifier_hash": "def456",
+    "atomic_ledger_version": "ATOMIC_EVIDENCE_LEDGER_V1",
+    "classifier_ledger_pit_valid": True,
+    "classifier_evidence_hash": "ledger-evidence-abc123",
     "data_cutoff_policy": "COMPLETED_SESSION_ONLY",
     "consumed_set_ids": ["historical-consumed-a", "historical-consumed-b"],
 }
@@ -61,6 +64,27 @@ class FormalEvalPreflightV1Tests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("MINIMUM_EFFECT_NOT_FROZEN", result["reasons"])
         self.assertIn("MINIMUM_SAMPLE_NOT_FROZEN", result["reasons"])
+
+    def test_wrong_atomic_ledger_version_fails_closed(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["atomic_ledger_version"] = "OTHER_LEDGER"
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("ATOMIC_LEDGER_VERSION_MISMATCH", result["reasons"])
+
+    def test_classifier_ledger_must_be_pit_valid(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["classifier_ledger_pit_valid"] = False
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("CLASSIFIER_LEDGER_NOT_PIT_VALID", result["reasons"])
+
+    def test_classifier_evidence_hash_is_required(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["classifier_evidence_hash"] = ""
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("CLASSIFIER_EVIDENCE_HASH_MISSING", result["reasons"])
 
     def test_preflight_does_not_authorize_production(self):
         result = check_manifest(dict(VALID_MANIFEST))
