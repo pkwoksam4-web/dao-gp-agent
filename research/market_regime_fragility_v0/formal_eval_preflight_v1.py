@@ -3,8 +3,14 @@ from __future__ import annotations
 EXPECTED_BASELINE_VERSION = "MOMENTUM_VOL_REGIME_V1"
 EXPECTED_SCORE_MAPPING_VERSION = "RISK_EVIDENCE_SCORE_MAPPING_V1"
 EXPECTED_INFERENCE_VERSION = "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1"
+EXPECTED_POWER_PLAN_VERSION = "POWER_SAMPLE_PLAN_V1"
 EXPECTED_PRIMARY_HORIZON = 3
+EXPECTED_PRIMARY_ALPHA = 0.05
 EXPECTED_DATA_CUTOFF_POLICY = "COMPLETED_SESSION_ONLY"
+
+
+def _positive_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0
 
 
 def check_manifest(manifest: dict) -> dict:
@@ -16,10 +22,26 @@ def check_manifest(manifest: dict) -> dict:
         reasons.append("SCORE_MAPPING_VERSION_MISMATCH")
     if manifest.get("inference_version") != EXPECTED_INFERENCE_VERSION:
         reasons.append("INFERENCE_VERSION_MISMATCH")
+    if manifest.get("power_plan_version") != EXPECTED_POWER_PLAN_VERSION:
+        reasons.append("POWER_PLAN_VERSION_MISMATCH")
     if manifest.get("primary_horizon_sessions") != EXPECTED_PRIMARY_HORIZON:
         reasons.append("PRIMARY_HORIZON_MISMATCH")
+    if manifest.get("primary_alpha") != EXPECTED_PRIMARY_ALPHA:
+        reasons.append("PRIMARY_ALPHA_MISMATCH")
     if manifest.get("data_cutoff_policy") != EXPECTED_DATA_CUTOFF_POLICY:
         reasons.append("DATA_CUTOFF_POLICY_MISMATCH")
+
+    target_power = manifest.get("target_power")
+    if not isinstance(target_power, (int, float)) or isinstance(target_power, bool) or not (0 < target_power < 1):
+        reasons.append("TARGET_POWER_NOT_FROZEN")
+
+    minimum_effect = manifest.get("minimum_effect_delta_tau")
+    if not _positive_number(minimum_effect):
+        reasons.append("MINIMUM_EFFECT_NOT_FROZEN")
+
+    minimum_sample = manifest.get("minimum_sample_required")
+    if not isinstance(minimum_sample, int) or isinstance(minimum_sample, bool) or minimum_sample < 2:
+        reasons.append("MINIMUM_SAMPLE_NOT_FROZEN")
 
     if manifest.get("unused_set") is not True:
         reasons.append("EVALUATION_SET_NOT_MARKED_UNUSED")
