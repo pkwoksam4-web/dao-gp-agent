@@ -7,8 +7,16 @@ on:
     paths:
       - "research/market_regime_fragility_v0/simple_baseline_v1.py"
       - "research/market_regime_fragility_v0/test_simple_baseline_v1.py"
+      - "research/market_regime_fragility_v0/baseline_series_v1.py"
+      - "research/market_regime_fragility_v0/test_baseline_series_v1.py"
+      - "research/market_regime_fragility_v0/primary_inference_v1.py"
+      - "research/market_regime_fragility_v0/test_primary_inference_v1.py"
+      - "research/market_regime_fragility_v0/formal_eval_preflight_v1.py"
+      - "research/market_regime_fragility_v0/test_formal_eval_preflight_v1.py"
       - "research/market_regime_fragility_v0/SIMPLE_BASELINE_EXECUTION_CONTRACT_V1.md"
       - "research/market_regime_fragility_v0/RISK_EVIDENCE_SCORE_MAPPING_V1.md"
+      - "research/market_regime_fragility_v0/PRIMARY_INFERENCE_PREREG_V1.md"
+      - "research/market_regime_fragility_v0/POWER_SAMPLE_PLAN_V1.md"
       - ".github/workflows/market-regime-baseline-v1.yml"
 permissions:
   contents: read
