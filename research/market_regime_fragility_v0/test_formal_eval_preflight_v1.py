@@ -5,8 +5,14 @@ from formal_eval_preflight_v1 import check_manifest
 
 VALID_MANIFEST = {
     "baseline_version": "MOMENTUM_VOL_REGIME_V1",
+    "zero_parameter_comparator_version": "BASELINE_0_NO_REGIME_OVERLAY",
     "score_mapping_version": "RISK_EVIDENCE_SCORE_MAPPING_V1",
     "inference_version": "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1",
+    "permutation_null_version": "BLOCK_PERMUTATION_NULL_V1",
+    "permutation_null_hash": "permutation-null-hash-abc123",
+    "permutation_block_length": 3,
+    "permutation_replications": 5000,
+    "permutation_seed": 20261016,
     "power_plan_version": "POWER_SAMPLE_PLAN_V1",
     "primary_horizon_sessions": 3,
     "primary_alpha": 0.05,
@@ -68,6 +74,43 @@ class FormalEvalPreflightV1Tests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("COMPLEX_CLASSIFIER_HASH_MISSING", result["reasons"])
         self.assertIn("BASELINE_VERSION_MISMATCH", result["reasons"])
+
+    def test_zero_parameter_comparator_version_must_match(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["zero_parameter_comparator_version"] = "OTHER"
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("ZERO_PARAMETER_COMPARATOR_VERSION_MISMATCH", result["reasons"])
+
+    def test_permutation_null_version_must_match(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["permutation_null_version"] = "OTHER"
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("PERMUTATION_NULL_VERSION_MISMATCH", result["reasons"])
+
+    def test_permutation_null_hash_is_required(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["permutation_null_hash"] = ""
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("PERMUTATION_NULL_HASH_MISSING", result["reasons"])
+
+    def test_permutation_block_length_is_locked_to_primary_horizon(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["permutation_block_length"] = 2
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("PERMUTATION_BLOCK_LENGTH_MISMATCH", result["reasons"])
+
+    def test_permutation_replications_and_seed_are_frozen(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["permutation_replications"] = 4999
+        manifest["permutation_seed"] = 7
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("PERMUTATION_REPLICATIONS_MISMATCH", result["reasons"])
+        self.assertIn("PERMUTATION_SEED_MISMATCH", result["reasons"])
 
     def test_missing_power_assumptions_fail_closed(self):
         manifest = dict(VALID_MANIFEST)
