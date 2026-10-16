@@ -129,13 +129,15 @@ def evaluate_tradability(record: dict) -> dict:
         }
 
     buy_eligible = buy_liq == "YES"
-    sell_eligible = sell_liq == "YES" and sell_qty > 0
+    market_sellable = sell_liq == "YES"
+    sell_eligible = market_sellable and sell_qty > 0
 
     decision_reasons: list[str] = []
     if limit_state == "UP_LOCKED_NO_BUY":
         buy_eligible = False
         decision_reasons.append("BUY_BLOCKED_PRICE_LIMIT")
     elif limit_state == "DOWN_LOCKED_NO_SELL":
+        market_sellable = False
         sell_eligible = False
         decision_reasons.append("SELL_BLOCKED_PRICE_LIMIT")
 
@@ -143,6 +145,7 @@ def evaluate_tradability(record: dict) -> dict:
         buy_eligible = False
         decision_reasons.append("BUY_LIQUIDITY_NOT_OBSERVED")
     if sell_liq == "NO" and "SELL_BLOCKED_PRICE_LIMIT" not in decision_reasons:
+        market_sellable = False
         sell_eligible = False
         decision_reasons.append("SELL_LIQUIDITY_NOT_OBSERVED")
     if sell_qty == 0:
@@ -155,7 +158,14 @@ def evaluate_tradability(record: dict) -> dict:
     if not trade_evidence:
         decision_reasons.append("NO_EXECUTED_TRADE_EVIDENCE")
 
-    rs_eligible = bool(buy_eligible and sell_eligible and trade_evidence and limit_state in {"NONE", "LIMIT_TOUCH_EXECUTABLE"})
+    # RS eligibility describes whether the market itself is genuinely trading on both
+    # sides. Position-specific T+1 sell eligibility is a separate execution constraint.
+    rs_eligible = bool(
+        buy_eligible
+        and market_sellable
+        and trade_evidence
+        and limit_state in {"NONE", "LIMIT_TOUCH_EXECUTABLE"}
+    )
 
     return {
         "version": VERSION,
