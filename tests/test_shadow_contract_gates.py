@@ -72,6 +72,12 @@ class ContractGateTests(unittest.TestCase):
         available_live_pit={"2026-09-29","2026-09-30","2026-10-08","2026-10-09","2026-10-13"}
         self.assertNotIn(targets["5d"],available_live_pit)
 
+    def test_future_target_is_not_due_before_exchange_date(self):
+        self.assertTrue(hasattr(gates,"target_is_due"),"target due-date gate is required")
+        self.assertFalse(gates.target_is_due("2026-10-15","2026-10-14"))
+        self.assertTrue(gates.target_is_due("2026-10-15","2026-10-15"))
+        self.assertTrue(gates.target_is_due("2026-10-15","2026-10-16"))
+
     def test_settlement_runtime_uses_exchange_calendar_not_available_rows(self):
         src=Path("scripts/ranking_shadow_settlement.py").read_text(encoding="utf-8")
         self.assertIn("maturity_targets_from_exchange_calendar",src)
