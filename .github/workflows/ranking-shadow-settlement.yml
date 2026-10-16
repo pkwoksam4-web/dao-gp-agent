@@ -2,20 +2,16 @@ name: Ranking Shadow Settlement
 
 on:
   workflow_run:
-    workflows: ["Live PIT Manifest Ingest"]
+    workflows: ["Shadow Ranking Observation"]
     types: [completed]
   workflow_dispatch:
-  push:
-    paths:
-      - "scripts/ranking_shadow_settlement.py"
-      - ".github/workflows/ranking-shadow-settlement.yml"
 
 permissions:
   contents: read
 
 jobs:
   settle:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -26,7 +22,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
-      - run: python scripts/ranking_shadow_settlement.py
+      - name: Settle eligible 5D and 20D horizons
+        run: python scripts/ranking_shadow_settlement.py
       - if: always()
         uses: actions/upload-artifact@v4
         with:

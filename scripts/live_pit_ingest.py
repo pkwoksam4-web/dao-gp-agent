@@ -22,6 +22,8 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
+from shadow_contract_gates import validate_prev_close_continuity
+
 CORE10 = ["000636.SZ","002138.SZ","002156.SZ","600392.SH","600487.SH","600522.SH","600667.SH","600703.SH","601991.SH","605358.SH"]
 ADDED = ["000977.SZ","000938.SZ","000063.SZ"]
 CORE13 = CORE10 + ADDED
@@ -155,13 +157,31 @@ def main():
 
     report={"schema":"agent-brain-live-pit-ingest-report/v1","manifest_path":p,"manifest_sha256":manifest_sha,
             "trade_date_cn":td,"inserted":{"bars":0,"quotes":0,"flows":0,"features":0,"sources":0},
-            "protected_before":{},"protected_after":{}}
+            "protected_before":{},"protected_after":{},"prev_close_continuity":{}}
     dsn=os.environ["NEON_DATABASE_URL"]
     now=datetime.now(timezone.utc).isoformat()
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
       with conn.cursor() as cur:
         cur.execute("BEGIN")
         cur.execute("SET LOCAL statement_timeout='30s'")
+
+        # Fail closed before any source/fact write: the provider-native
+        # quote.prev_close must match the latest prior Longbridge daily close
+        # for every canonical Core13 member.
+        latest_by_symbol={}
+        for x in rows:
+            s=x["symbol"]
+            cur.execute("""
+              SELECT close,
+                     ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date
+              FROM market_bars
+              WHERE provider='longbridge' AND period='day' AND symbol=%s
+                AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date < %s::date)
+              ORDER BY trade_time DESC LIMIT 1
+            """,(s,td))
+            latest_by_symbol[s]=cur.fetchone()
+        report["prev_close_continuity"]=validate_prev_close_continuity(rows,latest_by_symbol)
+
         for t in PROTECTED:
             cur.execute(f"SELECT count(*) AS n FROM {t}")
             report["protected_before"][t]=cur.fetchone()["n"]
