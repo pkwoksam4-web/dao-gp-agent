@@ -113,6 +113,15 @@ def maturity_targets_from_exchange_calendar(anchor, exchange_trading_dates):
     return targets
 
 
+def target_is_due(target, as_of_date):
+    try:
+        target_date = date.fromisoformat(target)
+        observed_date = date.fromisoformat(as_of_date)
+    except Exception as exc:
+        raise ContractGateError("SETTLEMENT_DUE_DATE_INVALID") from exc
+    return target_date <= observed_date
+
+
 def load_quarantine_registry(path):
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     ids = data.get("quarantined_strategy_ids")
