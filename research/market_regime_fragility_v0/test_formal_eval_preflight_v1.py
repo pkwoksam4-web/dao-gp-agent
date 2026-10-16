@@ -7,7 +7,12 @@ VALID_MANIFEST = {
     "baseline_version": "MOMENTUM_VOL_REGIME_V1",
     "score_mapping_version": "RISK_EVIDENCE_SCORE_MAPPING_V1",
     "inference_version": "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1",
+    "power_plan_version": "POWER_SAMPLE_PLAN_V1",
     "primary_horizon_sessions": 3,
+    "primary_alpha": 0.05,
+    "target_power": 0.80,
+    "minimum_effect_delta_tau": 0.05,
+    "minimum_sample_required": 120,
     "unused_set": True,
     "evaluation_set_id": "prospective-shadow-001",
     "evaluation_set_hash": "abc123",
@@ -47,6 +52,15 @@ class FormalEvalPreflightV1Tests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("COMPLEX_CLASSIFIER_HASH_MISSING", result["reasons"])
         self.assertIn("BASELINE_VERSION_MISMATCH", result["reasons"])
+
+    def test_missing_power_assumptions_fail_closed(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["minimum_effect_delta_tau"] = None
+        manifest["minimum_sample_required"] = None
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("MINIMUM_EFFECT_NOT_FROZEN", result["reasons"])
+        self.assertIn("MINIMUM_SAMPLE_NOT_FROZEN", result["reasons"])
 
     def test_preflight_does_not_authorize_production(self):
         result = check_manifest(dict(VALID_MANIFEST))
