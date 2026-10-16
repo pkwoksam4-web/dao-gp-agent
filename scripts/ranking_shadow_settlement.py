@@ -7,11 +7,18 @@ import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import psycopg
 from psycopg.rows import dict_row
 
-from shadow_contract_gates import load_quarantine_registry, maturity_targets, source_is_live_pit
+from shadow_contract_gates import (
+    load_exchange_trading_calendar,
+    load_quarantine_registry,
+    maturity_targets_from_exchange_calendar,
+    source_is_live_pit,
+    target_is_due,
+)
 
 CORE10=["000636.SZ","002138.SZ","002156.SZ","600392.SH","600487.SH","600522.SH","600667.SH","600703.SH","601991.SH","605358.SH"]
 RANK_VERSION="core10-stable-reversion-lowvol-candidate-v1"
@@ -21,6 +28,11 @@ QUARANTINE=Path(os.environ.get(
     "PROSPECTIVE_QUARANTINE_REGISTRY",
     "evidence/agent_brain/prospective_quarantine_registry_v1.json",
 ))
+EXCHANGE_CALENDAR=Path(os.environ.get(
+    "CN_EXCHANGE_CALENDAR_PATH",
+    "evidence/agent_brain/cn_exchange_calendar_2026.json",
+))
+SHANGHAI=ZoneInfo("Asia/Shanghai")
 
 
 def avg_ranks(values):
@@ -60,26 +72,9 @@ def require_shadow_success(cur, strategy_id):
         raise RuntimeError(f"{strategy_id}: attested observation missing: {observation_id}")
 
 
-def eligible_dates(cur, anchor):
-    cur.execute("""
-      SELECT ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date,
-             count(DISTINCT mb.symbol) AS n
-      FROM market_bars mb
-      JOIN sources s ON s.id=mb.source_id
-      WHERE mb.provider='longbridge' AND mb.period='day'
-        AND mb.symbol=ANY(%s)
-        AND ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date > %s::date)
-        AND (s.metadata_json::jsonb ->> 'mode')='LIVE_PIT'
-        AND COALESCE((s.metadata_json::jsonb ->> 'live_shadow_eligible')::boolean,false)=true
-      GROUP BY 1
-      HAVING count(DISTINCT mb.symbol)=10
-      ORDER BY 1
-    """,(CORE10,anchor))
-    return [r["trade_date"] for r in cur.fetchall()]
-
-
 def settle_horizon(cur, run_id, ranking, target, horizon):
     outcomes=[]
+    missing_target_symbols=[]
     key=f"actual_return_{horizon}d"
     for x in ranking:
         cur.execute("""
@@ -90,8 +85,14 @@ def settle_horizon(cur, run_id, ranking, target, horizon):
           ORDER BY mb.trade_time DESC LIMIT 1
         """,(x["symbol"],target))
         row=cur.fetchone()
-        if not row or not source_is_live_pit(row["metadata_json"]):
-            raise RuntimeError(f"{run_id}: SETTLEMENT_EXCLUDED_NON_LIVE {x['symbol']} {target}")
+        if not row:
+            missing_target_symbols.append({"symbol":x["symbol"],"reason":"MISSING_TARGET_BAR"})
+            continue
+        if not source_is_live_pit(row["metadata_json"]):
+            missing_target_symbols.append({
+                "symbol":x["symbol"],"reason":"TARGET_NOT_LIVE_PIT","source_id":row["source_id"]
+            })
+            continue
         actual=float(row["close"])/float(x["anchor_close"])-1.0
         outcomes.append({
             "symbol":x["symbol"],"rank":x["rank"],"candidate_score":x["candidate_score"],
@@ -99,6 +100,13 @@ def settle_horizon(cur, run_id, ranking, target, horizon):
             "target_source_id":row["source_id"],"target_source_mode":"LIVE_PIT",
             "live_shadow_eligible":True,
         })
+    settlement_rule=f"{horizon}th China exchange trading session strictly after anchor; exact target date required"
+    if missing_target_symbols:
+        return {
+            "status":"BLOCKED_DATA_GAP","horizon_sessions":horizon,
+            "settlement_trade_date":target,"missing_target_symbols":missing_target_symbols,
+            "settlement_rule":settlement_rule,"later_date_substitution_allowed":False,
+        }
     top=sorted(outcomes,key=lambda z:z["rank"])[:3]
     bottom=sorted(outcomes,key=lambda z:z["rank"])[-3:]
     top_mean=sum(x[key] for x in top)/3
@@ -110,18 +118,23 @@ def settle_horizon(cur, run_id, ranking, target, horizon):
         "top3_mean_return":top_mean,"bottom3_mean_return":bottom_mean,
         "top_bottom_spread":top_mean-bottom_mean,
         "spearman_rank_ic":corr(avg_ranks(scores),avg_ranks(rets)),
-        "outcomes":outcomes,
-        "settlement_rule":f"{horizon}th eligible LIVE_PIT China trading session strictly after anchor",
+        "outcomes":outcomes,"settlement_rule":settlement_rule,
+        "later_date_substitution_allowed":False,
     }
 
 
 def main():
     dsn=os.environ["NEON_DATABASE_URL"]
-    now=datetime.now(timezone.utc).isoformat()
+    now_dt=datetime.now(timezone.utc)
+    now=now_dt.isoformat()
+    as_of_cn=now_dt.astimezone(SHANGHAI).date().isoformat()
     quarantined=load_quarantine_registry(QUARANTINE)
-    report={"schema":"agent-brain-ranking-settlement/v2","checked_at":now,
+    exchange_dates=load_exchange_trading_calendar(EXCHANGE_CALENDAR)
+    report={"schema":"agent-brain-ranking-settlement/v3","checked_at":now,"as_of_cn":as_of_cn,
+            "exchange_calendar_path":str(EXCHANGE_CALENDAR),"exchange_calendar_sessions":len(exchange_dates),
             "pending_checked":0,"settled_5d_now":0,"settled_20d_now":0,
             "still_pending_5d":0,"still_pending_20d":0,
+            "blocked_data_gap_5d":0,"blocked_data_gap_20d":0,
             "excluded_strategy_ids":[],"settled_runs":[]}
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
       with conn.cursor() as cur:
@@ -142,24 +155,44 @@ def main():
               raise RuntimeError(f"{run['id']}: invalid ranking payload")
           if any(x.get("anchor_close") in (None,0) for x in ranking):
               raise RuntimeError(f"{run['id']}: missing anchor_close; cannot settle")
-          targets=maturity_targets(eligible_dates(cur,run["start_date"]))
+          anchor=str(run["start_date"])
+          targets=maturity_targets_from_exchange_calendar(anchor,exchange_dates)
           changed=False
           s5=metrics.get("settlement_5d",{"status":"PENDING"})
           s20=metrics.get("settlement_20d",{"status":"PENDING"})
+
           if s5.get("status")!="SETTLED":
-              if targets["5d"]:
-                  s5=settle_horizon(cur,run["id"],ranking,targets["5d"],5)
-                  s5["settled_at"]=now; report["settled_5d_now"]+=1; changed=True
-              else: report["still_pending_5d"]+=1
+              target5=targets["5d"]
+              if target5 and target_is_due(target5,as_of_cn):
+                  candidate=settle_horizon(cur,run["id"],ranking,target5,5)
+                  changed=changed or candidate!=s5
+                  s5=candidate
+                  if s5["status"]=="SETTLED":
+                      s5["settled_at"]=now; report["settled_5d_now"]+=1
+                  else:
+                      report["blocked_data_gap_5d"]+=1
+              else:
+                  report["still_pending_5d"]+=1
+
           if s20.get("status")!="SETTLED":
-              if targets["20d"]:
-                  s20=settle_horizon(cur,run["id"],ranking,targets["20d"],20)
-                  s20["settled_at"]=now; report["settled_20d_now"]+=1; changed=True
-              else: report["still_pending_20d"]+=1
+              target20=targets["20d"]
+              if target20 and target_is_due(target20,as_of_cn):
+                  candidate=settle_horizon(cur,run["id"],ranking,target20,20)
+                  changed=changed or candidate!=s20
+                  s20=candidate
+                  if s20["status"]=="SETTLED":
+                      s20["settled_at"]=now; report["settled_20d_now"]+=1
+                  else:
+                      report["blocked_data_gap_20d"]+=1
+              else:
+                  report["still_pending_20d"]+=1
+
           metrics["settlement_5d"]=s5
           metrics["settlement_20d"]=s20
-          metrics["eligible_future_live_pit_sessions"]=targets["eligible_future_sessions"]
+          metrics["exchange_calendar_path"]=str(EXCHANGE_CALENDAR)
+          metrics["exchange_calendar_last_session"]=targets["calendar_last_session"]
           metrics["outcome_data_may_include_recovered_future_bars"]=False
+          metrics["later_date_substitution_allowed"]=False
           metrics["automatic_promotion"]=False
           metrics["production_ranking_use"]=False
           if s20.get("status")=="SETTLED":
@@ -168,18 +201,28 @@ def main():
               cur.execute("UPDATE shadow_strategy_runs SET end_date=%s,metrics_json=%s WHERE id=%s",
                           (targets["20d"] if s20.get("status")=="SETTLED" else run["end_date"],
                            json.dumps(metrics,ensure_ascii=False,separators=(",",":")),run["id"]))
-          report["settled_runs"].append({"id":run["id"],"anchor":run["start_date"],
-                                         "maturity_5d":s5["status"],"maturity_20d":s20["status"]})
+          report["settled_runs"].append({
+              "id":run["id"],"anchor":anchor,"target_5d":targets["5d"],"target_20d":targets["20d"],
+              "maturity_5d":s5["status"],"maturity_20d":s20["status"]
+          })
         conn.commit()
     report["excluded_strategy_ids"]=sorted(set(report["excluded_strategy_ids"]))
-    report["status"]="PASS"
+    blocked=report["blocked_data_gap_5d"]+report["blocked_data_gap_20d"]
+    report["status"]="BLOCKED_DATA_GAP" if blocked else "PASS"
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
-    print("RANKING_SETTLEMENT_CHECK_PASS")
+    if blocked:
+        print("RANKING_SETTLEMENT_CHECK_BLOCKED_DATA_GAP")
+    else:
+        print("RANKING_SETTLEMENT_CHECK_PASS")
     print("excluded_strategy_ids="+json.dumps(report["excluded_strategy_ids"]))
     print(f"settled_5d_now={report['settled_5d_now']}")
     print(f"settled_20d_now={report['settled_20d_now']}")
+    print(f"blocked_data_gap_5d={report['blocked_data_gap_5d']}")
+    print(f"blocked_data_gap_20d={report['blocked_data_gap_20d']}")
     print("automatic_promotion=false")
+    if blocked:
+        raise SystemExit(2)
 
 
 if __name__=="__main__":
