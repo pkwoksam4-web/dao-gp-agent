@@ -73,6 +73,11 @@ class ContractGateTests(unittest.TestCase):
         available_live_pit={"2026-09-29","2026-09-30","2026-10-08","2026-10-09","2026-10-13"}
         self.assertNotIn(targets["5d"],available_live_pit)
 
+    def test_settlement_runtime_uses_exchange_calendar_not_available_rows(self):
+        src=Path("scripts/ranking_shadow_settlement.py").read_text(encoding="utf-8")
+        self.assertIn("maturity_targets_from_exchange_calendar",src)
+        self.assertNotIn("maturity_targets(eligible_dates(cur",src)
+
     def test_settlement_order_guard(self):
         with self.assertRaisesRegex(ContractGateError,"OUT_OF_ORDER"):
             validate_event_order(["LIVE_PIT_INGEST_PASS","SETTLEMENT_START",
