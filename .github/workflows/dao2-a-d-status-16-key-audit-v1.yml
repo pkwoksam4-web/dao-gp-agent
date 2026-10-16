@@ -1,0 +1,39 @@
+name: DAO2 A D-Status 16-Key Audit V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - 'scripts/dao2_a_d_status_16_key_audit.py'
+      - 'tests/test_dao2_a_d_status_16_key_audit.py'
+      - '.github/workflows/dao2-a-d-status-16-key-audit-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q baostock pandas
+      - name: Contract tests
+        run: python -m unittest -v tests.test_dao2_a_d_status_16_key_audit
+      - name: Query exact 16 keys under frozen D semantics
+        run: |
+          python scripts/dao2_a_d_status_16_key_audit.py \
+            --ledger data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json \
+            --out-dir artifact_d_status_16
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-a-d-status-16-key-audit-v1
+          path: artifact_d_status_16/
+          if-no-files-found: ignore
+          retention-days: 30
