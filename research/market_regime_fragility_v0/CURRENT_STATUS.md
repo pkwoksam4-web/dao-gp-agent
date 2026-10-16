@@ -16,19 +16,20 @@ This branch researches the risk-control layer above the frozen stock-selection c
 Mandatory files:
 
 1. `MODULE_PROMOTION_GOVERNANCE_V1.md`
-2. `SIMPLE_BASELINE_PREREG_V1.md`
-3. `SIMPLE_BASELINE_EXECUTION_CONTRACT_V1.md`
-4. `RISK_EVIDENCE_SCORE_MAPPING_V1.md`
-5. `PRIMARY_INFERENCE_PREREG_V1.md`
-6. `POWER_SAMPLE_PLAN_V1.md`
-7. `MINIMUM_EFFECT_JUSTIFICATION_STATUS_V1.md`
-8. `LAYER_CONFLICT_VETO_CONTRACT_V0.md`
-9. `A_SHARE_EXECUTION_CONTRACT_V0.md`
-10. `PORTFOLIO_HARD_RISK_GUARD_V0.md`
-11. `docs/superpowers/specs/2026-10-16-atomic-evidence-ledger-canonical-classifier-design.md`
-12. `docs/superpowers/plans/2026-10-16-atomic-evidence-ledger-canonical-classifier.md`
+2. `STATE_ENUM_ABLATION_GOVERNANCE_V1.md`
+3. `PORTFOLIO_HARD_RISK_GUARD_V1.md`
+4. `SIMPLE_BASELINE_PREREG_V1.md`
+5. `SIMPLE_BASELINE_EXECUTION_CONTRACT_V1.md`
+6. `RISK_EVIDENCE_SCORE_MAPPING_V1.md`
+7. `PRIMARY_INFERENCE_PREREG_V1.md`
+8. `POWER_SAMPLE_PLAN_V1.md`
+9. `MINIMUM_EFFECT_JUSTIFICATION_STATUS_V1.md`
+10. `LAYER_CONFLICT_VETO_CONTRACT_V0.md`
+11. `A_SHARE_EXECUTION_CONTRACT_V0.md`
+12. `docs/superpowers/specs/2026-10-16-atomic-evidence-ledger-canonical-classifier-design.md`
+13. `docs/superpowers/plans/2026-10-16-atomic-evidence-ledger-canonical-classifier.md`
 
-No module may advance to `CANDIDATE` without a genuinely unused preregistered set, locked primary endpoint and baseline, frozen power/sample requirement, implementation parity, and required execution/risk governance.
+No module may advance to `CANDIDATE` without a genuinely unused preregistered set, locked primary endpoint and baseline, frozen power/sample requirement, implementation parity, state-registry / ablation compliance, and required execution/risk governance.
 
 ## Evidence grades
 
@@ -40,10 +41,13 @@ No module may advance to `CANDIDATE` without a genuinely unused preregistered se
 
 Post-hoc rule repair resets the revised hypothesis to at most `E1` until independently retested.
 
+A state-space change is a rule change. Adding, splitting, merging, reinterpreting or reprioritizing a state / veto after seeing outcomes triggers a version reset under `STATE_ENUM_ABLATION_GOVERNANCE_V1.md`, even when no numeric threshold changes.
+
 ## Current architecture candidate
 
-`MODEL-INDEPENDENT HARD RISK GUARD [UNIMPLEMENTED_POLICY_LAYER]`
+`MODEL-INDEPENDENT HARD RISK GUARD V1 [P0 GOVERNANCE FROZEN; NUMERIC MANDATE REQUIRED]`
 → `DATA VALIDITY / PIT`
+→ `A-SHARE EXECUTION ELIGIBILITY / FEASIBILITY`
 → `ATOMIC EVIDENCE LEDGER V1 [IMPLEMENTED RESEARCH CONTRACT]`
 → `CANONICAL MARKET-STATE CLASSIFIER V1 [IMPLEMENTED CATEGORICAL CONTRACT]`
 → `EVENT / SHOCK SOURCE + PERSISTENCE / LOCAL TRANSMISSION EVIDENCE`
@@ -53,13 +57,28 @@ Post-hoc rule repair resets the revised hypothesis to at most `E1` until indepen
 → `THEME + DISPERSION`
 → `RELATIVE STRENGTH / CATALYST`
 → `TACTICAL TIMING`
-→ `EVIDENCE SCORE / PAYOFF`
-→ `POSITION BUDGET`
-→ `A-SHARE EXECUTION FEASIBILITY [PREREGISTERED, NOT FULLY IMPLEMENTED]`
+→ `SOFT EVIDENCE SCORE / PAYOFF`
+→ `POSITION TARGET SUBJECT TO HARD RISK CEILINGS`
+→ `EXECUTION`
+
+Hard gates / vetoes and soft evidence / ranking are now explicitly separate. A hard gate can block or cap an action but does not add positive score. A new multiplicative interaction among noisy soft layers is treated as a new hypothesis and requires versioning plus ablation.
 
 The implemented ledger/classifier begins from **already-categorical atomic evidence**. Raw numeric market observations are not yet converted into those categories by a frozen extractor. Therefore the branch does not claim an end-to-end live raw-data classifier.
 
 `HEDGE / CAPITAL ROTATION` cannot be cited as a live evidence layer until its required data are actually wired and timestamp-audited. Use `EVIDENCE SCORE`, not probability language, unless a future module is explicitly calibrated.
+
+## Frozen stock-core boundary
+
+The currently frozen / candidate Core10 ranking implementation uses only these ranking factors:
+
+- `return_5d`
+- `return_20d`
+- `return_30d`
+- `realized_vol_20d`
+
+with the stable equal-weight negative rank formula under `RWV-STABLE4-CORE10-CAND-V1`.
+
+Profit quality, revenue growth, earnings growth, valuation, catalyst, sector / theme, RS and funding / chip concepts are not silently treated as validated Core10 inputs unless a separately versioned module explicitly binds them. They remain auxiliary / research candidates unless otherwise governed.
 
 ## BASELINE_0 / BASELINE_1
 
@@ -88,6 +107,12 @@ PIT-safe batch runner:
 
 It emits per-session baseline states, deterministic input SHA256 provenance, strict session ordering, and is tested so appending future observations cannot change prior outputs.
 
+### Baseline-independence limitation
+
+`BASELINE_1` is intentionally simple, but it is not an independent information source relative to the frozen stock core: both use price / return / volatility information. Therefore beating `BASELINE_1` would demonstrate incremental decision value over a simple price-based regime rule, not proof of independent non-price information.
+
+Source-group overlap must be declared and tested through module / source-family ablation.
+
 ## RISK_EVIDENCE_SCORE normalization
 
 Evaluation-only ordinal scale:
@@ -98,6 +123,8 @@ Evaluation-only ordinal scale:
 - `3 = severe-risk / active-de-risking evidence`
 
 Canonical mapping is frozen in `RISK_EVIDENCE_SCORE_MAPPING_V1.md`. Unresolved state => `UNAVAILABLE / null`, never NORMAL.
+
+This score is not a calibrated probability.
 
 ## Primary inference locked
 
@@ -128,7 +155,17 @@ Locked uncertainty procedure:
 - two-sided 95% CI for `delta_tau`;
 - one-sided primary alpha = 0.05.
 
+The 3-session overlapping-return dependence is therefore not treated as IID in inference. Power / effective sample planning must likewise use block / event-effective units rather than raw daily row count.
+
 This is an inference contract, not evidence that the complex model works.
+
+## 3D risk horizon versus 5D trade horizon
+
+The 3D risk endpoint and the 5D tactical / trade evaluation horizon are separate objectives and must not be silently conflated.
+
+Before economic promotion, the project must preregister an action map specifying what a 3D risk score changes in a 5D holding process, for example exposure scaling, entry veto, or re-entry eligibility. The resulting decision must then be evaluated on drawdown, false-alarm opportunity cost, turnover and executable 5D trade outcomes.
+
+A higher `tau-b` by itself is not sufficient evidence of a better portfolio decision.
 
 ## Power / sample-size status
 
@@ -137,7 +174,8 @@ This is an inference contract, not evidence that the complex model works.
 - primary estimand = `delta_tau`;
 - alpha = 0.05;
 - target planning power = 0.80;
-- sample size must use the exact paired comparison procedure and development-only / synthetic assumptions;
+- sample size must use the exact paired comparison procedure and effective dependence-aware sampling units;
+- rare-event modules use independent event episodes rather than days;
 - unused outcomes cannot be used to choose the minimum effect or required sample.
 
 `MINIMUM_EFFECT_JUSTIFICATION_STATUS_V1.md` records the current objective blocker:
@@ -145,7 +183,9 @@ This is an inference contract, not evidence that the complex model works.
 - `minimum_effect_delta_tau = NOT_FROZEN`
 - `minimum_sample_required = NOT_FROZEN`
 
-Reason: there is no frozen numeric downstream action / exposure mapping that can yet translate a change in rank concordance into an economically meaningful tail-risk benefit net of false-alarm cost. Deriving an effect threshold from consumed historical windows or synthetic unit-test fixtures is prohibited.
+The intended next derivation is ex ante and cost-side first: the minimum meaningful effect must be at least large enough to support an economically useful action after turnover / execution / false-alarm cost, and it must also exceed a defensible noise floor derived without using the complex model's observed performance. Baseline-only uncertainty may inform the noise floor; the exact rule remains to be separately frozen before use.
+
+Because no frozen numeric downstream action / exposure mapping exists yet, the project cannot objectively translate `delta_tau` into tail-risk benefit net of false-alarm cost. Deriving an effect threshold from consumed complex-model windows or synthetic unit-test fixtures is prohibited.
 
 Therefore formal promotion testing remains blocked.
 
@@ -210,6 +250,21 @@ Key contract behavior:
 
 These are implementation semantics, not evidence that the classifier predicts future returns.
 
+All future state additions / splits / merges / precedence changes are subject to `STATE_ENUM_ABLATION_GOVERNANCE_V1.md` and cannot silently expand the model during E3 evaluation.
+
+## Rare-event module policy
+
+Shock, source-persistence, local-transmission and active-de-risking states are treated as rare-event risk controls by default, not high-frequency predictors.
+
+Binding interpretation:
+
+- sampling unit = independent `EVENT_EPISODE`, not trading days;
+- adjacent sessions inside one shock do not count as independent events;
+- quiet prospective shadow time with no event adds uptime evidence but not shock-outcome sample size;
+- event labels must be created from contemporaneous timestamped evidence available at the decision cutoff;
+- retrospective event relabeling cannot support E3;
+- by default these modules may tighten or preserve risk but may not increase leverage / exposure above the non-event policy.
+
 ## Formal evaluation preflight
 
 Executable fail-closed gate:
@@ -252,9 +307,58 @@ This remains downstream of the canonical classifier and applies the preregistere
 
 ## A-share execution / hard-risk governance
 
-`A_SHARE_EXECUTION_CONTRACT_V0.md` remains preregistered but not a complete execution engine. T+1, suspension, price-limit accessibility, liquidity/capacity, fees, slippage and financing assumptions must be frozen identically across models before any production PnL claim.
+`A_SHARE_EXECUTION_CONTRACT_V0.md` remains preregistered but not a complete execution engine. It already requires explicit treatment of T+1, suspension, price-limit accessibility, liquidity/capacity, fees, slippage and financing assumptions.
 
-`PORTFOLIO_HARD_RISK_GUARD_V0.md` remains an `UNIMPLEMENTED_POLICY_LAYER`; no numeric single-name, theme, beta, gross/net, correlation, liquidity or drawdown limit has been invented.
+`PORTFOLIO_HARD_RISK_GUARD_V1.md` is now the P0 portfolio gate. Its governance order and mandatory limit families are frozen, but numeric limits remain blocked pending one explicit portfolio-risk mandate. No arbitrary single-name, theme, beta, gross/net, correlation, liquidity, gap-loss or drawdown number has been inserted.
+
+A logical exit does not imply an executable fill. T+1, suspension, limit-down and liquidity failure must be handled through ex-ante sizing plus explicit unresolved-risk states rather than assuming post-signal liquidation is always possible.
+
+## Funding / chip semantics
+
+Vendor capital-flow fields are treated as vendor-defined capital net-flow / distribution data. They are not direct proof of institutional identity.
+
+Price-volume interpretations such as `price down + volume up = distribution` or `price down + volume down = liquidity withdrawal` are research hypotheses / descriptive possibilities, not frozen one-to-one mappings. Panic liquidation, forced selling and other mechanisms remain plausible alternatives and require separate evidence.
+
+## Design principles versus E2 observations
+
+### Design principles / governance rules
+
+The following are architecture rules, not formal empirical findings:
+
+- theme conviction and entry timing are separate decisions;
+- shock detection is not an automatic all-position sell command;
+- hard gates and soft scores are separate;
+- missing / unavailable evidence is not NORMAL;
+- a favorable model state cannot override hard portfolio limits;
+- model complexity must justify itself through ablation.
+
+### E2 research observations from consumed windows
+
+The following may support research design but are not formal OOS:
+
+- breadth weakness alone produced at least one clear false-positive control, so breadth divergence alone is insufficient for confirmed fragility;
+- some consumed windows with leadership deterioration plus small/mid-cap stress showed materially worse forward downside than breadth-only controls;
+- at least one consumed shock window showed that selling mechanically at the shock open would have been inferior to observing subsequent absorption / repair;
+- consumed severe-shock windows showed different post-close persistence paths, supporting separation of realized severity, local transmission and source persistence.
+
+Exact dates / outcomes remain consumed research evidence and cannot be reused as E3.
+
+## State enumeration / ablation governance
+
+`STATE_ENUM_ABLATION_GOVERNANCE_V1.md` is binding immediately.
+
+Before any decision-active state family may reach `CANDIDATE`, it must have:
+
+- a complete state registry;
+- source-group declarations;
+- a full-model versus module-removed ablation;
+- where possible a state-collapse ablation;
+- primary metric / uncertainty;
+- false-alarm and tail-risk attribution;
+- action / turnover burden;
+- event-episode counting for rare-event families.
+
+If removal or collapse does not materially worsen the preregistered decision objective, the extra state / module does not earn promotion.
 
 ## Verification
 
@@ -280,22 +384,28 @@ Atomic ledger / classifier TDD evidence:
 
 These runs verify executable contracts only. They are not predictive validation, formal OOS evidence, or production authorization.
 
-## Current blockers
+The later hard-risk / state-ablation changes in this status are governance/document changes; they do not constitute predictive-validation evidence and do not modify the 55-test implementation claim.
 
-1. `minimum_effect_delta_tau` is objectively unjustified and remains unfrozen.
-2. `minimum_sample_required` therefore remains unfrozen.
-3. Raw numeric PIT observations -> Atomic Evidence Ledger categorical extraction is not yet frozen or executable; V1 begins from already-categorical evidence.
-4. Live source wiring / timestamp-audited ingestion for the new ledger is not implemented.
-5. A-share execution numeric assumptions remain unfrozen.
-6. Portfolio hard-risk numeric limits remain unfrozen.
-7. `HEDGE / CAPITAL ROTATION` remains `UNIMPLEMENTED_DATA_LAYER`.
+## Current blockers — priority order
+
+1. `PORTFOLIO_HARD_RISK_GUARD_V1` numeric mandate is not frozen. This is now the first production-risk blocker.
+2. Risk-score -> action / exposure mapping is not frozen.
+3. `minimum_effect_delta_tau` is therefore objectively unjustified and remains unfrozen.
+4. `minimum_sample_required` therefore remains unfrozen.
+5. Raw numeric PIT observations -> Atomic Evidence Ledger categorical extraction is not yet frozen or executable; V1 begins from already-categorical evidence.
+6. Live source wiring / timestamp-audited ingestion for the new ledger is not implemented.
+7. A-share execution numeric assumptions remain unfrozen.
+8. State-family registry / ablation evidence does not yet exist for every lifecycle / timing / shock family.
+9. `HEDGE / CAPITAL ROTATION` remains `UNIMPLEMENTED_DATA_LAYER`.
 
 ## Next admissible work
 
 1. Do not open a new unused formal evaluation set.
-2. Do not infer raw-to-atomic numeric thresholds from consumed outcome windows.
-3. Attempt `minimum_effect_delta_tau` justification only from an ex-ante decision-utility / exposure mapping or a defensible independent external benchmark; otherwise retain the blocker.
-4. Design raw numeric PIT -> atomic category extraction separately, with source contracts and no outcome-derived threshold fitting.
-5. If and only if a defensible minimum effect is frozen, version and run the Monte Carlo power simulator to derive `minimum_sample_required`.
-6. Only after both the power gate and an end-to-end PIT evidence path are closed may a new unused / prospective formal comparison window be opened.
-7. Keep Core10/Core13, XH V0 and MA5 production status unchanged.
+2. Keep state-space frozen unless a new version is explicitly registered; no silent enum expansion.
+3. Prepare one consolidated portfolio-risk mandate request for the numeric hard limits instead of asking piecemeal questions.
+4. Freeze the risk-score -> action / exposure map before economically justifying `minimum_effect_delta_tau`.
+5. Derive minimum effect from ex-ante action economics / costs plus a defensible baseline-only noise floor; do not use observed complex-model delta to set the requirement.
+6. Derive minimum sample using dependence-aware effective units; for rare-event modules count independent event episodes.
+7. Design raw numeric PIT -> atomic category extraction separately, with source contracts and no outcome-derived threshold fitting.
+8. Confirm whether any genuinely unseen historical window still exists; if none exists, E3 is prospective-only.
+9. Keep Core10/Core13, XH V0 and MA5 production status unchanged.
