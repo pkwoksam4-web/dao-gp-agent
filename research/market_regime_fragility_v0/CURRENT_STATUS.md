@@ -25,6 +25,8 @@ Mandatory files:
 8. `LAYER_CONFLICT_VETO_CONTRACT_V0.md`
 9. `A_SHARE_EXECUTION_CONTRACT_V0.md`
 10. `PORTFOLIO_HARD_RISK_GUARD_V0.md`
+11. `docs/superpowers/specs/2026-10-16-atomic-evidence-ledger-canonical-classifier-design.md`
+12. `docs/superpowers/plans/2026-10-16-atomic-evidence-ledger-canonical-classifier.md`
 
 No module may advance to `CANDIDATE` without a genuinely unused preregistered set, locked primary endpoint and baseline, frozen power/sample requirement, implementation parity, and required execution/risk governance.
 
@@ -42,19 +44,20 @@ Post-hoc rule repair resets the revised hypothesis to at most `E1` until indepen
 
 `MODEL-INDEPENDENT HARD RISK GUARD [UNIMPLEMENTED_POLICY_LAYER]`
 → `DATA VALIDITY / PIT`
-→ `EVENT / SHOCK SOURCE`
-→ `SHOCK SOURCE PERSISTENCE`
-→ `LOCAL TRANSMISSION STATE`
-→ `MARKET REGIME`
-→ `INTERNAL FRAGILITY / SEVERITY`
+→ `ATOMIC EVIDENCE LEDGER V1 [IMPLEMENTED RESEARCH CONTRACT]`
+→ `CANONICAL MARKET-STATE CLASSIFIER V1 [IMPLEMENTED CATEGORICAL CONTRACT]`
+→ `EVENT / SHOCK SOURCE + PERSISTENCE / LOCAL TRANSMISSION EVIDENCE`
+→ `MARKET REGIME / INTERNAL FRAGILITY`
 → `HEDGE / CAPITAL ROTATION [UNIMPLEMENTED_DATA_LAYER]`
-→ `REGIME ROUTER`
+→ `REGIME ROUTER / VETO`
 → `THEME + DISPERSION`
 → `RELATIVE STRENGTH / CATALYST`
 → `TACTICAL TIMING`
 → `EVIDENCE SCORE / PAYOFF`
 → `POSITION BUDGET`
 → `A-SHARE EXECUTION FEASIBILITY [PREREGISTERED, NOT FULLY IMPLEMENTED]`
+
+The implemented ledger/classifier begins from **already-categorical atomic evidence**. Raw numeric market observations are not yet converted into those categories by a frozen extractor. Therefore the branch does not claim an end-to-end live raw-data classifier.
 
 `HEDGE / CAPITAL ROTATION` cannot be cited as a live evidence layer until its required data are actually wired and timestamp-audited. Use `EVIDENCE SCORE`, not probability language, unless a future module is explicitly calibrated.
 
@@ -146,17 +149,90 @@ Reason: there is no frozen numeric downstream action / exposure mapping that can
 
 Therefore formal promotion testing remains blocked.
 
+## Atomic Evidence Ledger V1
+
+Executable:
+
+`research/market_regime_fragility_v0/atomic_evidence_ledger_v1.py`
+
+Version:
+
+`ATOMIC_EVIDENCE_LEDGER_V1`
+
+The ledger validates already-categorical evidence for:
+
+- external shock;
+- source persistence;
+- local transmission;
+- breadth;
+- leadership;
+- small/mid-cap condition;
+- turnover state;
+- repair state.
+
+Each item must carry a valid enum, timezone-aware `observed_at`, non-empty provenance and `pit_valid=True`. Any post-cutoff observation, invalid enum, missing provenance, false PIT flag, malformed/naive timestamp, or missing required field fails closed. A deterministic SHA256 evidence hash includes the ledger version, classifier version, UTC-normalized cutoff and normalized evidence/provenance.
+
+This layer does not derive categorical evidence from raw numeric market values.
+
+## Canonical Market-State Classifier V1
+
+Executable:
+
+`research/market_regime_fragility_v0/canonical_state_classifier_v1.py`
+
+Version:
+
+`CANONICAL_STATE_CLASSIFIER_V1`
+
+It consumes only a validated Atomic Evidence Ledger and applies the preregistered finite categorical precedence:
+
+1. `ACTIVE_DE_RISKING`
+2. `EXTERNAL_SHOCK`
+3. `INTERNAL_FRAGILITY_CONFIRMED_HIGH_SEVERITY`
+4. `INTERNAL_FRAGILITY_CONFIRMED_LOW_SEVERITY`
+5. `REPAIR`
+6. `INTERNAL_FRAGILITY_WATCH`
+7. `NORMAL_RISK_ON`
+8. `NORMAL`
+9. `UNAVAILABLE`
+
+Key contract behavior:
+
+- explicit unavailable required evidence cannot become NORMAL;
+- breadth divergence alone is at most WATCH;
+- multi-channel categorical deterioration is required for confirmed fragility;
+- distribution plus broad deterioration has precedence as `ACTIVE_DE_RISKING`;
+- verified ongoing/escalating external shock with unresolved transmission resolves to `EXTERNAL_SHOCK` unless a higher-priority active-de-risking state applies;
+- broad repair may resolve to `REPAIR` without mutating source-persistence evidence;
+- contradictory required combinations fail closed;
+- score mapping is imported from existing `state_resolution_v1.py`, not duplicated;
+- `production_authorized` is always false.
+
+These are implementation semantics, not evidence that the classifier predicts future returns.
+
 ## Formal evaluation preflight
 
 Executable fail-closed gate:
 
 `research/market_regime_fragility_v0/formal_eval_preflight_v1.py`
 
-It requires exact baseline / score-mapping / inference / power-plan versions, horizon and alpha, frozen target power, positive numeric minimum effect, numeric minimum sample, classifier version/hash, completed-session cutoff policy, genuinely unused set ID/hash, definitions locked before set opening, and no collision with consumed-set IDs.
+It now requires:
+
+- exact baseline / score-mapping / inference / power-plan versions;
+- exact `ATOMIC_EVIDENCE_LEDGER_V1` version;
+- horizon and alpha;
+- frozen target power, positive numeric minimum effect and numeric minimum sample;
+- classifier version / implementation hash;
+- `classifier_ledger_pit_valid=True`;
+- non-empty classifier evidence hash;
+- completed-session cutoff policy;
+- genuinely unused set ID/hash;
+- definitions locked before set opening;
+- no collision with consumed-set IDs.
 
 It can authorize evaluation only and always returns `production_authorized = false`.
 
-Because the actual project minimum effect and sample remain unfrozen, no real formal promotion manifest is currently eligible.
+Because the actual project minimum effect and sample remain unfrozen, no real formal promotion manifest is currently eligible. Numeric values used in unit-test fixture manifests are test fixtures only and are not project thresholds.
 
 ## Categorical state-resolution / veto layer
 
@@ -164,9 +240,7 @@ Executable:
 
 `research/market_regime_fragility_v0/state_resolution_v1.py`
 
-Scope is deliberately narrow: it consumes an already-resolved canonical market state and applies the preregistered categorical conflict semantics. It does **not** classify raw market evidence into a canonical state.
-
-Current executable semantics include:
+This remains downstream of the canonical classifier and applies the preregistered conflict/veto semantics:
 
 - `ACTIVE_DE_RISKING` blocks new high-beta attack exposure but never implies `force_liquidate_all`;
 - `PENDING_TRANSMISSION + SOURCE_ONGOING/SOURCE_ESCALATING` blocks new high-beta attack before local repricing;
@@ -175,8 +249,6 @@ Current executable semantics include:
 - Theme CONFIRMED and EXTERNAL_SHOCK may coexist;
 - invalid data => score null / no full-architecture approval;
 - unknown canonical state => fail closed, never coerced to NORMAL.
-
-The still-missing component is the raw PIT evidence -> canonical market-state classifier. That remains a formal-comparison blocker.
 
 ## A-share execution / hard-risk governance
 
@@ -190,29 +262,40 @@ Workflow:
 
 `.github/workflows/market-regime-baseline-v1.yml`
 
-Relevant TDD evidence:
+Earlier verified TDD evidence:
 
 - RED `38832719000`: missing inference / batch-series / preflight implementations.
 - GREEN `38832999991`: inference + batch baseline + preflight suite successful, 23/23 tests PASS.
 - RED `38833183632`: state-resolution tests failed before `state_resolution_v1.py` existed.
 - GREEN `38833220950`: full suite successful after implementation, 30/30 tests PASS.
 
-These runs verify executable contracts only. They are not predictive validation or OOS evidence.
+Atomic ledger / classifier TDD evidence:
+
+- RED `38848386749`: atomic-ledger tests were wired before `atomic_evidence_ledger_v1.py` existed; expected failure.
+- GREEN `38848433691`: atomic ledger implementation passed the research suite.
+- RED `38848486788`: canonical-classifier tests were committed before `canonical_state_classifier_v1.py` existed; expected failure.
+- GREEN `38848598260`: canonical classifier implementation passed the research suite.
+- RED `38848654992`: new formal-preflight provenance requirements failed against the previous preflight implementation as expected.
+- GREEN `38848703828`: ledger + classifier + preflight provenance + existing research contracts all passed; workflow log reports `Ran 55 tests` and `OK`.
+
+These runs verify executable contracts only. They are not predictive validation, formal OOS evidence, or production authorization.
 
 ## Current blockers
 
 1. `minimum_effect_delta_tau` is objectively unjustified and remains unfrozen.
 2. `minimum_sample_required` therefore remains unfrozen.
-3. Raw PIT evidence -> canonical market-state classifier is not executable / auditable yet.
-4. A-share execution numeric assumptions remain unfrozen.
-5. Portfolio hard-risk numeric limits remain unfrozen.
-6. `HEDGE / CAPITAL ROTATION` remains `UNIMPLEMENTED_DATA_LAYER`.
+3. Raw numeric PIT observations -> Atomic Evidence Ledger categorical extraction is not yet frozen or executable; V1 begins from already-categorical evidence.
+4. Live source wiring / timestamp-audited ingestion for the new ledger is not implemented.
+5. A-share execution numeric assumptions remain unfrozen.
+6. Portfolio hard-risk numeric limits remain unfrozen.
+7. `HEDGE / CAPITAL ROTATION` remains `UNIMPLEMENTED_DATA_LAYER`.
 
 ## Next admissible work
 
 1. Do not open a new unused formal evaluation set.
-2. Continue implementation parity work on raw-evidence state resolution without inventing numeric fragility / shock thresholds.
-3. Attempt minimum-effect justification only from an ex-ante decision-utility mapping or independent external benchmark; otherwise retain the blocker.
-4. If a defensible effect is frozen, version and run the Monte Carlo power simulator to derive `minimum_sample_required`.
-5. Only after both the power gate and raw-classifier gate are closed may a new unused / prospective formal comparison window be opened.
-6. Keep Core10/Core13, XH V0 and MA5 production status unchanged.
+2. Do not infer raw-to-atomic numeric thresholds from consumed outcome windows.
+3. Attempt `minimum_effect_delta_tau` justification only from an ex-ante decision-utility / exposure mapping or a defensible independent external benchmark; otherwise retain the blocker.
+4. Design raw numeric PIT -> atomic category extraction separately, with source contracts and no outcome-derived threshold fitting.
+5. If and only if a defensible minimum effect is frozen, version and run the Monte Carlo power simulator to derive `minimum_sample_required`.
+6. Only after both the power gate and an end-to-end PIT evidence path are closed may a new unused / prospective formal comparison window be opened.
+7. Keep Core10/Core13, XH V0 and MA5 production status unchanged.
