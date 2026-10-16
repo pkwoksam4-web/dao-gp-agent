@@ -6,6 +6,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
+import scripts.shadow_contract_gates as gates
 from scripts.shadow_contract_gates import (
     CORE13, ContractGateError, build_shadow_request, load_quarantine_registry,
     maturity_targets, source_is_live_pit, validate_event_order,
@@ -56,6 +57,21 @@ class ContractGateTests(unittest.TestCase):
         self.assertEqual(maturity_targets(d[:5])["5d"],"2026-10-05")
         self.assertIsNone(maturity_targets(d[:19])["20d"])
         self.assertEqual(maturity_targets(d)["20d"],"2026-10-20")
+
+    def test_exchange_calendar_target_does_not_shift_when_live_pit_is_missing(self):
+        self.assertTrue(
+            hasattr(gates, "maturity_targets_from_exchange_calendar"),
+            "exchange-calendar maturity resolver is required",
+        )
+        exchange_calendar=[
+            "2026-09-28","2026-09-29","2026-09-30","2026-10-08","2026-10-09",
+            "2026-10-12","2026-10-13","2026-10-14","2026-10-15","2026-10-16",
+        ]
+        targets=gates.maturity_targets_from_exchange_calendar("2026-09-28",exchange_calendar)
+        self.assertEqual(targets["5d"],"2026-10-12")
+        # 10/12 being absent from collected LIVE_PIT rows must never move the target to 10/13+.
+        available_live_pit={"2026-09-29","2026-09-30","2026-10-08","2026-10-09","2026-10-13"}
+        self.assertNotIn(targets["5d"],available_live_pit)
 
     def test_settlement_order_guard(self):
         with self.assertRaisesRegex(ContractGateError,"OUT_OF_ORDER"):
