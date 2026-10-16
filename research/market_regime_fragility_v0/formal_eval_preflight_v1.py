@@ -4,6 +4,7 @@ EXPECTED_BASELINE_VERSION = "MOMENTUM_VOL_REGIME_V1"
 EXPECTED_SCORE_MAPPING_VERSION = "RISK_EVIDENCE_SCORE_MAPPING_V1"
 EXPECTED_INFERENCE_VERSION = "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1"
 EXPECTED_POWER_PLAN_VERSION = "POWER_SAMPLE_PLAN_V1"
+EXPECTED_ATOMIC_LEDGER_VERSION = "ATOMIC_EVIDENCE_LEDGER_V1"
 EXPECTED_PRIMARY_HORIZON = 3
 EXPECTED_PRIMARY_ALPHA = 0.05
 EXPECTED_DATA_CUTOFF_POLICY = "COMPLETED_SESSION_ONLY"
@@ -24,6 +25,8 @@ def check_manifest(manifest: dict) -> dict:
         reasons.append("INFERENCE_VERSION_MISMATCH")
     if manifest.get("power_plan_version") != EXPECTED_POWER_PLAN_VERSION:
         reasons.append("POWER_PLAN_VERSION_MISMATCH")
+    if manifest.get("atomic_ledger_version") != EXPECTED_ATOMIC_LEDGER_VERSION:
+        reasons.append("ATOMIC_LEDGER_VERSION_MISMATCH")
     if manifest.get("primary_horizon_sessions") != EXPECTED_PRIMARY_HORIZON:
         reasons.append("PRIMARY_HORIZON_MISMATCH")
     if manifest.get("primary_alpha") != EXPECTED_PRIMARY_ALPHA:
@@ -62,6 +65,10 @@ def check_manifest(manifest: dict) -> dict:
         reasons.append("COMPLEX_CLASSIFIER_VERSION_MISSING")
     if not manifest.get("complex_classifier_hash"):
         reasons.append("COMPLEX_CLASSIFIER_HASH_MISSING")
+    if manifest.get("classifier_ledger_pit_valid") is not True:
+        reasons.append("CLASSIFIER_LEDGER_NOT_PIT_VALID")
+    if not manifest.get("classifier_evidence_hash"):
+        reasons.append("CLASSIFIER_EVIDENCE_HASH_MISSING")
 
     return {
         "eligible": not reasons,
