@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+EXPECTED_BASELINE_VERSION = "MOMENTUM_VOL_REGIME_V1"
+EXPECTED_SCORE_MAPPING_VERSION = "RISK_EVIDENCE_SCORE_MAPPING_V1"
+EXPECTED_INFERENCE_VERSION = "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1"
+EXPECTED_PRIMARY_HORIZON = 3
+EXPECTED_DATA_CUTOFF_POLICY = "COMPLETED_SESSION_ONLY"
+
+
+def check_manifest(manifest: dict) -> dict:
+    reasons: list[str] = []
+
+    if manifest.get("baseline_version") != EXPECTED_BASELINE_VERSION:
+        reasons.append("BASELINE_VERSION_MISMATCH")
+    if manifest.get("score_mapping_version") != EXPECTED_SCORE_MAPPING_VERSION:
+        reasons.append("SCORE_MAPPING_VERSION_MISMATCH")
+    if manifest.get("inference_version") != EXPECTED_INFERENCE_VERSION:
+        reasons.append("INFERENCE_VERSION_MISMATCH")
+    if manifest.get("primary_horizon_sessions") != EXPECTED_PRIMARY_HORIZON:
+        reasons.append("PRIMARY_HORIZON_MISMATCH")
+    if manifest.get("data_cutoff_policy") != EXPECTED_DATA_CUTOFF_POLICY:
+        reasons.append("DATA_CUTOFF_POLICY_MISMATCH")
+
+    if manifest.get("unused_set") is not True:
+        reasons.append("EVALUATION_SET_NOT_MARKED_UNUSED")
+    if manifest.get("definitions_locked_before_set_open") is not True:
+        reasons.append("DEFINITIONS_NOT_LOCKED_BEFORE_SET_OPEN")
+
+    evaluation_set_id = manifest.get("evaluation_set_id")
+    if not evaluation_set_id:
+        reasons.append("EVALUATION_SET_ID_MISSING")
+    if not manifest.get("evaluation_set_hash"):
+        reasons.append("EVALUATION_SET_HASH_MISSING")
+
+    consumed = set(manifest.get("consumed_set_ids") or [])
+    if evaluation_set_id and evaluation_set_id in consumed:
+        reasons.append("EVALUATION_SET_ALREADY_CONSUMED")
+
+    if not manifest.get("complex_classifier_version"):
+        reasons.append("COMPLEX_CLASSIFIER_VERSION_MISSING")
+    if not manifest.get("complex_classifier_hash"):
+        reasons.append("COMPLEX_CLASSIFIER_HASH_MISSING")
+
+    return {
+        "eligible": not reasons,
+        "reasons": reasons,
+        "production_authorized": False,
+        "preflight_scope": "FORMAL_EVALUATION_ONLY",
+    }
