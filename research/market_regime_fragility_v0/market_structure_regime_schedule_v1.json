@@ -1,0 +1,390 @@
+{
+  "schedule_version": "A_SHARE_MARKET_STRUCTURE_REGIME_SCHEDULE_V1",
+  "status": "PARTIAL_SOURCE_BOUND",
+  "formal_window": {
+    "start": "2020-06-01",
+    "end": "2026-04-17"
+  },
+  "production_authorized": false,
+  "formal_evaluation_scope_complete": false,
+  "axes": [
+    "BOARD_PRICE_LIMIT_REGIME",
+    "IPO_NEW_LISTING_REGIME",
+    "BOARD_TAXONOMY_REGIME",
+    "TRANSACTION_COST_REGIME",
+    "FINANCING_REGIME",
+    "SHORT_HEDGE_REGIME",
+    "PROGRAM_TRADING_REGULATORY_REGIME"
+  ],
+  "baseline_states": [
+    {
+      "baseline_id": "SSE_MAIN_PRICE_LIMIT_ASOF_20200601",
+      "as_of": "2020-06-01",
+      "axis": "BOARD_PRICE_LIMIT_REGIME",
+      "scope": "SSE_MAIN_A_SHARE",
+      "state": {
+        "ordinary_daily_limit_pct": 10.0,
+        "risk_warning_daily_limit_pct": 5.0
+      },
+      "authority": "Shanghai Stock Exchange",
+      "source_url": "https://www.sse.com.cn/lawandrules/sselawsrules/repeal/rules/c/c_20230418_5720136.shtml",
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "baseline_id": "SZSE_MAIN_SME_PRICE_LIMIT_ASOF_20200601",
+      "as_of": "2020-06-01",
+      "axis": "BOARD_PRICE_LIMIT_REGIME",
+      "scope": "SZSE_MAIN_AND_SME_A_SHARE",
+      "state": {
+        "ordinary_daily_limit_pct": 10.0,
+        "risk_warning_daily_limit_pct": 5.0
+      },
+      "authority": "Shenzhen Stock Exchange",
+      "source_url": "https://www.szse.cn/disclosure/notice/general/t20060515_499577.html",
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "baseline_id": "STAR_PRICE_LIMIT_ASOF_20200601",
+      "as_of": "2020-06-01",
+      "axis": "BOARD_PRICE_LIMIT_REGIME",
+      "scope": "SSE_STAR",
+      "state": {
+        "ipo_first_five_trading_days_no_daily_limit": true,
+        "post_ipo_daily_limit_pct": 20.0,
+        "continuous_auction_buy_upper_pct_of_reference": 102.0,
+        "continuous_auction_sell_lower_pct_of_reference": 98.0
+      },
+      "authority": "Shanghai Stock Exchange",
+      "source_url": "https://star.sse.com.cn/star/media/news/c/c_20190719_4866789.shtml",
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "baseline_id": "CHINEXT_PRE_REFORM_ASOF_20200601",
+      "as_of": "2020-06-01",
+      "axis": "BOARD_PRICE_LIMIT_REGIME",
+      "scope": "SZSE_CHINEXT",
+      "state": {
+        "ordinary_daily_limit_pct": 10.0,
+        "risk_warning_daily_limit_pct": 5.0
+      },
+      "authority": "Shenzhen Stock Exchange / CSRC Tianjin Bureau",
+      "source_url": "https://www.csrc.gov.cn/tianjin/c105375/c1263458/content.shtml",
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "CHINEXT_REFORM_20200824",
+      "effective_date": "2020-08-24",
+      "first_affected_session": "2020-08-24",
+      "axes": ["BOARD_PRICE_LIMIT_REGIME", "IPO_NEW_LISTING_REGIME"],
+      "scope": "SZSE_CHINEXT",
+      "change": {
+        "existing_stock_daily_limit_pct": 20.0,
+        "ipo_first_five_trading_days_no_daily_limit": true,
+        "post_ipo_daily_limit_pct": 20.0,
+        "continuous_auction_buy_upper_pct_of_reference": 102.0,
+        "continuous_auction_sell_lower_pct_of_reference": 98.0,
+        "unlimited_period_intraday_halt_thresholds_pct": [30.0, 60.0]
+      },
+      "authority": "Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.szse.cn/aboutus/trends/conference/t20200821_580925.html",
+        "https://investor.szse.cn/knowledge/t20200721_579820.html"
+      ],
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "event_id": "SZSE_MAIN_SME_TAXONOMY_MERGER_20210406",
+      "effective_date": "2021-04-06",
+      "first_affected_session": "2021-04-06",
+      "axes": ["BOARD_TAXONOMY_REGIME"],
+      "scope": "SZSE_MAIN_AND_FORMER_SME",
+      "change": {
+        "former_sme_security_category": "MAIN_BOARD_A_SHARE",
+        "security_code_and_name_unchanged": true,
+        "execution_break_inferred": false
+      },
+      "authority": "Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.szse.cn/disclosure/notice/general/t20210331_585343.html"
+      ],
+      "source_bound": true,
+      "causal_use": "TAXONOMY_ONLY"
+    },
+    {
+      "event_id": "A_SHARE_TRANSFER_FEE_CUT_20220429",
+      "effective_date": "2022-04-29",
+      "first_affected_session": "2022-04-29",
+      "axes": ["TRANSACTION_COST_REGIME"],
+      "scope": "A_SHARE_TRANSFER_FEE",
+      "change": {
+        "prior_hs_a_share_bilateral_per_mille": 0.02,
+        "new_a_share_bilateral_per_mille": 0.01,
+        "overall_reduction_pct": 50.0
+      },
+      "authority": "China Securities Depository and Clearing Corporation Limited",
+      "source_urls": [
+        "https://m.chinaclear.cn/zdjs/dsj/about_dsj.shtml",
+        "https://finance.sina.com.cn/money/bond/2022-04-28/doc-imcwipii6993883.shtml"
+      ],
+      "source_bound": true,
+      "evidence_quality": "PRIMARY_CHRONOLOGY_PLUS_CONTEMPORANEOUS_REPUBLICATION",
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "event_id": "FULL_REG_MAIN_TRADING_REFORM_20230410",
+      "effective_date": "2023-04-10",
+      "first_affected_session": "2023-04-10",
+      "axes": ["IPO_NEW_LISTING_REGIME", "BOARD_PRICE_LIMIT_REGIME"],
+      "scope": "SSE_SZSE_MAIN_REGISTERED_IPO_TRADING",
+      "change": {
+        "main_ipo_first_five_trading_days_no_daily_limit": true,
+        "unlimited_period_intraday_halt_thresholds_pct": [30.0, 60.0],
+        "continuous_auction_price_cage_pct": 2.0
+      },
+      "authority": "Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.szse.cn/www/marketServices/technicalservice/doc/P020230724535729507237.pdf"
+      ],
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "event_id": "EXCHANGE_HANDLING_FEE_CUT_20230828",
+      "effective_date": "2023-08-28",
+      "first_affected_session": "2023-08-28",
+      "axes": ["TRANSACTION_COST_REGIME"],
+      "scope": "SSE_SZSE_A_B_SHARE_HANDLING_FEE",
+      "change": {
+        "prior_bilateral_pct": 0.00487,
+        "new_bilateral_pct": 0.00341,
+        "reduction_pct": 30.0
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7426794/content.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "event_id": "STAMP_TAX_HALVING_20230828",
+      "effective_date": "2023-08-28",
+      "first_affected_session": "2023-08-28",
+      "axes": ["TRANSACTION_COST_REGIME"],
+      "scope": "SECURITIES_TRANSACTION_STAMP_TAX",
+      "change": {
+        "statutory_pre_cut_per_mille": 1.0,
+        "new_effective_per_mille": 0.5,
+        "reduction_pct": 50.0
+      },
+      "authority": "Ministry of Finance / State Taxation Administration",
+      "source_urls": [
+        "https://www.mof.gov.cn/jrttts/202308/t20230828_3904235.htm",
+        "https://tianjin.chinatax.gov.cn/11200000000/0300/030005/20220725150235434.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "DIRECT_EXECUTION"
+    },
+    {
+      "event_id": "FINANCING_MARGIN_CUT_AFTER_CLOSE_20230908",
+      "effective_date": "2023-09-08",
+      "effective_after_close": true,
+      "first_affected_session": "2023-09-11",
+      "axes": ["FINANCING_REGIME"],
+      "scope": "SSE_SZSE_BSE_FINANCING_MINIMUM",
+      "change": {
+        "prior_minimum_pct": 100.0,
+        "new_minimum_pct": 80.0,
+        "outstanding_contracts_may_apply_subject_to_arrangement": true
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7428485/content.shtml",
+        "https://www.sse.com.cn/aboutus/mediacenter/hotandd/c/c_20230827_5725661.shtml",
+        "https://www.szse.cn/aboutus/trends/news/t20230827_602969.html"
+      ],
+      "source_bound": true,
+      "causal_use": "FINANCING_ONLY"
+    },
+    {
+      "event_id": "SECURITIES_LENDING_MARGIN_TIGHTEN_20231030",
+      "effective_date": "2023-10-30",
+      "first_affected_session": "2023-10-30",
+      "axes": ["SHORT_HEDGE_REGIME"],
+      "scope": "SSE_SZSE_SECURITIES_LENDING",
+      "change": {
+        "prior_minimum_pct": 50.0,
+        "new_minimum_pct": 80.0,
+        "private_securities_fund_minimum_pct": 100.0,
+        "outstanding_contracts_keep_prior_requirement": true
+      },
+      "authority": "Shanghai Stock Exchange / Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/specific/margin/c/c_20250616_10782023.shtml",
+        "https://investor.szse.cn/lawrules/rule/trade/t20231013_604060.html"
+      ],
+      "source_bound": true,
+      "causal_use": "HEDGE_ONLY"
+    },
+    {
+      "event_id": "RESTRICTED_SHARE_LENDING_SUSPENDED_20240129",
+      "effective_date": "2024-01-29",
+      "first_affected_session": "2024-01-29",
+      "axes": ["SHORT_HEDGE_REGIME"],
+      "scope": "RESTRICTED_SHARE_LENDING",
+      "change": {
+        "restricted_share_lending_suspended": true
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7459730/content.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "HEDGE_ONLY"
+    },
+    {
+      "event_id": "NEGOTIATED_SECURITIES_LENDING_NEXT_DAY_20240318",
+      "effective_date": "2024-03-18",
+      "first_affected_session": "2024-03-18",
+      "axes": ["SHORT_HEDGE_REGIME"],
+      "scope": "MARKET_ORIENTED_NEGOTIATED_SECURITIES_LENDING",
+      "change": {
+        "availability": "NEXT_DAY"
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7459730/content.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "HEDGE_ONLY"
+    },
+    {
+      "event_id": "SECURITIES_REFINANCING_SUSPENDED_20240711",
+      "effective_date": "2024-07-11",
+      "first_affected_session": "2024-07-11",
+      "axes": ["SHORT_HEDGE_REGIME"],
+      "scope": "SECURITIES_REFINANCING",
+      "change": {
+        "new_securities_refinancing_suspended": true,
+        "existing_contracts_may_extend_until_no_later_than": "2024-09-30"
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7493852/content.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "HEDGE_ONLY"
+    },
+    {
+      "event_id": "SECURITIES_LENDING_MARGIN_TIGHTEN_20240722",
+      "effective_date": "2024-07-22",
+      "first_affected_session": "2024-07-22",
+      "axes": ["SHORT_HEDGE_REGIME"],
+      "scope": "SSE_SZSE_BSE_SECURITIES_LENDING",
+      "change": {
+        "prior_minimum_pct": 80.0,
+        "new_minimum_pct": 100.0,
+        "private_securities_fund_prior_minimum_pct": 100.0,
+        "private_securities_fund_new_minimum_pct": 120.0
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7493852/content.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "HEDGE_ONLY"
+    },
+    {
+      "event_id": "CSRC_PROGRAM_TRADING_RULE_20241008",
+      "effective_date": "2024-10-08",
+      "first_affected_session": "2024-10-08",
+      "axes": ["PROGRAM_TRADING_REGULATORY_REGIME"],
+      "scope": "SECURITIES_MARKET_PROGRAM_TRADING",
+      "change": {
+        "program_trading_management_provisions_effective": true
+      },
+      "authority": "China Securities Regulatory Commission",
+      "source_urls": [
+        "https://www.csrc.gov.cn/csrc/c100028/c7480577/content.shtml"
+      ],
+      "source_bound": true,
+      "causal_use": "CONTEXT_ONLY"
+    },
+    {
+      "event_id": "EXCHANGE_PROGRAM_TRADING_IMPLEMENTATION_20250707",
+      "effective_date": "2025-07-07",
+      "first_affected_session": "2025-07-07",
+      "axes": ["PROGRAM_TRADING_REGULATORY_REGIME"],
+      "scope": "SSE_SZSE_PROGRAM_TRADING_IMPLEMENTATION",
+      "change": {
+        "exchange_implementation_rules_effective": true
+      },
+      "authority": "Shanghai Stock Exchange / Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20250612_10781696.shtml"
+      ],
+      "source_bound": true,
+      "evidence_quality": "SSE_PRIMARY_BOUND_SZSE_PRIMARY_URL_PENDING_IN_ARTIFACT",
+      "causal_use": "CONTEXT_ONLY"
+    },
+    {
+      "event_id": "NORTHBOUND_PROGRAM_REPORTING_20260112",
+      "effective_date": "2026-01-12",
+      "first_affected_session": "2026-01-12",
+      "axes": ["PROGRAM_TRADING_REGULATORY_REGIME"],
+      "scope": "SHANGHAI_SHENZHEN_STOCK_CONNECT_PROGRAM_TRADING",
+      "change": {
+        "northbound_program_trading_reporting_effective": true
+      },
+      "authority": "Shanghai Stock Exchange / Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/universal/c/c_20250711_10784631.shtml",
+        "https://www.szse.cn/lawrules/rule/trade/t20250711_614858.html"
+      ],
+      "source_bound": true,
+      "causal_use": "CROSS_BORDER_FLOW_CONTEXT"
+    },
+    {
+      "event_id": "FINANCING_MARGIN_RAISE_20260119",
+      "effective_date": "2026-01-19",
+      "first_affected_session": "2026-01-19",
+      "axes": ["FINANCING_REGIME"],
+      "scope": "SSE_SZSE_BSE_NEW_FINANCING_CONTRACTS",
+      "change": {
+        "prior_minimum_pct": 80.0,
+        "new_minimum_pct": 100.0,
+        "applies_to_new_contracts_only": true,
+        "preexisting_contracts_and_rollovers_keep_prior_requirement": true
+      },
+      "authority": "Shanghai Stock Exchange / Shenzhen Stock Exchange",
+      "source_urls": [
+        "https://www.sse.com.cn/lawandrules/sselawsrules2025/trade/specific/margin/c/c_20260114_10805174.shtml",
+        "https://www.szse.cn/lawrules/rule/trade/t20260114_618495.html"
+      ],
+      "source_bound": true,
+      "causal_use": "FINANCING_ONLY"
+    }
+  ],
+  "post_cutoff_exclusions": [
+    {
+      "event_id": "SSE_SZSE_TRADING_RULES_20260424",
+      "effective_date": "2026-04-24",
+      "reason": "POST_FORMAL_WINDOW_DO_NOT_BACKFILL_PRIOR_ROWS"
+    }
+  ],
+  "unresolved_requirements": [
+    "PRIMARY_CHINACLEAR_URL_FOR_20220429_EFFECTIVE_DATE",
+    "SZSE_20250707_PROGRAM_TRADING_PRIMARY_URL_IN_MACHINE_ARTIFACT",
+    "ROW_LEVEL_VENUE_BOARD_SECURITY_STATE_BINDING",
+    "HISTORICAL_SUSPENSION_RESUMPTION_RULE_BINDING_WHERE_REQUIRED",
+    "FORMAL_UNIVERSE_VENUE_COVERAGE_CONFIRMATION",
+    "EXECUTION_COST_CHANGE_COMPLETENESS_AUDIT"
+  ]
+}
