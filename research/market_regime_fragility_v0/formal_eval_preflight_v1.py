@@ -5,6 +5,7 @@ EXPECTED_SCORE_MAPPING_VERSION = "RISK_EVIDENCE_SCORE_MAPPING_V1"
 EXPECTED_INFERENCE_VERSION = "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1"
 EXPECTED_POWER_PLAN_VERSION = "POWER_SAMPLE_PLAN_V1"
 EXPECTED_ATOMIC_LEDGER_VERSION = "ATOMIC_EVIDENCE_LEDGER_V1"
+EXPECTED_TRADABILITY_POLICY_VERSION = "A_SHARE_TRADABILITY_GATE_V1"
 EXPECTED_PRIMARY_HORIZON = 3
 EXPECTED_PRIMARY_ALPHA = 0.05
 EXPECTED_DATA_CUTOFF_POLICY = "COMPLETED_SESSION_ONLY"
@@ -69,6 +70,17 @@ def check_manifest(manifest: dict) -> dict:
         reasons.append("CLASSIFIER_LEDGER_NOT_PIT_VALID")
     if not manifest.get("classifier_evidence_hash"):
         reasons.append("CLASSIFIER_EVIDENCE_HASH_MISSING")
+
+    if not manifest.get("universe_snapshot_hash"):
+        reasons.append("UNIVERSE_SNAPSHOT_HASH_MISSING")
+    if manifest.get("universe_pit_valid") is not True:
+        reasons.append("UNIVERSE_NOT_PIT_VALID")
+    if manifest.get("tradability_policy_version") != EXPECTED_TRADABILITY_POLICY_VERSION:
+        reasons.append("TRADABILITY_POLICY_VERSION_MISMATCH")
+    if manifest.get("tradability_filter_applied_before_ranking") is not True:
+        reasons.append("TRADABILITY_FILTER_NOT_APPLIED_BEFORE_RANKING")
+    if not manifest.get("market_structure_regime_schedule_version"):
+        reasons.append("MARKET_STRUCTURE_REGIME_SCHEDULE_VERSION_MISSING")
 
     return {
         "eligible": not reasons,
