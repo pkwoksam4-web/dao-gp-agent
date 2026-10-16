@@ -1,6 +1,6 @@
 # BLOCK PERMUTATION NULL PREREG V1
 
-Status: GOVERNANCE_FROZEN / IMPLEMENTATION_PENDING
+Status: GOVERNANCE_FROZEN / IMPLEMENTED_RESEARCH_CONTRACT
 Version: `BLOCK_PERMUTATION_NULL_V1`
 Production use: PROHIBITED
 Formal OOS authorization: NO
@@ -88,9 +88,31 @@ Fail closed when:
 - requested replication count is below the implementation minimum;
 - block length differs from the frozen primary 3-session horizon.
 
-The implementation must expose the exact block length, replicate count and seed in its result.
+The implementation exposes the exact block length, replicate count and seed in its result.
 
-## 8. Interpretation
+## 8. Executable binding
+
+Implementation:
+
+`block_permutation_null_v1.py`
+
+Tests:
+
+`test_block_permutation_null_v1.py`
+
+TDD evidence:
+
+- RED run `38867036663`: test contract was present before the implementation module and failed on the missing module as expected;
+- GREEN run `38867104379`: implementation plus the then-current research suite passed, with `Ran 109 tests` and `OK`.
+
+Formal-preflight binding evidence:
+
+- RED run `38867354329`: the five newly required comparator/permutation provenance checks failed against the prior preflight implementation while existing functionality remained green;
+- GREEN run `38867540890`: the complete research suite passed with `Ran 115 tests` and `OK` after the preflight consumed comparator identity, permutation version/hash, block length, replications and seed.
+
+These tests verify the executable contract only. Fixture scores/returns, fixture hashes and fixture p-values are not research evidence and cannot support promotion.
+
+## 9. Interpretation
 
 A favorable permutation result only addresses whether observed `delta_tau` is unusual under this block-shuffled time-alignment null.
 
@@ -105,6 +127,6 @@ It does **not** by itself establish:
 
 All existing preflight, execution, PIT, power, ablation and hard-risk gates remain binding.
 
-## 9. No historical re-selection
+## 10. No historical re-selection
 
 The permutation design is frozen before any new unused formal set is opened. Consumed historical windows may be used only for implementation diagnostics, never to select the block length, direction, p-value definition or replication count for formal promotion.
