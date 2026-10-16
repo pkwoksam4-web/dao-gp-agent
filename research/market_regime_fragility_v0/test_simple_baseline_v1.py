@@ -3,6 +3,8 @@ import unittest
 
 from simple_baseline_v1 import (
     BASELINE0_SCORE,
+    BASELINE0_VERSION,
+    BASELINE1_VERSION,
     SIMPLE_NEUTRAL,
     SIMPLE_RISK_OFF,
     SIMPLE_RISK_ON,
@@ -21,7 +23,11 @@ def closes_from_returns(returns, start=100.0):
 
 class SimpleBaselineV1Tests(unittest.TestCase):
     def test_baseline0_is_constant_neutral_reference(self):
+        self.assertEqual(BASELINE0_VERSION, "BASELINE_0_NO_REGIME_OVERLAY")
         self.assertEqual(BASELINE0_SCORE, 1)
+
+    def test_baseline1_identity_is_explicit(self):
+        self.assertEqual(BASELINE1_VERSION, "MOMENTUM_VOL_REGIME_V1")
 
     def test_classify_state_exact_contract(self):
         self.assertEqual(classify_simple_state(0.01, 0.10, 0.10), SIMPLE_RISK_ON)
