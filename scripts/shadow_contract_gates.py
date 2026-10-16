@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -73,6 +73,44 @@ def maturity_targets(eligible_dates):
         "5d": dates[4] if len(dates) >= 5 else None,
         "20d": dates[19] if len(dates) >= 20 else None,
     }
+
+
+def load_exchange_trading_calendar(path):
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("schema") != "agent-brain-cn-exchange-calendar/v1":
+        raise ContractGateError("EXCHANGE_CALENDAR_SCHEMA_INVALID")
+    dates = data.get("trading_days")
+    if not isinstance(dates, list) or not dates:
+        raise ContractGateError("EXCHANGE_CALENDAR_DATES_INVALID")
+    if len(dates) != len(set(dates)) or dates != sorted(dates):
+        raise ContractGateError("EXCHANGE_CALENDAR_DATES_NOT_SORTED_UNIQUE")
+    try:
+        parsed = [date.fromisoformat(x) for x in dates]
+    except Exception as exc:
+        raise ContractGateError("EXCHANGE_CALENDAR_DATE_FORMAT_INVALID") from exc
+    if any(d.weekday() >= 5 for d in parsed):
+        raise ContractGateError("EXCHANGE_CALENDAR_CONTAINS_WEEKEND")
+    if data.get("trading_day_count") != len(dates):
+        raise ContractGateError("EXCHANGE_CALENDAR_COUNT_MISMATCH")
+    return dates
+
+
+def maturity_targets_from_exchange_calendar(anchor, exchange_trading_dates):
+    try:
+        date.fromisoformat(anchor)
+    except Exception as exc:
+        raise ContractGateError("EXCHANGE_CALENDAR_ANCHOR_INVALID") from exc
+    dates = sorted(set(exchange_trading_dates))
+    try:
+        for d in dates:
+            date.fromisoformat(d)
+    except Exception as exc:
+        raise ContractGateError("EXCHANGE_CALENDAR_DATE_FORMAT_INVALID") from exc
+    future = [d for d in dates if d > anchor]
+    targets = maturity_targets(future)
+    targets["calendar_anchor"] = anchor
+    targets["calendar_last_session"] = dates[-1] if dates else None
+    return targets
 
 
 def load_quarantine_registry(path):
