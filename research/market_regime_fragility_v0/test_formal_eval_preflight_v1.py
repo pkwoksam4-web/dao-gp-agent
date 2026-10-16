@@ -27,7 +27,10 @@ VALID_MANIFEST = {
     "universe_pit_valid": True,
     "tradability_policy_version": "A_SHARE_TRADABILITY_GATE_V1",
     "tradability_filter_applied_before_ranking": True,
-    "market_structure_regime_schedule_version": "MARKET_STRUCTURE_SCHEDULE_TEST_V1",
+    "market_structure_regime_schedule_version": "A_SHARE_MARKET_STRUCTURE_REGIME_SCHEDULE_V1",
+    "market_structure_regime_schedule_hash": "schedule-hash-abc123",
+    "market_structure_schedule_pit_valid": True,
+    "market_structure_schedule_scope_complete": True,
     "consumed_set_ids": ["historical-consumed-a", "historical-consumed-b"],
 }
 
@@ -119,12 +122,33 @@ class FormalEvalPreflightV1Tests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("TRADABILITY_FILTER_NOT_APPLIED_BEFORE_RANKING", result["reasons"])
 
-    def test_market_structure_regime_schedule_version_is_required(self):
+    def test_market_structure_regime_schedule_version_must_match(self):
         manifest = dict(VALID_MANIFEST)
-        manifest["market_structure_regime_schedule_version"] = ""
+        manifest["market_structure_regime_schedule_version"] = "OTHER"
         result = check_manifest(manifest)
         self.assertFalse(result["eligible"])
-        self.assertIn("MARKET_STRUCTURE_REGIME_SCHEDULE_VERSION_MISSING", result["reasons"])
+        self.assertIn("MARKET_STRUCTURE_REGIME_SCHEDULE_VERSION_MISMATCH", result["reasons"])
+
+    def test_market_structure_schedule_hash_is_required(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["market_structure_regime_schedule_hash"] = ""
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("MARKET_STRUCTURE_REGIME_SCHEDULE_HASH_MISSING", result["reasons"])
+
+    def test_market_structure_schedule_must_be_pit_valid(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["market_structure_schedule_pit_valid"] = False
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("MARKET_STRUCTURE_SCHEDULE_NOT_PIT_VALID", result["reasons"])
+
+    def test_market_structure_schedule_must_be_scope_complete(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["market_structure_schedule_scope_complete"] = False
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("MARKET_STRUCTURE_SCHEDULE_SCOPE_INCOMPLETE", result["reasons"])
 
     def test_preflight_does_not_authorize_production(self):
         result = check_manifest(dict(VALID_MANIFEST))
