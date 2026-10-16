@@ -7,6 +7,8 @@ EXPECTED_POWER_PLAN_VERSION = "POWER_SAMPLE_PLAN_V1"
 EXPECTED_ATOMIC_LEDGER_VERSION = "ATOMIC_EVIDENCE_LEDGER_V1"
 EXPECTED_TRADABILITY_POLICY_VERSION = "A_SHARE_TRADABILITY_GATE_V1"
 EXPECTED_MARKET_STRUCTURE_SCHEDULE_VERSION = "A_SHARE_MARKET_STRUCTURE_REGIME_SCHEDULE_V1"
+EXPECTED_CHANGE_CONTROL_VERSION = "MODULE_DOWNGRADE_CHANGE_CONTROL_V1"
+EXPECTED_MANUAL_OVERRIDE_POLICY_VERSION = "MANUAL_OVERRIDE_LEDGER_V1"
 EXPECTED_PRIMARY_HORIZON = 3
 EXPECTED_PRIMARY_ALPHA = 0.05
 EXPECTED_DATA_CUTOFF_POLICY = "COMPLETED_SESSION_ONLY"
@@ -88,6 +90,19 @@ def check_manifest(manifest: dict) -> dict:
         reasons.append("MARKET_STRUCTURE_SCHEDULE_NOT_PIT_VALID")
     if manifest.get("market_structure_schedule_scope_complete") is not True:
         reasons.append("MARKET_STRUCTURE_SCHEDULE_SCOPE_INCOMPLETE")
+
+    if manifest.get("change_control_version") != EXPECTED_CHANGE_CONTROL_VERSION:
+        reasons.append("CHANGE_CONTROL_VERSION_MISMATCH")
+    if manifest.get("manual_override_policy_version") != EXPECTED_MANUAL_OVERRIDE_POLICY_VERSION:
+        reasons.append("MANUAL_OVERRIDE_POLICY_VERSION_MISMATCH")
+    if manifest.get("primary_model_metric_uses_unoverridden_outputs") is not True:
+        reasons.append("PRIMARY_MODEL_METRIC_CONTAMINATED_BY_OVERRIDE")
+
+    override_count = manifest.get("manual_override_count")
+    if not isinstance(override_count, int) or isinstance(override_count, bool) or override_count < 0:
+        reasons.append("MANUAL_OVERRIDE_COUNT_INVALID")
+    if not manifest.get("manual_override_ledger_hash"):
+        reasons.append("MANUAL_OVERRIDE_LEDGER_HASH_MISSING")
 
     return {
         "eligible": not reasons,
