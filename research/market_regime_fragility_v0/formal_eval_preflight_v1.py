@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 EXPECTED_BASELINE_VERSION = "MOMENTUM_VOL_REGIME_V1"
+EXPECTED_ZERO_PARAMETER_COMPARATOR_VERSION = "BASELINE_0_NO_REGIME_OVERLAY"
 EXPECTED_SCORE_MAPPING_VERSION = "RISK_EVIDENCE_SCORE_MAPPING_V1"
 EXPECTED_INFERENCE_VERSION = "PRIMARY_3D_DOWNSIDE_CONCORDANCE_V1"
+EXPECTED_PERMUTATION_NULL_VERSION = "BLOCK_PERMUTATION_NULL_V1"
+EXPECTED_PERMUTATION_BLOCK_LENGTH = 3
+EXPECTED_PERMUTATION_REPLICATIONS = 5000
+EXPECTED_PERMUTATION_SEED = 20261016
 EXPECTED_POWER_PLAN_VERSION = "POWER_SAMPLE_PLAN_V1"
 EXPECTED_ATOMIC_LEDGER_VERSION = "ATOMIC_EVIDENCE_LEDGER_V1"
 EXPECTED_TRADABILITY_POLICY_VERSION = "A_SHARE_TRADABILITY_GATE_V1"
@@ -23,10 +28,22 @@ def check_manifest(manifest: dict) -> dict:
 
     if manifest.get("baseline_version") != EXPECTED_BASELINE_VERSION:
         reasons.append("BASELINE_VERSION_MISMATCH")
+    if manifest.get("zero_parameter_comparator_version") != EXPECTED_ZERO_PARAMETER_COMPARATOR_VERSION:
+        reasons.append("ZERO_PARAMETER_COMPARATOR_VERSION_MISMATCH")
     if manifest.get("score_mapping_version") != EXPECTED_SCORE_MAPPING_VERSION:
         reasons.append("SCORE_MAPPING_VERSION_MISMATCH")
     if manifest.get("inference_version") != EXPECTED_INFERENCE_VERSION:
         reasons.append("INFERENCE_VERSION_MISMATCH")
+    if manifest.get("permutation_null_version") != EXPECTED_PERMUTATION_NULL_VERSION:
+        reasons.append("PERMUTATION_NULL_VERSION_MISMATCH")
+    if not manifest.get("permutation_null_hash"):
+        reasons.append("PERMUTATION_NULL_HASH_MISSING")
+    if manifest.get("permutation_block_length") != EXPECTED_PERMUTATION_BLOCK_LENGTH:
+        reasons.append("PERMUTATION_BLOCK_LENGTH_MISMATCH")
+    if manifest.get("permutation_replications") != EXPECTED_PERMUTATION_REPLICATIONS:
+        reasons.append("PERMUTATION_REPLICATIONS_MISMATCH")
+    if manifest.get("permutation_seed") != EXPECTED_PERMUTATION_SEED:
+        reasons.append("PERMUTATION_SEED_MISMATCH")
     if manifest.get("power_plan_version") != EXPECTED_POWER_PLAN_VERSION:
         reasons.append("POWER_PLAN_VERSION_MISMATCH")
     if manifest.get("atomic_ledger_version") != EXPECTED_ATOMIC_LEDGER_VERSION:
