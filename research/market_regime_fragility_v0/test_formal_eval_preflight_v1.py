@@ -31,6 +31,11 @@ VALID_MANIFEST = {
     "market_structure_regime_schedule_hash": "schedule-hash-abc123",
     "market_structure_schedule_pit_valid": True,
     "market_structure_schedule_scope_complete": True,
+    "change_control_version": "MODULE_DOWNGRADE_CHANGE_CONTROL_V1",
+    "manual_override_policy_version": "MANUAL_OVERRIDE_LEDGER_V1",
+    "primary_model_metric_uses_unoverridden_outputs": True,
+    "manual_override_count": 0,
+    "manual_override_ledger_hash": "empty-ledger-hash-abc123",
     "consumed_set_ids": ["historical-consumed-a", "historical-consumed-b"],
 }
 
@@ -149,6 +154,50 @@ class FormalEvalPreflightV1Tests(unittest.TestCase):
         result = check_manifest(manifest)
         self.assertFalse(result["eligible"])
         self.assertIn("MARKET_STRUCTURE_SCHEDULE_SCOPE_INCOMPLETE", result["reasons"])
+
+    def test_change_control_version_must_match(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["change_control_version"] = "OTHER"
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("CHANGE_CONTROL_VERSION_MISMATCH", result["reasons"])
+
+    def test_manual_override_policy_version_must_match(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["manual_override_policy_version"] = "OTHER"
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("MANUAL_OVERRIDE_POLICY_VERSION_MISMATCH", result["reasons"])
+
+    def test_primary_model_metric_must_use_unoverridden_outputs(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["primary_model_metric_uses_unoverridden_outputs"] = False
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("PRIMARY_MODEL_METRIC_CONTAMINATED_BY_OVERRIDE", result["reasons"])
+
+    def test_manual_override_count_must_be_nonnegative_integer(self):
+        for bad_value in (-1, 1.5, True, None):
+            manifest = dict(VALID_MANIFEST)
+            manifest["manual_override_count"] = bad_value
+            result = check_manifest(manifest)
+            self.assertFalse(result["eligible"])
+            self.assertIn("MANUAL_OVERRIDE_COUNT_INVALID", result["reasons"])
+
+    def test_manual_override_ledger_hash_is_required_even_when_count_zero(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["manual_override_ledger_hash"] = ""
+        result = check_manifest(manifest)
+        self.assertFalse(result["eligible"])
+        self.assertIn("MANUAL_OVERRIDE_LEDGER_HASH_MISSING", result["reasons"])
+
+    def test_nonzero_manual_override_count_is_allowed_when_provenance_is_present(self):
+        manifest = dict(VALID_MANIFEST)
+        manifest["manual_override_count"] = 2
+        manifest["manual_override_ledger_hash"] = "ledger-hash-with-two-overrides"
+        result = check_manifest(manifest)
+        self.assertTrue(result["eligible"])
+        self.assertEqual(result["reasons"], [])
 
     def test_preflight_does_not_authorize_production(self):
         result = check_manifest(dict(VALID_MANIFEST))
