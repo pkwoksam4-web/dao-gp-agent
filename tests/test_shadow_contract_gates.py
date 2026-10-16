@@ -69,7 +69,6 @@ class ContractGateTests(unittest.TestCase):
         ]
         targets=gates.maturity_targets_from_exchange_calendar("2026-09-28",exchange_calendar)
         self.assertEqual(targets["5d"],"2026-10-12")
-        # 10/12 being absent from collected LIVE_PIT rows must never move the target to 10/13+.
         available_live_pit={"2026-09-29","2026-09-30","2026-10-08","2026-10-09","2026-10-13"}
         self.assertNotIn(targets["5d"],available_live_pit)
 
@@ -77,6 +76,11 @@ class ContractGateTests(unittest.TestCase):
         src=Path("scripts/ranking_shadow_settlement.py").read_text(encoding="utf-8")
         self.assertIn("maturity_targets_from_exchange_calendar",src)
         self.assertNotIn("maturity_targets(eligible_dates(cur",src)
+
+    def test_missing_exact_target_is_reported_as_data_gap_not_shifted(self):
+        src=Path("scripts/ranking_shadow_settlement.py").read_text(encoding="utf-8")
+        self.assertIn("BLOCKED_DATA_GAP",src)
+        self.assertIn("missing_target_symbols",src)
 
     def test_settlement_order_guard(self):
         with self.assertRaisesRegex(ContractGateError,"OUT_OF_ORDER"):
