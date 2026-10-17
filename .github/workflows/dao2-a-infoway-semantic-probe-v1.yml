@@ -1,0 +1,304 @@
+name: DAO2 A Infoway Semantic Capability Probe V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-infoway-semantic-probe-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      INFOWAY_API_KEY_PRIMARY: ${{ secrets.INFOWAY_API_KEY }}
+      INFOWAY_API_KEY_LEGACY: ${{ secrets.TUSHARE_TOKEN }}
+    steps:
+      - name: Probe Infoway A-share capability
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone, timedelta
+
+          OUT = "dao2_a_infoway_semantic_capability_probe_v1.json"
+          TARGETS = [
+              "600306.SH","600898.SH","603996.SH","002618.SZ",
+              "000020.SZ","000157.SZ","000592.SZ","000753.SZ",
+              "002684.SZ","600112.SH","000564.SZ","001337.SZ",
+              "002118.SZ","002157.SZ","002503.SZ","002504.SZ",
+          ]
+          REQUIRED = [
+              "buy_lg_amount","buy_elg_amount",
+              "sell_lg_amount","sell_elg_amount",
+          ]
+          primary = os.environ.get("INFOWAY_API_KEY_PRIMARY", "").strip()
+          legacy = os.environ.get("INFOWAY_API_KEY_LEGACY", "").strip()
+          api_key = primary or legacy
+          credential_source = (
+              "INFOWAY_API_KEY" if primary
+              else ("TUSHARE_TOKEN_LEGACY_FALLBACK" if legacy else None)
+          )
+
+          result = {
+              "artifact": "DAO2_A_INFOWAY_SEMANTIC_CAPABILITY_PROBE_V1",
+              "provider": "Infoway",
+              "base_url": "https://data.infoway.io",
+              "credential_present": bool(api_key),
+              "credential_source": credential_source,
+              "targets": TARGETS,
+              "required_exact_fields": REQUIRED,
+              "documented_public_a_share_capabilities": [
+                  "historical/realtime candlestick",
+                  "latest trade",
+                  "level-2 top-5 market depth",
+                  "symbol fundamentals",
+                  "trading days/hours",
+              ],
+              "documentation": {
+                  "a_share_overview": "https://docs.infoway.io/en-docs/readme/china-a-shares-data-api",
+                  "latest_trade": "https://docs.infoway.io/en-docs/rest-api/market-data/get-latest-trade",
+                  "symbols": "https://docs.infoway.io/en-docs/rest-api/get-basic-info/get-symbol-list",
+                  "http_protocols": "https://docs.infoway.io/en-docs/getting-started/http-protocols",
+                  "historical_candles": "https://docs.infoway.io/rest-api/http-endpoints/get-candles",
+                  "rate_limit": "https://docs.infoway.io/en-docs/getting-started/api-limitation/rest-api-limitation",
+              },
+              "semantic_requirements": {
+                  "tushare_equivalent_formula": "(buy_lg_amount + buy_elg_amount - sell_lg_amount - sell_elg_amount) * 10000",
+                  "historical_dates_required": "2020-2023 residual dates",
+                  "proxy_allowed": False,
+                  "imputation_allowed": False,
+              },
+              "auth_probe": {},
+              "latest_trade_probe": {},
+              "historical_kline_probe": {},
+              "semantic_capability_proven": False,
+              "historical_exact_moneyflow_route_proven": False,
+              "admissible_exact_rows": 0,
+          }
+
+          def request_json(url, method="GET", payload=None):
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              headers = {
+                  "Accept": "application/json",
+                  "User-Agent": "dao2-a-infoway-probe/1.1",
+                  "apiKey": api_key,
+              }
+              if payload is not None:
+                  headers["Content-Type"] = "application/json"
+              last = None
+              for attempt in range(3):
+                  try:
+                      req = urllib.request.Request(
+                          url, data=data, headers=headers, method=method
+                      )
+                      with urllib.request.urlopen(req, timeout=60) as resp:
+                          raw = resp.read().decode("utf-8")
+                          return resp.status, json.loads(raw)
+                  except urllib.error.HTTPError as e:
+                      body = e.read().decode("utf-8", errors="replace")
+                      last = {
+                          "http_status": e.code,
+                          "body": body[:2000],
+                      }
+                      if e.code == 429 and attempt < 2:
+                          time.sleep(1.5)
+                          continue
+                      raise RuntimeError(
+                          f"HTTP {e.code}: {body[:500]}"
+                      ) from e
+              raise RuntimeError(str(last))
+
+          def extract_objects(body):
+              if isinstance(body, list):
+                  return [x for x in body if isinstance(x, dict)]
+              if not isinstance(body, dict):
+                  return []
+              data = body.get("data")
+              if isinstance(data, list):
+                  return [x for x in data if isinstance(x, dict)]
+              if isinstance(data, dict):
+                  return [data]
+              if isinstance(body.get("respList"), list):
+                  return [x for x in body["respList"] if isinstance(x, dict)]
+              return [body]
+
+          def collect_fields(body):
+              fields = set()
+              def walk(x, depth=0):
+                  if depth > 4:
+                      return
+                  if isinstance(x, dict):
+                      fields.update(x.keys())
+                      for v in x.values():
+                          walk(v, depth + 1)
+                  elif isinstance(x, list):
+                      for v in x[:20]:
+                          walk(v, depth + 1)
+              walk(body)
+              return sorted(fields)
+
+          if not api_key:
+              result["status"] = "NO_INFOWAY_API_KEY"
+          else:
+              auth_ok = False
+
+              # 1) Authentication + current symbol coverage.
+              try:
+                  symbols = ",".join(TARGETS)
+                  url = (
+                      "https://data.infoway.io/common/basic/symbols"
+                      "?type=STOCK_CN&symbols=" + urllib.parse.quote(symbols, safe=",")
+                  )
+                  status, body = request_json(url)
+                  rows = extract_objects(body)
+                  found = sorted({
+                      str(r.get("symbol"))
+                      for r in rows if r.get("symbol")
+                  })
+                  result["auth_probe"] = {
+                      "http_status": status,
+                      "ret": body.get("ret") if isinstance(body, dict) else None,
+                      "msg": body.get("msg") if isinstance(body, dict) else None,
+                      "traceId": body.get("traceId") if isinstance(body, dict) else None,
+                      "returned_symbol_count": len(found),
+                      "target_symbols_found": [s for s in TARGETS if s in found],
+                      "target_symbols_missing": [s for s in TARGETS if s not in found],
+                  }
+                  auth_ok = (
+                      status == 200 and
+                      (
+                          not isinstance(body, dict)
+                          or body.get("ret") in (None, 200)
+                      )
+                  )
+              except Exception as e:
+                  result["auth_probe"] = {"error": f"{type(e).__name__}: {e}"}
+
+              # Free plan is documented at max 1 request/second.
+              time.sleep(1.2)
+
+              # 2) Latest-trade schema probe: public docs expose p/v/vw/td,
+              # not Tushare large/extra-large amount buckets.
+              try:
+                  trade_url = (
+                      "https://data.infoway.io/stock/batch_trade/"
+                      + urllib.parse.quote(",".join(TARGETS), safe=",")
+                  )
+                  tstatus, tbody = request_json(trade_url)
+                  observed = collect_fields(tbody)
+                  result["latest_trade_probe"] = {
+                      "http_status": tstatus,
+                      "ret": tbody.get("ret") if isinstance(tbody, dict) else None,
+                      "msg": tbody.get("msg") if isinstance(tbody, dict) else None,
+                      "traceId": tbody.get("traceId") if isinstance(tbody, dict) else None,
+                      "observed_fields": observed,
+                      "required_exact_fields_present": [
+                          f for f in REQUIRED if f in observed
+                      ],
+                  }
+              except Exception as e:
+                  result["latest_trade_probe"] = {
+                      "error": f"{type(e).__name__}: {e}"
+                  }
+
+              time.sleep(1.2)
+
+              # 3) Historical-access probe on a residual target date.
+              # Even a successful K-line response is not accepted as moneyflow:
+              # it is only evidence about historical access/schema.
+              try:
+                  shanghai = timezone(timedelta(hours=8))
+                  ts = int(datetime(2021, 9, 24, 15, 0, tzinfo=shanghai).timestamp())
+                  payload = {
+                      "klineType": 1,
+                      "klineNum": 2,
+                      "codes": "000020.SZ",
+                      "timestamp": ts,
+                  }
+                  kstatus, kbody = request_json(
+                      "https://data.infoway.io/stock/v2/batch_kline",
+                      method="POST",
+                      payload=payload,
+                  )
+                  observed = collect_fields(kbody)
+                  result["historical_kline_probe"] = {
+                      "symbol": "000020.SZ",
+                      "target_trade_date": "20210924",
+                      "query_timestamp_cst": ts,
+                      "http_status": kstatus,
+                      "ret": kbody.get("ret") if isinstance(kbody, dict) else None,
+                      "msg": kbody.get("msg") if isinstance(kbody, dict) else None,
+                      "traceId": kbody.get("traceId") if isinstance(kbody, dict) else None,
+                      "observed_fields": observed,
+                      "required_exact_fields_present": [
+                          f for f in REQUIRED if f in observed
+                      ],
+                  }
+              except Exception as e:
+                  result["historical_kline_probe"] = {
+                      "symbol": "000020.SZ",
+                      "target_trade_date": "20210924",
+                      "error": f"{type(e).__name__}: {e}",
+                  }
+
+              # Hard semantic gate: the documented/observed Infoway public
+              # endpoints do not establish Tushare's four exact moneyflow buckets.
+              observed_all = set(
+                  result.get("latest_trade_probe", {}).get("observed_fields", [])
+              ) | set(
+                  result.get("historical_kline_probe", {}).get("observed_fields", [])
+              )
+              exact_fields_seen = all(f in observed_all for f in REQUIRED)
+              result["semantic_capability_proven"] = False
+              result["historical_exact_moneyflow_route_proven"] = False
+              result["admissible_exact_rows"] = 0
+              result["exact_fields_seen_in_probed_schemas"] = exact_fields_seen
+              result["status"] = (
+                  "AUTH_OK_SEMANTIC_CAPABILITY_NOT_PROVEN"
+                  if auth_ok else "INFOWAY_AUTH_FAILED"
+              )
+
+          canonical = json.dumps(
+              result, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+          )
+          result["content_sha256_without_hash_field"] = hashlib.sha256(
+              canonical.encode("utf-8")
+          ).hexdigest()
+
+          with open(OUT, "w", encoding="utf-8") as f:
+              json.dump(result, f, ensure_ascii=False, indent=2, sort_keys=True)
+              f.write("\n")
+
+          print(json.dumps({
+              "status": result.get("status"),
+              "credential_present": result.get("credential_present"),
+              "credential_source": result.get("credential_source"),
+              "auth_ret": result.get("auth_probe", {}).get("ret"),
+              "current_target_symbols_found": len(
+                  result.get("auth_probe", {}).get("target_symbols_found", [])
+              ),
+              "semantic_capability_proven": result.get("semantic_capability_proven"),
+              "historical_exact_moneyflow_route_proven": result.get("historical_exact_moneyflow_route_proven"),
+              "admissible_exact_rows": result.get("admissible_exact_rows"),
+              "result_sha256": result.get("content_sha256_without_hash_field"),
+          }, ensure_ascii=False))
+          PY
+
+      - name: Upload Infoway capability evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-infoway-semantic-capability-probe-v1
+          path: dao2_a_infoway_semantic_capability_probe_v1.json
+          if-no-files-found: error
+          retention-days: 30

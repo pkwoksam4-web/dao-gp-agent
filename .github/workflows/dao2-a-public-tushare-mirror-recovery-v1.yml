@@ -1,0 +1,164 @@
+name: DAO2 A Public Tushare Mirror Recovery V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-public-tushare-mirror-recovery-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recover and audit public Tushare mirror carriers
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv, hashlib, io, json, sqlite3, urllib.request, zipfile
+          from pathlib import Path
+
+          OUT = Path("dao2_a_public_tushare_mirror_recovery_v1.json")
+          COMMIT = "526ebbb94066bc623add892f6f8c21378d3e945a"
+          BASE = f"https://raw.githubusercontent.com/Moonlit-Pages/cozeclaw-workspace/{COMMIT}"
+          DB_URL = BASE + "/tasks/T01-a-stock-leader-selection/database/t01_stocks.db"
+          ZIP_URL = BASE + "/T01_%E4%B8%89%E4%B8%AA%E6%9C%88%E5%9B%9E%E6%B5%8B%E5%AE%8C%E6%95%B4%E6%95%B0%E6%8D%AE.zip"
+          CSV_URL = BASE + "/T01_%E5%9B%9E%E6%B5%8B%E6%95%B0%E6%8D%AE_%E8%B5%84%E9%87%91%E6%B5%81%E5%90%91.csv"
+          JESSICA_COMMIT = "6b245fa09cb628f3bcb812f0662bfef520e65fb4"
+          JESSICA_URL = f"https://raw.githubusercontent.com/Jessica-Zhangyj/dlquant/{JESSICA_COMMIT}/data/moneyflow/20260403.csv"
+
+          TARGETS = [
+            ("600306.SH","20200608"),("600898.SH","20201104"),("603996.SH","20210224"),
+            ("002618.SZ","20210923"),("000020.SZ","20210924"),("000157.SZ","20210924"),
+            ("000592.SZ","20210924"),("000753.SZ","20210924"),("002684.SZ","20211125"),
+            ("600112.SH","20220506"),("000564.SZ","20230320"),("001337.SZ","20230320"),
+            ("002118.SZ","20230522"),("002157.SZ","20230522"),("002503.SZ","20230522"),
+            ("002504.SZ","20230522")
+          ]
+          REQUIRED = ["buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount"]
+          COMPARE = ["ts_code","trade_date","buy_lg_amount","buy_elg_amount","sell_lg_amount","sell_elg_amount",
+                     "buy_sm_amount","buy_md_amount","sell_sm_amount","sell_md_amount","net_mf_amount"]
+
+          def download(url, path):
+            req=urllib.request.Request(url, headers={"User-Agent":"dao2-a-public-mirror/1.0"})
+            with urllib.request.urlopen(req, timeout=90) as r:
+              data=r.read()
+            Path(path).write_bytes(data)
+            return {
+              "url":url, "size_bytes":len(data),
+              "sha256":hashlib.sha256(data).hexdigest()
+            }
+
+          result={
+            "artifact":"DAO2_A_PUBLIC_TUSHARE_MIRROR_RECOVERY_V1",
+            "provider_repo":"Moonlit-Pages/cozeclaw-workspace",
+            "provider_commit":COMMIT,
+            "source_semantics":"Direct pro.moneyflow() evidenced by provider repository scripts",
+            "jessica_commit":JESSICA_COMMIT,
+            "targets": [{"ts_code":c,"trade_date":d} for c,d in TARGETS],
+            "proxy_allowed":False,
+            "imputation_allowed":False,
+          }
+
+          db_meta=download(DB_URL, "t01_stocks.db")
+          zip_meta=download(ZIP_URL, "backtest.zip")
+          csv_meta=download(CSV_URL, "mirror_20260403.csv")
+          jes_meta=download(JESSICA_URL, "jessica_20260403.csv")
+          result["carriers"]={"sqlite":db_meta,"zip":zip_meta,"csv_20260403":csv_meta,"jessica_20260403":jes_meta}
+
+          # SQLite audit
+          con=sqlite3.connect("t01_stocks.db")
+          tables=[r[0] for r in con.execute("select name from sqlite_master where type='table' order by name")]
+          result["sqlite_tables"]=tables
+          sqlite_audit={}
+          if "moneyflow_data" in tables:
+            cols=[r[1] for r in con.execute("pragma table_info(moneyflow_data)")]
+            count=con.execute("select count(*) from moneyflow_data").fetchone()[0]
+            mn,mx,nd=con.execute("select min(trade_date),max(trade_date),count(distinct trade_date) from moneyflow_data").fetchone()
+            hits=[]
+            dup=[]
+            for code,date in TARGETS:
+              rows=con.execute(
+                "select * from moneyflow_data where ts_code=? and replace(trade_date,'-','')=?",
+                (code,date)
+              ).fetchall()
+              if rows:
+                hits.append({"ts_code":code,"trade_date":date,"row_count":len(rows)})
+              if len(rows)>1:
+                dup.append({"ts_code":code,"trade_date":date,"row_count":len(rows)})
+            sqlite_audit={
+              "columns":cols,"row_count":count,"min_date":mn,"max_date":mx,"distinct_dates":nd,
+              "target_hit_count":len(hits),"target_hits":hits,"target_duplicates":dup
+            }
+          result["sqlite_audit"]=sqlite_audit
+          con.close()
+
+          # ZIP manifest audit
+          with zipfile.ZipFile("backtest.zip") as z:
+            names=z.namelist()
+            mf=[n for n in names if "资金流向" in n or "moneyflow" in n.lower()]
+            result["zip_audit"]={
+              "entry_count":len(names),
+              "moneyflow_entries":mf,
+              "sample_entries":names[:100]
+            }
+
+          # Full exact overlap: public mirror CSV vs Jessica pinned 20260403
+          def read_csv(path):
+            with open(path,"r",encoding="utf-8-sig",newline="") as f:
+              return list(csv.DictReader(f))
+          a=read_csv("mirror_20260403.csv"); b=read_csv("jessica_20260403.csv")
+          bm={(x["ts_code"],x["trade_date"]):x for x in b}
+          overlap=0; mism=[]
+          for x in a:
+            y=bm.get((x["ts_code"],x["trade_date"]))
+            if y is None:
+              continue
+            overlap += 1
+            bad=[f for f in COMPARE if str(x.get(f,"")) != str(y.get(f,""))]
+            if bad:
+              mism.append({"ts_code":x["ts_code"],"trade_date":x["trade_date"],"fields":bad})
+          result["overlap_20260403"]={
+            "mirror_rows":len(a),"jessica_rows":len(b),"overlap_rows":overlap,
+            "mismatch_rows":len(mism),
+            "exact_match": overlap>0 and len(mism)==0 and overlap==len(a)==len(b),
+            "compared_fields":COMPARE,
+            "sample_mismatches":mism[:10]
+          }
+
+          # Classify route
+          target_hits=sqlite_audit.get("target_hit_count",0)
+          result["admissible_exact_rows"]=0
+          if result["overlap_20260403"]["exact_match"] and target_hits:
+            result["status"]="PUBLIC_MIRROR_HAS_TARGET_CANDIDATES_NEEDS_TARGET_ROW_FIELD_AUDIT"
+          elif result["overlap_20260403"]["exact_match"]:
+            result["status"]="PUBLIC_MIRROR_IDENTITY_PASS_NO_RESIDUAL_ROWS"
+          else:
+            result["status"]="PUBLIC_MIRROR_IDENTITY_FAIL"
+
+          canonical=json.dumps(result,ensure_ascii=False,sort_keys=True,separators=(",",":"))
+          result["content_sha256_without_hash_field"]=hashlib.sha256(canonical.encode()).hexdigest()
+          OUT.write_text(json.dumps(result,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+          print(json.dumps({
+            "status":result["status"],
+            "sqlite_moneyflow_rows":sqlite_audit.get("row_count"),
+            "sqlite_min_date":sqlite_audit.get("min_date"),
+            "sqlite_max_date":sqlite_audit.get("max_date"),
+            "target_hit_count":sqlite_audit.get("target_hit_count",0),
+            "overlap_exact":result["overlap_20260403"]["exact_match"],
+            "overlap_rows":result["overlap_20260403"]["overlap_rows"],
+            "result_sha256":result["content_sha256_without_hash_field"]
+          },ensure_ascii=False))
+          PY
+
+      - name: Upload public mirror evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-public-tushare-mirror-recovery-v1
+          path: dao2_a_public_tushare_mirror_recovery_v1.json
+          if-no-files-found: error
+          retention-days: 30

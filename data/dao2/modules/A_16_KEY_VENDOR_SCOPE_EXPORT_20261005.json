@@ -1,0 +1,28 @@
+{
+  "artifact":"A_16_KEY_VENDOR_SCOPE_EXPORT_20261005",
+  "source":"data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
+  "source_version":"1.1",
+  "contract":"main_net_flow_cny exact Tushare semantic four fields",
+  "key_count":16,
+  "keys":[
+    ["600306.SH","2020-06-08"],
+    ["600898.SH","2020-11-04"],
+    ["603996.SH","2021-02-24"],
+    ["002618.SZ","2021-09-23"],
+    ["000020.SZ","2021-09-24"],
+    ["000157.SZ","2021-09-24"],
+    ["000592.SZ","2021-09-24"],
+    ["000753.SZ","2021-09-24"],
+    ["002684.SZ","2021-11-25"],
+    ["600112.SH","2022-05-06"],
+    ["000564.SZ","2023-03-20"],
+    ["001337.SZ","2023-03-20"],
+    ["002118.SZ","2023-05-22"],
+    ["002157.SZ","2023-05-22"],
+    ["002503.SZ","2023-05-22"],
+    ["002504.SZ","2023-05-22"]
+  ],
+  "admission_rule":"raw bytes -> hash -> Jessica four-field exact overlap -> provenance -> partial admission",
+  "absence_not_resolved":true,
+  "proxy_not_allowed":true
+}

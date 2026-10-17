@@ -1,0 +1,53 @@
+{
+  "artifact": "DAO2_A_ALPHAT01_AUTH_RECHECK_20261010",
+  "version": "1.0",
+  "module": "A_MAIN_NET_FLOW",
+  "route": "HISTORICAL_L2_ORIGINAL_ORDER_RECONSTRUCTION",
+  "provider": "Hugging Face",
+  "repository": "alphat01/Tick-by-Tick-Orders-China",
+  "observed_at": "2026-10-10T08:13:26Z",
+  "job_id": "6ac9f3a6095c5780893103a2",
+  "status": "RAW_GATED_403_AWAITING_AUTHOR_REVIEW",
+  "repo_listing": {
+    "readable": true,
+    "file_count": 249
+  },
+  "target_checks": {
+    "202303/20230320.7z": {
+      "raw_readable": false,
+      "http_status": 403,
+      "error_type": "GatedRepoError",
+      "provider_message": "Your request to access dataset alphat01/Tick-by-Tick-Orders-China is awaiting a review from the repo authors."
+    },
+    "202305/20230522.7z": {
+      "raw_readable": false,
+      "http_status": 403,
+      "error_type": "GatedRepoError",
+      "provider_message": "Your request to access dataset alphat01/Tick-by-Tick-Orders-China is awaiting a review from the repo authors."
+    }
+  },
+  "comparison_to_prior_recheck": {
+    "prior_job_id": "6aba364952d0dbd7f1da0cba",
+    "prior_status": "RAW_GATED_403_AWAITING_AUTHOR_REVIEW",
+    "authorization_state_changed": false
+  },
+  "formal_effect": {
+    "raw_bytes_downloaded": false,
+    "identity_gate_executed": false,
+    "admitted_rows": 0,
+    "resolved_delta": 0,
+    "unresolved_delta": 0,
+    "checkpoint_created": false,
+    "main_net_flow_unbound_closed": false
+  },
+  "governance": {
+    "application_resubmitted": false,
+    "repeat_large_download_attempted": false,
+    "algorithm_changed": false,
+    "frozen_controls_changed": false,
+    "proxy_used": false,
+    "imputation_used": false,
+    "next_recheck_allowed_only_on_new_authorization_signal": true
+  },
+  "decision": "KEEP_ALPHAT01_FROZEN_PENDING_AUTHOR_APPROVAL"
+}
