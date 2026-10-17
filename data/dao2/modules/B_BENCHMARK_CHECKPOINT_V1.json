@@ -1,0 +1,30 @@
+{
+  "artifact": "DAO2_B_BENCHMARK_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "B",
+  "status": "PASS_SUBCOMPONENT",
+  "benchmark_blocker": "MARKET_BENCHMARK_UNBOUND",
+  "blocker_closed_within_module": true,
+  "candidate_only": true,
+  "historical_gp_v11_benchmark_recovered": false,
+  "validation": {
+    "workflow_run_id": 35493957183,
+    "workflow_head": "2be305b43e73b06a4a9f40ef4d45bf902d074151",
+    "artifact_id": 10599722775,
+    "artifact_name": "dao2-b-benchmark-replay-v1",
+    "artifact_zip_sha256": "9cbfccb5a35aec7b84394897574a9a08db70ddea32863b7e69ca9624f1b4f77e",
+    "validation_status": "PASS_CANDIDATE_BENCHMARK_V1",
+    "formal_dates_expected": 1426,
+    "formal_dates_observed": 1426,
+    "full_coverage": true,
+    "pit_policy_valid": true,
+    "binding_sha256": "73e9f84bd5a7a01ae43a6d780c66279a48c63743636e4fb3611996bead544c1a",
+    "close_series_sha256": "e9541cf917893b214ebe31a8602914c793e162bc5280137bfac88d243b75a73e"
+  },
+  "safety": {
+    "candidate_adoption_status": "UNAPPROVED",
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "note": "This closes only the candidate benchmark subcomponent. MARKET_BREADTH_UNBOUND remains open, so Module B is not PASS."
+}

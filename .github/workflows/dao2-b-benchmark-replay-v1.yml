@@ -1,0 +1,78 @@
+name: DAO2 B Benchmark Replay V1
+on:
+  push:
+    branches:
+      - gp/dao2-b-market-package
+    paths:
+      - 'data/GP12_CANDIDATE_BENCHMARK_V1.json'
+      - 'data/GP12_CANDIDATE_FACTORS_V1.json'
+      - 'data/GP12_CANDIDATE_PARAMETERS_V1.json'
+      - 'data/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv.gz.hex'
+      - 'scripts/gp12_candidate_benchmark_v1.py'
+      - 'scripts/test_gp12_candidate_benchmark_v1.py'
+      - '.github/workflows/dao2-b-benchmark-replay-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q requests
+      - name: Run benchmark contract tests
+        env:
+          PYTHONPATH: scripts
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_candidate_benchmark_v1.py
+  full-window-replay:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q requests
+      - name: Download verified V4.80 frozen calendar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gp-pit-st-v480-final-audit
+          path: calendar-final
+          run-id: 33977325822
+          github-token: ${{ github.token }}
+      - name: Replay 000985 benchmark validation
+        env:
+          PYTHONPATH: scripts
+        run: |
+          python scripts/gp12_candidate_benchmark_v1.py             --binding data/GP12_CANDIDATE_BENCHMARK_V1.json             --factors data/GP12_CANDIDATE_FACTORS_V1.json             --parameters data/GP12_CANDIDATE_PARAMETERS_V1.json             --calendar-csv calendar-final/OFFICIAL_A_SHARE_OPEN_DATES_V357.csv             --out-dir artifact_dao2_b_benchmark_v1
+      - name: Enforce candidate-only full-window result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("artifact_dao2_b_benchmark_v1/GP12_CANDIDATE_BENCHMARK_VALIDATION_V1.json")
+          x=json.loads(p.read_text(encoding="utf-8"))
+          assert x["status"]=="PASS_CANDIDATE_BENCHMARK_V1", x
+          assert x["calendar"]["observed_n"]==1426, x
+          assert x["calendar"]["full_coverage"] is True, x
+          assert x["pit"]["policy_valid"] is True, x
+          assert x["candidate_benchmark_blocker_closed"] is True, x
+          assert x["gp_v11_benchmark_recovered"] is False, x
+          assert x["historical_recovery_claim_allowed"] is False, x
+          assert x["blockers"]==[], x
+          print(json.dumps(x,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-b-benchmark-replay-v1
+          path: artifact_dao2_b_benchmark_v1/
+          if-no-files-found: warn
+          retention-days: 30

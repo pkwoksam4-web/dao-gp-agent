@@ -1,0 +1,134 @@
+name: DAO2 B Breadth Candidate Replay V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-b-market-package
+    paths:
+      - '.github/workflows/dao2-b-breadth-candidate-replay-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download pinned complete candidate breadth evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: gp12-market-breadth-bridge-v1
+          path: input/breadth
+          run-id: 35054180237
+          github-token: ${{ github.token }}
+      - name: Replay and verify candidate breadth contract
+        run: |
+          mkdir -p out/dao2-b-breadth-candidate-replay-v1
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path('input/breadth')
+          audit_path = root / 'GP12_MARKET_BREADTH_BRIDGE_V1.json'
+          series_path = root / 'GP12_MARKET_BREADTH_CANDIDATE_DAILY_V1.csv'
+          directions_path = root / 'GP12_MARKET_BREADTH_BRIDGE_DIRECTIONS_V1.csv'
+
+          audit_bytes = audit_path.read_bytes()
+          series_bytes = series_path.read_bytes()
+          directions_bytes = directions_path.read_bytes()
+
+          assert hashlib.sha256(audit_bytes).hexdigest() == 'f2f3073098979e669e961c8654234b6792fadf8a46a51fe249d93406f356a300'
+          assert hashlib.sha256(series_bytes).hexdigest() == '7aaa527806d373133fbedd202b92d3e5da8b903099cfc3335b267951ead3c788'
+          assert hashlib.sha256(directions_bytes).hexdigest() == 'ee4ec577bf23e867bb2eb44fad271a9fdb788d769f098c0c2794a2516e616a68'
+
+          audit = json.loads(audit_bytes)
+          assert audit['artifact'] == 'GP12_MARKET_BREADTH_BRIDGE_V1'
+          assert audit['status'] == 'PASS_COMPLETE_CANDIDATE_SERIES'
+          assert audit['formal_window'] == ['2020-06-01', '2026-04-17']
+          assert audit['formal_symbol_n'] == 844
+          assert audit['date_n'] == 1426
+          assert audit['old_lifecycle_bridge_n'] == 737
+          assert audit['bridge_resolved_n'] == 737
+          assert audit['old_lifecycle_no_previous_trade_excluded_n'] == 0
+          assert audit['new_lifecycle_first_trade_excluded_n'] == 107
+          assert audit['candidate_series_sha256'] == '7aaa527806d373133fbedd202b92d3e5da8b903099cfc3335b267951ead3c788'
+          assert audit['pit_scope'] == 'SESSION_CLOSE_NO_LOOKAHEAD_POLICY'
+          assert audit['same_session_usable_before_close'] is False
+          assert audit['historical_gp_v11_source_recovered'] is False
+          assert audit['candidate_definition_approved'] is False
+          assert audit['formal_binding_allowed'] is False
+          assert audit['model_freeze_allowed'] is False
+          assert audit['oos_metrics_allowed'] is False
+
+          rows = list(csv.DictReader(series_bytes.decode('utf-8').splitlines()))
+          assert len(rows) == 1426
+          assert rows[0]['date'] == '2020-06-01'
+          assert rows[-1]['date'] == '2026-04-17'
+          last = ''
+          for row in rows:
+              assert row['date'] > last
+              last = row['date']
+              adv = int(row['advancers'])
+              dec = int(row['decliners'])
+              flat = int(row['flat'])
+              comparable = int(row['comparable'])
+              directional = int(row['directional_n'])
+              ratio = float(row['market_breadth_ratio'])
+              assert directional == adv + dec
+              assert comparable == adv + dec + flat
+              assert directional > 0
+              assert 0.0 <= ratio <= 1.0
+              assert abs(ratio - (adv / directional)) < 1e-15
+
+          out = {
+              'artifact': 'DAO2_B_BREADTH_CANDIDATE_REPLAY_V1',
+              'version': '1.0',
+              'module_id': 'B',
+              'status': 'PASS_CANDIDATE_SUBCOMPONENT',
+              'origin': 'NEW_RECONSTRUCTION_CANDIDATE',
+              'upstream': {
+                  'workflow_run': 35054180237,
+                  'workflow_head': '6a0eb77dd54c7cabda128f1d84f9954eba2d0037',
+                  'artifact_name': 'gp12-market-breadth-bridge-v1',
+                  'artifact_id': 10429659699,
+                  'artifact_zip_sha256': '9615dba0c2eb9c3db2cd04cf8d5ecf2509752f419fb65ef38815b851185b8031',
+                  'audit_sha256': hashlib.sha256(audit_bytes).hexdigest(),
+                  'series_sha256': hashlib.sha256(series_bytes).hexdigest(),
+                  'bridge_directions_sha256': hashlib.sha256(directions_bytes).hexdigest(),
+              },
+              'formal_window': ['2020-06-01', '2026-04-17'],
+              'date_n': 1426,
+              'formal_symbol_n': 844,
+              'old_lifecycle_bridge_n': 737,
+              'bridge_resolved_n': 737,
+              'new_lifecycle_first_trade_excluded_n': 107,
+              'definition': 'advancers/(advancers+decliners); flat and first trade without prior comparable trade are excluded from denominator',
+              'pit_scope': 'SESSION_CLOSE_NO_LOOKAHEAD_POLICY',
+              'same_session_usable_before_close': False,
+              'historical_gp_v11_source_recovered': False,
+              'historical_identity_claimed': False,
+              'closes_market_breadth_unbound': False,
+              'reason_not_closing_historical_blocker': 'Candidate panel is independently replayed and PIT-valid, but exact historical GP V1.1 breadth function source text and final 4-percent aggregation/normalization/clipping remain unrecovered.',
+              'model_freeze_allowed': False,
+              'oos_metrics_allowed': False,
+          }
+          target = Path('out/dao2-b-breadth-candidate-replay-v1/DAO2_B_BREADTH_CANDIDATE_REPLAY_V1.json')
+          target.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(out, ensure_ascii=False, indent=2))
+          PY
+      - name: Upload DAO2 B candidate breadth replay
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-b-breadth-candidate-replay-v1
+          path: out/dao2-b-breadth-candidate-replay-v1/
+          if-no-files-found: error
+          retention-days: 30
