@@ -1,0 +1,57 @@
+{
+  "artifact": "DAO2_C_SECTOR_TUSHARE_SW_DAILY_ENTITLEMENT_RECHECK_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "BLOCKED_VENDOR_ENTITLEMENT_REQUIRED",
+  "checked_at_utc": "2026-10-08T03:56:30Z",
+  "workflow": {
+    "name": "DAO2 C Tushare Sector Probe V1",
+    "workflow_run_id": 35586731646,
+    "run_attempt": 2,
+    "workflow_job_id": 113141261231,
+    "head_sha": "8395760c2d3ddf02d7cb6f6cf7895b47b2136246",
+    "conclusion": "success"
+  },
+  "artifact_evidence": {
+    "artifact_id": 11527860144,
+    "artifact_name": "dao2-c-tushare-sector-probe-v1",
+    "artifact_digest": "sha256:0a95b81815db21ba04842901948aefbe04e7791a23dd82255f85026a2458e8fc",
+    "member": "tushare_sector_probe.json",
+    "member_sha256": "dd93cadd29e286e3140933a9b356ea742c5b51e399e5b2dc7cf4c923b1c9b6d8",
+    "token_present": true
+  },
+  "sw_daily_entitlement": {
+    "available": false,
+    "error_class": "INTERFACE_ACCESS_DENIED",
+    "provider_message": "抱歉，您没有接口(sw_daily)访问权限",
+    "checked_calls": [
+      "sw_daily_trade_date_20260417",
+      "sw_daily_gap_801020_20210806",
+      "sw_daily_gap_801960_20220303",
+      "sw_daily_gap_801010_20230908"
+    ],
+    "successful_sw_daily_calls": 0,
+    "raw_rows_recovered": 0,
+    "admitted_rows": 0
+  },
+  "direct_priority": {
+    "target_code": "801020.SI",
+    "target_dates": ["20210806", "20211008", "20211022"],
+    "required_neighbor_dates": ["20210805", "20210809", "20210930", "20211011", "20211021", "20211025"],
+    "current_route_result": "TUSHARE_SW_DAILY_PERMISSION_REQUIRED"
+  },
+  "governance": {
+    "series_checkpoint_changed_to_pass": false,
+    "admissible_before": 42783,
+    "admissible_after": 42783,
+    "missing_before": 301,
+    "missing_after": 301,
+    "derived_close_admitted": 0,
+    "breadth_gate_open": false,
+    "public_search_resumed": false,
+    "external_intervention_required": true,
+    "intervention_type": "VENDOR_PERMISSION_OR_AUTHORITATIVE_PRIVATE_EXPORT"
+  },
+  "resume_condition": "Provide usable Wind/iFind/RQData/DataCube authoritative export, or enable Tushare sw_daily entitlement, then recover raw OHLC with exact key and neighbor-date validation."
+}

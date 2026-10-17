@@ -1,0 +1,46 @@
+{
+  "artifact": "DAO2_C_SECTOR_PRICE_BASIS_BINDING_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "status": "PASS_CANDIDATE_PRICE_BASIS_DEFINITION",
+  "candidate_only": true,
+  "historical_gp_v11_identity_claim": false,
+  "gp12_input_family": "sector_adjusted_close",
+  "bound_semantics": {
+    "canonical_value": "SW industry index close level for the date-effective L1 industry index",
+    "provider_fields": [
+      "Tushare sw_daily.close",
+      "AKShare index_hist_sw 收盘 normalized to close"
+    ],
+    "stock_qfq_factor_applied_to_sector_index": false,
+    "alias_rule": "Within GP12_REBUILD_CANDIDATE_V1 only, sector_adjusted_close is an input-family label bound to the canonical SW industry index close level. It does not mean applying stock adj_factor/qfq mechanics to an index.",
+    "continuity_rule": "Accept the provider's published index level for that same trade date; do not synthesize, forward-fill, or splice across dates without row-level provider provenance."
+  },
+  "evidence": [
+    {
+      "kind": "PINNED_GENERATOR",
+      "repository": "Jessica-Zhangyj/dlquant",
+      "commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+      "generator_sha": "f00fed00a969a39a73a71152fb3031e1631c3476",
+      "observation": "INDUSTRY_KEEP carries industry_code, trade_date, OHLC, vol and amount; both sw_daily and index_hist_sw materialize close directly and no adj_factor is applied to industry index rows."
+    },
+    {
+      "kind": "PINNED_COURSE_USAGE",
+      "observation": "Course feature paths compute industry returns from industry_close / shifted industry_close, providing corroborating candidate semantics for using an industry index close level as the return basis."
+    },
+    {
+      "kind": "PROVIDER_DOC",
+      "provider": "Tushare",
+      "observation": "SW/index interfaces describe close as the index closing point/level rather than an equity unadjusted close requiring a stock qfq factor."
+    }
+  ],
+  "exclusions": [
+    "Does not prove historical GP V1.1 used the same sector series.",
+    "Does not authorize filling a missing index date from a previous date.",
+    "Does not resolve PIT membership."
+  ],
+  "blocker_effect": {
+    "price_basis_subblocker_closed_for_candidate": true,
+    "SECTOR_SERIES_UNBOUND_closed": false
+  }
+}

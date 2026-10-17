@@ -1,0 +1,46 @@
+{
+  "artifact": "DAO2_C_SECTOR_OFFICIAL_SWS_ANALYSIS_TARGETED_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "CLOSED_NO_801020_ROWS",
+  "workflow": {
+    "name": "DAO2 C Official SWS Analysis Targeted Probe V1",
+    "workflow_run_id": 37750231088,
+    "head_sha": "4cceae9f148add4ebff8e9a7fbe6694211f32e54",
+    "artifact_id": 11538040657,
+    "artifact_digest": "sha256:d0c1c9f3d541118356fabae20532dd475386ec4aedf67952158a2abaf33dc1e1"
+  },
+  "source": {
+    "provider": "申万宏源研究官网",
+    "endpoint": "https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/"
+  },
+  "tested_dates": ["20210805","20210806","20211008","20211022"],
+  "parameter_variants": [
+    "index_type=一级行业,type=DAY,swindexcode=801020",
+    "index_type='',type=DAY,swindexcode=801020",
+    "index_type omitted,type=DAY,swindexcode=801020"
+  ],
+  "result": {
+    "requests": 12,
+    "target_exact_hit_count": 0,
+    "known_neighbor_801020_hit_count": 0,
+    "all_responses_data_count": 0,
+    "shared_empty_response_sha256": "8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240",
+    "route_closes_gap": false
+  },
+  "decision": {
+    "official_sws_analysis_route": "CLOSED_NO_801020_SUPPORT",
+    "trend_route_target_rows": 0,
+    "analysis_route_target_rows": 0,
+    "admitted_rows": 0,
+    "coverage_changed": false,
+    "series_checkpoint_changed_to_pass": false,
+    "breadth_gate_open": false
+  },
+  "remaining_direct_keys": [
+    ["801020.SI","20210806"],
+    ["801020.SI","20211008"],
+    ["801020.SI","20211022"]
+  ]
+}

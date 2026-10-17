@@ -1,0 +1,61 @@
+{
+  "artifact": "DAO2_C_SECTOR_HF_TUSHARE_SW2021_CARRIER_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "CLOSED_NO_801020_IN_2021_INDEX_DAILY",
+  "source": {
+    "bucket": "q1232990/Quant_DataLake-bucket",
+    "declared_semantics": "Public bucket README labels 01_Raw_Data as Bronze raw Tushare pulls. This declaration was treated as source evidence only and was not elevated to authoritative admission.",
+    "daily_prefix": "01_Raw_Data/index_data/daily_quotes/year=2021",
+    "basic_prefix": "01_Raw_Data/index_data/basic_list",
+    "workflow_run_id": 37904905477,
+    "workflow_job_id": 113735913072,
+    "artifact_id": 11604151414,
+    "artifact_digest": "sha256:a8b44838f1dcd4abaa6b87f11301a9d04dbe4c489b95d857f2aab3471ef790e1",
+    "result_sha256_without_hash_field": "2a6f53ddcbe09d1256ec0120d008c227d3e4d26556ac764699b26db48a3bd087"
+  },
+  "objects": {
+    "daily_2021": {
+      "path": "01_Raw_Data/index_data/daily_quotes/year=2021/quotes_2021.parquet",
+      "bytes": 98683,
+      "xet_hash": "b29580138c6d301de4c820e40f7f2f0f70aeabc5dc59294ab966d2bf68795fcd",
+      "sha256": "a7d18faa850e77f09b29de0d82425157256bce17eeeb5ece78283ceab3ff8ee5",
+      "rows": 1944,
+      "columns": ["ts_code","trade_date","close","open","high","low","pre_close","change","pct_chg","vol","amount"]
+    },
+    "basic_list": {
+      "path": "01_Raw_Data/index_data/basic_list/index_list.parquet",
+      "bytes": 7834,
+      "xet_hash": "b2db8722b040edb61a3b7e7fab57284d6c9a2515616b82589cadb7fd5ce6d325",
+      "sha256": "8e402d9a8236ddb11d2ede78a71f524ce46ab5fbfda6352f306a3d6a2a7f6e28"
+    }
+  },
+  "target": {
+    "code": "801020.SI",
+    "dates": ["20210805","20210806","20210809","20210930","20211008","20211011","20211021","20211022","20211025"]
+  },
+  "result": {
+    "observed_801020_rows_in_2021": 0,
+    "exact_wanted_dates_found": [],
+    "basic_identity_rows": [],
+    "neighbor_exact_count": 0,
+    "target_ffd_exact_count": 0,
+    "carrier_closes_gap": false
+  },
+  "admission_decision": {
+    "admitted_rows": 0,
+    "formal_series_coverage_changed": false,
+    "admissible_coverage": "42783/43084",
+    "missing_required_keys": 301,
+    "reason": "The public Tushare-labelled 2021 index daily object contains no 801020.SI rows and its basic-list object contains no 801020.SI identity row. It therefore cannot supply or bind any of the three missing direct rows.",
+    "route_closed": true,
+    "repeat_probe_for_same_bucket_object_forbidden": true
+  },
+  "safety": {
+    "frozen_42783_rewritten": false,
+    "ffd_requeried": false,
+    "derived_close_admitted": false,
+    "breadth_derivation_allowed": false
+  }
+}

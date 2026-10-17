@@ -1,0 +1,83 @@
+{
+  "artifact": "DAO2_C_SECTOR_801020_PUBLIC_RETURN_EVIDENCE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "EVIDENCE_ONLY_REJECTED_FOR_ADMISSION",
+  "target": {
+    "industry_code": "801020.SI",
+    "dates": ["20210806", "20211008", "20211022"]
+  },
+  "frozen_previous_close_anchors": [
+    {"trade_date": "20210805", "close": 2954.25},
+    {"trade_date": "20210930", "close": 3976.45},
+    {"trade_date": "20211021", "close": 3886.69}
+  ],
+  "public_return_observations": [
+    {
+      "trade_date": "20210806",
+      "reported_return_pct": 2.82,
+      "source": "证券时报/数据宝",
+      "url": "https://www.stcn.com/data/zjlx/202108/t20210806_3517688.html",
+      "scope_text": "申万一级行业采掘",
+      "candidate_close_from_prev_anchor": 3037.56
+    },
+    {
+      "trade_date": "20211008",
+      "reported_return_pct": -0.08,
+      "source": "fx358 行业表现转载页",
+      "url": "https://www.fx358.com/news/68005.html",
+      "scope_text": "采掘",
+      "candidate_close_from_prev_anchor": 3973.27
+    },
+    {
+      "trade_date": "20211008",
+      "reported_return_pct": -1.58,
+      "source": "万和证券每周策略研究",
+      "url": "https://pdf.dfcfw.com/pdf/H3_AP202110121522139092_1.pdf?1634037843000.pdf=",
+      "scope_text": "截至2021-10-08申万一级行业采掘；报告口径与网页汇总存在冲突",
+      "candidate_close_from_prev_anchor": 3913.63
+    },
+    {
+      "trade_date": "20211022",
+      "reported_return_pct": -4.74,
+      "source": "证券时报/数据宝",
+      "url": "https://www.stcn.com/data/kdsj/202110/t20211022_3785981.html",
+      "scope_text": "申万所属28个一级行业采掘",
+      "candidate_close_from_prev_anchor": 3702.46
+    }
+  ],
+  "cross_checks": {
+    "20211025_public_return_pct": 2.77,
+    "20211025_source": "格上每日收评/中国证券报均报道申万采掘当日+2.77%",
+    "20211025_frozen_close": 3804.92,
+    "reverse_implied_20211022_close": 3702.36,
+    "forward_candidate_20211022_close": 3702.46,
+    "difference": 0.10,
+    "interpretation": "Two-decimal published percentage returns are too coarsely rounded to prove exact two-sided 2dp identity."
+  },
+  "admission_decision": {
+    "admission_allowed": false,
+    "reasons": [
+      "20211008 has conflicting public reported returns (-0.08% vs -1.58%).",
+      "Published percentage returns are rounded summaries, not row-level raw carrier bytes.",
+      "20211022 forward/reverse reconstruction differs by 0.10 index points under rounded public returns.",
+      "Strict DERIVED_CLOSE migration requires unique deterministic two-sided 2dp validation and locked source carrier."
+    ],
+    "may_close_direct_gap": false,
+    "may_be_labeled_raw_close": false,
+    "may_expand_admissible_coverage": false
+  },
+  "remaining_direct_gaps": [
+    {"industry_code": "801020.SI", "trade_date": "20210806"},
+    {"industry_code": "801020.SI", "trade_date": "20211008"},
+    {"industry_code": "801020.SI", "trade_date": "20211022"}
+  ],
+  "next_allowed_routes": [
+    "Authoritative RQData 801020.INDX same-day close export",
+    "Authoritative Wind/iFind/Founder DataCube same-day close export",
+    "Entitled Tushare sw_daily exact rows",
+    "New stable public row-level carrier with exact target+neighbor values"
+  ],
+  "fail_closed": true
+}

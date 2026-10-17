@@ -1,0 +1,60 @@
+{
+  "artifact": "DAO2_C_SECTOR_FFD_801020_UPSTREAM_PROVENANCE_AUDIT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "FAIL_UPSTREAM_AUTHORITY_BINDING_STRONG_CROSSCHECK_ONLY",
+  "source_evidence": {
+    "ffd_raw_artifact_id": 11600713150,
+    "ffd_raw_artifact_digest": "sha256:f58ced5ecec4a1a36da6a4d199d3dc29f21dd18abc3b0edff040abbf80bd70b8",
+    "raw_response_sha256": [
+      "5e3bc15811276c7d132b77aeb7379c0617e7e4abd1a9d99c433f5b03cfc4e6d2",
+      "24671c53f532ac45b0373b1374f21ca27bf1102a9e3e4171c93a9e3b1eaf4d10",
+      "fd0d33506ee991ac872a2b13559fca83c60a87f1e4096a920ede978626658bd7"
+    ]
+  },
+  "raw_response_provenance_fields": {
+    "accepted_codes": ["801020.SI"],
+    "requested_fields": ["open", "high", "low", "close"],
+    "adjustment_requested": "none",
+    "adjustment_requested_raw": "CPS:1",
+    "adjustment_effective": "none",
+    "provider_parameter_omitted_for_unadjusted": true,
+    "conversion_or_recalculation_by_ffd": false,
+    "verification_status": "request_and_effective_parameter_exposed",
+    "identity_proof_values": ["structured_asset_code_date_field_key", "single_code_physical_shards"],
+    "provider_actual_points": 0,
+    "upstream_lease_ids": [],
+    "cache_status_values": ["complete_structured_asset_hit", "not_cached_as_complete_request"]
+  },
+  "interpretation": {
+    "ffd_delivery_identity_proven": true,
+    "same_day_direct_ohlc_delivery_proven": true,
+    "unadjusted_delivery_proven": true,
+    "ffd_recalculation_excluded": true,
+    "specific_upstream_authoritative_vendor_named": false,
+    "specific_upstream_authoritative_export_or_lease_bound": false,
+    "sw2014_taxonomy_metadata_in_raw_response": false,
+    "historical_name_caijue_in_raw_response": false,
+    "publisher_shenwan_in_raw_response": false,
+    "conclusion": "The preserved responses prove what FFD delivered, but not which frozen-authority upstream carrier originated the historical rows. Empty upstream_lease_ids and zero provider_actual_points prevent treating this delivery as a bound Wind/iFind/RQData/DataCube/Tushare raw export."
+  },
+  "public_contract_boundary": {
+    "findesk_start_guide": "https://www.findesk.cn/start",
+    "findesk_capability_catalog": "https://www.findesk.cn/financial-data-api/capabilities",
+    "findesk_terms": "https://www.findesk.cn/terms",
+    "public_history_surface_documented": true,
+    "public_pages_acknowledge_third_party_data_may_exist": true,
+    "public_pages_expose_restricted_upstream_provider_for_this_series": false,
+    "authority_binding_effect": "NO_CHANGE"
+  },
+  "admission_effect": {
+    "ffd_rows_admitted": 0,
+    "admissible_coverage": "42783/43084",
+    "missing_required_keys": 301,
+    "derived_close_admitted": 0,
+    "sector_series_status": "BLOCKED",
+    "sector_breadth_status": "BLOCKED_PENDING_SERIES_PASS"
+  },
+  "restart_condition": "Only new immutable evidence naming/binding a qualifying authoritative upstream source for the preserved FFD rows, or an independent accepted authoritative vendor export, may reopen direct admission. Do not re-query the same FFD OHLC merely to reproduce values."
+}

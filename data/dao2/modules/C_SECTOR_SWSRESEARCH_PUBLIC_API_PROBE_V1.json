@@ -1,0 +1,91 @@
+{
+  "artifact": "DAO2_C_SECTOR_SWSRESEARCH_PUBLIC_API_PROBE_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "CLOSED_OFFICIAL_PUBLIC_TARGET_ABSENCE",
+  "recorded_at_utc": "2026-10-08T06:48:09.879063+00:00",
+  "target": {
+    "industry_code": "801020.SI",
+    "target_dates": ["20210806", "20211008", "20211022"],
+    "neighbor_dates": ["20210805", "20210809", "20210930", "20211011", "20211021", "20211025"]
+  },
+  "implementation": {
+    "workflow": ".github/workflows/dao2-c-swsresearch-trend-probe-v1.yml",
+    "script": "scripts/dao2_c_swsresearch_trend_probe_v1.py",
+    "tests": "scripts/test_dao2_c_swsresearch_trend_probe_v1.py",
+    "tdd_red_run_id": 37739412412,
+    "tdd_red_expected_failure": "normalize_analysis_rows missing before implementation",
+    "probe_run_id": 37739589051,
+    "probe_head_sha": "c30dd75197afe4c293dd1c53f2412087a272ba37",
+    "artifact_id": 11533131609,
+    "artifact_digest": "sha256:22823bb95dd745275c584cfd01d8592d09acd14fe1b4dcd46e9928d2cb271dee",
+    "unit_contract_tests": "PASS"
+  },
+  "official_trend_endpoint": {
+    "url": "https://www.swsresearch.com/institute-sw/api/index_publish/trend/",
+    "params": {"swindexcode": "801020", "period": "DAY"},
+    "http_status": 200,
+    "final_host": "www.swsresearch.com",
+    "official_host": true,
+    "content_type": "application/json",
+    "raw_bytes": 1238646,
+    "raw_sha256": "fcddfc5c449e1ec2acb8376e901b72bbc465254f63e47617e60ba051f14d328c",
+    "normalized_source_rows": 5308,
+    "target_rows_found": 0,
+    "target_rows_required": 3,
+    "neighbor_rows_found": 6,
+    "neighbor_rows_required": 6,
+    "neighbor_overlap_status": "PASS_EXACT_NEIGHBOR_OVERLAP",
+    "neighbor_overlap_matched": 6,
+    "neighbor_closes": [
+      {"trade_date": "20210805", "source_close": 2954.25, "frozen_base_close": 2954.25},
+      {"trade_date": "20210809", "source_close": 3048.39, "frozen_base_close": 3048.39},
+      {"trade_date": "20210930", "source_close": 3976.45, "frozen_base_close": 3976.45},
+      {"trade_date": "20211011", "source_close": 3971.72, "frozen_base_close": 3971.72},
+      {"trade_date": "20211021", "source_close": 3886.69, "frozen_base_close": 3886.69},
+      {"trade_date": "20211025", "source_close": 3804.92, "frozen_base_close": 3804.92}
+    ],
+    "decision": "SOURCE_IDENTITY_CONFIRMED_BUT_TARGET_DATES_ABSENT"
+  },
+  "official_analysis_endpoint": {
+    "url": "https://www.swsresearch.com/institute-sw/api/index_analysis/index_analysis_report/",
+    "index_type": "一级行业",
+    "same_day_direct_close_field": "closeindex",
+    "all_calls_official_host": true,
+    "target_dates": {
+      "20210806": {"http_status": 200, "raw_bytes": 89, "raw_sha256": "8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240", "response_count": 0, "801020_rows": 0},
+      "20211008": {"http_status": 200, "raw_bytes": 89, "raw_sha256": "8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240", "response_count": 0, "801020_rows": 0},
+      "20211022": {"http_status": 200, "raw_bytes": 89, "raw_sha256": "8c5479e6b20de175a255a11c7694c7114a7dd9015023c68992229fe6d8ad9240", "response_count": 0, "801020_rows": 0}
+    },
+    "neighbor_dates": {
+      "response_rows_exist": true,
+      "observed_industry_count_per_nonempty_call": 27,
+      "801020_present": false,
+      "taxonomy_note": "The official analysis report returned other SW2014 L1 codes on neighboring dates but omitted 801020; it is not an identity-compatible replacement carrier for this key."
+    },
+    "decision": "NO_DIRECT_801020_TARGET_CARRIER"
+  },
+  "independent_public_eastmoney_route": {
+    "status": "CLOSED_NOT_ONE_TO_ONE_FOR_801020",
+    "evidence_repository": "k-macao/02",
+    "evidence_commit": "b1ef89f9901a5662caee58a6199c70f54a676dc6",
+    "evidence_path": "output/octopus_quant/industry_rotation.py",
+    "finding": "The audited SW L1 to Eastmoney BK map is SW2021-oriented and maps mining into separate 801950 coal / 801960 petroleum-petrochemical sectors; no direct one-to-one 801020 mining BK carrier is defined.",
+    "derived_recombination_allowed": false
+  },
+  "governance": {
+    "admitted_rows": 0,
+    "admitted_derived_close_rows": 0,
+    "admissible_before": 42783,
+    "admissible_after": 42783,
+    "missing_before": 301,
+    "missing_after": 301,
+    "series_checkpoint_changed_to_pass": false,
+    "breadth_gate_open": false,
+    "public_official_probe_recovery_allowed": false,
+    "derived_or_recombined_proxy_allowed": false
+  },
+  "conclusion": "The current official public SWSResearch trend carrier is identity-valid on all six frozen neighboring dates but omits all three direct target dates. A second official SWSResearch analysis endpoint also yields no 801020 target rows and is not an identity-compatible substitute. Public Eastmoney sector indices do not provide a one-to-one 801020 carrier. No raw close is admitted.",
+  "resume_condition": "Resume direct-gap recovery only when a new traceable same-day raw 801020 close carrier appears, Tushare sw_daily entitlement is enabled, or an original authoritative Wind/iFind/RQData/Founder DataCube export is supplied. Do not repeat the SWSResearch trend/analysis or Eastmoney recombination routes without new upstream evidence."
+}

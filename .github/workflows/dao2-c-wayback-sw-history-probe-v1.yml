@@ -1,0 +1,127 @@
+name: DAO2 C Wayback Legacy SWS Exact-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-wayback-sw-history-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q requests beautifulsoup4 html5lib
+      - name: Probe Wayback legacy SWS history captures
+        run: |
+          python - <<'PY'
+          import hashlib, json, re, urllib.parse
+          from pathlib import Path
+          import requests
+          from bs4 import BeautifulSoup
+
+          OUT=Path('artifact_wayback_sws'); RAW=OUT/'raw'; RAW.mkdir(parents=True, exist_ok=True)
+          cdx='https://web.archive.org/cdx/search/cdx'
+          targets=['2021-08-06','2021-10-08','2021-10-22']
+          symbol='801020'
+          sess=requests.Session()
+          sess.headers.update({'User-Agent':'Mozilla/5.0 DAO2 research audit/1.0'})
+          records=[]; captures=[]
+
+          def exact_url(d):
+              where=f" swindexcode in ('{symbol}') and BargainDate >= '{d}' and BargainDate <= '{d}'"
+              return 'http://www.swsindex.com/excel2.aspx?ctable=swindexhistory&where=' + where + ' '
+
+          queries=[]
+          for d in targets:
+              u=exact_url(d)
+              queries.append((f'exact_{d}',u,{}))
+              queries.append((f'exact_encoded_{d}',urllib.parse.quote(u,safe=':/?=&'),{}))
+          queries += [
+              ('prefix_excel2','http://www.swsindex.com/excel2.aspx?ctable=swindexhistory',{'matchType':'prefix','from':'2020','to':'2022','limit':'500'}),
+              ('prefix_excel2_https','https://www.swsindex.com/excel2.aspx?ctable=swindexhistory',{'matchType':'prefix','from':'2020','to':'2022','limit':'500'}),
+          ]
+
+          for name,u,extra in queries:
+              params={'url':u,'output':'json','fl':'timestamp,original,statuscode,mimetype,digest,length','filter':'statuscode:200','collapse':'digest'}
+              params.update(extra)
+              try:
+                  r=sess.get(cdx,params=params,timeout=(10,60))
+                  body=r.content
+                  (RAW/f'{name}.cdx.bin').write_bytes(body)
+                  meta={'query':name,'requested_url':r.url,'http_status':r.status_code,'bytes':len(body),'sha256':hashlib.sha256(body).hexdigest()}
+                  try:
+                      j=r.json()
+                      rows=j[1:] if isinstance(j,list) and j else []
+                  except Exception:
+                      rows=[]
+                  meta['rows']=len(rows)
+                  records.append(meta)
+                  for row in rows:
+                      if len(row)>=2:
+                          captures.append({'timestamp':str(row[0]),'original':str(row[1]),'query':name})
+              except Exception as e:
+                  records.append({'query':name,'error':type(e).__name__+': '+str(e)})
+
+          # de-duplicate captures and keep captures whose URL mentions 801020 or a target date first.
+          seen=set(); uniq=[]
+          for x in captures:
+              k=(x['timestamp'],x['original'])
+              if k in seen: continue
+              seen.add(k); uniq.append(x)
+          ranked=sorted(uniq,key=lambda x:(0 if (symbol in urllib.parse.unquote(x['original']) or any(d in urllib.parse.unquote(x['original']) for d in targets)) else 1,x['timestamp']))[:80]
+
+          hits=[]
+          for i,x in enumerate(ranked):
+              snap=f"https://web.archive.org/web/{x['timestamp']}id_/{x['original']}"
+              try:
+                  r=sess.get(snap,timeout=(10,60),allow_redirects=True)
+                  b=r.content
+                  (RAW/f'capture_{i:03d}.bin').write_bytes(b)
+                  text=b.decode('utf-8','ignore')
+                  decoded=urllib.parse.unquote(x['original'])
+                  found_dates=[d for d in targets if d in text or d.replace('-','/') in text or d in decoded]
+                  soup=BeautifulSoup(text,'html5lib')
+                  table_rows=[]
+                  for tr in soup.find_all('tr'):
+                      cols=[td.get_text(' ',strip=True) for td in tr.find_all('td')]
+                      if len(cols)>=7 and (symbol in ' '.join(cols) or any(d in ' '.join(cols) or d.replace('-','/') in ' '.join(cols) for d in targets)):
+                          table_rows.append(cols[:10])
+                  if found_dates or table_rows or symbol in text:
+                      hits.append({'capture':x,'snapshot_url':snap,'http_status':r.status_code,'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'found_dates':found_dates,'table_rows':table_rows[:20]})
+              except Exception as e:
+                  pass
+
+          result={
+            'artifact':'DAO2_C_WAYBACK_LEGACY_SWS_EXACT_GAP_PROBE_V1',
+            'version':'1.0',
+            'symbol':symbol,
+            'targets':targets,
+            'legacy_contract_source':'PKUJohnson/OpenData get_index_daily -> swsindex.com/excel2.aspx ctable=swindexhistory',
+            'cdx_queries':records,
+            'unique_captures':len(uniq),
+            'ranked_capture_fetches':len(ranked),
+            'target_or_symbol_hits':hits,
+            'raw_target_rows_recovered':sum(len(h.get('table_rows',[])) for h in hits),
+            'admission_allowed':False,
+            'note':'Evidence-only probe. Any recovered row still requires exact target-date parsing and frozen-neighbor overlap before admission.'
+          }
+          OUT.mkdir(exist_ok=True)
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-wayback-legacy-sws-exact-gap-probe-v1
+          path: artifact_wayback_sws/
+          if-no-files-found: error
+          retention-days: 30
