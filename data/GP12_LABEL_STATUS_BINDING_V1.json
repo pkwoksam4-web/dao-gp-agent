@@ -1,0 +1,142 @@
+{
+  "artifact": "GP12_LABEL_STATUS_BINDING_V1",
+  "version": "1.0",
+  "as_of": "2026-09-20",
+  "module_id": "D",
+  "scope": "Historical GP V1.1 label provenance plus GP12_REBUILD_CANDIDATE_V1 current-snapshot status semantics. This is not adoption of the candidate as historical GP V1.1.",
+  "historical_label_provenance": {
+    "status": "BOUND_FILE_BACKED",
+    "identity": "GP_V11_DAILY_BASE_V3_10",
+    "source_archive": {
+      "library_source_id": "LIBRARY:file_0000000027d4820683c9a38a9886d045:v11_offline_backtest_v3_10.zip",
+      "filename": "v11_offline_backtest_v3_10.zip",
+      "sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d"
+    },
+    "source_files": [
+      {
+        "path": "src/run_backtest.py",
+        "sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+        "role": "Daily Base features and label construction"
+      },
+      {
+        "path": "src/run_panel_backtest.py",
+        "sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+        "role": "panel walk-forward target calibration and target-specific purge"
+      },
+      {
+        "path": "src/run_formal_pipeline.py",
+        "sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c",
+        "role": "historical Formal pipeline carrier"
+      }
+    ],
+    "definition_authority": "Exact historical formulas remain the byte-identified V3.10 source above; this module does not re-author or substitute course-repository label code.",
+    "label_clock": "T+1/T+2/T+3 advance on the market trading calendar, never to the next stock bar after suspension.",
+    "label_families": [
+      "T+1",
+      "T+2",
+      "T+3",
+      "MFE",
+      "MAE",
+      "fixed-hit thresholds",
+      "ATR-adaptive 3-day first-touch UP/DOWN/FLAT/AMBIG"
+    ],
+    "probability_targets": [
+      "up_close_1",
+      "up_close_2",
+      "up_close_3",
+      "hit_up2_3d",
+      "hit_up4_3d",
+      "hit_dn2_3d"
+    ],
+    "target_horizons_market_days": {
+      "up_close_1": 1,
+      "up_close_2": 2,
+      "up_close_3": 3,
+      "hit_up2_3d": 3,
+      "hit_up4_3d": 3,
+      "hit_dn2_3d": 3
+    },
+    "target_specific_purge": true,
+    "leakage_rule": "Future label values and future status observations are validation outcomes only and cannot construct or tune the signal at T.",
+    "execution_diagnostics_boundary": "Future suspension/limit/delist fields may be used only by exact-horizon executable/event-clean diagnostics. They do not move the label clock and are not fill-price mechanics."
+  },
+  "status_contract": {
+    "contract_identity": "GP12_REBUILD_CANDIDATE_V1_CURRENT_SNAPSHOT_STATUS_V1",
+    "historical_gp_v11_execution_policy_recovered": false,
+    "required_fields": [
+      "known_at",
+      "is_st",
+      "tradable",
+      "upper_limit"
+    ],
+    "strict_boolean_fields": [
+      "is_st",
+      "tradable",
+      "upper_limit"
+    ],
+    "known_at_rule": "status.known_at must be <= snapshot as_of. For this after-close contract, set known_at no earlier than the session close timestamp (15:00 Asia/Shanghai).",
+    "lifecycle_precondition": "The symbol-date must belong to the audited V4.80 required lifecycle/calendar domain; outside-lifecycle dates are unavailable, not synthetic status rows.",
+    "is_st": {
+      "semantics": "true iff the audited PIT-ST row has isST == '1' on the signal market date.",
+      "source": "V4.80 PIT-ST formal overlay; V4.82 tradestatus corrections explicitly do not alter isST.",
+      "unknown_policy": "FAIL_CLOSED"
+    },
+    "tradable": {
+      "semantics": "true iff the audited/corrected PIT-ST row has tradestatus == '1' on the signal market date.",
+      "source": "V4.80 PIT-ST formal overlay with exactly four V4.82 tradestatus point corrections.",
+      "independence": "This field is suspension/trading-status only. ST and price-limit state are separate fields and are not folded into tradable.",
+      "unknown_policy": "FAIL_CLOSED"
+    },
+    "upper_limit": {
+      "semantics": "For a tradable signal date, true iff the same-date raw-unadjusted daily close equals the official Tushare stk_limit up_limit for that symbol/date. It means 'closed at upper limit', not 'touched upper limit intraday' and not 'next-session order cannot fill'.",
+      "source": "Pinned Jessica-Zhangyj/dlquant commit 6b245fa09cb628f3bcb812f0662bfef520e65fb4: Tushare daily + stk_limit source contract.",
+      "comparison": "Parse both finite price values as decimal values and compare exact decimal values after source normalization; do not infer percentage bands manually.",
+      "nontradable_rule": "If tradable is false, upper_limit is false by event semantics because no tradable closing-price-at-limit event exists; this is an explicit composition rule, not imputation.",
+      "missing_tradable_input_policy": "If tradable is true and either same-date close or up_limit is missing/invalid, status is UNKNOWN and the candidate must fail closed."
+    },
+    "final_status_eligibility": {
+      "formula": "status_entry_eligible = (not is_st) and tradable and (not upper_limit)",
+      "scope": "Status-only gate. Liquidity, momentum, ranking, sector caps and other candidate exclusions remain separate.",
+      "candidate_code_alignment": [
+        "IS_ST",
+        "NONTRADABLE",
+        "UPPER_LIMIT"
+      ]
+    },
+    "future_horizon_rule": {
+      "signal_date": "Only T status may be used to construct the T snapshot.",
+      "target_dates": "T+1/T+2/T+3 are market-calendar dates and are never shifted to a later stock bar.",
+      "diagnostics": "Future suspension, price-limit and delisting observations are outcome/execution diagnostics only.",
+      "fills": "Execution diagnostics do not define actual fill prices, slippage, intraday ordering, or order-book mechanics.",
+      "next_session_execution": "Any next-session execution implementation must independently re-check that session's tradability/limit constraints; T status does not guarantee a fill."
+    }
+  },
+  "evidence": {
+    "pit_st_transition_evidence": "data/PIT_ST_TRANSITION_EVIDENCE_V480.json",
+    "tradestatus_corrections": "docs/v482-pitst-tradestatus-corrections.md",
+    "strategy_recovery_evidence": "data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json",
+    "decision_policy_recovery_matrix": "data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json",
+    "factor_recovery_matrix": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
+    "discovery": "data/dao2/modules/D_LABEL_STATUS_DISCOVERY_V1.json"
+  },
+  "blocker_resolution": {
+    "LABEL_PROVENANCE_UNBOUND": {
+      "ready_to_close": true,
+      "reason": "Historical label identity is bound to an exact recovered archive SHA and exact source-file SHA256 chain with market-calendar clock and target-specific purge semantics."
+    },
+    "STATUS_SEMANTICS_INCOMPLETE": {
+      "ready_to_close": true,
+      "reason": "The GP12 candidate status family now has exact field, source, timestamp, unknown, composition and future-horizon semantics."
+    }
+  },
+  "governance": {
+    "candidate_label_is_historical_label": false,
+    "course_repo_label_code_substituted_for_historical": false,
+    "future_leakage_allowed": false,
+    "execution_diagnostics_are_fill_mechanics": false,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}

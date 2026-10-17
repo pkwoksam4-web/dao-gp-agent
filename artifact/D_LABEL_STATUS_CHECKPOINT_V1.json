@@ -1,0 +1,102 @@
+{
+  "artifact": "D_LABEL_STATUS_CHECKPOINT_V1",
+  "version": "1.0",
+  "as_of": "2026-09-20",
+  "module_id": "D",
+  "module_name": "LABEL_STATUS",
+  "branch": "gp/dao2-d-label-status",
+  "verified": true,
+  "verification": {
+    "contract_commit": "0310fe64ab1418fa5fcc7c0df5094d8bbf82a81e",
+    "workflow_name": "DAO2 D LABEL_STATUS Guard V1",
+    "workflow_run_id": 35499004601,
+    "workflow_job_id": 106047258340,
+    "workflow_conclusion": "success",
+    "contract_tests": {
+      "count": 4,
+      "result": "PASS"
+    },
+    "contract_result": {
+      "valid": true,
+      "label_provenance": "BOUND",
+      "status_semantics": "COMPLETE"
+    },
+    "module_state_guard": "PASS"
+  },
+  "evidence_blobs": {
+    "discovery": {
+      "path": "data/dao2/modules/D_LABEL_STATUS_DISCOVERY_V1.json",
+      "git_blob_sha": "84f3eaca94fa290d4d185af9d684124ff746ac18"
+    },
+    "binding": {
+      "path": "data/GP12_LABEL_STATUS_BINDING_V1.json",
+      "git_blob_sha": "8d425d30dd699be13adb0ff222b52281b73f8456"
+    },
+    "validator": {
+      "path": "scripts/dao2_label_status_contract_v1.py",
+      "git_blob_sha": "17ca1beaadf75ee8de0de9d636a7b33bb69391e9"
+    },
+    "tests": {
+      "path": "scripts/test_dao2_label_status_contract_v1.py",
+      "git_blob_sha": "42ab72c32268d844e7f602f364995555d7d6c9ca"
+    },
+    "strategy_recovery": {
+      "path": "data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json",
+      "git_blob_sha": "d2d557a8d51de78ea730c1efc3dd55ab437aacf3"
+    },
+    "decision_policy": {
+      "path": "data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json",
+      "git_blob_sha": "ab11aed65c34e2a5788e3d21e8fe0b6513773ab3"
+    },
+    "factor_recovery": {
+      "path": "data/GP_V11_FACTOR_RECOVERY_MATRIX_V482.json",
+      "git_blob_sha": "40b13cd87066ff2eb78e8f566bc980f79f0f550f"
+    }
+  },
+  "formal_status_evidence": {
+    "v480_artifact": "gp-pit-st-v480-final-audit",
+    "v480_artifact_id": 9972698555,
+    "v480_artifact_digest": "sha256:a86d807829deb393e012e93fea44637cefd1759c973fa109e2a728647fa83f58",
+    "lifecycle_pass": "847/847",
+    "calendar_pass": "1426/1426",
+    "missing_required_dates_total": 0,
+    "transition_crosscheck": "6/6 PASS",
+    "formal_overlay_rows": 1021953,
+    "v482_tradestatus_correction_count": 4,
+    "v482_isST_changed": false
+  },
+  "historical_label_evidence": {
+    "archive": "v11_offline_backtest_v3_10.zip",
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "run_backtest_sha256": "6b81feaa37ade4970fcda62601e2a699951fe00ef678ee83fa84f84928d69ff1",
+    "run_panel_backtest_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+    "run_formal_pipeline_sha256": "dde897aa7daeca318ab438cd985d7708a5db7b7bc89a7cb47ef231a4aad94c8c",
+    "label_clock": "MARKET_TRADING_DAYS",
+    "target_specific_purge": true
+  },
+  "blocker_resolution": {
+    "LABEL_PROVENANCE_UNBOUND": {
+      "status": "CLOSED",
+      "checkpoint_reason": "Exact historical archive/source identity, label family/target inventory, market-calendar clock, target horizons, purge semantics and no-leakage boundary are bound without substituting candidate/course label code."
+    },
+    "STATUS_SEMANTICS_INCOMPLETE": {
+      "status": "CLOSED",
+      "checkpoint_reason": "Exact GP12 current-snapshot is_st/tradable/upper_limit/known_at semantics, source roles, fail-closed behavior, final status eligibility and future-diagnostic boundary are bound."
+    }
+  },
+  "non_claims": [
+    "GP12_REBUILD_CANDIDATE_V1 is not historical GP V1.1.",
+    "The course repository is not used as historical GP label source identity.",
+    "Future execution diagnostics are not actual fill mechanics.",
+    "Historical final entry/exit/fill policy is not recovered by this checkpoint.",
+    "This checkpoint does not authorize Model Freeze or OOS."
+  ],
+  "governance": {
+    "fail_closed": true,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false,
+    "cross_module_status_mutation": false
+  }
+}
