@@ -1,0 +1,25 @@
+name: GP12 Main Net Flow Contract V1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - 'scripts/gp12_main_net_flow_tushare_v1.py'
+      - 'scripts/test_gp12_main_net_flow_tushare_v1.py'
+      - '.github/workflows/gp12-main-net-flow-contract-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run main net flow contract tests
+        run: |
+          cd scripts
+          python -m unittest -v test_gp12_main_net_flow_tushare_v1.py
