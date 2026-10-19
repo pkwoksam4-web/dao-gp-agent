@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import ast
+import inspect
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -22,23 +24,95 @@ class ContractGateTests(unittest.TestCase):
     def test_missing_previous_session_fails_closed(self):
         latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13[1:]}
         with self.assertRaisesRegex(ContractGateError,"MISSING_PREVIOUS_SESSION"):
-            validate_prev_close_continuity(rows(),latest)
+            validate_prev_close_continuity(
+                rows(),latest,expected_previous_trade_date="2026-10-09"
+            )
 
     def test_prev_close_mismatch_fails_closed(self):
         latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13}
         bad=rows(); bad[4]["quote"]["normalized"]["prev_close"]=9.0
         with self.assertRaisesRegex(ContractGateError,"PREV_CLOSE_MISMATCH"):
-            validate_prev_close_continuity(bad,latest)
+            validate_prev_close_continuity(
+                bad,latest,expected_previous_trade_date="2026-10-09"
+            )
 
     def test_prev_close_sub_nanounit_mismatch_fails_closed(self):
         latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13}
         bad=rows(); bad[4]["quote"]["normalized"]["prev_close"]=10.0000000005
         with self.assertRaisesRegex(ContractGateError,"PREV_CLOSE_MISMATCH"):
-            validate_prev_close_continuity(bad,latest)
+            validate_prev_close_continuity(
+                bad,latest,expected_previous_trade_date="2026-10-09"
+            )
 
     def test_prev_close_13_of_13_passes(self):
         latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13}
-        self.assertEqual(validate_prev_close_continuity(rows(),latest)["matched"],13)
+        self.assertEqual(
+            validate_prev_close_continuity(
+                rows(),latest,expected_previous_trade_date="2026-10-09"
+            )["matched"],
+            13,
+        )
+
+    def test_prev_close_must_come_from_expected_exchange_predecessor(self):
+        self.assertIn(
+            "expected_previous_trade_date",
+            inspect.signature(validate_prev_close_continuity).parameters,
+            "previous-session validation must bind the exchange-calendar key",
+        )
+        latest={s:{"close":10.0,"trade_date":"2026-10-09"} for s in CORE13}
+        with self.assertRaisesRegex(ContractGateError,"UNEXPECTED_PREVIOUS_SESSION"):
+            validate_prev_close_continuity(
+                rows(),latest,expected_previous_trade_date="2026-10-08"
+            )
+
+    def test_feature_window_fails_closed_on_missing_interior_exchange_session(self):
+        self.assertTrue(
+            hasattr(gates,"feature_window_dates"),
+            "calendar-keyed feature window resolver is required",
+        )
+        self.assertTrue(
+            hasattr(gates,"validate_feature_window_continuity"),
+            "calendar-keyed feature window validator is required",
+        )
+        dates=gates.load_exchange_trading_calendar(
+            "evidence/agent_brain/cn_exchange_calendar_2026.json"
+        )
+        expected=gates.feature_window_dates("2026-10-09",dates,required_sessions=31)
+        self.assertEqual(len(expected),31)
+        self.assertEqual(expected[-1],"2026-10-09")
+        self.assertEqual(expected[-2],"2026-10-08")
+        observed=[d for d in expected if d!=expected[-6]]
+        self.assertEqual(observed[-1],expected[-1])
+        self.assertEqual(observed[-2],expected[-2])
+        with self.assertRaisesRegex(ContractGateError,"MISSING_EXCHANGE_SESSIONS"):
+            gates.validate_feature_window_continuity("000636.SZ",expected,observed)
+
+    def test_feature_window_fails_closed_on_missing_immediate_predecessor(self):
+        dates=gates.load_exchange_trading_calendar(
+            "evidence/agent_brain/cn_exchange_calendar_2026.json"
+        )
+        expected=gates.feature_window_dates("2026-10-09",dates,required_sessions=31)
+        observed=expected[:-2]+[expected[-1]]
+        with self.assertRaisesRegex(ContractGateError,"MISSING_EXCHANGE_SESSIONS"):
+            gates.validate_feature_window_continuity("000636.SZ",expected,observed)
+
+    def test_live_ingest_checks_full_calendar_window_before_any_write(self):
+        src=Path("scripts/live_pit_ingest.py").read_text(encoding="utf-8")
+        tree=ast.parse(src)
+        main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="main")
+        validation_lines=[
+            n.lineno for n in ast.walk(main)
+            if isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+            and n.func.id=="validate_feature_window_continuity"
+        ]
+        write_lines=[
+            n.lineno for n in ast.walk(main)
+            if isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+            and n.func.id=="insert_source"
+        ]
+        self.assertTrue(validation_lines,"pre-write calendar feature-window gate is required")
+        self.assertTrue(write_lines,"expected source write path was not found")
+        self.assertLess(min(validation_lines),min(write_lines))
 
     def test_historical_recovery_is_never_eligible(self):
         self.assertFalse(source_is_live_pit({"mode":"HISTORICAL_RECOVERY_NON_LIVE","live_shadow_eligible":False}))

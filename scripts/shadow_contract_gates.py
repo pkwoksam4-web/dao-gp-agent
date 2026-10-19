@@ -20,7 +20,11 @@ class ContractGateError(RuntimeError):
     pass
 
 
-def validate_prev_close_continuity(rows, latest_by_symbol):
+def validate_prev_close_continuity(rows, latest_by_symbol, *, expected_previous_trade_date):
+    try:
+        date.fromisoformat(expected_previous_trade_date)
+    except Exception as exc:
+        raise ContractGateError("PIT_PREV_CLOSE_CONTINUITY_FAILED: EXPECTED_PREVIOUS_SESSION_INVALID") from exc
     by_symbol = {x["symbol"]: x for x in rows}
     if sorted(by_symbol) != sorted(CORE13):
         raise ContractGateError("PIT_PREV_CLOSE_CONTINUITY_FAILED: CORE13_NOT_13_OF_13")
@@ -30,6 +34,11 @@ def validate_prev_close_continuity(rows, latest_by_symbol):
         if not prior or prior.get("close") is None:
             raise ContractGateError(
                 f"PIT_PREV_CLOSE_CONTINUITY_FAILED: MISSING_PREVIOUS_SESSION symbol={symbol}"
+            )
+        if prior.get("trade_date") != expected_previous_trade_date:
+            raise ContractGateError(
+                "PIT_PREV_CLOSE_CONTINUITY_FAILED: UNEXPECTED_PREVIOUS_SESSION "
+                f"symbol={symbol} expected={expected_previous_trade_date} observed={prior.get('trade_date')}"
             )
         qn = by_symbol[symbol].get("quote", {}).get("normalized", {})
         observed = qn.get("prev_close")
@@ -51,6 +60,56 @@ def validate_prev_close_continuity(rows, latest_by_symbol):
             "manifest_prev_close": observed,
         })
     return {"status": "PASS", "matched": 13, "required": 13, "symbols": checked}
+
+
+def feature_window_dates(anchor, exchange_trading_dates, *, required_sessions):
+    try:
+        date.fromisoformat(anchor)
+        for trading_date in exchange_trading_dates:
+            date.fromisoformat(trading_date)
+    except Exception as exc:
+        raise ContractGateError("FEATURE_WINDOW_CALENDAR_DATE_INVALID") from exc
+    if not isinstance(required_sessions, int) or required_sessions < 1:
+        raise ContractGateError("FEATURE_WINDOW_REQUIRED_SESSIONS_INVALID")
+    if exchange_trading_dates != sorted(set(exchange_trading_dates)):
+        raise ContractGateError("FEATURE_WINDOW_CALENDAR_NOT_SORTED_UNIQUE")
+    try:
+        anchor_index = exchange_trading_dates.index(anchor)
+    except ValueError as exc:
+        raise ContractGateError("FEATURE_WINDOW_ANCHOR_NOT_IN_EXCHANGE_CALENDAR") from exc
+    start_index = anchor_index - required_sessions + 1
+    if start_index < 0:
+        raise ContractGateError("FEATURE_WINDOW_CALENDAR_HISTORY_INSUFFICIENT")
+    return exchange_trading_dates[start_index:anchor_index + 1]
+
+
+def validate_feature_window_continuity(symbol, expected_dates, observed_dates):
+    expected = list(expected_dates)
+    observed = list(observed_dates)
+    if not expected or expected != sorted(set(expected)):
+        raise ContractGateError(
+            f"FEATURE_WINDOW_CONTINUITY_FAILED: INVALID_EXPECTED_SESSIONS symbol={symbol}"
+        )
+    if len(observed) != len(set(observed)):
+        raise ContractGateError(
+            f"FEATURE_WINDOW_CONTINUITY_FAILED: DUPLICATE_OBSERVED_SESSIONS symbol={symbol}"
+        )
+    expected_set = set(expected)
+    observed_set = set(observed)
+    missing = [d for d in expected if d not in observed_set]
+    extra = [d for d in observed if d not in expected_set]
+    if missing or extra or observed != expected:
+        reason = (
+            "MISSING_EXCHANGE_SESSIONS" if missing else
+            "EXTRA_OBSERVED_SESSIONS" if extra else
+            "EXCHANGE_SESSION_ORDER_MISMATCH"
+        )
+        raise ContractGateError(
+            f"FEATURE_WINDOW_CONTINUITY_FAILED: {reason} "
+            f"symbol={symbol} missing={missing} extra={extra} observed_order_matches={observed == expected}"
+        )
+    return {"status": "PASS", "symbol": symbol, "sessions": len(expected),
+            "start_date": expected[0], "end_date": expected[-1]}
 
 
 def source_is_live_pit(metadata):
