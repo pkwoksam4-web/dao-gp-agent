@@ -87,6 +87,40 @@ class ContractGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractGateError,"MISSING_EXCHANGE_SESSIONS"):
             gates.validate_feature_window_continuity("000636.SZ",expected,observed)
 
+    def test_2026_10_10_weekend_makeup_is_not_an_exchange_session(self):
+        dates=gates.load_exchange_trading_calendar(
+            "evidence/agent_brain/cn_exchange_calendar_2026.json"
+        )
+        self.assertNotIn("2026-10-10",dates)
+        self.assertNotIn("2026-10-11",dates)
+        self.assertIn("2026-10-12",dates)
+
+    def test_31_session_window_counts_across_national_day_closure(self):
+        dates=gates.load_exchange_trading_calendar(
+            "evidence/agent_brain/cn_exchange_calendar_2026.json"
+        )
+        expected=gates.feature_window_dates("2026-10-09",dates,required_sessions=31)
+        self.assertEqual(len(expected),31)
+        self.assertEqual(expected[0],"2026-08-20")
+        self.assertEqual(
+            expected[-5:],
+            ["2026-09-28","2026-09-29","2026-09-30","2026-10-08","2026-10-09"],
+        )
+        self.assertTrue(
+            {"2026-10-01","2026-10-02","2026-10-03","2026-10-04",
+             "2026-10-05","2026-10-06","2026-10-07"}.isdisjoint(expected)
+        )
+
+    def test_missing_2026_09_29_feature_bar_fails_closed(self):
+        dates=gates.load_exchange_trading_calendar(
+            "evidence/agent_brain/cn_exchange_calendar_2026.json"
+        )
+        expected=gates.feature_window_dates("2026-10-09",dates,required_sessions=31)
+        self.assertIn("2026-09-29",expected)
+        observed=[d for d in expected if d!="2026-09-29"]
+        with self.assertRaisesRegex(ContractGateError,"MISSING_EXCHANGE_SESSIONS"):
+            gates.validate_feature_window_continuity("000636.SZ",expected,observed)
+
     def test_feature_window_fails_closed_on_missing_immediate_predecessor(self):
         dates=gates.load_exchange_trading_calendar(
             "evidence/agent_brain/cn_exchange_calendar_2026.json"
