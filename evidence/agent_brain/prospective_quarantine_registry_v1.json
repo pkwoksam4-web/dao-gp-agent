@@ -1,0 +1,14 @@
+{
+  "schema": "agent-brain-prospective-quarantine-registry/v1",
+  "quarantined_strategy_ids": [
+    "SSR-CORE10-STABLE4-20260930"
+  ],
+  "evidence": {
+    "SSR-CORE10-STABLE4-20260930": "evidence/agent_brain/20261010_20260930_feature_integrity_quarantine_v1.json"
+  },
+  "policy": {
+    "preserve_original_rows": true,
+    "exclude_from_clean_qualification": true,
+    "exclude_from_settlement": true
+  }
+}
