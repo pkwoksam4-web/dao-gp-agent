@@ -64,6 +64,14 @@ def require_shadow_success(cur, strategy_id):
     if not row:
         raise RuntimeError(f"{strategy_id}: SETTLEMENT_BLOCKED_WAITING_SHADOW_OBSERVATION")
     evidence=json.loads(row["evidence_json"])
+    ingest=evidence.get("ingest_evidence")
+    if not isinstance(ingest,dict) or ingest.get("status")!="PASS":
+        raise RuntimeError(f"{strategy_id}: attestation missing PASS ingest_evidence")
+    hashes=[ingest.get("manifest_sha256"),ingest.get("ingest_report_sha256")]
+    if any(not isinstance(h,str) or len(h)!=64 or any(c not in "0123456789abcdef" for c in h) for h in hashes):
+        raise RuntimeError(f"{strategy_id}: attestation has invalid ingest evidence hash")
+    if ingest.get("verified_rows")!={"bars":13,"features":13}:
+        raise RuntimeError(f"{strategy_id}: attestation ingest row counts are not 13/13")
     observation_id=evidence.get("core13_observation_id")
     if not observation_id:
         raise RuntimeError(f"{strategy_id}: attestation missing core13_observation_id")
