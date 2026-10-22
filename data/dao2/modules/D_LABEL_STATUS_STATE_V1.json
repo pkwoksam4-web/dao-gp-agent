@@ -1,0 +1,56 @@
+{
+  "artifact": "DAO2_MODULE_D_LABEL_STATUS_STATE_V1",
+  "version": "1.2",
+  "module_id": "D",
+  "module_name": "LABEL_STATUS",
+  "branch": "gp/dao2-d-label-status",
+  "status": "PASS",
+  "depends_on": [],
+  "owned_blockers": [
+    "LABEL_PROVENANCE_UNBOUND",
+    "STATUS_SEMANTICS_INCOMPLETE"
+  ],
+  "objective": "Close label provenance and tradability/status semantics without contaminating market-data bindings.",
+  "inputs": [
+    "data/GP12_CANDIDATE_PARAMETERS_V1.json",
+    "data/GP12_FORMAL_INPUT_EVIDENCE_V1.json",
+    "data/PIT_ST_TRANSITION_EVIDENCE_V480.json",
+    "docs/v482-pitst-tradestatus-corrections.md",
+    "data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json",
+    "data/GP_V11_DECISION_POLICY_RECOVERY_MATRIX_V482.json"
+  ],
+  "expected_outputs": [
+    "data/dao2/modules/D_LABEL_STATUS_STATE_V1.json",
+    "data/GP12_LABEL_STATUS_BINDING_V1.json",
+    "artifact/D_LABEL_STATUS_CHECKPOINT_V1.json"
+  ],
+  "checkpoint": {
+    "path": "artifact/D_LABEL_STATUS_CHECKPOINT_V1.json",
+    "verified": true,
+    "verification_commit": "0310fe64ab1418fa5fcc7c0df5094d8bbf82a81e",
+    "workflow_run_id": 35499004601,
+    "workflow_job_id": 106047258340
+  },
+  "governance": {
+    "fail_closed": true,
+    "forward_fill": false,
+    "silent_proxy_substitution": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "progress": {
+    "discovery": "data/dao2/modules/D_LABEL_STATUS_DISCOVERY_V1.json",
+    "binding": "data/GP12_LABEL_STATUS_BINDING_V1.json",
+    "formal_pit_st_lifecycle_pass": "847/847",
+    "formal_open_dates": 1426,
+    "formal_pit_st_missing_required_dates": 0,
+    "course_stock_st_missing_dates": 12,
+    "course_stock_st_role": "SUPPLEMENTARY_NON_BLOCKING",
+    "v482_tradestatus_point_corrections": 4,
+    "historical_label_provenance_bound": true,
+    "status_semantics_complete": true,
+    "LABEL_PROVENANCE_UNBOUND": "CLOSED",
+    "STATUS_SEMANTICS_INCOMPLETE": "CLOSED",
+    "contract_tests": "4/4 PASS"
+  }
+}
