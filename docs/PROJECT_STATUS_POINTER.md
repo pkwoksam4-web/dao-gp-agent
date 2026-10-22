@@ -1,6 +1,6 @@
 # Agent Brain status pointer
 
-`status_checked_at: 2026-10-22 11:25 Asia/Shanghai`
+`status_checked_at: 2026-10-22 11:28 Asia/Shanghai`
 
 ## Current state
 
@@ -23,6 +23,6 @@ As of the 11:25 CST pointer check, gate 1 is not satisfied. The 10/22 cutoff res
 
 ## Restart gate
 
-Do not run the collector until the calendar-keyed 31-session continuity gate is merged to `main`, the original safety/authorization evidence is available, and all preflight gates pass. The calendar continuity gate is isolated in open PR [#27](https://github.com/pkwoksam4-web/dao-gp-agent/pull/27); CI passed, but an independent review is still required. Late outcome capture remains unimplemented and is tracked separately in draft PR [#21](https://github.com/pkwoksam4-web/dao-gp-agent/pull/21) and [issue #28](https://github.com/pkwoksam4-web/dao-gp-agent/issues/28). The current control-plane note is in open draft [#14](https://github.com/pkwoksam4-web/dao-gp-agent/pull/14). See [issue #26](https://github.com/pkwoksam4-web/dao-gp-agent/issues/26) for the minimum persistence-permission decision request and [issue #29](https://github.com/pkwoksam4-web/dao-gp-agent/issues/29) for the daily status-issue publisher.
+Do not run the collector until the calendar-keyed 31-session continuity gate is merged to `main`, the original safety/authorization evidence is available, and all preflight gates pass. The calendar continuity gate is isolated in open PR [#27](https://github.com/pkwoksam4-web/dao-gp-agent/pull/27); CI passed, but an independent review is still required. Late outcome capture remains unimplemented; proposed policy and unresolved fields are tracked in [issue #28](https://github.com/pkwoksam4-web/dao-gp-agent/issues/28). PR [#21](https://github.com/pkwoksam4-web/dao-gp-agent/pull/21) is a non-mergeable overlapping draft pending cleanup; it is not a late-capture implementation. The current control-plane note is in open draft [#14](https://github.com/pkwoksam4-web/dao-gp-agent/pull/14). See [issue #26](https://github.com/pkwoksam4-web/dao-gp-agent/issues/26) for the minimum persistence-permission decision request and [issue #29](https://github.com/pkwoksam4-web/dao-gp-agent/issues/29) for the daily status-issue publisher.
 
 Missing-day samples are never backfilled. Historical lookback bars may be added only before a future run's decision cutoff, with source, retrieval time, immutable hash, and `HISTORICAL_LOOKBACK` provenance. A retrospective status or successful CI is not a research result or production authorization.
