@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   shadow:
+    # Hard-disabled while PR #27 and the owner authorization gate are unresolved.
+    # Re-enable only after PR #27 is merged to main and the ordered issue #26 gates pass.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
