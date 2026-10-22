@@ -11,13 +11,21 @@ permissions:
 jobs:
   ingest:
     # Hard-disabled until PR #27 is merged to main and all four issue #26 gates pass.
-    # Re-enable only in a post-merge commit after recording the merge SHA and preflight evidence.
+    # Re-enable only after the full authoritative preflight is bound and passes.
     if: ${{ false }}
+    environment: pit-production
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
     steps:
+      - name: Enforce owner authorization kill switch
+        shell: bash
+        env:
+          PIT_WRITE_AUTHORIZATION: ${{ vars.PIT_WRITE_AUTHORIZATION }}
+        run: |
+          test "$PIT_WRITE_AUTHORIZATION" = "APPROVED" || {
+            echo "::error::PIT production writes are not authorized"
+            exit 1
+          }
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -35,6 +43,7 @@ jobs:
       - name: Ingest live PIT manifest
         env:
           PIT_MANIFEST_PATH: ${{ steps.manifest.outputs.path }}
+          NEON_DATABASE_URL: ${{ secrets.PIT_WRITER_DATABASE_URL }}
         run: python scripts/live_pit_ingest_compat_runner.py
       - if: always()
         uses: actions/upload-artifact@v4
