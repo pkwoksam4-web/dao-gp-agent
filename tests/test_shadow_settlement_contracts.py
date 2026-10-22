@@ -79,10 +79,18 @@ class ShadowSettlementContractTests(unittest.TestCase):
 
     def test_shadow_request_idempotency_key_and_time_gate(self):
         m={"trade_date_cn":"2026-10-12","universe_id":"WAT-core13-observation-v1"}
+        good={"status":"PASS","manifest_sha256":"abc","ingest_report_sha256":"a"*64,
+              "verified_rows":{"bars":13,"features":13}}
         with self.assertRaisesRegex(ContractGateError,"BEFORE_1730"):
-            build_shadow_request(m,"abc",datetime(2026,10,12,9,0,tzinfo=timezone.utc))
-        a=build_shadow_request(m,"abc",datetime(2026,10,12,9,31,tzinfo=timezone.utc))
-        b=build_shadow_request(m,"abc",datetime(2026,10,12,10,0,tzinfo=timezone.utc))
+            build_shadow_request(m,"abc",datetime(2026,10,12,9,0,tzinfo=timezone.utc),good)
+        a=build_shadow_request(m,"abc",datetime(2026,10,12,9,31,tzinfo=timezone.utc),good)
+        b=build_shadow_request(m,"abc",datetime(2026,10,12,10,0,tzinfo=timezone.utc),good)
+        self.assertEqual(a["trigger"]["ingest_evidence_sha256"],"a"*64)
+        with self.assertRaisesRegex(ContractGateError,"INGEST_EVIDENCE_NOT_PASS"):
+            build_shadow_request(m,"abc",datetime(2026,10,12,9,31,tzinfo=timezone.utc),{"status":"BLOCKED"})
+        bad={**good,"manifest_sha256":"wrong"}
+        with self.assertRaisesRegex(ContractGateError,"MANIFEST_HASH_MISMATCH"):
+            build_shadow_request(m,"abc",datetime(2026,10,12,9,31,tzinfo=timezone.utc),bad)
         self.assertEqual(a["trigger"]["idempotency_key"],b["trigger"]["idempotency_key"])
         self.assertFalse(a["probability_forecast_allowed"])
 
