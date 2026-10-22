@@ -14,14 +14,30 @@ from shadow_contract_gates import ContractGateError, build_shadow_request
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", required=True)
+    ap.add_argument("--ingest-report", required=True)
     ap.add_argument("--now-utc")
     args = ap.parse_args()
     manifest_path = Path(args.manifest)
     raw = manifest_path.read_bytes()
     manifest = json.loads(raw)
+    report_path = Path(args.ingest_report)
+    report_raw = report_path.read_bytes()
+    report = json.loads(report_raw)
+    manifest_sha = hashlib.sha256(raw).hexdigest()
+    if report.get("status") != "PASS" or report.get("manifest_sha256") != manifest_sha:
+        raise ContractGateError("ingest report must PASS for the exact manifest")
+    coverage = report.get("verified_coverage")
+    if coverage != {"bars": 13, "features": 13}:
+        raise ContractGateError("ingest report must verify 13 bars and 13 features")
+    ingest_evidence = {
+        "status": report["status"],
+        "manifest_sha256": manifest_sha,
+        "ingest_report_sha256": hashlib.sha256(report_raw).hexdigest(),
+        "verified_rows": coverage,
+    }
     now = (datetime.fromisoformat(args.now_utc.replace("Z", "+00:00"))
            if args.now_utc else datetime.now(timezone.utc))
-    request = build_shadow_request(manifest, hashlib.sha256(raw).hexdigest(), now)
+    request = build_shadow_request(manifest, manifest_sha, now, ingest_evidence)
     out = Path("runtime/shadow_requests") / f"{manifest['trade_date_cn']}.json"
     if out.exists():
         existing = json.loads(out.read_text(encoding="utf-8"))
