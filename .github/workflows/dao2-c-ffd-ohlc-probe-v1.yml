@@ -1,0 +1,161 @@
+name: DAO2 C FFD 801020 OHLC Probe V1
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_requery:
+        description: 'Explicitly allow a fresh FFD API query. Leave false when existing raw evidence is sufficient.'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  no_requery_guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce explicit re-query opt-in
+        shell: bash
+        run: |
+          if [ "${{ inputs.confirm_requery }}" = "true" ]; then
+            echo "Explicit FFD re-query authorized for this manual run."
+          else
+            echo "FFD re-query disabled. Reuse preserved evidence from run 37897977466 / artifact 11600713150."
+          fi
+
+  probe:
+    if: ${{ inputs.confirm_requery == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FFD_API_KEY: ${{ secrets.FFD_API_KEY }}
+    steps:
+      - name: Probe FFD historical OHLC for 801020.SI
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, urllib.error, urllib.request
+          from pathlib import Path
+
+          OUT = Path('artifact_ffd_c_801020')
+          OUT.mkdir(exist_ok=True)
+          endpoint = 'https://ffd.findesk.cn/api/query'
+          api_key = os.environ.get('FFD_API_KEY', '').strip()
+          windows = [
+              ('2021-08-05', '2021-08-09'),
+              ('2021-09-30', '2021-10-11'),
+              ('2021-10-21', '2021-10-25'),
+          ]
+          required_dates = {
+              '2021-08-05': 'neighbor',
+              '2021-08-06': 'target',
+              '2021-08-09': 'neighbor',
+              '2021-09-30': 'neighbor',
+              '2021-10-08': 'target',
+              '2021-10-11': 'neighbor',
+              '2021-10-21': 'neighbor',
+              '2021-10-22': 'target',
+              '2021-10-25': 'neighbor',
+          }
+          anchor_close = {
+              '2021-08-05': '2954.25',
+              '2021-08-09': '3048.39',
+              '2021-09-30': '3976.45',
+              '2021-10-11': '3971.72',
+              '2021-10-21': '3886.69',
+              '2021-10-25': '3804.92',
+          }
+          result = {
+              'artifact': 'DAO2_C_FFD_801020_OHLC_PROBE_V1',
+              'provider': 'FFD',
+              'endpoint': endpoint,
+              'secret_present': bool(api_key),
+              'code': '801020.SI',
+              'function': 'history',
+              'indicators': ['open','high','low','close'],
+              'adjust': 'CPS:1',
+              'required_dates': required_dates,
+              'anchor_close': anchor_close,
+              'requests': [],
+              'formal_admission_changed': False,
+          }
+
+          if not api_key:
+              result['status'] = 'NO_FFD_API_KEY_SECRET'
+          else:
+              auth_header = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json', 'Accept': 'application/json'}
+              all_http_ok = True
+              for idx, (start_date, end_date) in enumerate(windows, 1):
+                  payload = {
+                      'function': 'history',
+                      'codes': '801020.SI',
+                      'indicators': 'open,high,low,close',
+                      'start_date': start_date,
+                      'end_date': end_date,
+                      'options': 'CPS:1',
+                  }
+                  req_entry = {'start_date': start_date, 'end_date': end_date, 'payload': payload}
+                  try:
+                      req = urllib.request.Request(endpoint, data=json.dumps(payload).encode('utf-8'), headers=auth_header, method='POST')
+                      with urllib.request.urlopen(req, timeout=60) as resp:
+                          raw = resp.read()
+                          req_entry['http_status'] = resp.status
+                      req_entry['raw_sha256'] = hashlib.sha256(raw).hexdigest()
+                      raw_name = f'response_{idx}.json'
+                      (OUT / raw_name).write_bytes(raw)
+                      req_entry['raw_file'] = raw_name
+                      try:
+                          req_entry['response'] = json.loads(raw.decode('utf-8'))
+                      except Exception:
+                          req_entry['response_text_prefix'] = raw[:2000].decode('utf-8', errors='replace')
+                  except urllib.error.HTTPError as e:
+                      all_http_ok = False
+                      body = e.read()
+                      req_entry['http_status'] = e.code
+                      req_entry['error'] = f'HTTPError: {e}'
+                      req_entry['error_body_prefix'] = body[:4000].decode('utf-8', errors='replace')
+                  except Exception as e:
+                      all_http_ok = False
+                      req_entry['error'] = f'{type(e).__name__}: {e}'
+                  result['requests'].append(req_entry)
+
+              extracted = []
+              date_keys = {'date','trade_date','datetime','time','timestamp'}
+              def walk(obj):
+                  if isinstance(obj, dict):
+                      keys = {str(k).lower() for k in obj}
+                      if keys & date_keys and ({'open','high','low','close'} & keys):
+                          extracted.append(obj)
+                      for v in obj.values():
+                          walk(v)
+                  elif isinstance(obj, list):
+                      for v in obj:
+                          walk(v)
+              for req in result['requests']:
+                  if 'response' in req:
+                      walk(req['response'])
+              result['extracted_date_records'] = extracted[:200]
+              result['extracted_record_count'] = len(extracted)
+              result['status'] = 'HTTP_OK_REVIEW_RESPONSE' if all_http_ok else 'HTTP_OR_TRANSPORT_ERROR'
+
+          canonical = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+          result['content_sha256_without_hash_field'] = hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+          (OUT / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps({
+              'status': result['status'],
+              'secret_present': result['secret_present'],
+              'request_count': len(result.get('requests', [])),
+              'extracted_record_count': result.get('extracted_record_count', 0),
+              'result_sha256': result['content_sha256_without_hash_field'],
+          }, ensure_ascii=False))
+          PY
+
+      - name: Upload probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dao2-c-ffd-801020-ohlc-probe-v1
+          path: artifact_ffd_c_801020/
+          if-no-files-found: error
+          retention-days: 30

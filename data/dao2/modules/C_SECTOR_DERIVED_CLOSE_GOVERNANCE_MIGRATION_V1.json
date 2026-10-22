@@ -1,0 +1,77 @@
+{
+  "artifact": "DAO2_C_SECTOR_DERIVED_CLOSE_GOVERNANCE_MIGRATION_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "component": "sector_series",
+  "status": "PASS_LIMITED_298_SERIES_STILL_BLOCKED_3",
+  "scope": {
+    "provenance_type": "DERIVED_CLOSE",
+    "admitted_rows": 298,
+    "raw_close": false,
+    "may_be_labeled_raw_close": false,
+    "scope_rule": "Only the exact 298 sector-date keys carried by wind_two_sided_reconstruction.csv are admitted.",
+    "direct_801020_rows_in_scope": 0
+  },
+  "source_lock": {
+    "repository": "z15114664687-dot/fund-holdings",
+    "commit": "92864a330e5bad393315cb6664fe626370e9c92d",
+    "path": "data/raw/industry_returns.csv",
+    "git_blob_sha": "45550d4d621ba0e6be39dc3e39b150576784b83c",
+    "sha256": "97410eb4acf16fd14b16b0a60f4bbe45b3da071f078fdb5dea7c3044120f1786",
+    "row_carrier_artifact_id": 10674701717,
+    "row_carrier_artifact_digest": "sha256:cc498f5785fe092e53ceb11968253fa5049e204ad2cbed04f07c2594db8e5103",
+    "row_carrier_member": "wind_two_sided_reconstruction.csv",
+    "row_carrier_member_sha256": "0667a268a025355366012a65db36752d609df3b3cdea194f910b82f2599ff4b1"
+  },
+  "production_contract": {
+    "source_provider": "WIND_ASWSINDEXEOD_DERIVED_CLOSE",
+    "derivation_method": "PREV_ACCEPTED_CLOSE_X_SAME_DAY_WIND_RETURN",
+    "formula": "round(prev_accepted_close * (1 + same_day_wind_return), 2)",
+    "source_trade_date_equals_trade_date": true,
+    "same_day_return_trade_date_equals_trade_date": true,
+    "previous_anchor_must_be_prior": true,
+    "production_uses_future_data": false,
+    "fill_method": "NONE",
+    "two_sided_unique_2dp_required": true,
+    "next_day_anchor_usage": "AUDIT_ONLY_NOT_VALUE_PRODUCTION"
+  },
+  "verification": {
+    "tdd_red_commit": "8ec2f9016d7c42513619d486748464e1cec58932",
+    "tdd_red_workflow_run_id": 37761107407,
+    "tdd_red_expected_failure_count": 1,
+    "verifier_commit": "83168ee163ea85fb6cd761c24c803e1b3f051d7c",
+    "green_contract_test_workflow_run_id": 37761389603,
+    "migration_audit_workflow_run_id": 37761686352,
+    "migration_audit_artifact_id": 11542492347,
+    "migration_audit_artifact_digest": "sha256:3b169ed8bac79bc91c273544ba8280a3c5122215072cabbb57681bff1a77298b",
+    "frozen_base_rows": 42783,
+    "governed_derived_rows": 298,
+    "combined_observed_required_keys": 43081,
+    "required_keys": 43084,
+    "missing_required_keys": 3,
+    "derived_rows_rejected": 0,
+    "only_verifier_error": "missing_required_sector_dates:3"
+  },
+  "official_source_absence_evidence": {
+    "workflow_run_id": 37760225424,
+    "artifact_id": 11541747981,
+    "artifact_digest": "sha256:75d45e8dd47e388aedfbe2800a5d3200985f5a1b43d9e912b2d7060958068137",
+    "official_sws_successful_code_requests": 32,
+    "frozen_identity_rows_checked": 42783,
+    "frozen_identity_2dp_matches": 42783,
+    "gap_rows_recovered": 0,
+    "gap_rows_missing": 301
+  },
+  "remaining_direct_gaps": [
+    {"industry_code": "801020.SI", "trade_date": "20210806"},
+    {"industry_code": "801020.SI", "trade_date": "20211008"},
+    {"industry_code": "801020.SI", "trade_date": "20211022"}
+  ],
+  "fail_closed": {
+    "series_blocker_closed": false,
+    "breadth_derivation_allowed": false,
+    "historical_gp_v11_raw_series_recovery_claim": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  }
+}

@@ -1,0 +1,140 @@
+name: DAO2 C Official SWS Full 301-Gap Probe V1
+on:
+  push:
+    branches:
+      - gp/dao2-c-sector-pit
+    paths:
+      - '.github/workflows/dao2-c-official-sw-full-gap-probe-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -q pandas requests
+      - name: Download frozen 42,783-key Series base
+        uses: actions/download-artifact@v4
+        with:
+          name: dao2-c-sector-series-exact-v1
+          path: series-base
+          run-id: 35575797301
+          github-token: ${{ github.token }}
+      - name: Probe all 301 gaps against current official SWS trend API
+        run: |
+          python - <<'PY'
+          import csv, gzip, hashlib, json, time
+          from pathlib import Path
+          import pandas as pd
+          import requests
+          import urllib3
+          urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+          OUT=Path('artifact_sws_full_gap'); RAW=OUT/'raw'; RAW.mkdir(parents=True, exist_ok=True)
+          ledger=json.loads(Path('data/dao2/modules/C_301_GAP_LEDGER_V1.json').read_text(encoding='utf-8'))
+          cols=ledger['row_schema']
+          gaps=[dict(zip(cols,row)) for row in ledger['rows']]
+          assert len(gaps)==301
+          by_code={}
+          for g in gaps:
+              code=str(g['sector_code']).replace('.SI','')
+              by_code.setdefault(code,[]).append(g)
+
+          endpoint='https://www.swsresearch.com/institute-sw/api/index_publish/trend/'
+          headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36','Accept':'application/json,text/plain,*/*','Referer':'https://www.swsresearch.com/institute_sw/allIndex/releasedIndex'}
+          sess=requests.Session(); sess.headers.update(headers)
+          all_source={}; request_meta=[]
+          for i,code in enumerate(sorted(by_code)):
+              try:
+                  r=sess.get(endpoint,params={'swindexcode':code,'period':'DAY'},timeout=(10,90),verify=False)
+                  b=r.content; (RAW/f'{code}.json').write_bytes(b)
+                  meta={'code':code,'http_status':r.status_code,'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),'url':r.request.url}
+                  try:
+                      obj=r.json(); data=obj.get('data') if isinstance(obj,dict) else None
+                  except Exception as e:
+                      data=None; meta['json_error']=type(e).__name__+': '+str(e)
+                  if isinstance(data,list):
+                      meta['rows']=len(data)
+                      for x in data:
+                          if not isinstance(x,dict): continue
+                          d=pd.to_datetime(str(x.get('bargaindate')),errors='coerce')
+                          if pd.isna(d): continue
+                          td=d.strftime('%Y%m%d')
+                          all_source[(code,td)]=x
+                  else:
+                      meta['rows']=0
+                  request_meta.append(meta)
+              except Exception as e:
+                  request_meta.append({'code':code,'error':type(e).__name__+': '+str(e)})
+              time.sleep(0.15)
+
+          # Frozen base for identity checks around source rows and target raw overlap.
+          with gzip.open('series-base/sector_close_formal.csv.gz','rt',encoding='utf-8',newline='') as f:
+              base=list(csv.DictReader(f))
+          base_map={(str(x['industry_code']).replace('.SI',''),str(x['trade_date']).replace('-','')):float(x['close']) for x in base}
+
+          recovered=[]; missing=[]; derived_matches=[]; direct_hits=[]
+          for g in gaps:
+              code=str(g['sector_code']).replace('.SI',''); td=str(g['trade_date']).replace('-','')
+              x=all_source.get((code,td))
+              if x is None:
+                  missing.append({'sector_code':g['sector_code'],'trade_date':td,'gap_class':g['gap_class'],'candidate_close_2dp':g.get('candidate_close_2dp')})
+                  continue
+              def num(k):
+                  try: return float(str(x.get(k)).replace(',',''))
+                  except Exception: return None
+              rec={'sector_code':g['sector_code'],'trade_date':td,'open':num('openindex'),'high':num('maxindex'),'low':num('minindex'),'close':num('closeindex'),'hike':num('hike'),'markup':num('markup'),'volume':num('bargainamount'),'amount':num('bargainsum'),'gap_class':g['gap_class'],'candidate_close_2dp':g.get('candidate_close_2dp'),'source_provider':'SWS_RESEARCH_OFFICIAL_TREND','source_trade_date':td,'fill_method':'NONE','raw_row':x}
+              cand=g.get('candidate_close_2dp')
+              rec['candidate_match_2dp']=None if cand is None or rec['close'] is None else round(float(cand),2)==round(rec['close'],2)
+              recovered.append(rec)
+              if g['gap_class']=='DERIVED_CLOSE_EVIDENCE_ONLY': derived_matches.append(rec['candidate_match_2dp'])
+              if g['gap_class']=='DIRECT_RAW_REQUIRED': direct_hits.append(rec)
+
+          # Global source identity against all frozen base rows available from these 31 codes.
+          identity=[]
+          for (code,td),x in all_source.items():
+              ref=base_map.get((code,td))
+              if ref is None: continue
+              try: src=float(x.get('closeindex'))
+              except Exception: continue
+              identity.append({'code':code,'trade_date':td,'source_close':src,'frozen_close':ref,'abs_diff':abs(src-ref),'match_2dp':round(src,2)==round(ref,2)})
+          id_match=sum(1 for x in identity if x['match_2dp'])
+
+          serial=[]
+          for x in recovered:
+              serial.append({k:v for k,v in x.items() if k!='raw_row'})
+          pd.DataFrame(serial).to_csv(OUT/'recovered_gap_rows.csv',index=False)
+          pd.DataFrame(missing).to_csv(OUT/'missing_gap_rows.csv',index=False)
+          pd.DataFrame(identity).to_csv(OUT/'frozen_identity_rows.csv',index=False)
+          result={
+            'artifact':'DAO2_C_OFFICIAL_SWS_FULL_301_GAP_PROBE_V1','version':'1.0','endpoint':endpoint,
+            'ledger_rows':len(gaps),'unique_codes':len(by_code),'successful_code_requests':sum(1 for x in request_meta if x.get('http_status')==200),
+            'recovered_gap_rows':len(recovered),'missing_gap_rows':len(missing),
+            'derived_evidence_rows_recovered':sum(1 for x in recovered if x['gap_class']=='DERIVED_CLOSE_EVIDENCE_ONLY'),
+            'derived_candidate_match_2dp_count':sum(1 for x in recovered if x['gap_class']=='DERIVED_CLOSE_EVIDENCE_ONLY' and x['candidate_match_2dp'] is True),
+            'derived_candidate_mismatch_2dp_count':sum(1 for x in recovered if x['gap_class']=='DERIVED_CLOSE_EVIDENCE_ONLY' and x['candidate_match_2dp'] is False),
+            'direct_raw_rows_recovered':len(direct_hits),'direct_raw_hits':[{k:v for k,v in x.items() if k!='raw_row'} for x in direct_hits],
+            'identity_rows_checked':len(identity),'identity_match_2dp_count':id_match,'identity_match_2dp_rate':(id_match/len(identity) if identity else None),
+            'all_301_raw_recovered':len(recovered)==301,
+            'admission_allowed':False,
+            'note':'Probe/evidence only. No Series mutation. Raw rows require governance-consistent provenance verification and exact audit before admission.',
+            'requests':request_meta,
+          }
+          (OUT/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          print(json.dumps(result,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dao2-c-official-sws-full-301-gap-probe-v1
+          path: artifact_sws_full_gap/
+          if-no-files-found: error
+          retention-days: 30

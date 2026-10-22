@@ -1,0 +1,43 @@
+{
+  "artifact": "DAO2_C_SECTOR_PIT_PREFLIGHT_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "C",
+  "status": "PASS_PREFLIGHT_BLOCKERS_PRESERVED",
+  "verified": true,
+  "verification": {
+    "workflow_name": "DAO2 C Sector PIT Preflight V1",
+    "workflow_run_id": 35498836988,
+    "workflow_head": "d97eaab36fd15543e4d682e5ee118d6ebeab174d",
+    "contract_test_job_id": 106046785148,
+    "preflight_job_id": 106046806600,
+    "artifact_id": 10600914594,
+    "artifact_name": "dao2-c-sector-pit-preflight-v1",
+    "artifact_zip_sha256": "d7163a7f7b8b5a70a9af292a31c18bbba05e8db9e7bf5d96ae56dc1306e37b76"
+  },
+  "formal_calendar": {
+    "start": "2020-06-01",
+    "end": "2026-04-17",
+    "trading_days_observed": 1426,
+    "trading_days_expected": 1426,
+    "full_coverage": true
+  },
+  "component_status": {
+    "sector_membership_pit": "BLOCKED",
+    "sector_series": "BLOCKED",
+    "sector_breadth": "BLOCKED_DEPENDENCIES_AND_FORMULA"
+  },
+  "candidate_materialization_environment": {
+    "tushare_token_available_in_pr_actions": false,
+    "note": "This only states that the PR Actions environment had no TUSHARE_TOKEN at preflight time. It is not evidence that Tushare data cannot be acquired elsewhere."
+  },
+  "historical_gp_v11_sector_package_recovered": false,
+  "blockers_preserved": [
+    "SECTOR_SERIES_UNBOUND",
+    "SECTOR_MEMBERSHIP_PIT_UNBOUND",
+    "SECTOR_BREADTH_UNBOUND"
+  ],
+  "blocker_closure_allowed": false,
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false,
+  "note": "Verified preflight proves the calendar and fail-closed verifier/checkpoint governance only. It is not a PASS for sector data."
+}
