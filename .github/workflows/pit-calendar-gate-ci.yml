@@ -2,12 +2,6 @@ name: PIT Calendar Gate CI
 
 on:
   pull_request:
-    paths:
-      - "scripts/pit_calendar_gate.py"
-      - "scripts/live_pit_ingest.py"
-      - "tests/test_pit_calendar_gate.py"
-      - "evidence/agent_brain/cn_exchange_calendar_2026.json"
-      - ".github/workflows/pit-calendar-gate-ci.yml"
 
 permissions:
   contents: read
