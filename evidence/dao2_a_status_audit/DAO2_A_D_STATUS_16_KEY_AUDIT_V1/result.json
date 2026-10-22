@@ -1,0 +1,47 @@
+{
+  "artifact": "DAO2_A_D_STATUS_16_KEY_AUDIT_V1",
+  "status": "PASS_DIAGNOSTIC_ONLY",
+  "retrieved_at_utc": "2026-10-16T09:23:18.884375+00:00",
+  "provider": "BaoStock",
+  "query_contract": {
+    "fields": [
+      "date",
+      "code",
+      "tradestatus",
+      "isST"
+    ],
+    "frequency": "d",
+    "adjustflag": "3",
+    "exact_date_only": true
+  },
+  "d_frozen_commit": "2a7056ffd61885046e34dc1494bc668143d96793",
+  "d_semantics_source": "scripts/pit_st_collector_v480.py",
+  "key_count": 16,
+  "key_set_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+  "classification_counts": {
+    "D_STATUS_VALID_TRADABLE": 16
+  },
+  "st_key_count": 11,
+  "st_keys": [
+    "600306.SH/2020-06-08",
+    "600898.SH/2020-11-04",
+    "603996.SH/2021-02-24",
+    "002618.SZ/2021-09-23",
+    "002684.SZ/2021-11-25",
+    "600112.SH/2022-05-06",
+    "000564.SZ/2023-03-20",
+    "002118.SZ/2023-05-22",
+    "002157.SZ/2023-05-22",
+    "002503.SZ/2023-05-22",
+    "002504.SZ/2023-05-22"
+  ],
+  "expected_axis_conflict_count": 0,
+  "expected_axis_conflicts": [],
+  "transport_error_count": 0,
+  "transport_errors": [],
+  "na_rows_admitted": 0,
+  "admission_changed": false,
+  "expected_rows_changed": false,
+  "resolved_rows_changed": false,
+  "governance": "DIAGNOSTIC_ONLY_DO_NOT_MUTATE_A_OR_D"
+}
