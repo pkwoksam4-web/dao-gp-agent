@@ -87,9 +87,18 @@ def validate_event_order(events):
     return True
 
 
-def build_shadow_request(manifest, manifest_sha256, requested_at):
+def build_shadow_request(manifest, manifest_sha256, requested_at, ingest_evidence):
     if requested_at.tzinfo is None:
         raise ContractGateError("SHADOW_REQUEST_TIME_MUST_BE_TIMEZONE_AWARE")
+    if not isinstance(ingest_evidence, dict) or ingest_evidence.get("status") != "PASS":
+        raise ContractGateError("SHADOW_REQUEST_INGEST_EVIDENCE_NOT_PASS")
+    if ingest_evidence.get("manifest_sha256") != manifest_sha256:
+        raise ContractGateError("SHADOW_REQUEST_INGEST_MANIFEST_HASH_MISMATCH")
+    report_hash = ingest_evidence.get("ingest_report_sha256")
+    if not isinstance(report_hash, str) or len(report_hash) != 64 or any(c not in "0123456789abcdef" for c in report_hash):
+        raise ContractGateError("SHADOW_REQUEST_INGEST_REPORT_HASH_INVALID")
+    if ingest_evidence.get("verified_rows") != {"bars": 13, "features": 13}:
+        raise ContractGateError("SHADOW_REQUEST_INGEST_ROW_COUNTS_INVALID")
     local = requested_at.astimezone(SHANGHAI)
     if (local.hour, local.minute) < (17, 30):
         raise ContractGateError("SHADOW_REQUEST_BEFORE_1730_ASIA_SHANGHAI")
@@ -111,6 +120,9 @@ def build_shadow_request(manifest, manifest_sha256, requested_at):
         "trigger": {
             "source": "LIVE_PIT_INGEST_PASS",
             "manifest_sha256": manifest_sha256,
+            "ingest_evidence_sha256": report_hash,
+            "ingest_status": "PASS",
+            "verified_rows": {"bars": 13, "features": 13},
             "idempotency_key": key,
         },
     }
