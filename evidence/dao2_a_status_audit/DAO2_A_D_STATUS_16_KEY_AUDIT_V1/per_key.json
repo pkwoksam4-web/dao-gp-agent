@@ -1,0 +1,290 @@
+[
+  {
+    "ts_code": "600306.SH",
+    "trade_date": "2020-06-08",
+    "formal_amount_cny": 314500.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2000-12-26",
+      "outDate": "2024-06-26"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "600898.SH",
+    "trade_date": "2020-11-04",
+    "formal_amount_cny": 587900.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "1996-04-18",
+      "outDate": "2025-02-10"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "603996.SH",
+    "trade_date": "2021-02-24",
+    "formal_amount_cny": 534300.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2015-12-22",
+      "outDate": "2022-05-24"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "002618.SZ",
+    "trade_date": "2021-09-23",
+    "formal_amount_cny": 12846700.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2011-09-20",
+      "outDate": "2022-06-22"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "000020.SZ",
+    "trade_date": "2021-09-24",
+    "formal_amount_cny": 4760300.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "1992-04-28",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": false,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "000157.SZ",
+    "trade_date": "2021-09-24",
+    "formal_amount_cny": 737075800.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2000-10-12",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": false,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "000592.SZ",
+    "trade_date": "2021-09-24",
+    "formal_amount_cny": 315622900.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "1996-03-27",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": false,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "000753.SZ",
+    "trade_date": "2021-09-24",
+    "formal_amount_cny": 13478500.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "1997-06-26",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": false,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "002684.SZ",
+    "trade_date": "2021-11-25",
+    "formal_amount_cny": 10405500.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2012-06-12",
+      "outDate": "2022-06-27"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "600112.SH",
+    "trade_date": "2022-05-06",
+    "formal_amount_cny": 2238500.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "1997-11-27",
+      "outDate": "2024-08-15"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "000564.SZ",
+    "trade_date": "2023-03-20",
+    "formal_amount_cny": 61512300.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "1994-01-10",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "001337.SZ",
+    "trade_date": "2023-03-20",
+    "formal_amount_cny": 18323400.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2023-03-03",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": false,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "002118.SZ",
+    "trade_date": "2023-05-22",
+    "formal_amount_cny": 1401500.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2007-03-02",
+      "outDate": "2023-08-04"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "002157.SZ",
+    "trade_date": "2023-05-22",
+    "formal_amount_cny": 51511600.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2007-08-17",
+      "outDate": ""
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "002503.SZ",
+    "trade_date": "2023-05-22",
+    "formal_amount_cny": 3658700.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2010-11-17",
+      "outDate": "2023-08-11"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  },
+  {
+    "ts_code": "002504.SZ",
+    "trade_date": "2023-05-22",
+    "formal_amount_cny": 1610300.0,
+    "classification": "D_STATUS_VALID_TRADABLE",
+    "nonzero_formal_turnover": true,
+    "lifecycle_status": "INSIDE_LIFECYCLE",
+    "lifecycle_row": {
+      "ipoDate": "2010-11-18",
+      "outDate": "2023-08-21"
+    },
+    "status_row_present": true,
+    "tradestatus": "1",
+    "is_st": true,
+    "conflict_reasons": [],
+    "expected_axis_review_required": false,
+    "na_allowed": false
+  }
+]

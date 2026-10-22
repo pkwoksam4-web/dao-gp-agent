@@ -1,0 +1,42 @@
+{
+  "artifact": "DAO2_A_PANGUCHENG_HISTORICAL_CARRIER_AUDIT_V1",
+  "source": {
+    "repository": "PanGucheng/a-share-quant-research",
+    "commit": "ade0db2cef9dc003d6eb5013bbc68017143cd526",
+    "path": "reports/historical_frontier_admission_v1/raw/moneyflow.parquet",
+    "blob_sha": "e8826d3b5e82edb7c85b63ebf371a6987afaa7a5",
+    "raw_bytes": 1082293,
+    "raw_sha256": "6e523f20be785182e98e5d7fc4a01afee145e0f1bcef70bb72dbc2b9e5b47c59"
+  },
+  "workflow": {
+    "name": "DAO2 A PanGucheng Historical Carrier Audit V1",
+    "run_id": 35944136939,
+    "artifact_id": 10785089768,
+    "artifact_digest": "sha256:59be13a1168ccc01c71c5779cbd890f921e835f20471c6c50c433cc201a2c9be",
+    "head_sha": "255e842041ea214ea86bd9189649de250edc7931"
+  },
+  "row_count": 134472,
+  "columns": [
+    "ts_code",
+    "trade_date",
+    "net_mf_amount"
+  ],
+  "required_exact_fields": [
+    "buy_lg_amount",
+    "buy_elg_amount",
+    "sell_lg_amount",
+    "sell_elg_amount"
+  ],
+  "missing_required_fields": [
+    "buy_lg_amount",
+    "buy_elg_amount",
+    "sell_lg_amount",
+    "sell_elg_amount"
+  ],
+  "result": "REJECT_MISSING_EXACT_MONEYFLOW_FIELDS",
+  "source_identity_pass": false,
+  "admissible_rows": 0,
+  "reason": "The public parquet is an actual historical raw carrier, but it contains only ts_code, trade_date, and net_mf_amount. DAO2 requires the four original large/extra-large amount fields; net_mf_amount is explicitly non-admissible as a substitute.",
+  "no_proxy": true,
+  "no_imputation": true
+}

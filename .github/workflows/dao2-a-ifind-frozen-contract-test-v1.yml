@@ -1,0 +1,29 @@
+name: DAO2 A iFinD Frozen Contract Test V1
+
+on:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - .github/workflows/dao2-a-ifind-exact-probe-v1.yml
+      - .github/workflows/dao2-a-ifind-frozen-contract-test-v1.yml
+      - scripts/dao2_a_ifind_exact_probe_v2.py
+      - scripts/test_dao2_a_ifind_exact_probe_v2.py
+      - scripts/test_dao2_a_ifind_workflow_contract_v1.py
+      - data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json
+      - data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - run: python -m pytest -q scripts/test_dao2_a_ifind_exact_probe_v2.py scripts/test_dao2_a_ifind_workflow_contract_v1.py

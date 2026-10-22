@@ -1,0 +1,482 @@
+[
+  {
+    "ts_code": "600306.SH",
+    "trade_date": "2020-06-08",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2020-06-08",
+          "code": "sh.600306",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sh.600306",
+          "code_name": "退市商城",
+          "ipoDate": "2000-12-26",
+          "outDate": "2024-06-26",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "600898.SH",
+    "trade_date": "2020-11-04",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2020-11-04",
+          "code": "sh.600898",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sh.600898",
+          "code_name": "*ST美讯",
+          "ipoDate": "1996-04-18",
+          "outDate": "2025-02-10",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "603996.SH",
+    "trade_date": "2021-02-24",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-02-24",
+          "code": "sh.603996",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sh.603996",
+          "code_name": "退市中新",
+          "ipoDate": "2015-12-22",
+          "outDate": "2022-05-24",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "002618.SZ",
+    "trade_date": "2021-09-23",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-09-23",
+          "code": "sz.002618",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.002618",
+          "code_name": "丹邦退",
+          "ipoDate": "2011-09-20",
+          "outDate": "2022-06-22",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "000020.SZ",
+    "trade_date": "2021-09-24",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-09-24",
+          "code": "sz.000020",
+          "tradestatus": "1",
+          "isST": "0"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.000020",
+          "code_name": "深华发A",
+          "ipoDate": "1992-04-28",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "000157.SZ",
+    "trade_date": "2021-09-24",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-09-24",
+          "code": "sz.000157",
+          "tradestatus": "1",
+          "isST": "0"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.000157",
+          "code_name": "中联重科",
+          "ipoDate": "2000-10-12",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "000592.SZ",
+    "trade_date": "2021-09-24",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-09-24",
+          "code": "sz.000592",
+          "tradestatus": "1",
+          "isST": "0"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.000592",
+          "code_name": "平潭发展",
+          "ipoDate": "1996-03-27",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "000753.SZ",
+    "trade_date": "2021-09-24",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-09-24",
+          "code": "sz.000753",
+          "tradestatus": "1",
+          "isST": "0"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.000753",
+          "code_name": "漳州发展",
+          "ipoDate": "1997-06-26",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "002684.SZ",
+    "trade_date": "2021-11-25",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2021-11-25",
+          "code": "sz.002684",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.002684",
+          "code_name": "猛狮退",
+          "ipoDate": "2012-06-12",
+          "outDate": "2022-06-27",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "600112.SH",
+    "trade_date": "2022-05-06",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2022-05-06",
+          "code": "sh.600112",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sh.600112",
+          "code_name": "*ST天成",
+          "ipoDate": "1997-11-27",
+          "outDate": "2024-08-15",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "000564.SZ",
+    "trade_date": "2023-03-20",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2023-03-20",
+          "code": "sz.000564",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.000564",
+          "code_name": "供销大集",
+          "ipoDate": "1994-01-10",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "001337.SZ",
+    "trade_date": "2023-03-20",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2023-03-20",
+          "code": "sz.001337",
+          "tradestatus": "1",
+          "isST": "0"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.001337",
+          "code_name": "四川黄金",
+          "ipoDate": "2023-03-03",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "002118.SZ",
+    "trade_date": "2023-05-22",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2023-05-22",
+          "code": "sz.002118",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.002118",
+          "code_name": "*ST紫鑫",
+          "ipoDate": "2007-03-02",
+          "outDate": "2023-08-04",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "002157.SZ",
+    "trade_date": "2023-05-22",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2023-05-22",
+          "code": "sz.002157",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.002157",
+          "code_name": "正邦科技",
+          "ipoDate": "2007-08-17",
+          "outDate": "",
+          "type": "1",
+          "status": "1"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "002503.SZ",
+    "trade_date": "2023-05-22",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2023-05-22",
+          "code": "sz.002503",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.002503",
+          "code_name": "*ST搜特",
+          "ipoDate": "2010-11-17",
+          "outDate": "2023-08-11",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  },
+  {
+    "ts_code": "002504.SZ",
+    "trade_date": "2023-05-22",
+    "status_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "date": "2023-05-22",
+          "code": "sz.002504",
+          "tradestatus": "1",
+          "isST": "1"
+        }
+      ]
+    },
+    "basic_query": {
+      "error_code": "0",
+      "error_msg": "success",
+      "rows": [
+        {
+          "code": "sz.002504",
+          "code_name": "*ST弘高",
+          "ipoDate": "2010-11-18",
+          "outDate": "2023-08-21",
+          "type": "1",
+          "status": "0"
+        }
+      ]
+    }
+  }
+]

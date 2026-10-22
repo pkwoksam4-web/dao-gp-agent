@@ -1,0 +1,30 @@
+{
+  "artifact": "DAO2_A_D_STATUS_16_KEY_AUDIT_V1",
+  "source": {
+    "repository": "pkwoksam4-web/dao-gp-agent",
+    "pull_request": 15,
+    "workflow_run_id": 38880076711,
+    "artifact_id": 12036928006,
+    "artifact_name": "dao2-a-d-status-16-key-audit-v1",
+    "downloaded_archive_sha256": "a11d971bd13d1ed1d637429361f8b241ea34c9236da5760182ce72e168d52730"
+  },
+  "audit": {
+    "retrieved_at_utc": "2026-10-16T09:23:18.884375+00:00",
+    "provider": "BaoStock",
+    "result_status": "PASS_DIAGNOSTIC_ONLY",
+    "key_count": 16,
+    "D_STATUS_VALID_TRADABLE": 16,
+    "st_key_count": 11,
+    "expected_axis_conflict_count": 0,
+    "transport_error_count": 0,
+    "frozen_D_commit": "2a7056ffd61885046e34dc1494bc668143d96793",
+    "key_set_sha256": "8d0151f61adba6d10da2b06aa0ebcf82d74fa9a3d17cda627c652e71f8697e9c",
+    "governance": "DIAGNOSTIC_ONLY_DO_NOT_MUTATE_A_OR_D"
+  },
+  "committed_files_sha256": {
+    "result.json": "eee76b64229b6b3b706dff1d91b466a51ae071698041a55d40f5b8d6e666e2c2",
+    "per_key.csv": "8a7b82d67e13d13f606ba67be2706def09a3b375a72ac5ebbe1557d71d4be161",
+    "per_key.json": "558b587718130f489341f90e86334b192b75149fc8f3e0320ad4c22f3d4290a0",
+    "raw_queries.json": "032acf498a6b9d509a7d9bd825e042e92ffaede74701349c54c2db7107e54ede"
+  }
+}

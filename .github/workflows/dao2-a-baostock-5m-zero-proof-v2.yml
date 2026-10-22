@@ -1,0 +1,26 @@
+name: DAO2 A BaoStock 5m Zero Proof V2
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gp/dao2-a-main-net-flow
+    paths:
+      - 'scripts/dao2_a_baostock_5m_zero_proof_v2.py'
+      - '.github/workflows/dao2-a-baostock-5m-zero-proof-v2.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install baostock
+      - run: python scripts/dao2_a_baostock_5m_zero_proof_v2.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dao2-a-baostock-5m-zero-proof-v2
+          path: artifact/dao2-a-baostock-5m-zero-proof-v2.json
+          if-no-files-found: error

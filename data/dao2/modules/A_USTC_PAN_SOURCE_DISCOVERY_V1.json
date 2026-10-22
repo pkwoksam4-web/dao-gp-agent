@@ -1,0 +1,85 @@
+{
+  "artifact": "DAO2_A_USTC_PAN_SOURCE_DISCOVERY_V1",
+  "version": "1.0",
+  "as_of": "2026-09-22",
+  "route": "USTC_PAN_COURSE_MONEYFLOW_ARCHIVE",
+  "status": "SOURCE_LOCATED_LOGIN_REQUIRED",
+  "course_identity": {
+    "course": "深度学习基础-2026",
+    "provider": "中国科学技术大学 科大云盘",
+    "pan_root": "https://pan.ustc.edu.cn/",
+    "group_name": "深度学习基础-2026",
+    "expected_root": "A股数据",
+    "target_directory": "A股数据/moneyflow"
+  },
+  "source_identity_evidence": [
+    {
+      "repository": "licunchun/dl",
+      "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+      "path": "大作业 (1).md",
+      "blob_sha": "1925620967fd930c42506faf6730bc91189bf8d8",
+      "evidence": "课程作业说明明确：数据存放在科大云盘 https://pan.ustc.edu.cn/；登录后搜索并加入群组“深度学习基础-2026”，即可在群盘下载共享数据；数据自2016年开始并每日更新；详细字段见群盘 README。"
+    },
+    {
+      "repository": "licunchun/dl",
+      "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+      "path": "scripts/sync_data.sh",
+      "blob_sha": "5c2fdfe2242dfc00b4b297af83ea8fe97efc0247",
+      "evidence": "真实同步脚本标注 USTC Pan (WebDAV via rclone)，REMOTE=ustc_pan:/A股数据，并直接 rclone copy $REMOTE/moneyflow/ 到本地 moneyflow/。"
+    },
+    {
+      "repository": "licunchun/dl",
+      "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+      "path": "alpha-stage/DATA_REPORT.md",
+      "blob_sha": "bfb0c1345c19865f33f400e681b76e62e0bd159d",
+      "evidence": "2026-06-03 本地 PAN snapshot /home/lcc17/pan_sync_20260528 共12915文件、15.321GB；A股数据/moneyflow 有2526个文件，与 daily/metric 同级。"
+    },
+    {
+      "repository": "licunchun/dl",
+      "commit": "bd4cc65d091ced1fec28cb652727f7e01156a381",
+      "path": "reports/final_report.md",
+      "evidence": "附录明确引用 USTC 云盘群组“深度学习基础-2026”，并称数据说明位于 zip 内 README.md。"
+    },
+    {
+      "repository": "que3sui/A_stock",
+      "path": "README.md",
+      "evidence": "同课程仓库再次确认数据位于 USTC PAN 群组“深度学习基础-2026”，目录包含 A股数据/moneyflow/。"
+    }
+  ],
+  "carrier_assessment": {
+    "original_course_archive_exists_proven": true,
+    "moneyflow_directory_exists_proven": true,
+    "direct_pan_share_url_found": false,
+    "archive_filename_found": false,
+    "authenticated_group_access_required": true,
+    "public_raw_bytes_retrieved": false,
+    "source_identity_pass_allowed": false,
+    "reason": "Source location and course identity are proven, but original raw bytes have not yet been retrieved and Jessica overlap has not been executed."
+  },
+  "required_dates": [
+    "20200608",
+    "20201104",
+    "20210224",
+    "20210923",
+    "20210924",
+    "20211125",
+    "20220506",
+    "20230320",
+    "20230522"
+  ],
+  "residual_key_count": 16,
+  "admission_gate": {
+    "first_gate": "Retrieve untouched original USTC PAN moneyflow CSV bytes for overlap and target dates.",
+    "overlap_requirement": "At least 3 years, 5 trading days, 20-50 existing Jessica rows; exact-match ts_code, trade_date, buy_lg_amount, buy_elg_amount, sell_lg_amount, sell_elg_amount. Prefer also sm/md/net_mf fields.",
+    "required_match_rate": "100%",
+    "residual_retrieval_allowed_before_overlap_pass": false,
+    "proxy_allowed": false,
+    "imputation_allowed": false
+  },
+  "manual_access_blocker": {
+    "login_url": "https://pan.ustc.edu.cn/",
+    "group_name": "深度学习基础-2026",
+    "required_user_action": "Log in with an authorized USTC PAN account, search for and join/open the group 深度学习基础-2026, then provide one group/folder share URL or otherwise grant access to the top-level A股数据 folder; do not manually select individual files.",
+    "next_agent_target": "A股数据/moneyflow/ and specifically the nine date CSV files; if only a course archive/zip is exposed, retrieve the archive unchanged and extract only those dates plus overlap samples."
+  }
+}

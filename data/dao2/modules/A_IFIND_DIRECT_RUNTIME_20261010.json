@@ -1,0 +1,62 @@
+{
+  "artifact": "DAO2_A_IFIND_DIRECT_RUNTIME_20261010",
+  "observed_at": "2026-10-10T07:23:50Z",
+  "provider": "TongHuaShun iFinD Quant API",
+  "workflow": ".github/workflows/dao2-a-ifind-exact-probe-v1.yml",
+  "workflow_run_id": 38034274009,
+  "workflow_run_number": 3,
+  "workflow_head_sha": "746cc1f6b5c25688da7d72f7865924b63709b0d4",
+  "workflow_job_id": 114161369245,
+  "workflow_conclusion": "success",
+  "result_status": "IFIND_DIRECT_BLOCKED_ENTITLEMENT_OR_HISTORY",
+  "readability": {
+    "stage": "refresh_token_presence",
+    "readable": false,
+    "reason": "IFIND_REFRESH_TOKEN_MISSING"
+  },
+  "secret_observation": {
+    "secret_name": "IFIND_REFRESH_TOKEN",
+    "present": false,
+    "secret_value_persisted": false
+  },
+  "history_endpoint_planned": "https://quantapi.51ifind.com/api/v1/cmd_history_quotation",
+  "token_endpoint_planned": "https://quantapi.51ifind.com/api/v1/get_access_token",
+  "history_request_executed": false,
+  "identity_gate": {
+    "frozen_control_path": "data/dao2/modules/A_JESSICA_KNOWN_ROW_CONTROL_SCOPE_V1.json",
+    "control_count": 8,
+    "required_exact_comparisons": 32,
+    "required_result": "32/32 EXACT + mismatch=0",
+    "identity_gate_pass": false,
+    "winner_count": 0,
+    "identity_failure_claimed": false
+  },
+  "residual_scope_source": "data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json",
+  "residual_query_executed": false,
+  "resolved_target_count": 0,
+  "result_content_sha256_without_hash_field": "b8d1f3d68c38f3508b0a96c05c8534eee1c346308340877d332358fa985a87df",
+  "actions_artifact": {
+    "id": 11662899267,
+    "name": "dao2-a-ifind-exact-probe-v1",
+    "size_in_bytes": 928,
+    "zip_digest": "sha256:194e8902b17f8c058e871380d660690f0c2fe54f48e9498b45d453bc4fbd1e99",
+    "expires_at": "2026-11-09T07:23:50Z"
+  },
+  "formal_effect": {
+    "admitted_rows": 0,
+    "resolved_delta": 0,
+    "unresolved_delta": 0,
+    "checkpoint_created": false,
+    "main_net_flow_unbound_closed": false
+  },
+  "governance": {
+    "classification": "AUTHENTICATION_PREREQUISITE_MISSING_NOT_IDENTITY_FAILURE",
+    "repeat_without_new_secret_signal": false,
+    "request_secret_plaintext": false,
+    "next_route": [
+      "alphat01 targeted raw authorization/readability",
+      "targeted L2 vendor sample/raw",
+      "new authoritative four-field carrier"
+    ]
+  }
+}

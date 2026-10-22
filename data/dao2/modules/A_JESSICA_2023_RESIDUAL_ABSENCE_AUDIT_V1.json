@@ -1,0 +1,75 @@
+{
+  "artifact": "DAO2_A_JESSICA_2023_RESIDUAL_ABSENCE_AUDIT_V1",
+  "version": "1.0",
+  "as_of": "2026-09-27",
+  "module": "A_MAIN_NET_FLOW",
+  "jessica_commit": "6b245fa09cb628f3bcb812f0662bfef520e65fb4",
+  "job": "6ab8962152d0dbd7f1d99f33",
+  "governance": {
+    "evidence_only": true,
+    "no_proxy": true,
+    "no_imputation": true,
+    "no_value_inference": true,
+    "admission_effect": 0
+  },
+  "dates": {
+    "20230320": {
+      "moneyflow_path": "data/moneyflow/20230320.csv",
+      "moneyflow_sha256": "dd7d4e00ceb970decc61f5dd4b5951fb89f5401c042a845fe9ccc6000a499680",
+      "moneyflow_rows": 4929,
+      "daily_open_path": "data/daily_open/20230320.csv",
+      "daily_open_sha256": "58173089d57a1eede31919c24f07cdc21298a2b2c36080742716a7a39e1c68ab",
+      "daily_open_rows": 5115,
+      "targets": {
+        "000564.SZ": {
+          "moneyflow_present": false,
+          "daily_open_present": true,
+          "open": "1.54",
+          "pre_close": "1.47"
+        },
+        "001337.SZ": {
+          "moneyflow_present": false,
+          "daily_open_present": true,
+          "open": "29.15",
+          "pre_close": "26.5"
+        }
+      }
+    },
+    "20230522": {
+      "moneyflow_path": "data/moneyflow/20230522.csv",
+      "moneyflow_sha256": "ee3e66c4a8671cb124a6a99a72abd65ba8295eb00c1a0c30caa27a36e95d206a",
+      "moneyflow_rows": 4951,
+      "daily_open_path": "data/daily_open/20230522.csv",
+      "daily_open_sha256": "347c31af7b0bcf13a7724daf7a6f3188fd8e3f2d9819fb31f7eee35e26243a70",
+      "daily_open_rows": 5158,
+      "targets": {
+        "002118.SZ": {
+          "moneyflow_present": false,
+          "daily_open_present": true,
+          "open": "0.91",
+          "pre_close": "0.96"
+        },
+        "002157.SZ": {
+          "moneyflow_present": false,
+          "daily_open_present": true,
+          "open": "2.38",
+          "pre_close": "2.27"
+        },
+        "002503.SZ": {
+          "moneyflow_present": false,
+          "daily_open_present": true,
+          "open": "0.42",
+          "pre_close": "0.44"
+        },
+        "002504.SZ": {
+          "moneyflow_present": false,
+          "daily_open_present": true,
+          "open": "0.81",
+          "pre_close": "0.85"
+        }
+      }
+    }
+  },
+  "conclusion": "All six 2023 residual symbol-dates are present in Jessica pinned daily_open on the same date but absent from the corresponding classic moneyflow daily file. This confirms source-row absence rather than a non-trading date. It does not supply or infer the missing moneyflow values.",
+  "residual_rows_resolved": 0
+}

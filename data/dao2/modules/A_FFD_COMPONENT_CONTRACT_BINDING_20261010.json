@@ -1,0 +1,127 @@
+{
+  "artifact": "DAO2_A_FFD_COMPONENT_CONTRACT_BINDING_20261010",
+  "version": "1.0",
+  "module_id": "A",
+  "component": "main_net_flow",
+  "observed_at": "2026-10-10",
+  "status": "PASS_CROSSCHECK_EVIDENCE_NOT_ADMITTED",
+  "formal_effect": {
+    "admitted_rows": 0,
+    "resolved_delta": 0,
+    "unresolved_delta": 0,
+    "checkpoint_created": false,
+    "main_net_flow_unbound_closed": false
+  },
+  "sources": {
+    "ffd_public_contract_discovery": {
+      "workflow_run_id": 37897938406,
+      "artifact_id": 11600229232,
+      "artifact_digest": "sha256:19735f91e5000f6d0ba3cac84e17a7678ad439264136b0dda08fcfe85dcffe3c",
+      "catalog_url": "https://ffd.findesk.cn/api/v1/catalog/public-capabilities",
+      "catalog_http_status": 200,
+      "catalog_sha256": "274630e658eab0025e437543fddbe2a1db09d03da07bb830288816472a9dc05a",
+      "result_content_sha256_without_hash_field": "e15d5f67027101528c6d1be1c86e61a6d1f189c4bab0c2e30c5c45ec8fc1998a"
+    },
+    "existing_identity_evidence": "data/dao2/modules/A_FFD_MAIN_NET_AND_MINUTE_IDENTITY_EVIDENCE_V1.json",
+    "order_size_coverage_evidence": "data/dao2/modules/A_FFD_ORDER_SIZE_FLOW_COVERAGE_EVIDENCE_V1.json"
+  },
+  "contract_binding": {
+    "underlying_indicator_identifier": {
+      "ffd_public_main_net_definition_id": "ffd.public_main_net.v1",
+      "ffd_public_main_net_source_dataset": "stock_main_net_inflow",
+      "ffd_native_minute_definition_id": "ffd.native_minute_order_flow.v1",
+      "underlying_ifind_native_indicator_identifier": "UNBOUND",
+      "decision": "NO_PUBLIC_SOURCE_BACKED_IFIND_RAW_INDICATOR_NAME"
+    },
+    "classification_thresholds": {
+      "status": "UNBOUND",
+      "source_observation": "ffd.native_minute_order_flow.v1 catalog reports classification_threshold_status=unverified",
+      "fit_or_inference_used": false
+    },
+    "active_buy_sell_aggressor_rule": {
+      "status": "UNBOUND",
+      "source_observation": "Catalog exposes native fields tagged side=active_buy / active_sell, but does not define the aggressor-classification algorithm.",
+      "fit_or_inference_used": false
+    },
+    "amount_unit": {
+      "native_minute_status": "UNBOUND",
+      "native_minute_amount_unit": null,
+      "native_minute_currency": null,
+      "native_minute_scale": 1,
+      "native_minute_unit_status": "unverified",
+      "daily_order_size_definition_unit": "CNY",
+      "daily_order_size_definition_scale": 1,
+      "daily_order_size_applicability_to_a_residual_window": false,
+      "reason": "ffd.public_order_size_flow.v1 published historical coverage starts 2026-05-26, after all Module A residual dates."
+    },
+    "auction_inclusion": {
+      "opening_call_auction": "UNBOUND",
+      "continuous_auction": "PARTIAL_TIME_LABEL_BINDING_ONLY",
+      "closing_call_auction": "UNBOUND",
+      "source_observation": {
+        "timezone": "Asia/Shanghai",
+        "timestamp": "bar_end",
+        "range_bounds": "inclusive_bar_end_labels",
+        "continuous_sessions": ["09:31-11:30", "13:01-15:00"],
+        "warning": "资金分类金额与普通分钟成交额的时间归属尚未证明完全一致"
+      },
+      "inference_from_clock_labels_used": false
+    },
+    "cancel_and_trade_treatment": {
+      "status": "UNBOUND",
+      "reason": "No source-backed public contract statement found defining cancel handling versus executed-trade handling for the native minute money-flow fields."
+    },
+    "minute_timestamp_semantics": {
+      "status": "BOUND_FOR_LABELING_ONLY",
+      "timezone": "Asia/Shanghai",
+      "timestamp": "bar_end",
+      "range_bounds": "inclusive_bar_end_labels",
+      "intervals_minutes": [1, 5],
+      "continuous_sessions": ["09:31-11:30", "13:01-15:00"],
+      "does_not_prove_auction_assignment": true
+    },
+    "historical_revision_version_policy": {
+      "native_minute_revision_locked": false,
+      "native_minute_latency_sla_verified": false,
+      "public_main_net_historical_revision_retrieval_promised": false,
+      "order_size_definition_version": "1.2.0",
+      "order_size_definition_locked": true,
+      "order_size_fallback_to_other_definition": false,
+      "immutable_historical_asset_version_available": false,
+      "decision": "NO_REVISION_LOCKED_HISTORICAL_COMPONENT_CONTRACT_FOR_A_FORMAL_RESIDUAL_WINDOW"
+    },
+    "ifind_raw_indicator_names_or_metadata": {
+      "status": "UNBOUND",
+      "reason": "FFD public contract exposes FFD-native field names and definition IDs, not a source-backed mapping to iFinD native indicator identifiers."
+    },
+    "hidden_daily_component_fields": {
+      "status": "NO_EVIDENCE_FOR_RESIDUAL_WINDOW",
+      "known_explicit_component_asset": "ffd.public_order_size_flow.v1@1.2.0",
+      "known_asset_is_hidden": false,
+      "known_asset_equivalent_to_public_main_net": false,
+      "known_asset_historical_coverage_start": "2026-05-26",
+      "decision": "No source-backed evidence that daily four-component fields with Tushare-equivalent semantics are available for the 2020-2023 residual dates but merely hidden from the current public schema."
+    }
+  },
+  "identity_context": {
+    "ffd_public_main_net_residual_coverage": "13/16 scalar values exist",
+    "ffd_public_main_net_identity": "REJECT_SEMANTIC_IDENTITY_FAIL",
+    "ffd_native_minute_identity": "REJECT_FOUR_FIELD_IDENTITY_FAIL",
+    "frozen_gate_required": "8 controls / 32 exact field comparisons / mismatch=0",
+    "full_frozen_gate_reexecuted": false,
+    "reason_not_reexecuted": "No newly bound fixed component contract resolves unit, classification threshold, aggressor rule, auction treatment, and historical revision semantics."
+  },
+  "decision": {
+    "ffd_candidate_promoted_to_exact_carrier": false,
+    "ffd_formal_admission_allowed": false,
+    "route_status": "PASS_CROSSCHECK_EVIDENCE_NOT_ADMITTED",
+    "reopen_condition": "A new source-backed fixed component contract binds the missing semantics and is then tested unchanged against all frozen 8 Jessica controls for 32/32 exact with mismatch=0 before any residual admission."
+  },
+  "governance": {
+    "numeric_threshold_fitting_used": false,
+    "result_driven_scale_tuning_used": false,
+    "proxy_admission_used": false,
+    "frozen_controls_modified": false,
+    "public_indexed_search_reopened": false
+  }
+}
