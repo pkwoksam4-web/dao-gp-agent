@@ -10,14 +10,22 @@ permissions:
 
 jobs:
   shadow:
-    # Hard-disabled while PR #27 and the owner authorization gate are unresolved.
-    # Re-enable only after PR #27 is merged to main and the ordered issue #26 gates pass.
+    # Hard-disabled while PR #27 and owner authorization are unresolved.
+    # Re-enable only after the full authoritative preflight is bound and passes.
     if: ${{ false }}
+    environment: pit-production
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
     steps:
+      - name: Enforce owner authorization kill switch
+        shell: bash
+        env:
+          PIT_WRITE_AUTHORIZATION: ${{ vars.PIT_WRITE_AUTHORIZATION }}
+        run: |
+          test "$PIT_WRITE_AUTHORIZATION" = "APPROVED" || {
+            echo "::error::PIT production writes are not authorized"
+            exit 1
+          }
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
@@ -35,6 +43,7 @@ jobs:
       - name: Write prospective ranking and observation Shadow
         env:
           SHADOW_REQUEST_PATH: ${{ steps.req.outputs.path }}
+          NEON_DATABASE_URL: ${{ secrets.PIT_WRITER_DATABASE_URL }}
         run: python scripts/shadow_ranking_observation.py
       - if: always()
         uses: actions/upload-artifact@v4
