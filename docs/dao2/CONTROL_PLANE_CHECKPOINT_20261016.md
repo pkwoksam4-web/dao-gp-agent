@@ -81,7 +81,7 @@ B remains structurally underdetermined rather than a small missing-data gap:
 - historical final scorer source/executable = not recovered
 - normalization, clipping, combination and final mapping = not historically bound
 
-`recovery_decision_date: 2026-10-31`
+`recovery_decision_date: 2026-10-30` (proposed for owner confirmation on 2026-10-23; 10/31 falls on Saturday)
 
 If no new authoritative carrier exists by that date, historical final-scorer recovery stops being an open-ended active loop. `MARKET_BREADTH_UNBOUND` remains formally unresolved/frozen and execution switches to a separately versioned successor reconstruction contract explicitly labelled **NOT the historical GP12 scorer**. The historical recovery path remains preserved for future authoritative evidence.
 
@@ -90,8 +90,10 @@ If no new authoritative carrier exists by that date, historical final-scorer rec
 Counts remain internally consistent:
 `43,084 - 42,783 = 301 = 298 + 3`.
 
-Frozen decision:
+Branch-local recorded disposition (not owner-confirmed):
 `DERIVED_CLOSE_PROVENANCE_MIGRATION = REJECTED_FOR_HISTORICAL_IDENTITY_PATH`.
+
+Owner confirmation: `PENDING`. The branch status does not establish the owner's final decision.
 
 The 298 derived-close rows remain evidence-only and may not close historical Series identity. Thus historical C is missing 301 authoritative raw keys, not only three rows.
 
@@ -163,3 +165,10 @@ PR #21 review gate is recorded in review `5545478529`. CI PASS at current HEAD d
 ## 10. Governing conclusion
 
 There is no evidence of a discipline breach in the fail-closed rules. The material weakness was the absence of explicit exit conditions and several over-strong evidence interpretations. Those are corrected in this checkpoint: A source omission is no longer inferred, B now has a decision date, C derived provenance is explicitly rejected for historical identity, D PASS is tied to data-layer evidence and branch identity, and PR #21 is blocked from merge pending the two runtime contract fixes above.
+
+
+## 11. Governance status update — 2026-10-22
+
+- The proposed B decision date is 2026-10-30, subject to owner review on 10/23; this corrects the prior Saturday date.
+- C's branch-local historical identity migration rejection remains recorded as branch state only. The owner has not confirmed it; do not treat the rejection as a final project decision.
+- Main controller naming is 主控 Agent 3, per the owner's prior explicit instruction.
