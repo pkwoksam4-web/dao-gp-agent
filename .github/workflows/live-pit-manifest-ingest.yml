@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   ingest:
+    # Hard-disabled until PR #27 is merged to main and all four issue #26 gates pass.
+    # Re-enable only in a post-merge commit after recording the merge SHA and preflight evidence.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
