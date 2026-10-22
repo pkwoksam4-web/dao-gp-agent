@@ -180,7 +180,7 @@ def main():
             "feature_window_end":expected_feature_dates[-1],
             "expected_previous_trade_date":expected_previous_trade_date,
             "inserted":{"bars":0,"quotes":0,"flows":0,"features":0,"sources":0},
-            "protected_before":{},"protected_after":{},"prev_close_continuity":{}}
+            "protected_before":{},"protected_after":{},"prev_close_continuity":{},"verified_coverage":{}
     dsn=os.environ["NEON_DATABASE_URL"]
     now=datetime.now(timezone.utc).isoformat()
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
@@ -325,6 +325,7 @@ def main():
         cur.execute("SELECT count(*) AS n FROM stock_feature_snapshots WHERE snapshot_date=%s AND symbol=ANY(%s)",(td,CORE13))
         if cur.fetchone()["n"]!=13:
             raise RuntimeError("post-write feature coverage !=13/13")
+        report["verified_coverage"]={"bars":13,"features":13}
 
         for t in PROTECTED:
             cur.execute(f"SELECT count(*) AS n FROM {t}")
