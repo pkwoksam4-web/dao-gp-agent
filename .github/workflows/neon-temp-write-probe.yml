@@ -1,0 +1,70 @@
+name: Temporary Neon Permission Probe
+
+on:
+  push:
+    branches:
+      - probe/neon-temp-write-20261022
+    paths:
+      - .github/workflows/neon-temp-write-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL client
+        run: python -m pip install --disable-pip-version-check "psycopg[binary]>=3.2,<4"
+      - name: Write one row to a transaction-local test table
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import psycopg
+
+          report = {
+              "probe": "GITHUB_ACTIONS_NEON_DATABASE_URL_TEMP_TABLE_V1",
+              "rule_id": None,
+              "error_message": None,
+              "blocked_action": None,
+          }
+          try:
+              with psycopg.connect(os.environ["NEON_DATABASE_URL"]) as conn:
+                  with conn.cursor() as cur:
+                      cur.execute(
+                          "CREATE TEMP TABLE codex_permission_probe_20261022 "
+                          "(probe_id text PRIMARY KEY, marker text NOT NULL) ON COMMIT DROP"
+                      )
+                      cur.execute(
+                          "INSERT INTO codex_permission_probe_20261022 (probe_id, marker) "
+                          "VALUES (%s, %s)",
+                          ("dao-gp-agent-actions-probe-20261022", "CONTROLLED_TEMP_ONLY"),
+                      )
+                      cur.execute(
+                          "SELECT probe_id, marker FROM codex_permission_probe_20261022"
+                      )
+                      report["selected_row"] = cur.fetchone()
+              report["status"] = "PASS"
+          except Exception as exc:
+              report["status"] = "FAIL"
+              report["blocked_action"] = (
+                  "connect via NEON_DATABASE_URL; CREATE TEMP TABLE ON COMMIT DROP; INSERT one test row"
+              )
+              report["rule_id"] = None
+              report["sqlstate"] = getattr(exc, "sqlstate", None)
+              diag = getattr(exc, "diag", None)
+              message = getattr(diag, "message_primary", None) or str(exc)
+              dsn = os.environ.get("NEON_DATABASE_URL", "")
+              report["error_message"] = message.replace(dsn, "[REDACTED_DSN]") if dsn else message
+              print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+              raise SystemExit(1)
+          print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+          PY
