@@ -8,7 +8,10 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from pit_calendar_gate import ContractGateError, load_exchange_trading_calendar
+try:
+    from pit_calendar_gate import ContractGateError, load_exchange_trading_calendar
+except ModuleNotFoundError:
+    from scripts.pit_calendar_gate import ContractGateError, load_exchange_trading_calendar
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
