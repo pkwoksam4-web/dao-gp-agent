@@ -1,0 +1,65 @@
+name: Shadow Request After Live PIT Ingest
+
+on:
+  workflow_run:
+    workflows: ["Live PIT Manifest Ingest"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shadow-request-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  request:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Resolve triggering immutable manifest
+        id: manifest
+        shell: bash
+        env:
+          INGEST_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          FILE="$(git show --pretty='' --name-only "$INGEST_HEAD_SHA" | grep '^runtime/pit_manifests/.*\.json$' | head -n 1)"
+          test -n "$FILE" || { echo "::error::No PIT manifest in successful ingest head"; exit 1; }
+          echo "path=$FILE" >> "$GITHUB_OUTPUT"
+      - name: Wait until frozen 17:30 Asia/Shanghai request gate
+        shell: bash
+        run: |
+          WAIT="$(python - <<'PY'
+          from datetime import datetime, time
+          from zoneinfo import ZoneInfo
+          now=datetime.now(ZoneInfo("Asia/Shanghai"))
+          target=datetime.combine(now.date(),time(17,30),tzinfo=now.tzinfo)
+          print(max(0,int((target-now).total_seconds())))
+          PY
+          )"
+          test "$WAIT" -le 5400 || { echo "::error::17:30 gate is more than 90 minutes away"; exit 1; }
+          if [ "$WAIT" -gt 0 ]; then sleep "$WAIT"; fi
+      - name: Generate immutable idempotent Shadow request
+        run: python scripts/generate_shadow_request.py --manifest "${{ steps.manifest.outputs.path }}"
+      - name: Commit request if newly created
+        shell: bash
+        env:
+          TARGET_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          git add runtime/shadow_requests
+          if git diff --cached --quiet; then
+            echo "SHADOW_REQUEST_NOOP_ALREADY_EXISTS"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "runtime: add idempotent Shadow request after ingest"
+          git push origin "HEAD:$TARGET_BRANCH"
