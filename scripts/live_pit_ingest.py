@@ -22,7 +22,7 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
-from shadow_contract_gates import (
+from pit_calendar_gate import (
     feature_window_dates,
     load_exchange_trading_calendar,
     validate_feature_window_continuity,
