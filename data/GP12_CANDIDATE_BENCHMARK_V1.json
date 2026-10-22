@@ -1,0 +1,37 @@
+{
+  "artifact": "GP12_CANDIDATE_BENCHMARK_BINDING_V1",
+  "version": "V1",
+  "strategy_id": "GP12_REBUILD_CANDIDATE_V1",
+  "status": "CANDIDATE_ONLY_UNAPPROVED",
+  "definition_origin": "NEW_RECONSTRUCTION_CANDIDATE",
+  "description": "New reconstruction candidate benchmark definition only. It is not a recovered GP V1.1 benchmark and must never be represented as historical recovery evidence.",
+  "benchmark": {
+    "name": "CSI All Share",
+    "local_name": "中证全指",
+    "code": "000985",
+    "eastmoney_secid": "1.000985",
+    "series": "daily_close",
+    "series_construction": "INDEX_OWN_DAILY_CLOSE_NO_CONSTITUENT_RECONSTRUCTION",
+    "source": "Eastmoney historical daily kline endpoint, fqt=0, klt=101"
+  },
+  "formal_window": {
+    "start": "2020-06-01",
+    "end": "2026-04-17"
+  },
+  "pit_policy": {
+    "timezone": "Asia/Shanghai",
+    "session_close": "15:00:00",
+    "same_session_close_usable_before_close": false,
+    "availability_semantics": "A session D index close is admitted only at or after D 15:00:00 Asia/Shanghai. This validates no-lookahead timing of the candidate binding; it does not claim archival proof of the provider's historical publication timestamp."
+  },
+  "pins": {
+    "parameters_sha256": "22f054d0068c2c1d7bed3c17e586eca1b22d7b3888547de36e6e754578ceb204",
+    "factors_sha256": "b52f394fb13417e6f0323f7175a50a7d950dba8af09f63a97e739c6a4c70160e",
+    "frozen_calendar_legacy_sha256": "0bfa32175dfccbd24d30eb7ceb0605f6cde2ed0bcc31ac2cac61479ba812add0",
+    "frozen_calendar_n": 1426
+  },
+  "claims": {
+    "gp_v11_benchmark_recovered": false,
+    "historical_recovery_claim_allowed": false
+  }
+}

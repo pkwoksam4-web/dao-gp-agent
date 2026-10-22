@@ -1,0 +1,150 @@
+{
+  "artifact": "DAO2_B_FINAL_BREADTH_SCORER_SPEC_AUDIT_V1",
+  "audited_head": "38859f37e4d49aa2bc743a6ff1127b7ad85c455b",
+  "authoritative_raw_breadth": {
+    "function_name": "market_breadth_daily",
+    "function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a",
+    "known_outputs": [
+      "adv_all",
+      "dec_all",
+      "flat_all",
+      "adv_ratio_all",
+      "eligible_n",
+      "adv_eligible",
+      "dec_eligible",
+      "adv_ratio_eligible",
+      "median_ret_all",
+      "advancer_state_partial"
+    ],
+    "known_ratio_semantics": {
+      "adv_ratio_all": "adv_all/max(1,adv_all+dec_all); flat excluded",
+      "adv_ratio_eligible": "adv_eligible/max(1,adv_eligible+dec_eligible)"
+    },
+    "source_file_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+    "source_path": "src/run_panel_backtest.py",
+    "status": "PASS_SUBCOMPONENT"
+  },
+  "benchmark_check": {
+    "candidate_only": true,
+    "code": "000985",
+    "date_n": 1426,
+    "formal_window": [
+      "2020-06-01",
+      "2026-04-17"
+    ],
+    "historical_gp_v11_benchmark_identity_recovered": false,
+    "name": "CSI All Share",
+    "reason": "The benchmark checkpoint contains no authoritative expected Market Breadth/Diffusion scorer outputs or raw-breadth-to-score pairs.",
+    "status": "PASS_SUBCOMPONENT",
+    "usable_as_final_breadth_scorer_oracle": false
+  },
+  "branch": "gp/dao2-b-market-package",
+  "candidate_formula_rejected_as_historical_spec": {
+    "candidate_common_clip": "clip(x)=max(-1,min(1,x))",
+    "candidate_common_score": "factor_score=50*(1+clip(raw))",
+    "candidate_market_breadth_formula": "2*mean(market_breadth_ratio[-5:])-1",
+    "historical_identity_claim_allowed": false,
+    "proposal_status": "UNAPPROVED",
+    "reason": "The file explicitly states these are newly authored proposal definitions, not recovered GP V1.1 formulas.",
+    "source": "data/GP12_CANDIDATE_FACTORS_V1.json"
+  },
+  "checked_sources": [
+    {
+      "blob_sha": "efc589721db834f97e846c13f62cb7932888c149",
+      "path": "data/dao2/modules/B_MARKET_PACKAGE_STATE_V1.json"
+    },
+    {
+      "blob_sha": "5dc7da64f7ce5547ce6ed33d0920ee5c68b3fe83",
+      "path": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_CHECKPOINT_V1.json"
+    },
+    {
+      "blob_sha": "625ecab93334ac0b6be1ea2f2eaf3e30a6fb0782",
+      "path": "data/dao2/modules/B_MARKET_BREADTH_HISTORICAL_SOURCE_V1.json"
+    },
+    {
+      "blob_sha": "cfe99e4dc49a83bc15bfc6614668e2b81325c8f1",
+      "path": "data/dao2/modules/B_MARKET_BREADTH_RECOVERY_V1.json"
+    },
+    {
+      "blob_sha": "345ac747e23d580a84d650a84d7725213e23b272",
+      "path": "data/dao2/modules/B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1.json"
+    },
+    {
+      "blob_sha": "f424a8a71498e8ec9d8ba5d68da97b4b2d67fbf8",
+      "path": "data/dao2/modules/B_MARKET_BENCHMARK_CHECKPOINT_V1.json"
+    },
+    {
+      "blob_sha": "1d82fd44aa952766bf4ab917fa7e69354e23f8a3",
+      "path": "data/GP12_CANDIDATE_FACTORS_V1.json"
+    },
+    {
+      "blob_sha": "fdb92de355a5f50263f94090d72facea3a2c4a36",
+      "path": "data/GP_V11_STRATEGY_RECOVERY_EVIDENCE_V482.json"
+    }
+  ],
+  "decision": {
+    "final_breadth_scorer_implementation_allowed": false,
+    "market_breadth_unbound_closed": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false,
+    "reason": "Authoritative historical final scorer semantics are not fully specified. Implementing from the candidate scorer would invent historical definitions."
+  },
+  "frozen_non_actions": {
+    "benchmark_replay": false,
+    "candidate_formula_promotion": false,
+    "clipping_guess": false,
+    "model_or_admission_change": false,
+    "normalization_enumeration": false,
+    "oos_start": false,
+    "raw_breadth_rebuild": false
+  },
+  "implementation_result": {
+    "files_created_for_scorer": [],
+    "reason_no_run": "No authoritative final scorer formula or expected-output oracle exists; running a newly invented scorer against the benchmark would not validate historical identity.",
+    "scorer_code_changed": false,
+    "targeted_scorer_validation_run": null
+  },
+  "missing_authoritative_final_scorer_contract": {
+    "all_vs_eligible_final_combination": {
+      "required_definition": "Exact historical combination rule for all-universe versus eligible-universe breadth in the final scorer.",
+      "status": "UNKNOWN"
+    },
+    "authoritative_io_pairs": 0,
+    "clipping": {
+      "required_definition": "Exact clipping/capping rule, bounds and whether clipping occurs before or after aggregation/normalization.",
+      "status": "UNKNOWN"
+    },
+    "final_score_mapping": {
+      "required_definition": "Exact conversion from normalized/clipped breadth signal to the historical factor contribution described in B as the final 4% mapping, including sign, scale, offset and weighting order.",
+      "status": "UNKNOWN"
+    },
+    "input_selection": {
+      "required_definition": "Which recovered daily raw outputs feed the historical Market Breadth/Diffusion final scorer: adv_ratio_all, adv_ratio_eligible, both, median_ret_all, state, or another exact combination.",
+      "status": "UNKNOWN"
+    },
+    "normalization": {
+      "required_definition": "Exact normalization transform, constants/scales, centering and denominator semantics.",
+      "status": "UNKNOWN"
+    },
+    "output_contract": {
+      "required_definition": "Authoritative output field name(s), numeric range/units, whether output is pre-weight factor score or post-weight contribution, and exact missing/non-finite behavior.",
+      "status": "UNKNOWN"
+    },
+    "temporal_aggregation": {
+      "required_definition": "Exact lookback/window and aggregation across dates, if any, before normalization.",
+      "status": "UNKNOWN"
+    }
+  },
+  "module_id": "B",
+  "remaining_dependency": {
+    "current_action": "WAIT_FOR_NEW_AUTHORITATIVE_FINAL_SCORER_CARRIER",
+    "reopen_requires_one_of": [
+      "exact historical final-scorer source or executable",
+      "same-date authoritative raw breadth -> breadth component score row(s)",
+      "same-date authoritative breadth component score -> final/total score row(s)",
+      "multiple authoritative historical I/O rows sufficient to uniquely determine the final mapping"
+    ]
+  },
+  "status": "SPEC_INCOMPLETE_NO_IMPLEMENTATION",
+  "version": "1.0"
+}

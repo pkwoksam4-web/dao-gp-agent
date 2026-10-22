@@ -1,0 +1,83 @@
+{
+  "artifact": "DAO2_B_MARKET_BREADTH_HISTORICAL_SOURCE_V1",
+  "version": "1.0",
+  "module_id": "B",
+  "status": "PASS_RAW_HISTORICAL_EXECUTABLE_IDENTITY",
+  "source_chain": {
+    "library_original_file_id": "file_0000000027d4820683c9a38a9886d045",
+    "temporary_copy_file_id": "file_00000000fd208206b76b9cd1e1dd43ba",
+    "archive_name": "v11_offline_backtest_v3_10.zip",
+    "archive_size_bytes": 1301865,
+    "archive_sha256": "d526b1341694e14b13ee753200165c0701c3948f984a2e96211bb812f856f03d",
+    "package_manifest_path": "PACKAGE_MANIFEST_V310.json",
+    "package_manifest_sha256": "fa7fe8d4856a1a9140d7c3171c315cd0f2ec0a90ac4946b8c18940507f19aad8",
+    "source_path": "src/run_panel_backtest.py",
+    "source_file_size_bytes": 43631,
+    "source_file_sha256": "62229450e488a75ba4352a239fc762a2b9f48034f765966242632970937278c2",
+    "function_name": "market_breadth_daily",
+    "function_line_start": 617,
+    "function_line_end": 634,
+    "function_hash_rule": "UTF-8 exact source slice lines 617..634 inclusive, final LF stripped; no other normalization",
+    "function_source_bytes_without_final_lf": 1150,
+    "function_sha256": "b60d7afcb881bd1903e6cdeb5e80af895e5d337b1094988be110fca9f83d543a"
+  },
+  "source_text": "def market_breadth_daily(panel: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Partial GP market-regime input from Daily data only.\n    This DOES NOT claim to be the full three-state regime because yesterday-limit-up performance\n    and first-30-minute volume require extra datasets.\n    \"\"\"\n    x=panel.copy()\n    active=~x[\"ex_suspended\"].astype(bool)\n    rows=[]\n    for d,g0 in x[active].groupby(\"date\"):\n        g=g0[g0[\"ret_d1\"].notna()]\n        ge=g[g[\"eligible\"]]\n        adv_all=int((g[\"ret_d1\"]>0).sum()); dec_all=int((g[\"ret_d1\"]<0).sum()); flat_all=int((g[\"ret_d1\"]==0).sum())\n        adv_el=int((ge[\"ret_d1\"]>0).sum()); dec_el=int((ge[\"ret_d1\"]<0).sum())\n        if adv_all>3000: adv_state=\"HOT\"\n        elif adv_all>=1000: adv_state=\"NEUTRAL\"\n        else: adv_state=\"COLD\"\n        rows.append({\"date\":d,\"active_all\":len(g),\"adv_all\":adv_all,\"dec_all\":dec_all,\"flat_all\":flat_all,\"adv_ratio_all\":adv_all/max(1,adv_all+dec_all),\"eligible_n\":len(ge),\"adv_eligible\":adv_el,\"dec_eligible\":dec_el,\"adv_ratio_eligible\":adv_el/max(1,adv_el+dec_el),\"median_ret_all\":g[\"ret_d1\"].median(),\"advancer_state_partial\":adv_state})\n    return pd.DataFrame(rows)",
+  "exact_semantics": {
+    "active_universe": "rows where ex_suspended is false",
+    "return_observation_filter": "within active rows, retain ret_d1 not null",
+    "eligible_universe": "subset of observed active rows where eligible is true",
+    "adv_all": "count(ret_d1 > 0) in observed active universe",
+    "dec_all": "count(ret_d1 < 0) in observed active universe",
+    "flat_all": "count(ret_d1 == 0) in observed active universe",
+    "adv_ratio_all": "adv_all / max(1, adv_all + dec_all); flat excluded from denominator",
+    "adv_eligible": "count(ret_d1 > 0) in eligible universe",
+    "dec_eligible": "count(ret_d1 < 0) in eligible universe",
+    "adv_ratio_eligible": "adv_eligible / max(1, adv_eligible + dec_eligible)",
+    "median_ret_all": "median ret_d1 in observed active universe",
+    "advancer_state_partial": "HOT if adv_all>3000; NEUTRAL if adv_all>=1000; otherwise COLD"
+  },
+  "behavior_reverse_check": {
+    "historical_equivalence_test_path": "src/test_streaming_breadth_equivalence_v37.py",
+    "historical_equivalence_test_sha256": "f365d34ae44319558738b25921a25742c55f4cc183ca6db0a43646b39b5e7f9b",
+    "streaming_implementation_path": "src/run_streaming_normalized_backtest.py",
+    "streaming_implementation_sha256": "7390edb56d0df549ec997c7d52141c5bed37410f307bd5cd62733a5b27e9a470",
+    "historical_equivalence_test_result": "PASS v3.7 streaming breadth exactly matches monolithic reference",
+    "current_custom_reverse_check_result": "PASS",
+    "custom_case_expected": {
+      "active_all": 3,
+      "adv_all": 1,
+      "dec_all": 1,
+      "flat_all": 1,
+      "adv_ratio_all": 0.5,
+      "eligible_n": 2,
+      "adv_eligible": 1,
+      "dec_eligible": 1,
+      "adv_ratio_eligible": 0.5,
+      "median_ret_all": 0,
+      "advancer_state_partial": "COLD"
+    }
+  },
+  "historical_scope_boundary": {
+    "readme_cn_sha256": "195e8e126437cdd4a9ed1f68e7d503d07ba2470cfbef124c17504d21ede42b6a",
+    "readme_panel_cn_sha256": "21d47ec268115f036a89bb99517b73dfc6eff5d5a73ced8e0d8cc37aa70f4395",
+    "data_source_validation_sha256": "089bf7a29e123591d90749b0f00d20f9b95304882d1fc212c9527afbd0439892",
+    "v310_declares_daily_structure_layer_only": true,
+    "market_regime_not_fully_merged": true,
+    "market_breadth_final_4pct_mapping_present_in_package": false,
+    "exact_normalization_present_in_package": false,
+    "exact_clipping_present_in_package": false,
+    "interpretation": "The recovered function is authoritative historical raw Daily breadth / partial market-regime input. It is not proof of the final V1.0 Market Breadth/Diffusion 4% score mapping."
+  },
+  "blocker_effect": {
+    "MARKET_BREADTH_UNBOUND": "REMAINS_OPEN",
+    "closed_subcomponent": "HISTORICAL_RAW_BREADTH_EXECUTABLE_IDENTITY",
+    "remaining_required_identity": [
+      "final breadth/diffusion aggregation beyond raw outputs if any",
+      "normalization",
+      "clipping",
+      "final 4% score mapping or another authoritative executable proving those semantics"
+    ]
+  },
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}

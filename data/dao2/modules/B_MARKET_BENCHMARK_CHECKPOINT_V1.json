@@ -1,0 +1,37 @@
+{
+  "artifact": "DAO2_B_MARKET_BENCHMARK_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "B",
+  "status": "PASS_SUBCOMPONENT",
+  "blocker_closed": "MARKET_BENCHMARK_UNBOUND",
+  "candidate_only": true,
+  "historical_gp_v11_benchmark_identity_recovered": false,
+  "benchmark": {
+    "name": "CSI All Share",
+    "local_name": "中证全指",
+    "code": "000985",
+    "series": "daily_close",
+    "formal_window": ["2020-06-01", "2026-04-17"],
+    "date_n": 1426,
+    "same_session_close_usable_before_1500": false
+  },
+  "verified_replay": {
+    "workflow_name": "DAO2 B Benchmark Replay V1",
+    "workflow_run": 35493957183,
+    "workflow_head": "2be305b43e73b06a4a9f40ef4d45bf902d074151",
+    "artifact_name": "dao2-b-benchmark-replay-v1",
+    "artifact_id": 10599722775,
+    "artifact_zip_sha256": "9cbfccb5a35aec7b84394897574a9a08db70ddea32863b7e69ca9624f1b4f77e",
+    "validation_json_sha256": "d0d5238aa956df4607d9232918964f79f4d8a49530b159bf70df2ee90eca1d2a",
+    "close_csv_sha256": "ed7361f0f80971f70355e6a8cfe04c0f3e9772b88810f4a95a33d32b800d07db",
+    "close_series_sha256": "e9541cf917893b214ebe31a8602914c793e162bc5280137bfac88d243b75a73e"
+  },
+  "policy": {
+    "replay_again": false,
+    "candidate_definition_origin": "NEW_RECONSTRUCTION_CANDIDATE",
+    "historical_recovery_claim_allowed": false,
+    "module_b_pass_from_benchmark_alone": false
+  },
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}

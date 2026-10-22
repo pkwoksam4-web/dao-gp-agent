@@ -1,0 +1,44 @@
+{
+  "artifact": "DAO2_B_MARKET_BREADTH_CANDIDATE_CHECKPOINT_V1",
+  "version": "1.0",
+  "module_id": "B",
+  "status": "PASS_CANDIDATE_SUBCOMPONENT_ONLY",
+  "origin": "NEW_RECONSTRUCTION_CANDIDATE",
+  "historical_identity_claimed": false,
+  "historical_gp_v11_source_recovered": false,
+  "definition": "advancers/(advancers+decliners); flat and first trade without prior comparable trade are excluded from denominator",
+  "formal_window": ["2020-06-01", "2026-04-17"],
+  "date_n": 1426,
+  "formal_symbol_n": 844,
+  "pit_scope": "SESSION_CLOSE_NO_LOOKAHEAD_POLICY",
+  "same_session_usable_before_close": false,
+  "verified_evidence": {
+    "bridge_workflow_run": 35054180237,
+    "bridge_workflow_head": "6a0eb77dd54c7cabda128f1d84f9954eba2d0037",
+    "bridge_artifact_name": "gp12-market-breadth-bridge-v1",
+    "bridge_artifact_id": 10429659699,
+    "bridge_artifact_zip_sha256": "9615dba0c2eb9c3db2cd04cf8d5ecf2509752f419fb65ef38815b851185b8031",
+    "bridge_audit_sha256": "f2f3073098979e669e961c8654234b6792fadf8a46a51fe249d93406f356a300",
+    "candidate_series_sha256": "7aaa527806d373133fbedd202b92d3e5da8b903099cfc3335b267951ead3c788",
+    "bridge_directions_sha256": "ee4ec577bf23e867bb2eb44fad271a9fdb788d769f098c0c2794a2516e616a68",
+    "old_lifecycle_bridge_n": 737,
+    "bridge_resolved_n": 737,
+    "old_lifecycle_no_previous_trade_excluded_n": 0,
+    "new_lifecycle_first_trade_excluded_n": 107
+  },
+  "binding_evidence": {
+    "repository_commit": "1263d350974a599b5e61248c298800dee6b75ba5",
+    "binding_path": "data/GP12_CANDIDATE_MARKET_BREADTH_BINDING_V1.json",
+    "binding_blob_sha": "b0565f4264717409e26b72fe8ece80c563e778e9",
+    "binding_canonical_sha256": "337f6dafa3894c55fb8f24b87779d600c9258b1c09f10b8b140d65a120eed1c1",
+    "candidate_input_readiness_run": 35054783668,
+    "candidate_input_readiness_artifact_id": 10430775088,
+    "candidate_input_readiness_artifact_zip_sha256": "6402fd76a6cfb9944e4e55186468748d797fc6b941f9443080017610e5944397"
+  },
+  "blocker_effect": {
+    "MARKET_BREADTH_UNBOUND": "NO_CHANGE",
+    "reason": "Candidate series is PIT-verified but its formula is explicitly a new reconstruction candidate; it is not historical GP V1.1 executable identity."
+  },
+  "model_freeze_allowed": false,
+  "oos_metrics_allowed": false
+}
