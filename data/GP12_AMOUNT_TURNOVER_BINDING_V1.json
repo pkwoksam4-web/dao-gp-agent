@@ -1,0 +1,90 @@
+{
+  "amount_source": {
+    "amount_cny_formal_verified": true,
+    "bad_amount_rows": 0,
+    "liquidity_artifact": "gp-liquidity-80m-v482",
+    "liquidity_sha256": "a041d50ab2c9bbbe5f129d9afae87e817de0b1d8073c86cf829427f031bbc37b",
+    "raw_daily_artifact": "gp-sohu-full-raw-v482-reaudit",
+    "raw_daily_sha256": "cee7e91f1fda605f7c3bdf41c3f4a7796feeae83f8c3702e50900e6af3fa9550",
+    "raw_pitst_exact_date_verified": true,
+    "trade_rows": 1011607
+  },
+  "artifact": "GP12_AMOUNT_TURNOVER_BINDING_V1",
+  "coverage": {
+    "amount_turnover_pit_verified": true,
+    "formal_symbol_n": 844,
+    "na_symbols": [
+      "600074.SH",
+      "600485.SH",
+      "600677.SH"
+    ],
+    "trade_rows": 1011607,
+    "universe_n": 847
+  },
+  "formal_end": "2026-04-17",
+  "formal_start": "2020-06-01",
+  "safety": {
+    "candidate_adoption_status": "UNAPPROVED",
+    "candidate_scoring_ready": false,
+    "model_freeze_allowed": false,
+    "oos_metrics_allowed": false
+  },
+  "turnover_source_audit": {
+    "applied_trade_status_corrections": [
+      [
+        "002087.SZ",
+        "2024-06-13"
+      ],
+      [
+        "300356.SZ",
+        "2023-06-20"
+      ],
+      [
+        "600647.SH",
+        "2024-06-13"
+      ],
+      [
+        "600766.SH",
+        "2024-06-13"
+      ],
+      [
+        "603133.SH",
+        "2024-06-13"
+      ]
+    ],
+    "artifact_id": 10383758045,
+    "artifact_name": "gp12-baostock-turnover-full-v482",
+    "artifact_zip_sha256": "53e574b91d72359e2dc073fdb1796f1945c46222902cf85beb9089b2a712e55a",
+    "audit_json_sha256": "9709dd46516f7ba8b3d6914c3a1866649bb23ffc041214ac932477553afa8c0f",
+    "bad_turnover_n": 0,
+    "coverage_verified": true,
+    "cross_source_sohu_anchor_n": 2,
+    "cross_source_sohu_anchor_tolerance_bp": 0.5,
+    "cross_source_sohu_fail_n": 0,
+    "cross_source_sohu_matched_n": 2,
+    "cross_source_sohu_max_diff_bp": 0.1600000000000268,
+    "duplicate_n": 0,
+    "extra_n": 0,
+    "missing_n": 0,
+    "normalized_unit": "ratio",
+    "parquet_sha256": "13c86aa5ee0920f00e8bd3c031a275640b3f75a82c7e28c380245b43a9bf84e6",
+    "provider": "BaoStock query_history_k_data_plus",
+    "provider_field": "turn",
+    "provider_turn_unit": "percent",
+    "provider_version": "0.9.3",
+    "scope_n": 847,
+    "source_semantics_verified": true,
+    "turnover_ratio_pit_verified": true,
+    "turnover_rows": 1011607,
+    "turnover_symbol_n": 844,
+    "unresolved_symbol_n": 0,
+    "workflow_head": "c8a3db077d3dc73e188937e9c355bc0bfa863382",
+    "workflow_run": 34937058721,
+    "zero_trade_symbols": [
+      "600074.SH",
+      "600485.SH",
+      "600677.SH"
+    ]
+  },
+  "version": "1.0"
+}

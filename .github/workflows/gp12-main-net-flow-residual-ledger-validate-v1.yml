@@ -1,0 +1,81 @@
+name: gp12-main-net-flow-residual-ledger-validate-v1
+
+on:
+  push:
+    branches:
+      - gp/gp12-turnover-ratio-v1
+    paths:
+      - data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json
+      - .github/workflows/gp12-main-net-flow-residual-ledger-validate-v1.yml
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate residual ledger invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          p=Path('data/GP12_CANDIDATE_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1.json')
+          d=json.loads(p.read_text())
+
+          assert d['formal_expected_rows'] == 1011607
+          assert d['direct_public_archive_rows'] == 1011565
+          assert d['zero_proof_rows'] == 26
+          assert d['resolved_rows'] == d['direct_public_archive_rows'] + d['zero_proof_rows'] == 1011591
+          assert d['unresolved_rows'] == d['formal_expected_rows'] - d['resolved_rows'] == 16
+          assert abs(d['resolved_fraction'] - d['resolved_rows']/d['formal_expected_rows']) < 1e-15
+          assert abs(d['unresolved_fraction'] - d['unresolved_rows']/d['formal_expected_rows']) < 1e-15
+
+          keys=[(x['ts_code'],x['trade_date']) for x in d['unresolved_keys']]
+          assert len(keys) == 16
+          assert len(set(keys)) == 16
+          assert ('600145.SH','2020-07-06') not in keys
+          assert ('600145.SH','2020-07-16') not in keys
+          assert all(float(x['formal_amount_cny']) >= 200000 for x in d['unresolved_keys'])
+
+          assert d['source_extra_rows'] == 1
+          assert len(d['source_extra']) == 1
+          assert d['formal_projection_policy'] == 'PROJECT_TO_PINNED_SOHU_FORMAL_RAW_SYMBOL_DATE_AXIS'
+          assert d['source_extra_policy'] == 'EXCLUDE_SOURCE_ONLY_ROWS_NOT_PRESENT_ON_FORMAL_RAW_AXIS'
+
+          pit=d['pit_policy']
+          assert pit['policy'] == 'NEXT_TRADING_SESSION_AVAILABILITY'
+          assert pit['same_session_usage_allowed'] is False
+          assert pit['historical_provider_publication_timestamp_proven'] is False
+
+          assert d['family_ready'] is False
+          assert d['blockers'] == ['RECOVER_EXACT_TUSHARE_SEMANTIC_VALUES_FOR_16_SYMBOL_DATE_KEYS']
+          assert d['historical_gp_v11_source_recovered'] is False
+          assert d['model_freeze_allowed'] is False
+          assert d['oos_metrics_allowed'] is False
+
+          ev=d['evidence']
+          assert ev['date_axis_run_id'] == 35176014214
+          assert ev['formal_row_audit_run_id'] == 35176135787
+          assert ev['zero_proof_run_id'] == 35177365870
+          assert ev['baostock_5m_zero_proof_run_id'] == 35197394746
+          assert ev['baostock_5m_zero_proof_job_id'] == 105123765092
+          assert ev['baostock_5m_zero_proof_additional_rows'] == 2
+          proof_keys={(x['ts_code'],x['trade_date']) for x in ev['baostock_5m_zero_proof_keys']}
+          assert proof_keys == {
+              ('600145.SH','2020-07-06'),
+              ('600145.SH','2020-07-16'),
+          }
+          assert all(float(x['max_5m_amount_cny']) < 200000 for x in ev['baostock_5m_zero_proof_keys'])
+          assert all(abs(float(x['daily_amount_cny'])-float(x['sum_5m_amount_cny'])) <= 1.0 for x in ev['baostock_5m_zero_proof_keys'])
+
+          print('EXPECTED_ROWS',d['formal_expected_rows'])
+          print('RESOLVED_ROWS',d['resolved_rows'])
+          print('UNRESOLVED_ROWS',d['unresolved_rows'])
+          print('RESOLVED_FRACTION',f"{d['resolved_fraction']:.12f}")
+          print('PIT_POLICY',pit['policy'])
+          print('PASS_GP12_MAIN_NET_FLOW_RESIDUAL_LEDGER_V1')
+          PY
