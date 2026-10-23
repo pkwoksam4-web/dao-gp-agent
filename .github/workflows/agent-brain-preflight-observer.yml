@@ -2,7 +2,7 @@ name: Agent Brain Preflight Observer
 
 on:
   schedule:
-    # 16:15 Asia/Shanghai. This is an observe-only report after the 16:10 cutoff.
+    # Target 08:15 UTC (~16:15 Asia/Shanghai); GitHub may delay scheduled runs.
     - cron: "15 8 * * 1-5"
 
 permissions:
