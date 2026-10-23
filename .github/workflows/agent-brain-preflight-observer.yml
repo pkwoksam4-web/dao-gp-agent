@@ -16,7 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PIT_WRITE_AUTHORIZATION: ${{ vars.PIT_WRITE_AUTHORIZATION }}
       PIT_WRITE_AUTHORIZED_UNTIL: ${{ vars.PIT_WRITE_AUTHORIZED_UNTIL }}
     steps:
@@ -27,4 +26,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Calculate and publish read-only status
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/agent_brain_preflight_observer.py
