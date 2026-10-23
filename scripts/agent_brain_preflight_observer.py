@@ -26,7 +26,7 @@ CUTOFF = time(16, 10)
 CALENDAR_SCHEMA = "agent-brain-cn-exchange-calendar/v1"
 EXPECTED_LOOKBACK_SESSIONS = 31
 FROZEN_CALENDAR_SHA256 = {
-    2026: "d16e3a1dbd2c8306997138802dba656e4e940111274fb903984a4c999746d7af",
+    2026: "4211957f7916adf07da0b9005e90dbdeb5aba25facb9d5637e47483f2048bd87",
 }
 MANIFEST_DIR = Path("runtime/pit_manifests")
 
