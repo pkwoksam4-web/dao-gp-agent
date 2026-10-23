@@ -25,6 +25,9 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 CUTOFF = time(16, 10)
 CALENDAR_SCHEMA = "agent-brain-cn-exchange-calendar/v1"
 EXPECTED_LOOKBACK_SESSIONS = 31
+FROZEN_CALENDAR_SHA256 = {
+    2026: "d16e3a1dbd2c8306997138802dba656e4e940111274fb903984a4c999746d7af",
+}
 MANIFEST_DIR = Path("runtime/pit_manifests")
 
 
@@ -123,6 +126,24 @@ def inspect_calendar(calendar_path: Path, trade_date: str) -> dict[str, Any]:
             "error": f"CALENDAR_CONTENT_INVALID: {type(exc).__name__}",
             "evidence_sha256": digest,
             "calendar_sha256": digest,
+            "expected_31_session_dates": [],
+        }
+    expected_digest = FROZEN_CALENDAR_SHA256.get(year)
+    if expected_digest is None:
+        return {
+            "status": "UNKNOWN",
+            "error": "FROZEN_CALENDAR_SHA256_NOT_CONFIGURED",
+            "evidence_sha256": digest,
+            "calendar_sha256": digest,
+            "expected_31_session_dates": [],
+        }
+    if digest != expected_digest:
+        return {
+            "status": "PRECHECK_FAIL",
+            "error": "FROZEN_CALENDAR_SHA256_MISMATCH",
+            "evidence_sha256": digest,
+            "calendar_sha256": digest,
+            "expected_calendar_sha256": expected_digest,
             "expected_31_session_dates": [],
         }
     if date.fromisoformat(trade_date).year != year:
@@ -373,7 +394,12 @@ def publish_status_issue(payload: dict[str, Any], *, token: str, repository: str
             return {"action": "NOOP_DUPLICATE_RUN", "issue_number": existing["number"], "title": title}
         comment = body + f"\n<!-- {marker} -->\n"
         result, _ = _api_json(f"{base}/issues/{existing['number']}/comments", token, "POST", {"body": comment})
-        return {"action": "APPENDED_RUN_COMMENT", "issue_number": result["id"], "title": title}
+        return {
+            "action": "APPENDED_RUN_COMMENT",
+            "issue_number": existing["number"],
+            "comment_id": result["id"],
+            "title": title,
+        }
     body += f"\n<!-- {marker} -->\n"
     result, _ = _api_json(f"{base}/issues", token, "POST", {"title": title, "body": body})
     return {"action": "CREATED_DAILY_ISSUE", "issue_number": result["number"], "title": title}
