@@ -22,11 +22,22 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
+from pit_calendar_gate import (
+    feature_window_dates,
+    load_exchange_trading_calendar,
+    validate_feature_window_continuity,
+    validate_prev_close_continuity,
+)
+
 CORE10 = ["000636.SZ","002138.SZ","002156.SZ","600392.SH","600487.SH","600522.SH","600667.SH","600703.SH","601991.SH","605358.SH"]
 ADDED = ["000977.SZ","000938.SZ","000063.SZ"]
 CORE13 = CORE10 + ADDED
 PROTECTED = ["forecast_runs","forecast_items","live_shadow_run_attestations","shadow_strategy_runs"]
 OUT = Path("artifacts/live-pit-ingest-report.json")
+EXCHANGE_CALENDAR = Path(os.environ.get(
+    "CN_EXCHANGE_CALENDAR_PATH",
+    "evidence/agent_brain/cn_exchange_calendar_2026.json",
+))
 
 def utc_dt(s: str) -> datetime:
     return datetime.fromisoformat(s.replace("Z","+00:00")).astimezone(timezone.utc)
@@ -68,17 +79,21 @@ def insert_source(cur, *, sid, symbol, dataset, published_at, retrieved_at, raw,
          rh,json.dumps(metadata,ensure_ascii=False,separators=(",",":"))))
     return rt, True
 
-def compute_features(cur, symbol: str, td: str):
+def compute_features(cur, symbol: str, td: str, exchange_dates):
+    expected_dates=feature_window_dates(td,exchange_dates,required_sessions=31)
     cur.execute("""
-      SELECT trade_time,high,low,close,volume,turnover
+      SELECT trade_time,high,low,close,volume,turnover,
+             ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date
       FROM market_bars
       WHERE provider='longbridge' AND period='day' AND symbol=%s
+        AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date >= %s::date)
         AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date <= %s::date)
       ORDER BY trade_time
-    """,(symbol,td))
+    """,(symbol,expected_dates[0],td))
     rows=cur.fetchall()
-    if len(rows)<31:
-        raise RuntimeError(f"{symbol}: insufficient bars for 30D features: {len(rows)}")
+    validate_feature_window_continuity(
+        symbol,expected_dates,[r["trade_date"] for r in rows]
+    )
     closes=[float(r["close"]) for r in rows]
     highs=[float(r["high"]) for r in rows]
     lows=[float(r["low"]) for r in rows]
@@ -116,6 +131,11 @@ def main():
         raise RuntimeError("market close/trading-day gate not verified")
 
     td=manifest["trade_date_cn"]
+    exchange_dates=load_exchange_trading_calendar(EXCHANGE_CALENDAR)
+    expected_feature_dates=feature_window_dates(
+        td,exchange_dates,required_sessions=31
+    )
+    expected_previous_trade_date=expected_feature_dates[-2]
     retrieved=manifest["retrieved_at"]
     rsh=sh_dt(retrieved)
     if rsh.date().isoformat()!=td:
@@ -154,14 +174,45 @@ def main():
                 raise RuntimeError(f"{x['symbol']}: capital flow date mismatch")
 
     report={"schema":"agent-brain-live-pit-ingest-report/v1","manifest_path":p,"manifest_sha256":manifest_sha,
-            "trade_date_cn":td,"inserted":{"bars":0,"quotes":0,"flows":0,"features":0,"sources":0},
-            "protected_before":{},"protected_after":{}}
+            "trade_date_cn":td,"exchange_calendar_path":str(EXCHANGE_CALENDAR),
+            "exchange_calendar_sessions":len(exchange_dates),
+            "feature_window_start":expected_feature_dates[0],
+            "feature_window_end":expected_feature_dates[-1],
+            "expected_previous_trade_date":expected_previous_trade_date,
+            "inserted":{"bars":0,"quotes":0,"flows":0,"features":0,"sources":0},
+            "protected_before":{},"protected_after":{},"prev_close_continuity":{},"verified_coverage":{}}
     dsn=os.environ["NEON_DATABASE_URL"]
     now=datetime.now(timezone.utc).isoformat()
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
       with conn.cursor() as cur:
         cur.execute("BEGIN")
         cur.execute("SET LOCAL statement_timeout='30s'")
+
+        # Fail closed before any source/fact write: every required exchange
+        # session in the 31-close feature window must exist for Core13, and
+        # quote.prev_close must match the exact calendar predecessor.
+        latest_by_symbol={}
+        for x in rows:
+            s=x["symbol"]
+            cur.execute("""
+              SELECT close,
+                     ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date
+              FROM market_bars
+              WHERE provider='longbridge' AND period='day' AND symbol=%s
+                AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date >= %s::date)
+                AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date < %s::date)
+              ORDER BY trade_time
+            """,(s,expected_feature_dates[0],td))
+            history=cur.fetchall()
+            observed_dates=[r["trade_date"] for r in history]+[td]
+            validate_feature_window_continuity(s,expected_feature_dates,observed_dates)
+            previous_rows=[r for r in history if r["trade_date"]==expected_previous_trade_date]
+            latest_by_symbol[s]=previous_rows[-1] if len(previous_rows)==1 else None
+        report["prev_close_continuity"]=validate_prev_close_continuity(
+            rows,latest_by_symbol,
+            expected_previous_trade_date=expected_previous_trade_date,
+        )
+
         for t in PROTECTED:
             cur.execute(f"SELECT count(*) AS n FROM {t}")
             report["protected_before"][t]=cur.fetchone()["n"]
@@ -243,7 +294,7 @@ def main():
             raise RuntimeError("post-write Core13 daily bar coverage !=13/13")
 
         for s in CORE13:
-          f=compute_features(cur,s,td)
+          f=compute_features(cur,s,td,exchange_dates)
           cur.execute("""
             INSERT INTO stock_feature_snapshots(
               snapshot_date,symbol,sector,close,high_30d,low_30d,drawdown_from_30d_high,
@@ -274,6 +325,7 @@ def main():
         cur.execute("SELECT count(*) AS n FROM stock_feature_snapshots WHERE snapshot_date=%s AND symbol=ANY(%s)",(td,CORE13))
         if cur.fetchone()["n"]!=13:
             raise RuntimeError("post-write feature coverage !=13/13")
+        report["verified_coverage"]={"bars":13,"features":13}
 
         for t in PROTECTED:
             cur.execute(f"SELECT count(*) AS n FROM {t}")
