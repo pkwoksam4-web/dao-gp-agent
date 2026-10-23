@@ -1,0 +1,30 @@
+name: Agent Brain Preflight Observer
+
+on:
+  schedule:
+    # 16:15 Asia/Shanghai. This is an observe-only report after the 16:10 cutoff.
+    - cron: "15 8 * * 1-5"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  observe-only:
+    if: github.ref == 'refs/heads/main'
+    environment: pit-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PIT_WRITE_AUTHORIZATION: ${{ vars.PIT_WRITE_AUTHORIZATION }}
+      PIT_WRITE_AUTHORIZED_UNTIL: ${{ vars.PIT_WRITE_AUTHORIZED_UNTIL }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Calculate and publish read-only status
+        run: python scripts/agent_brain_preflight_observer.py
