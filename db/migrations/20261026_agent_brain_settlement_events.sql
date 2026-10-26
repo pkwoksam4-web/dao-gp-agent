@@ -23,9 +23,11 @@ REVOKE ALL ON TABLE public.agent_brain_settlement_events FROM PUBLIC;
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_writer') THEN
+        EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public.agent_brain_settlement_events FROM pit_writer';
         EXECUTE 'GRANT SELECT, INSERT ON TABLE public.agent_brain_settlement_events TO pit_writer';
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_reader') THEN
+        EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public.agent_brain_settlement_events FROM pit_reader';
         EXECUTE 'GRANT SELECT ON TABLE public.agent_brain_settlement_events TO pit_reader';
     END IF;
 END
