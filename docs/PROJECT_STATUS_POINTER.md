@@ -1,26 +1,27 @@
 # Agent Brain status pointer
 
-`status_checked_at: 2026-10-23 pre-cutoff (Asia/Shanghai)`
+`status_checked_at: 2026-10-26 13:38 (Asia/Shanghai)`
 
 ## Current state
 
-- Last verified LIVE PIT date: **2026-10-09**.
-- The retrospective status index is [issue #25](https://github.com/pkwoksam4-web/dao-gp-agent/issues/25); it distinguishes retrospective records from contemporaneous records.
-- 2026-10-12, 10-13, 10-14, 10-19, and 10-21: `NON_LIVE` in issue #25 because no same-day LIVE manifest is verified on `main`; this does not assert that a collector ran or failed.
-- 2026-10-16: `PRECHECK_FAIL / NON_LIVE`, contemporaneous record in [issue #23](https://github.com/pkwoksam4-web/dao-gp-agent/issues/23).
-- 2026-10-20: `NON_LIVE`, contemporaneous record in [issue #24](https://github.com/pkwoksam4-web/dao-gp-agent/issues/24).
-- 2026-10-22: `NON_LIVE`, recorded after the cutoff in issue #25; reason: `授权门禁待负责人决定`.
-- 2026-10-23: before 16:10 CST, status is `PRECHECK_PENDING`; do not record a final day status early.
-- 2026-10-10/11 and 10-17/18 were weekends.
+- Last verified prospective LIVE PIT date: **2026-10-09**. Later dates have no verified same-day LIVE manifest.
+- 2026-10-12, 10-13, 10-14, 10-19, 10-21, and 10-22 are recorded as NON_LIVE in issue #25; 10-16 is PRECHECK_FAIL / NON_LIVE in issue #23; 10-20 is NON_LIVE in issue #24; 10-23 is NON_LIVE in issue #34. These records do not claim a collector ran or failed unless a run is evidenced.
+- 2026-10-24 and 10-25 were weekends.
+- PR #35 was reviewed at exact head 7707357f9d223e62440879cce85ff5fc43512e51 and merged as bb43e5e9cb7a3727c4a0bf56494d534c2b63aecf.
+- For 2026-10-26, the observer is scheduled for about 16:15 Asia/Shanghai. At 13:38 no scheduled run or daily issue is present. Do not record a final daily status before the run and evidence exist.
 
-## 16:10 preflight gates — evaluate in order
+## Phase 1 observer — observe-only
 
-1. **Authorization and safety evidence:** retrieve the raw `rule_id`, `error_message`, and `blocked_action`, and verify the explicitly permitted writer. If this gate fails, record `NON_LIVE` and stop.
-2. **Immutable evidence path:** verify versioned/immutable location, commit identity, workflow/run reference, and hash capture.
-3. **31-session lookback:** prove every Core13 symbol has every required exchange session, with no missing predecessor or interior session.
-4. **Same-day PIT chain readiness:** verify the exact-date manifest and the frozen PIT/ingest/observation contract and authorized collector entry.
+PR #35 checks authorization plus expiry, the exact-date manifest path/commit/hash, and the expected 31-session window from the frozen calendar. Database and authoritative ingest remain NOT_CHECKED, so overall PASS is impossible. It has no writer dependency and does not authorize a collector.
 
-At the 2026-10-22 post-cutoff check, Gate 1 failed and later gates were not evaluated. For 2026-10-23, the cutoff check has not happened yet.
+## Full writer restart gates — not yet met
+
+1. **Authorization and safety evidence:** recover the original raw rule_id, error_message, and blocked_action; verify explicit authorization and expiry; use a dedicated least-privilege role.
+2. **Immutable evidence path:** bind the exact manifest path, immutable commit, workflow/run reference, and SHA-256.
+3. **31-session runtime lookback:** verify each Core13 bar's source, hash, retrieval timestamp, and HISTORICAL_LOOKBACK provenance; missing sessions or provenance fail closed.
+4. **Same-day PIT/ingest chain:** require the exact-date manifest, preflight dependency, and authoritative 13/13 bar/feature ingest evidence.
+
+Keep writers hard-disabled through the five-session observation and all separate recovery gates.
 
 ## Restart gate
 
@@ -34,9 +35,13 @@ A Neon role setup attempt found the role-creation API did not produce a verifiab
 
 ## Other open contracts
 
-- Shadow request evidence and settlement changes are isolated in draft [PR #32](https://github.com/pkwoksam4-web/dao-gp-agent/pull/32). It has six settlement-only paths and passing contract CI. Append-only settlement records and idempotent retries remain unresolved and block merge. PR #31 is closed unmerged as superseded.
-- Historical lookback bars may be added only before a future run's decision cutoff, with source, retrieval time, immutable hash, and `HISTORICAL_LOOKBACK` provenance. Missing prospective samples are never backfilled. The current before/equal/after cutoff tests cover a helper only; runtime query binding remains a follow-up.
-- Late outcome capture remains unimplemented. Source pair and corporate-action handling still need to be frozen in issue #28 before settlement.
-- The control-plane decision record is in issue #26. Daily outcome records belong in issues; update this pointer only when control state changes.
+- Shadow request and settlement are in draft PR #32, head 292444fcfc6f5f54adcbe20c2c7f91fc2c9a18ea. Append-only settlement events and hash-keyed idempotent retries are implemented; the owner-run migration is included. CI passed. The PR remains draft: the migration and grants are not applied or verified, and no settlement was run.
+- Runtime lookback provenance is in draft PR #36, head e0879d7e785b737082d668536c6a31391872e104. It reads each bar's source, hash, and retrieved_at, requires the historical HISTORICAL_LOOKBACK tag, and records per-bar attestation. It fails closed until stored historical metadata has the tag. No writer workflow was enabled.
+- Late outcome capture remains separate from LIVE. Issue #28 freezes sources, company-action handling, baseline, and numeric thresholds by 2026-10-28. Do not calculate rank IC or cohort aggregates before that freeze. The 2026-11-02, 11-05, and 11-06 raw candidates use the no-database PR-backed evidence path after the freeze.
+- The 2026-10-22 price-path rehearsal has not been run. If performed after the freeze, keep it on one disposable branch under tmp/non_evidence_rehearsal/2026-10-22/; do not open or merge a PR and do not write to evidence or ingest paths.
+- The dedicated Neon writer/reader roles are still absent. The previously inspected production branch was archived; role creation and readback must happen in SQL Editor on the active production branch. No global ACL was changed.
+- The corrected A/D/#27 tag targets and fetch command are recorded in issue #26, including gp/dao2-a-main-net-flow. Tags have not been created or remotely verified; that requires local annotated-tag creation and peeled-tag comparison.
+- Re-enable LIVE only after the five-session observer acceptance in issue #29, dedicated-role verification, PR #32 settlement migration/permissions, runtime lookback wiring, and a reviewed preflight dependency. The 2026-11-02 estimate is provisional and moves if any dependency slips.
+- The control-plane decision record remains issue #26; daily status evidence belongs in its date-specific issue.
 
 A successful CI run is not a research result or production authorization.
