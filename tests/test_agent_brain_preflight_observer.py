@@ -110,14 +110,77 @@ class AgentBrainPreflightObserverTests(unittest.TestCase):
                 result = inspect_calendar(path, "2026-10-24")
             self.assertEqual(result["status"], "SKIPPED_NON_SESSION")
 
-    def test_frozen_calendar_holiday_is_skipped_not_non_live(self):
+    def test_frozen_calendar_holidays_weekends_and_makeup_saturday_are_skipped(self):
         calendar = (
             Path(__file__).resolve().parents[1]
             / "evidence/agent_brain/cn_exchange_calendar_2026.json"
         )
-        result = inspect_calendar(calendar, "2026-10-01")
-        self.assertEqual(result["status"], "SKIPPED_NON_SESSION")
-        self.assertNotEqual(result["status"], "NON_LIVE")
+        closed_dates = [
+            "2026-09-25",
+            *[f"2026-10-{day:02d}" for day in range(1, 8)],
+            "2026-10-10",
+            "2026-10-24",
+        ]
+        for trade_date in closed_dates:
+            with self.subTest(trade_date=trade_date):
+                result = inspect_calendar(calendar, trade_date)
+                self.assertEqual(result["status"], "SKIPPED_NON_SESSION")
+                self.assertNotEqual(result["status"], "NON_LIVE")
+
+    def test_calendar_coverage_gap_is_blocked_before_other_failed_gates(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            calendar = (
+                Path(__file__).resolve().parents[1]
+                / "evidence/agent_brain/cn_exchange_calendar_2026.json"
+            )
+            now = datetime(2027, 1, 4, 8, 15, tzinfo=timezone.utc)
+            result = build_observation(
+                trade_date="2027-01-04",
+                now=now,
+                main_sha="f" * 40,
+                repo_root=root,
+                calendar_path=calendar,
+                write_authorization="NOT_AUTHORIZED",
+                authorized_until="",
+                repository="owner/repo",
+                workflow_run_id="calendar-coverage",
+                workflow_run_url="https://github.com/owner/repo/actions/runs/calendar-coverage",
+            )
+        self.assertEqual(
+            result["gates"]["calendar_31_session_calculation"]["status"],
+            "BLOCKED_CALENDAR_COVERAGE",
+        )
+        self.assertEqual(result["status"], "BLOCKED_CALENDAR_COVERAGE")
+        self.assertNotEqual(result["status"], "PASS")
+
+    def test_trading_day_failure_is_not_hidden_as_non_session(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            calendar = (
+                Path(__file__).resolve().parents[1]
+                / "evidence/agent_brain/cn_exchange_calendar_2026.json"
+            )
+            now = datetime(2026, 10, 23, 8, 15, tzinfo=timezone.utc)
+            result = build_observation(
+                trade_date="2026-10-23",
+                now=now,
+                main_sha="a" * 40,
+                repo_root=root,
+                calendar_path=calendar,
+                write_authorization="APPROVED",
+                authorized_until="2026-10-24T08:15:00Z",
+                repository="owner/repo",
+                workflow_run_id="trading-day-missing-manifest",
+                workflow_run_url="https://github.com/owner/repo/actions/runs/trading-day-missing-manifest",
+            )
+        self.assertEqual(
+            result["gates"]["calendar_31_session_calculation"]["status"],
+            "PASS",
+        )
+        self.assertEqual(result["manifest"]["status"], "MISSING")
+        self.assertEqual(result["status"], "NON_LIVE")
+        self.assertNotEqual(result["status"], "SKIPPED_NON_SESSION")
 
     def test_missing_session_in_frozen_window_fails_calendar_hash_check(self):
         frozen_calendar = (
