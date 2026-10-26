@@ -115,6 +115,11 @@ class AgentBrainPreflightObserverTests(unittest.TestCase):
             Path(__file__).resolve().parents[1]
             / "evidence/agent_brain/cn_exchange_calendar_2026.json"
         )
+        calendar_data = json.loads(calendar.read_text(encoding="utf-8"))
+        self.assertTrue(
+            all(date.fromisoformat(session).weekday() < 5
+                for session in calendar_data["trading_days"])
+        )
         closed_dates = [
             "2026-09-25",
             *[f"2026-10-{day:02d}" for day in range(1, 8)],
