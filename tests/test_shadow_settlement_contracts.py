@@ -113,6 +113,70 @@ class ShadowSettlementContractTests(unittest.TestCase):
         self.assertNotEqual(first["event_id"], settled["event_id"])
         self.assertEqual(first["evaluated_at"], "2026-10-20T01:00:00+00:00")
 
+    def test_20d_can_settle_before_5d_retry_and_latest_event_is_current(self):
+        latest = getattr(settlement, "latest_settlement_events", None)
+        self.assertTrue(callable(latest), "latest event per horizon resolver is required")
+        t1 = datetime(2026, 10, 20, 1, tzinfo=timezone.utc)
+        t2 = datetime(2026, 11, 2, 10, tzinfo=timezone.utc)
+        t3 = datetime(2026, 11, 3, 10, tzinfo=timezone.utc)
+        rows = [
+            {"event_id":"5-gap", "horizon_sessions":5, "status":"BLOCKED_DATA_GAP",
+             "created_at":t1, "event_json":{"result":{"status":"BLOCKED_DATA_GAP"}}},
+            {"event_id":"20-settled", "horizon_sessions":20, "status":"SETTLED",
+             "created_at":t2, "event_json":{"result":{"status":"SETTLED"}}},
+            {"event_id":"5-retried", "horizon_sessions":5, "status":"SETTLED",
+             "created_at":t3, "event_json":{"result":{"status":"SETTLED"}}},
+        ]
+        current = latest(rows)
+        self.assertEqual(current[5]["event_id"], "5-retried")
+        self.assertEqual(current[5]["status"], "SETTLED")
+        self.assertEqual(current[20]["event_id"], "20-settled")
+        self.assertEqual(set(current), {5, 20})
+
+    def test_duplicate_evidence_insert_is_idempotent(self):
+        class EventCursor:
+            def __init__(self):
+                self.ids = set()
+                self.rowcount = 0
+                self.sql = ""
+
+            def execute(self, sql, params):
+                self.sql = sql
+                event_id = params[0]
+                self.rowcount = int(event_id not in self.ids)
+                self.ids.add(event_id)
+
+        event = settlement.build_settlement_event(
+            "SSR-CORE10-20261012", 20, "2026-11-09",
+            {"status":"SETTLED", "outcomes":[{"symbol":"000636.SZ","actual_return_20d":0.1}]},
+            "2026-11-09T10:00:00+00:00",
+        )
+        cur = EventCursor()
+        self.assertTrue(settlement.persist_settlement_event(cur, event))
+        self.assertFalse(settlement.persist_settlement_event(cur, event))
+        self.assertEqual(cur.ids, {event["event_id"]})
+        self.assertIn("ON CONFLICT (event_id) DO NOTHING", cur.sql)
+
+    def test_migration_fails_before_table_creation_if_dedicated_role_is_missing(self):
+        migration = Path("db/migrations/20261026_agent_brain_settlement_events.sql").read_text(encoding="utf-8")
+        table_creation = migration.index("CREATE TABLE IF NOT EXISTS")
+        for role in ("pit_writer", "pit_reader"):
+            guard = (
+                f"IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN\n"
+                f"        RAISE EXCEPTION 'required role {role} must exist';"
+            )
+            self.assertIn(guard, migration)
+            self.assertLess(migration.index(guard), table_creation)
+        self.assertNotIn("IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_writer')", migration)
+        self.assertNotIn("IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_reader')", migration)
+
+    def test_migration_is_owner_run_and_not_applied_by_ci(self):
+        migration = Path("db/migrations/20261026_agent_brain_settlement_events.sql").read_text(encoding="utf-8")
+        workflow = Path(".github/workflows/shadow-settlement-contracts-ci.yml").read_text(encoding="utf-8")
+        self.assertIn("Run manually by the database owner", migration)
+        self.assertNotIn("NEON_DATABASE_URL", workflow)
+        self.assertNotIn("psql", workflow.lower())
+
 
 if __name__=="__main__":
     unittest.main()
