@@ -131,8 +131,8 @@ def inspect_calendar(calendar_path: Path, trade_date: str) -> dict[str, Any]:
     expected_digest = FROZEN_CALENDAR_SHA256.get(year)
     if expected_digest is None:
         return {
-            "status": "UNKNOWN",
-            "error": "FROZEN_CALENDAR_SHA256_NOT_CONFIGURED",
+            "status": "BLOCKED_CALENDAR_COVERAGE",
+            "error": "CALENDAR_SHA256_NOT_FROZEN",
             "evidence_sha256": digest,
             "calendar_sha256": digest,
             "expected_31_session_dates": [],
@@ -146,10 +146,11 @@ def inspect_calendar(calendar_path: Path, trade_date: str) -> dict[str, Any]:
             "expected_calendar_sha256": expected_digest,
             "expected_31_session_dates": [],
         }
-    if date.fromisoformat(trade_date).year != year:
+    trade_year = date.fromisoformat(trade_date).year
+    if trade_year != year:
         return {
-            "status": "UNKNOWN",
-            "error": "FROZEN_CALENDAR_YEAR_NOT_AVAILABLE",
+            "status": "BLOCKED_CALENDAR_COVERAGE",
+            "error": f"NO_FROZEN_CALENDAR_FOR_TRADE_DATE_YEAR_{trade_year}",
             "evidence_sha256": digest,
             "calendar_sha256": digest,
             "expected_31_session_dates": [],
@@ -299,6 +300,9 @@ def build_observation(
     elif calendar["status"] == "PRECHECK_FAIL":
         status = "PRECHECK_FAIL"
         reason = calendar["error"] or "Frozen exchange calendar validation failed."
+    elif calendar["status"] == "BLOCKED_CALENDAR_COVERAGE":
+        status = "BLOCKED_CALENDAR_COVERAGE"
+        reason = calendar["error"] or "No frozen, SHA-pinned exchange calendar covers this trade date."
     elif auth["status"] != "PASS":
         status = "NON_LIVE"
         reason = "授权门禁待负责人决定"
