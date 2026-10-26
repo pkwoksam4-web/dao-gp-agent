@@ -27,5 +27,5 @@ jobs:
           python-version: "3.12"
       - name: Calculate and publish read-only status
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: python scripts/agent_brain_preflight_observer.py
