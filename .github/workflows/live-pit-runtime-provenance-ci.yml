@@ -5,6 +5,7 @@ on:
     paths:
       - "scripts/live_pit_ingest.py"
       - "tests/test_live_pit_ingest_provenance.py"
+      - "docs/PROJECT_STATUS_POINTER.md"
       - ".github/workflows/live-pit-runtime-provenance-ci.yml"
 
 permissions:
