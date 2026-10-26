@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import scripts.shadow_contract_gates as gates
+import scripts.ranking_shadow_settlement as settlement
 from scripts.shadow_contract_gates import (
     ContractGateError, build_shadow_request, load_quarantine_registry,
     maturity_targets, source_is_live_pit, validate_event_order,
@@ -93,6 +94,24 @@ class ShadowSettlementContractTests(unittest.TestCase):
             build_shadow_request(m,"abc",datetime(2026,10,12,9,31,tzinfo=timezone.utc),bad)
         self.assertEqual(a["trigger"]["idempotency_key"],b["trigger"]["idempotency_key"])
         self.assertFalse(a["probability_forecast_allowed"])
+
+
+    def test_settlement_events_are_stable_for_retries_and_append_when_result_changes(self):
+        builder = getattr(settlement, "build_settlement_event", None)
+        self.assertTrue(callable(builder), "append-only settlement event builder is required")
+        blocked = {"status": "BLOCKED_DATA_GAP", "missing_target_symbols": [
+            {"symbol": "000636.SZ", "reason": "MISSING_TARGET_BAR"}
+        ]}
+        first = builder("SSR-CORE10-20261012", 5, "2026-10-19", blocked,
+                        "2026-10-20T01:00:00+00:00")
+        retry = builder("SSR-CORE10-20261012", 5, "2026-10-19", blocked,
+                        "2026-10-20T02:00:00+00:00")
+        settled = builder("SSR-CORE10-20261012", 5, "2026-10-19",
+                          {"status": "SETTLED", "outcomes": [{"symbol": "000636.SZ", "actual_return_5d": 0.1}]},
+                          "2026-10-20T03:00:00+00:00")
+        self.assertEqual(first["event_id"], retry["event_id"])
+        self.assertNotEqual(first["event_id"], settled["event_id"])
+        self.assertEqual(first["evaluated_at"], "2026-10-20T01:00:00+00:00")
 
 
 if __name__=="__main__":

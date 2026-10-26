@@ -2,6 +2,7 @@
 """Settle only clean Core10 ranking Shadow runs at independent 5D/20D horizons."""
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -9,16 +10,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import psycopg
-from psycopg.rows import dict_row
-
-from shadow_contract_gates import (
-    load_exchange_trading_calendar,
-    load_quarantine_registry,
-    maturity_targets_from_exchange_calendar,
-    source_is_live_pit,
-    target_is_due,
-)
+try:
+    from shadow_contract_gates import (
+        load_exchange_trading_calendar,
+        load_quarantine_registry,
+        maturity_targets_from_exchange_calendar,
+        source_is_live_pit,
+        target_is_due,
+    )
+except ModuleNotFoundError:
+    from scripts.shadow_contract_gates import (
+        load_exchange_trading_calendar,
+        load_quarantine_registry,
+        maturity_targets_from_exchange_calendar,
+        source_is_live_pit,
+        target_is_due,
+    )
 
 CORE10=["000636.SZ","002138.SZ","002156.SZ","600392.SH","600487.SH","600522.SH","600667.SH","600703.SH","601991.SH","605358.SH"]
 RANK_VERSION="core10-stable-reversion-lowvol-candidate-v1"
@@ -51,6 +58,36 @@ def corr(a,b):
     xa=[x-ma for x in a]; xb=[x-mb for x in b]
     da=math.sqrt(sum(x*x for x in xa)); db=math.sqrt(sum(x*x for x in xb))
     return None if da==0 or db==0 else sum(x*y for x,y in zip(xa,xb))/(da*db)
+
+
+def build_settlement_event(strategy_id, horizon, target, result, evaluated_at):
+    material = {
+        "schema": "agent-brain-settlement-event/v1",
+        "strategy_run_id": strategy_id,
+        "horizon_sessions": int(horizon),
+        "settlement_trade_date": target,
+        "result": result,
+    }
+    canonical = json.dumps(material, ensure_ascii=False, sort_keys=True,
+                           separators=(",", ":"), allow_nan=False)
+    event_id = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return {**material, "event_id": event_id, "evaluated_at": evaluated_at}
+
+
+def persist_settlement_event(cur, event):
+    cur.execute("""
+      INSERT INTO public.agent_brain_settlement_events(
+        event_id,strategy_run_id,horizon_sessions,settlement_trade_date,status,event_json
+      ) VALUES (%s,%s,%s,%s,%s,%s::jsonb)
+      ON CONFLICT (event_id) DO NOTHING
+    """, (event["event_id"], event["strategy_run_id"], event["horizon_sessions"],
+          event["settlement_trade_date"], event["result"]["status"],
+          json.dumps(event, ensure_ascii=False, separators=(",", ":"), allow_nan=False)))
+    return cur.rowcount == 1
+
+
+def decoded_event(value):
+    return value if isinstance(value, dict) else json.loads(value)
 
 
 def require_shadow_success(cur, strategy_id):
@@ -132,29 +169,29 @@ def settle_horizon(cur, run_id, ranking, target, horizon):
 
 
 def main():
+    import psycopg
+    from psycopg.rows import dict_row
+
     dsn=os.environ["NEON_DATABASE_URL"]
     now_dt=datetime.now(timezone.utc)
     now=now_dt.isoformat()
     as_of_cn=now_dt.astimezone(SHANGHAI).date().isoformat()
     quarantined=load_quarantine_registry(QUARANTINE)
     exchange_dates=load_exchange_trading_calendar(EXCHANGE_CALENDAR)
-    report={"schema":"agent-brain-ranking-settlement/v3","checked_at":now,"as_of_cn":as_of_cn,
+    report={"schema":"agent-brain-ranking-settlement/v4","checked_at":now,"as_of_cn":as_of_cn,
             "exchange_calendar_path":str(EXCHANGE_CALENDAR),"exchange_calendar_sessions":len(exchange_dates),
             "pending_checked":0,"settled_5d_now":0,"settled_20d_now":0,
             "still_pending_5d":0,"still_pending_20d":0,
             "blocked_data_gap_5d":0,"blocked_data_gap_20d":0,
-            "excluded_strategy_ids":[],"settled_runs":[]}
+            "excluded_strategy_ids":[],"settled_runs":[],"settlement_events":[]}
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
       with conn.cursor() as cur:
         cur.execute("BEGIN")
         cur.execute("SET LOCAL statement_timeout='30s'")
         cur.execute("SELECT * FROM shadow_strategy_runs WHERE mode=%s ORDER BY start_date,id",(MODE,))
         for run in cur.fetchall():
-          metrics=json.loads(run["metrics_json"])
           if run["id"] in quarantined:
               report["excluded_strategy_ids"].append(run["id"])
-              continue
-          if metrics.get("settlement")!="PENDING" and metrics.get("settlement_20d",{}).get("status")=="SETTLED":
               continue
           report["pending_checked"]+=1
           require_shadow_success(cur,run["id"])
@@ -165,53 +202,50 @@ def main():
               raise RuntimeError(f"{run['id']}: missing anchor_close; cannot settle")
           anchor=str(run["start_date"])
           targets=maturity_targets_from_exchange_calendar(anchor,exchange_dates)
-          changed=False
-          s5=metrics.get("settlement_5d",{"status":"PENDING"})
-          s20=metrics.get("settlement_20d",{"status":"PENDING"})
+          target_by_horizon={5:targets["5d"],20:targets["20d"]}
+          cur.execute("""
+            SELECT horizon_sessions,settlement_trade_date,status,event_json
+            FROM public.agent_brain_settlement_events
+            WHERE strategy_run_id=%s
+          """,(run["id"],))
+          prior_events=cur.fetchall()
+          settled_by_horizon={}
+          for prior in prior_events:
+              horizon=int(prior["horizon_sessions"])
+              if horizon not in target_by_horizon or str(prior["settlement_trade_date"])!=target_by_horizon[horizon]:
+                  raise RuntimeError(f"{run['id']}: stored settlement event conflicts with frozen calendar")
+              if prior["status"]=="SETTLED":
+                  settled_by_horizon[horizon]=decoded_event(prior["event_json"])
 
-          if s5.get("status")!="SETTLED":
-              target5=targets["5d"]
-              if target5 and target_is_due(target5,as_of_cn):
-                  candidate=settle_horizon(cur,run["id"],ranking,target5,5)
-                  changed=changed or candidate!=s5
-                  s5=candidate
-                  if s5["status"]=="SETTLED":
-                      s5["settled_at"]=now; report["settled_5d_now"]+=1
-                  else:
-                      report["blocked_data_gap_5d"]+=1
+          outcomes={}
+          for horizon in (5,20):
+              key=f"settlement_{horizon}d"
+              if horizon in settled_by_horizon:
+                  outcomes[horizon]=settled_by_horizon[horizon]["result"]
+                  continue
+              target=target_by_horizon[horizon]
+              if not target or not target_is_due(target,as_of_cn):
+                  outcomes[horizon]={"status":"PENDING","horizon_sessions":horizon,
+                                     "settlement_trade_date":target}
+                  report[f"still_pending_{horizon}d"]+=1
+                  continue
+              candidate=settle_horizon(cur,run["id"],ranking,target,horizon)
+              event=build_settlement_event(run["id"],horizon,target,candidate,now)
+              inserted=persist_settlement_event(cur,event)
+              report["settlement_events"].append({
+                  "event_id":event["event_id"],"strategy_run_id":run["id"],
+                  "horizon_sessions":horizon,"inserted":inserted,
+              })
+              outcomes[horizon]=candidate
+              if candidate["status"]=="SETTLED":
+                  if inserted:
+                      report[f"settled_{horizon}d_now"]+=1
               else:
-                  report["still_pending_5d"]+=1
+                  report[f"blocked_data_gap_{horizon}d"]+=1
 
-          if s20.get("status")!="SETTLED":
-              target20=targets["20d"]
-              if target20 and target_is_due(target20,as_of_cn):
-                  candidate=settle_horizon(cur,run["id"],ranking,target20,20)
-                  changed=changed or candidate!=s20
-                  s20=candidate
-                  if s20["status"]=="SETTLED":
-                      s20["settled_at"]=now; report["settled_20d_now"]+=1
-                  else:
-                      report["blocked_data_gap_20d"]+=1
-              else:
-                  report["still_pending_20d"]+=1
-
-          metrics["settlement_5d"]=s5
-          metrics["settlement_20d"]=s20
-          metrics["exchange_calendar_path"]=str(EXCHANGE_CALENDAR)
-          metrics["exchange_calendar_last_session"]=targets["calendar_last_session"]
-          metrics["outcome_data_may_include_recovered_future_bars"]=False
-          metrics["later_date_substitution_allowed"]=False
-          metrics["automatic_promotion"]=False
-          metrics["production_ranking_use"]=False
-          if s20.get("status")=="SETTLED":
-              metrics["settlement"]="SETTLED"
-          if changed:
-              cur.execute("UPDATE shadow_strategy_runs SET end_date=%s,metrics_json=%s WHERE id=%s",
-                          (targets["20d"] if s20.get("status")=="SETTLED" else run["end_date"],
-                           json.dumps(metrics,ensure_ascii=False,separators=(",",":")),run["id"]))
           report["settled_runs"].append({
               "id":run["id"],"anchor":anchor,"target_5d":targets["5d"],"target_20d":targets["20d"],
-              "maturity_5d":s5["status"],"maturity_20d":s20["status"]
+              "maturity_5d":outcomes[5]["status"],"maturity_20d":outcomes[20]["status"]
           })
         conn.commit()
     report["excluded_strategy_ids"]=sorted(set(report["excluded_strategy_ids"]))

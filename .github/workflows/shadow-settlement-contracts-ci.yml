@@ -8,6 +8,7 @@ on:
       - "scripts/ranking_shadow_settlement.py"
       - "tests/test_shadow_settlement_contracts.py"
       - "evidence/agent_brain/prospective_quarantine_registry_v1.json"
+      - "db/migrations/20261026_agent_brain_settlement_events.sql"
       - ".github/workflows/shadow-settlement-contracts-ci.yml"
 
 permissions:
