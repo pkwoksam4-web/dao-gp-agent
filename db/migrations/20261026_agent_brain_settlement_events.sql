@@ -1,5 +1,17 @@
--- Run once as the database owner after creating pit_writer and pit_reader.
+-- Run manually by the database owner after creating pit_writer and pit_reader.
+-- This migration is never applied by GitHub Actions.
 -- Settlement attempts are append-only. The event_id primary key makes retries idempotent.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_writer') THEN
+        RAISE EXCEPTION 'required role pit_writer must exist';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_reader') THEN
+        RAISE EXCEPTION 'required role pit_reader must exist';
+    END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS public.agent_brain_settlement_events (
     event_id text PRIMARY KEY CHECK (event_id ~ '^[0-9a-f]{64}$'),
     strategy_run_id text NOT NULL,
@@ -19,16 +31,7 @@ CREATE INDEX IF NOT EXISTS agent_brain_settlement_events_run_horizon_idx
     ON public.agent_brain_settlement_events (strategy_run_id, horizon_sessions, created_at);
 
 REVOKE ALL ON TABLE public.agent_brain_settlement_events FROM PUBLIC;
-
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_writer') THEN
-        EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public.agent_brain_settlement_events FROM pit_writer';
-        EXECUTE 'GRANT SELECT, INSERT ON TABLE public.agent_brain_settlement_events TO pit_writer';
-    END IF;
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pit_reader') THEN
-        EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public.agent_brain_settlement_events FROM pit_reader';
-        EXECUTE 'GRANT SELECT ON TABLE public.agent_brain_settlement_events TO pit_reader';
-    END IF;
-END
-$$;
+REVOKE ALL PRIVILEGES ON TABLE public.agent_brain_settlement_events FROM pit_writer;
+GRANT SELECT, INSERT ON TABLE public.agent_brain_settlement_events TO pit_writer;
+REVOKE ALL PRIVILEGES ON TABLE public.agent_brain_settlement_events FROM pit_reader;
+GRANT SELECT ON TABLE public.agent_brain_settlement_events TO pit_reader;
