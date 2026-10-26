@@ -90,6 +90,19 @@ def decoded_event(value):
     return value if isinstance(value, dict) else json.loads(value)
 
 
+def latest_settlement_events(rows):
+    """Resolve the current append-only event independently for each horizon."""
+    latest = {}
+    for row in rows:
+        horizon = int(row["horizon_sessions"])
+        current = latest.get(horizon)
+        event_order = (row["created_at"], row["event_id"])
+        current_order = (current["created_at"], current["event_id"]) if current else None
+        if current is None or event_order > current_order:
+            latest[horizon] = {**row, "event_json": decoded_event(row["event_json"])}
+    return latest
+
+
 def require_shadow_success(cur, strategy_id):
     cur.execute("""
       SELECT evidence_json FROM live_shadow_run_attestations
@@ -204,40 +217,47 @@ def main():
           targets=maturity_targets_from_exchange_calendar(anchor,exchange_dates)
           target_by_horizon={5:targets["5d"],20:targets["20d"]}
           cur.execute("""
-            SELECT horizon_sessions,settlement_trade_date,status,event_json
+            SELECT horizon_sessions,settlement_trade_date,status,event_id,event_json,created_at
             FROM public.agent_brain_settlement_events
             WHERE strategy_run_id=%s
           """,(run["id"],))
-          prior_events=cur.fetchall()
-          settled_by_horizon={}
-          for prior in prior_events:
-              horizon=int(prior["horizon_sessions"])
+          latest_by_horizon=latest_settlement_events(cur.fetchall())
+          for horizon,prior in latest_by_horizon.items():
               if horizon not in target_by_horizon or str(prior["settlement_trade_date"])!=target_by_horizon[horizon]:
                   raise RuntimeError(f"{run['id']}: stored settlement event conflicts with frozen calendar")
-              if prior["status"]=="SETTLED":
-                  settled_by_horizon[horizon]=decoded_event(prior["event_json"])
 
           outcomes={}
           for horizon in (5,20):
               key=f"settlement_{horizon}d"
-              if horizon in settled_by_horizon:
-                  outcomes[horizon]=settled_by_horizon[horizon]["result"]
+              current=latest_by_horizon.get(horizon)
+              if current and current["status"]=="SETTLED":
+                  outcomes[horizon]=current["event_json"]["result"]
                   continue
               target=target_by_horizon[horizon]
               if not target or not target_is_due(target,as_of_cn):
-                  outcomes[horizon]={"status":"PENDING","horizon_sessions":horizon,
-                                     "settlement_trade_date":target}
-                  report[f"still_pending_{horizon}d"]+=1
+                  if current:
+                      outcomes[horizon]=current["event_json"]["result"]
+                  else:
+                      outcomes[horizon]={"status":"PENDING","horizon_sessions":horizon,
+                                         "settlement_trade_date":target}
+                      report[f"still_pending_{horizon}d"]+=1
                   continue
               candidate=settle_horizon(cur,run["id"],ranking,target,horizon)
               event=build_settlement_event(run["id"],horizon,target,candidate,now)
               inserted=persist_settlement_event(cur,event)
+              if inserted:
+                  latest_by_horizon[horizon]={
+                      "event_id":event["event_id"],"horizon_sessions":horizon,
+                      "settlement_trade_date":target,"status":candidate["status"],
+                      "created_at":now_dt,"event_json":event,
+                  }
               report["settlement_events"].append({
                   "event_id":event["event_id"],"strategy_run_id":run["id"],
                   "horizon_sessions":horizon,"inserted":inserted,
               })
-              outcomes[horizon]=candidate
-              if candidate["status"]=="SETTLED":
+              current=latest_by_horizon.get(horizon)
+              outcomes[horizon]=current["event_json"]["result"]
+              if current["status"]=="SETTLED":
                   if inserted:
                       report[f"settled_{horizon}d_now"]+=1
               else:
