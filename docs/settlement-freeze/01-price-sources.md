@@ -4,12 +4,14 @@
 
 ## Recommendation
 
-- **Primary:** Longbridge historical daily candlestick endpoint, with adjustment mode explicitly set to `NoAdjust`.
-- **Independent cross-check:** Tushare Pro `daily` endpoint, which documents its daily close as unadjusted.
+- **Candidate primary (conditional; not currently access-qualified):** Longbridge historical daily candlestick endpoint, with adjustment mode explicitly set to `NoAdjust`.
+- **Candidate independent cross-check (not access-tested):** Tushare Pro `daily` endpoint, which documents its daily close as unadjusted.
 
 Official endpoint documentation: [Longbridge historical candlesticks](https://open.longbridge.com/docs/quote/pull/history-candlestick) and [Tushare A-share daily data](https://tushare.pro/document/1?doc_id=27).
 
-This is a vendor-level source pair. The available documentation does not establish that the vendors use independent upstream feeds; do not describe it as upstream-independent unless that is verified separately. Verify account permission, quota, coverage for every symbol/date, and each source's unadjusted field before approval. No source access or price retrieval was performed to prepare this proposal.
+This is a vendor-level source pair. The available documentation does not establish that the vendors use independent upstream feeds; do not describe it as upstream-independent unless that is verified separately. Verify account permission, quota, coverage for every symbol/date, and each source's unadjusted field before approval.
+
+A read-only Longbridge history-candlestick request for the 2026-10-22 rehearsal was denied on 2026-10-27 with an explicit history quota limit of zero; no bar or close was returned. Longbridge is therefore not currently qualified for this account. Tushare access was not tested. The rehearsal is `BLOCKED_ACCESS`; do not retry through a proxy, VPN, or alternate field. The owner must freeze an accessible, authorized source pair before any outcome-price capture.
 
 ## Capture and agreement rule
 
