@@ -1,34 +1,30 @@
 # One-time historical lookback re-pull and reconciliation
 
-**Status: SPECIFICATION_ONLY / NOT_DONE.** This document does not authorize branch restoration, database writes, a collector run, or settlement.
+**Status: SPECIFICATION_ONLY / NOT_DONE.** This document does not authorize database writes, a collector run, settlement, or role creation.
 
-## Purpose and expected coverage
+## Read-only inventory completed
 
-For a future authorized runtime window, reconcile every required Core13 symbol/session bar against the frozen exchange calendar. A 31-session window for 13 symbols contains 403 expected bar keys. Build the exact date list from the frozen calendar for the requested run; do not infer sessions from weekdays. The observer's 2026-10-26 window was 2026-09-04 through 2026-10-26, but that does not establish which historical rows are present or complete.
+On 2026-10-27, under the owner's read-only authorization, the default Neon `production` branch (`br-raspy-breeze-b5clzass`) was queried for the PIT tables. The branch had been archived by inactivity and Neon automatically made it ready when the database was accessed; no manual restore operation was invoked. The database contains `market_bars` and `sources`. The role list contains only `investment_intel_owner`; `pit_writer` and `pit_reader` do not exist. No DDL, database write, backup/export, credential action, or ACL change was performed. The owner must take the backup/export before creating or validating the dedicated roles in SQL Editor.
 
-The requested read-only inventory remains `NOT_DONE`: as of the 2026-10-27 Neon check, all nine listed branches were archived and the eligible PIT-data branch had not been identified. Do not restore an archived branch or query a guessed branch. The owner must identify the branch and complete the separately specified backup/export step before any inventory access.
+For the Core13 daily bars:
 
-## Inventory report
+| Stored provider/date range | Rows and symbols | Missing provenance |
+| --- | --- | --- |
+| `longbridge`, 2026-09-04–2026-10-09 | 260 rows; 13 symbols; 20 distinct sessions | 130 rows lack raw hash (2026-09-04–2026-09-18); all 260 lack `HISTORICAL_LOOKBACK`; source IDs and `retrieved_at` are present |
+| `longbridge-connector`, 2026-09-04–2026-09-18 | 110 rows; 10 symbols | all 110 lack source ID/source row, raw hash, `retrieved_at`, and `HISTORICAL_LOOKBACK` |
 
-For each expected `(symbol, trade_date)`, report whether the row exists and whether it has:
+The legacy `longbridge-connector` rows may overlap the same symbol/session keys as the main `longbridge` rows; do not count them as additional coverage without a key-by-key reconciliation. Across the 370 stored rows above, 240 lack raw hash, 110 lack source/retrieval time, and all 370 lack the lookback tag.
 
-- a stable source identifier;
-- raw response SHA-256 and canonical bar SHA-256;
-- timezone-aware `retrieved_at`;
-- `HISTORICAL_LOOKBACK` provenance for a prior bar (and the required current-bar mode for the runtime date).
+For 2026-09-28–2026-10-09 specifically, 65 rows cover 13 symbols across five sessions. All have source ID, raw hash, and retrieval time; all lack `HISTORICAL_LOOKBACK`. The stored source URI identifies the `candlesticks` dataset but does not preserve the exact SDK operation or all request parameters. The missing provenance must not be fabricated from current rows.
 
-Summarize missing rows and each missing/invalid field by count and inclusive date range. Also report duplicate keys, hash mismatches, invalid timestamps, unexpected source/mode, and dates outside the frozen calendar. Do not infer or fill missing metadata from current database values.
+## Expected window and re-pull plan
 
-## Re-pull and reconciliation procedure
+The frozen 2026 calendar gives 31 sessions from 2026-09-04 through 2026-10-26, or 403 expected Core13 bar keys. The observer recorded no prospective LIVE samples after 2026-10-09 and 11 missing sessions from 2026-10-12 through 2026-10-26. Do not backfill those prospective samples or relabel derived/current bars as raw historical evidence.
 
-1. Bind the task to an approved source, exact calendar hash, symbol list, date list, source parameters, and a new immutable run ID.
-2. Retrieve only the missing or invalid source evidence using authorized read-only access. Save provider responses and a manifest in a reviewed candidate artifact; record retrieval timestamps and both raw-response and canonical-bar hashes.
-3. Compare each candidate bar to the stored key and value without changing the stored row. Classify each as `MATCH`, `MISSING_ROW`, `VALUE_MISMATCH`, `MISSING_PROVENANCE`, or `BLOCKED_ACCESS`. Preserve all originals and mismatches.
-4. Require manual review of every mismatch and a signed-off difference report. Do not silently select a source, overwrite a row, relabel a prospective bar, or claim that a re-pull proves historical ingestion occurred at the time.
-5. Any later append of missing historical bars requires a separate reviewed PR, all restart prerequisites, and written owner authorization in issue #26. The task itself is read-only and this specification contains no SQL to execute.
+For a later owner-authorized runtime window, reconcile every expected `(symbol, trade_date)` against the frozen calendar. Report row presence, source ID, raw and canonical hashes, timezone-aware `retrieved_at`, and the required `HISTORICAL_LOOKBACK` tag for every prior bar. Also report duplicate keys, hash mismatches, invalid timestamps, unexpected source/mode, and dates outside the calendar. Summarize each missing/invalid field by count and inclusive date range.
 
-If an endpoint is unavailable or returns HTTP 451, stop and record `BLOCKED_ACCESS`. Do not use a proxy, VPN, alternate field, or fabricated retrieval metadata. Until source, hash, retrieval time, and provenance are actually joined by the runtime, fail closed.
+A separate re-pull specification must bind the approved source, exact calendar hash, symbol/date list, request parameters, and immutable run ID. Any future re-pull is read-only: preserve provider responses and manifest hashes; classify each key as `MATCH`, `MISSING_ROW`, `VALUE_MISMATCH`, `MISSING_PROVENANCE`, or `BLOCKED_ACCESS`; manually review every mismatch; do not overwrite rows or invent retrieval metadata. Any append requires a separate reviewed PR and written owner authorization in issue #26.
 
 ## Exit artifact
 
-The future task must produce: frozen calendar/source references; exact expected and observed row counts; missing/invalid-field counts and date ranges; raw evidence and manifest hashes; per-key reconciliation classifications; mismatch review; and an explicit statement that no database write or settlement occurred.
+The future task must include the frozen calendar/source references, expected and observed row counts, field-level missing counts/date ranges, raw evidence and manifest hashes, per-key classifications, mismatch review, and confirmation that no write or settlement occurred.
