@@ -10,7 +10,7 @@ For the Core13 daily bars:
 
 | Stored provider/date range | Rows and symbols | Missing provenance |
 | --- | --- | --- |
-| `longbridge`, 2026-09-04–2026-10-09 | 260 rows; 13 symbols; 20 distinct sessions | 130 rows lack raw hash (2026-09-04–2026-09-18); all 260 lack `HISTORICAL_LOOKBACK`; source IDs and `retrieved_at` are present |
+| `longbridge`, 2026-09-04–2026-10-09 | 260 rows; 13 symbols; 20 distinct sessions | 130 rows lack raw hash (2026-09-04–2026-09-22); all 260 lack `HISTORICAL_LOOKBACK`; source IDs and `retrieved_at` are present |
 | `longbridge-connector`, 2026-09-04–2026-09-18 | 110 rows; 10 symbols | all 110 lack source ID/source row, raw hash, `retrieved_at`, and `HISTORICAL_LOOKBACK` |
 
 The legacy `longbridge-connector` rows may overlap the same symbol/session keys as the main `longbridge` rows; do not count them as additional coverage without a key-by-key reconciliation. Across the 370 stored rows above, 240 lack raw hash, 110 lack source/retrieval time, and all 370 lack the lookback tag.
