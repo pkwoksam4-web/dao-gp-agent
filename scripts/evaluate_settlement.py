@@ -100,6 +100,10 @@ def _cost_fraction(positions, capital, implementation):
 
 
 def evaluate_settlement_event(event, frozen_spec):
+    if isinstance(event.get("result"),dict):
+        envelope=event
+        event={**envelope["result"],"event_id":envelope.get("event_id"),
+               "strategy_run_id":envelope.get("strategy_run_id")}
     spec=frozen_spec["spec"]
     if int(event.get("horizon_sessions",0))!=5:
         raise EvaluationGateError("EVALUATION_PRIMARY_HORIZON_ONLY")
