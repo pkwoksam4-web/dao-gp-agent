@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import os
+import re
+from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -40,24 +41,6 @@ EXCHANGE_CALENDAR=Path(os.environ.get(
     "evidence/agent_brain/cn_exchange_calendar_2026.json",
 ))
 SHANGHAI=ZoneInfo("Asia/Shanghai")
-
-
-def avg_ranks(values):
-    n=len(values); pairs=sorted(enumerate(values),key=lambda x:x[1]); ranks=[0.0]*n; i=0
-    while i<n:
-        j=i
-        while j+1<n and pairs[j+1][1]==pairs[i][1]: j+=1
-        r=(i+j)/2.0
-        for k in range(i,j+1): ranks[pairs[k][0]]=r
-        i=j+1
-    return ranks
-
-
-def corr(a,b):
-    ma=sum(a)/len(a); mb=sum(b)/len(b)
-    xa=[x-ma for x in a]; xb=[x-mb for x in b]
-    da=math.sqrt(sum(x*x for x in xa)); db=math.sqrt(sum(x*x for x in xb))
-    return None if da==0 or db==0 else sum(x*y for x,y in zip(xa,xb))/(da*db)
 
 
 def build_settlement_event(strategy_id, horizon, target, result, evaluated_at):
@@ -130,56 +113,110 @@ def require_shadow_success(cur, strategy_id):
         raise RuntimeError(f"{strategy_id}: attested observation missing: {observation_id}")
 
 
-def settle_horizon(cur, run_id, ranking, target, horizon):
-    outcomes=[]
-    missing_target_symbols=[]
-    key=f"actual_return_{horizon}d"
-    for x in ranking:
-        cur.execute("""
-          SELECT mb.close,mb.source_id,s.metadata_json
-          FROM market_bars mb JOIN sources s ON s.id=mb.source_id
-          WHERE mb.provider='longbridge' AND mb.period='day' AND mb.symbol=%s
-            AND ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date=%s::date)
-          ORDER BY mb.trade_time DESC LIMIT 1
-        """,(x["symbol"],target))
-        row=cur.fetchone()
-        if not row:
-            missing_target_symbols.append({"symbol":x["symbol"],"reason":"MISSING_TARGET_BAR"})
-            continue
-        if not source_is_live_pit(row["metadata_json"]):
-            missing_target_symbols.append({
-                "symbol":x["symbol"],"reason":"TARGET_NOT_LIVE_PIT","source_id":row["source_id"]
-            })
-            continue
-        actual=float(row["close"])/float(x["anchor_close"])-1.0
-        outcomes.append({
-            "symbol":x["symbol"],"rank":x["rank"],"candidate_score":x["candidate_score"],
-            "anchor_close":x["anchor_close"],"target_close":row["close"],key:actual,
-            "target_source_id":row["source_id"],"target_source_mode":"LIVE_PIT",
-            "live_shadow_eligible":True,
-        })
-    settlement_rule=f"{horizon}th China exchange trading session strictly after anchor; exact target date required"
-    if missing_target_symbols:
-        return {
-            "status":"BLOCKED_DATA_GAP","horizon_sessions":horizon,
-            "settlement_trade_date":target,"missing_target_symbols":missing_target_symbols,
-            "settlement_rule":settlement_rule,"later_date_substitution_allowed":False,
-        }
-    top=sorted(outcomes,key=lambda z:z["rank"])[:3]
-    bottom=sorted(outcomes,key=lambda z:z["rank"])[-3:]
-    top_mean=sum(x[key] for x in top)/3
-    bottom_mean=sum(x[key] for x in bottom)/3
-    scores=[x["candidate_score"] for x in outcomes]
-    rets=[x[key] for x in outcomes]
+def load_reviewed_outcome_manifest(path, *, expected_trade_date):
+    """Load only an explicitly reviewed, hash-bound no-database price manifest."""
+    path=Path(path)
+    try:
+        raw=path.read_bytes()
+        document=json.loads(raw)
+    except FileNotFoundError as exc:
+        raise ContractGateError(f"REVIEWED_OUTCOME_MANIFEST_MISSING: {path}") from exc
+    except (OSError,ValueError) as exc:
+        raise ContractGateError(f"REVIEWED_OUTCOME_MANIFEST_INVALID: {path}") from exc
+    if document.get("schema")!="agent-brain-reviewed-outcome-manifest/v1":
+        raise ContractGateError("OUTCOME_MANIFEST_SCHEMA_INVALID")
+    if document.get("status")!="REVIEWED":
+        raise ContractGateError("OUTCOME_MANIFEST_NOT_REVIEWED")
+    review=document.get("review")
+    if (not isinstance(review,dict) or review.get("status")!="APPROVED"
+            or not str(review.get("pull_request_url","")).startswith(
+                "https://github.com/pkwoksam4-web/dao-gp-agent/pull/"
+            ) or not review.get("approver")):
+        raise ContractGateError("OUTCOME_MANIFEST_REVIEW_ATTESTATION_MISSING")
+    payload=document.get("payload")
+    if not isinstance(payload,dict):
+        raise ContractGateError("OUTCOME_MANIFEST_PAYLOAD_INVALID")
+    canonical=json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":"),allow_nan=False)
+    payload_sha=hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    claimed=document.get("payload_sha256")
+    if not isinstance(claimed,str) or claimed!=payload_sha:
+        raise ContractGateError("OUTCOME_MANIFEST_HASH_MISMATCH")
+    if payload.get("trade_date_cn")!=expected_trade_date:
+        raise ContractGateError("OUTCOME_MANIFEST_TRADE_DATE_MISMATCH")
+    bars=payload.get("symbols")
+    if not isinstance(bars,list) or not bars:
+        raise ContractGateError("OUTCOME_MANIFEST_SYMBOLS_MISSING")
+    seen=set()
+    for bar in bars:
+        if not isinstance(bar,dict) or not isinstance(bar.get("symbol"),str):
+            raise ContractGateError("OUTCOME_MANIFEST_SYMBOL_INVALID")
+        symbol=bar["symbol"]
+        if symbol in seen:
+            raise ContractGateError(f"OUTCOME_MANIFEST_DUPLICATE_SYMBOL: {symbol}")
+        seen.add(symbol)
+        raw_hash=bar.get("raw_response_sha256")
+        if not isinstance(raw_hash,str) or not re.fullmatch(r"[0-9a-f]{64}",raw_hash):
+            raise ContractGateError(f"OUTCOME_MANIFEST_RAW_HASH_INVALID: {symbol}")
+        try:
+            close=Decimal(str(bar.get("target_close")))
+        except (InvalidOperation,TypeError,ValueError) as exc:
+            raise ContractGateError(f"OUTCOME_MANIFEST_CLOSE_INVALID: {symbol}") from exc
+        if not close.is_finite() or close<=0:
+            raise ContractGateError(f"OUTCOME_MANIFEST_CLOSE_INVALID: {symbol}")
     return {
-        "status":"SETTLED","horizon_sessions":horizon,"settlement_trade_date":target,
-        "top3_mean_return":top_mean,"bottom3_mean_return":bottom_mean,
-        "top_bottom_spread":top_mean-bottom_mean,
-        "spearman_rank_ic":corr(avg_ranks(scores),avg_ranks(rets)),
-        "outcomes":outcomes,"settlement_rule":settlement_rule,
-        "later_date_substitution_allowed":False,
+        "payload":payload,
+        "payload_sha256":payload_sha,
+        "manifest_sha256":hashlib.sha256(raw).hexdigest(),
+        "review":review,
     }
 
+
+def settle_horizon(ranking, target, horizon, manifest):
+    """Persist only per-symbol target closes and returns from reviewed evidence."""
+    payload=manifest["payload"]
+    target_by_symbol={x["symbol"]:x for x in payload["symbols"]}
+    outcomes=[]
+    missing=[]
+    return_key=f"actual_return_{horizon}d"
+    for item in ranking:
+        symbol=item["symbol"]
+        bar=target_by_symbol.get(symbol)
+        if not bar:
+            missing.append({"symbol":symbol,"reason":"MISSING_TARGET_SYMBOL_IN_REVIEWED_MANIFEST"})
+            continue
+        try:
+            anchor=Decimal(str(item.get("anchor_close")))
+            close=Decimal(str(bar.get("target_close")))
+        except (InvalidOperation,TypeError,ValueError) as exc:
+            raise ContractGateError(f"SETTLEMENT_PRICE_INVALID: {symbol}") from exc
+        if not anchor.is_finite() or anchor<=0 or not close.is_finite() or close<=0:
+            raise ContractGateError(f"SETTLEMENT_PRICE_INVALID: {symbol}")
+        outcome={
+            "symbol":symbol,
+            "rank":int(item["rank"]),
+            "anchor_close":str(item["anchor_close"]),
+            "target_close":str(bar["target_close"]),
+            return_key:float(close/anchor-Decimal(1)),
+            "target_source_raw_sha256":bar["raw_response_sha256"],
+            "target_manifest_sha256":manifest["manifest_sha256"],
+            "target_provider":payload.get("provider"),
+        }
+        outcomes.append(outcome)
+    settlement_rule=f"{horizon}th China exchange trading session strictly after anchor; reviewed exact-date manifest required"
+    if missing:
+        return {
+            "status":"BLOCKED_DATA_GAP","horizon_sessions":horizon,
+            "settlement_trade_date":target,"missing_target_symbols":missing,
+            "settlement_rule":settlement_rule,"later_date_substitution_allowed":False,
+            "target_manifest_sha256":manifest["manifest_sha256"],
+        }
+    return {
+        "status":"SETTLED","horizon_sessions":horizon,"settlement_trade_date":target,
+        "outcomes":outcomes,"settlement_rule":settlement_rule,
+        "later_date_substitution_allowed":False,
+        "target_manifest_sha256":manifest["manifest_sha256"],
+        "target_payload_sha256":manifest["payload_sha256"],
+    }
 
 def main():
     import psycopg
@@ -242,7 +279,11 @@ def main():
                                          "settlement_trade_date":target}
                       report[f"still_pending_{horizon}d"]+=1
                   continue
-              candidate=settle_horizon(cur,run["id"],ranking,target,horizon)
+              manifest_path=REVIEWED_OUTCOME_MANIFEST_DIR / f"{target}.json"
+              reviewed_manifest=load_reviewed_outcome_manifest(
+                  manifest_path,expected_trade_date=target
+              )
+              candidate=settle_horizon(ranking,target,horizon,reviewed_manifest)
               event=build_settlement_event(run["id"],horizon,target,candidate,now)
               inserted=persist_settlement_event(cur,event)
               if inserted:
@@ -270,13 +311,13 @@ def main():
         conn.commit()
     report["excluded_strategy_ids"]=sorted(set(report["excluded_strategy_ids"]))
     blocked=report["blocked_data_gap_5d"]+report["blocked_data_gap_20d"]
-    report["status"]="BLOCKED_DATA_GAP" if blocked else "PASS"
+    report["status"]="BLOCKED_DATA_GAP" if blocked else "SETTLEMENT_CAPTURE_COMPLETE"
     OUT.parent.mkdir(parents=True,exist_ok=True)
     OUT.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
     if blocked:
         print("RANKING_SETTLEMENT_CHECK_BLOCKED_DATA_GAP")
     else:
-        print("RANKING_SETTLEMENT_CHECK_PASS")
+        print("SETTLEMENT_CAPTURE_COMPLETE")
     print("excluded_strategy_ids="+json.dumps(report["excluded_strategy_ids"]))
     print(f"settled_5d_now={report['settled_5d_now']}")
     print(f"settled_20d_now={report['settled_20d_now']}")
