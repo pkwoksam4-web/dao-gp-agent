@@ -7,7 +7,6 @@ import hashlib
 import json
 import math
 import re
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
@@ -165,7 +164,7 @@ def main():
     report=evaluate_settlement_event(event,loaded)
     out=Path(args.output)
     out.parent.mkdir(parents=True,exist_ok=True)
-    out.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\\n",encoding="utf-8")
+    out.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print("SETTLEMENT_EVALUATION_CALCULATED")
     print("frozen_spec_sha256="+loaded["sha256"])
 
