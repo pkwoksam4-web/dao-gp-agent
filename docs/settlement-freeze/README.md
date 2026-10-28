@@ -1,6 +1,6 @@
 # Settlement freeze packet — 2026-10-28 owner decision
 
-**Status: PROPOSAL_NOT_FROZEN.** These drafts are for owner review on 2026-10-28 before any candidate outcome results are inspected. They contain no candidate close values, rank IC, or cohort performance calculations. A passing CI run is not a research result or authorization.
+**Status: PROPOSAL_NOT_FROZEN.** These drafts contain no candidate cohort close values, rank IC, or cohort performance calculations. A passing CI run is not a research result or authorization.
 
 ## Decisions for the owner
 
@@ -12,16 +12,17 @@
 
 The first four documents define the outcome policy. The fifth is an implementation specification only; it does not authorize database access or writes.
 
-## New access findings — 2026-10-27
+## Access and evidence status — 2026-10-28
 
-A single Longbridge latest-daily-bar probe for one symbol succeeded. The separate historical-by-date rehearsal request returned an explicit zero-quota error and no bar. The personal account tier, usage, and reset date are **NOT_VERIFIED** pending owner-side Developer Center inspection. Tushare `daily` permission is **NOT_TESTED**; its unadjusted-close path remains a fallback proposal only, subject to a one-symbol access test and exact 13-symbol overlap validation.
-
-The owner-authorized Neon inventory was read-only. It identified the default `production` branch and historical source metadata; Neon automatically activated the branch during access. No backup/export, DDL, data write, role creation, credential operation, or ACL change was performed. The owner must complete backup/export before any SQL Editor role work.
-
-The repository is public. No raw provider response or close value is included in this PR. Provider terms for public redistribution remain **NOT_VERIFIED**.
+- Longbridge historical-by-date access returned zero quota and no bar. The owner-side account tier, month-to-date usage, and reset date remain **NOT_VERIFIED**.
+- A post-close, read-only latest-daily-bar probe returned one current-date bar for each of 13 Core13 symbols. The response hashes are kept only in a local `REHEARSAL_NOT_EVIDENCE` manifest; the rehearsal was not committed to this public repository and did not write to Neon. Provider terms remain **NOT_VERIFIED**.
+- Tushare `daily` permission is **NOT_DONE / BLOCKED_ACCESS** because the executing agent has no authorized connector or credential. No overlap comparison was performed; this is not a denial from Tushare.
+- Observer gate 4 (`same_day_ingest_chain`) remains `NOT_CHECKED`. A latest-bar probe does not satisfy the production manifest and ingest chain.
+- The Neon inventory was read-only. No backup/export, DDL, data write, role creation, credential operation, or ACL change was performed. The owner must back up the correct branch before SQL Editor role work.
+- The `longbridge-connector` count of 110 covers 2026-09-04–2026-09-18; 100 covers 2026-09-07–2026-09-18. The ten-row difference is the excluded 2026-09-04 session, not a data change.
 
 ## Freeze record
 
 On approval, record the exact decision timestamp in Asia/Shanghai, each approved value, and the merged commit SHA in issue #28. Hash the merged decision files with SHA-256 and record that digest there. Any item not approved stays `NOT_FROZEN`; do not inspect candidate outcomes to choose among alternatives.
 
-The source, thresholds, statistical assumptions, and economic cost model remain proposals until the owner records the freeze.
+The source, corporate-action rule, baseline, costs, statistical assumptions, and power target remain proposals until the owner records the freeze.
