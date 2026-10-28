@@ -15,7 +15,7 @@ The first four documents define the outcome policy. The fifth is an implementati
 ## Access and evidence status — 2026-10-28
 
 - Longbridge historical-by-date access returned zero quota and no bar. The owner-side account tier, month-to-date usage, and reset date remain **NOT_VERIFIED**.
-- A post-close, read-only latest-daily-bar probe returned one current-date bar for each of 13 Core13 symbols. The response hashes are kept only in a local `REHEARSAL_NOT_EVIDENCE` manifest; the rehearsal was not committed to this public repository and did not write to Neon. Provider terms remain **NOT_VERIFIED**.
+- A post-close, read-only latest-daily-bar probe returned one current-date bar for each of 13 Core13 symbols. The response hashes are kept only in a local `REHEARSAL_NOT_EVIDENCE` manifest; the rehearsal was not committed to this public repository and did not write to Neon. Reviewed public Longbridge and Tushare terms do not establish public-repository redistribution permission; account-specific terms remain unchecked. No provider data or hashes are committed.
 - Tushare `daily` permission is **NOT_DONE / BLOCKED_ACCESS** because the executing agent has no authorized connector or credential. No overlap comparison was performed; this is not a denial from Tushare.
 - Observer gate 4 (`same_day_ingest_chain`) remains `NOT_CHECKED`. A latest-bar probe does not satisfy the production manifest and ingest chain.
 - The Neon inventory was read-only. No backup/export, DDL, data write, role creation, credential operation, or ACL change was performed. The owner must back up the correct branch before SQL Editor role work.
