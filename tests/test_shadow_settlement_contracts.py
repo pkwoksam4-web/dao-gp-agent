@@ -247,7 +247,7 @@ class ShadowSettlementContractTests(unittest.TestCase):
         section = source[start:end]
         self.assertNotIn("FROM market_bars", section)
         self.assertNotIn("spearman_rank_ic", source)
-        self.assertIn("load_reviewed_outcome_manifest", section)
+        self.assertIn("load_reviewed_outcome_manifest", source)
 
     def test_evaluation_refuses_to_run_without_frozen_spec_hash(self):
         from scripts import evaluate_settlement as evaluation
@@ -270,6 +270,58 @@ class ShadowSettlementContractTests(unittest.TestCase):
             }), encoding="utf-8")
             with self.assertRaisesRegex(evaluation.EvaluationGateError, "EVALUATION_SPEC_SHA256_MISMATCH"):
                 evaluation.load_frozen_evaluation_spec(path, "0" * 64)
+
+
+
+    def test_evaluation_computes_long_only_top_k_against_equal_weight_pool_with_frozen_fee_table(self):
+        from scripts import evaluate_settlement as evaluation
+        spec = {
+            "schema": "agent-brain-frozen-evaluation-spec/v1",
+            "status": "FROZEN",
+            "metric": "top_k_long_only_vs_equal_weight_pool_net_excess",
+            "primary_horizon_sessions": 5,
+            "descriptive_only_horizons": [20],
+            "universe_symbols": ["000636.SZ", "600392.SH"],
+            "top_k": 1,
+            "minimum_net_excess_pp": 1.0,
+            "company_action_rule": "block affected horizon",
+            "missing_data_rule": "require complete frozen universe",
+            "lookback_rule": "exact 31-session provenance window",
+            "inference": {
+                "alpha": 0.05, "power": 0.8, "sigma_pp": 3.0,
+                "method": "one-sided block bootstrap",
+                "sigma_source": "independent strategy-neutral baseline",
+                "unit": "non-overlapping five-session block",
+            },
+            "implementation": {
+                "execution_rule": "buy_at_anchor_close_hold_then_sell_at_target_close",
+                "starting_capital_cny": 100000.0,
+                "commission_rate": 0.0,
+                "minimum_commission_cny": 0.0,
+                "sell_stamp_duty_rate": 0.0,
+                "transfer_fee_rate_by_exchange": {"SH": 0.0, "SZ": 0.0},
+                "slippage_bps_per_side": 0.0,
+            },
+        }
+        frozen = {"spec": spec, "sha256": "b" * 64}
+        event = {
+            "event_id": "c" * 64,
+            "strategy_run_id": "run-1",
+            "result": {
+                "status": "SETTLED",
+                "horizon_sessions": 5,
+                "target_manifest_sha256": "d" * 64,
+                "outcomes": [
+                    {"symbol": "000636.SZ", "rank": 1, "actual_return_5d": 0.10},
+                    {"symbol": "600392.SH", "rank": 2, "actual_return_5d": 0.00},
+                ],
+            },
+        }
+        report = evaluation.evaluate_settlement_event(event, frozen)
+        self.assertEqual(report["metric"], "top_k_long_only_vs_equal_weight_pool_net_excess")
+        self.assertAlmostEqual(report["gross_excess_pp"], 5.0)
+        self.assertAlmostEqual(report["net_excess_pp"], 5.0)
+        self.assertEqual(report["frozen_spec_sha256"], "b" * 64)
 
 
 if __name__=="__main__":
