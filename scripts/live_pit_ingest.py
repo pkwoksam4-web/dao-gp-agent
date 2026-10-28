@@ -16,18 +16,28 @@ import json
 import math
 import os
 import statistics
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, time, timezone, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
-import psycopg
-from psycopg.rows import dict_row
-
-from pit_calendar_gate import (
-    feature_window_dates,
-    load_exchange_trading_calendar,
-    validate_feature_window_continuity,
-    validate_prev_close_continuity,
-)
+try:
+    from pit_calendar_gate import (
+        ContractGateError,
+        feature_window_dates,
+        historical_bar_available_by_cutoff,
+        load_exchange_trading_calendar,
+        validate_feature_window_continuity,
+        validate_prev_close_continuity,
+    )
+except ModuleNotFoundError:
+    from scripts.pit_calendar_gate import (
+        ContractGateError,
+        feature_window_dates,
+        historical_bar_available_by_cutoff,
+        load_exchange_trading_calendar,
+        validate_feature_window_continuity,
+        validate_prev_close_continuity,
+    )
 
 CORE10 = ["000636.SZ","002138.SZ","002156.SZ","600392.SH","600487.SH","600522.SH","600667.SH","600703.SH","601991.SH","605358.SH"]
 ADDED = ["000977.SZ","000938.SZ","000063.SZ"]
@@ -79,21 +89,102 @@ def insert_source(cur, *, sid, symbol, dataset, published_at, retrieved_at, raw,
          rh,json.dumps(metadata,ensure_ascii=False,separators=(",",":"))))
     return rt, True
 
+def _source_metadata(value):
+    if isinstance(value, dict):
+        return value
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        return None
+    return decoded if isinstance(decoded, dict) else None
+
+
+def validate_feature_window_provenance(symbol, expected_dates, rows, target_date):
+    if not expected_dates or expected_dates[-1]!=target_date:
+        raise RuntimeError(f"{symbol}: LOOKBACK_TARGET_MISMATCH")
+    observed_dates=[r.get("trade_date") for r in rows]
+    validate_feature_window_continuity(symbol,expected_dates,observed_dates)
+    attested=[]
+    for expected_date,row in zip(expected_dates,rows):
+        source_id=row.get("source_id")
+        raw_json=row.get("raw_json")
+        claimed_hash=row.get("source_raw_hash")
+        metadata=_source_metadata(row.get("source_metadata_json"))
+        retrieved=row.get("retrieved_at")
+        persisted=row.get("persisted_at")
+        if not source_id or raw_json is None or not metadata or not claimed_hash or retrieved is None or persisted is None:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_PROVENANCE_MISSING")
+        raw_text_value=raw_text(raw_json) if isinstance(raw_json,(dict,list)) else str(raw_json)
+        actual_hash=hashlib.sha256(raw_text_value.encode("utf-8")).hexdigest()
+        if actual_hash!=claimed_hash:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_HASH_MISMATCH")
+        def parse_aware_timestamp(value, error_code):
+            try:
+                if isinstance(value,datetime):
+                    parsed=value
+                else:
+                    parsed=datetime.fromisoformat(str(value).replace("Z","+00:00"))
+                if parsed.tzinfo is None or parsed.utcoffset() is None:
+                    raise ValueError("timezone missing")
+                return parsed.astimezone(timezone.utc)
+            except (TypeError,ValueError) as exc:
+                raise RuntimeError(f"{symbol} {expected_date}: {error_code}") from exc
+        retrieved_dt=parse_aware_timestamp(retrieved,"BAR_RETRIEVED_AT_INVALID")
+        persisted_dt=parse_aware_timestamp(persisted,"BAR_PERSISTED_AT_INVALID")
+        decision_cutoff=datetime.combine(
+            date.fromisoformat(expected_date),time(16,10),tzinfo=ZoneInfo("Asia/Shanghai")
+        )
+        try:
+            available=historical_bar_available_by_cutoff(persisted_dt,decision_cutoff)
+        except ContractGateError as exc:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_PERSISTED_AT_INVALID") from exc
+        if not available:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_PERSISTED_AFTER_DECISION_CUTOFF")
+        mode=metadata.get("mode")
+        if not isinstance(mode,str) or not mode:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_SOURCE_MODE_MISSING")
+        record={
+            "trade_date":expected_date,"source_id":source_id,
+            "bar_sha256":actual_hash,
+            "retrieved_at":retrieved_dt.isoformat(),
+            "persisted_at":persisted_dt.isoformat(),
+            "source_mode":mode,
+        }
+        manifest_hash=metadata.get("manifest_sha256")
+        if manifest_hash is not None:
+            if not isinstance(manifest_hash,str) or len(manifest_hash)!=64 or any(c not in "0123456789abcdef" for c in manifest_hash):
+                raise RuntimeError(f"{symbol} {expected_date}: SOURCE_MANIFEST_HASH_INVALID")
+            record["manifest_sha256"]=manifest_hash
+        if expected_date==target_date:
+            if mode!="LIVE_PIT" or metadata.get("live_shadow_eligible") is not True:
+                raise RuntimeError(f"{symbol} {expected_date}: CURRENT_BAR_NOT_LIVE_PIT")
+        else:
+            lookback_tag=metadata.get("lookback_tag")
+            if lookback_tag is None and mode=="HISTORICAL_LOOKBACK":
+                lookback_tag=mode
+            if lookback_tag!="HISTORICAL_LOOKBACK":
+                raise RuntimeError(f"{symbol} {expected_date}: HISTORICAL_LOOKBACK_TAG_MISSING")
+            record["lookback_tag"]=lookback_tag
+        attested.append(record)
+    return {"symbol":symbol,"target_date":target_date,"bars":attested}
+
+
 def compute_features(cur, symbol: str, td: str, exchange_dates):
     expected_dates=feature_window_dates(td,exchange_dates,required_sessions=31)
     cur.execute("""
-      SELECT trade_time,high,low,close,volume,turnover,
-             ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date
-      FROM market_bars
-      WHERE provider='longbridge' AND period='day' AND symbol=%s
-        AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date >= %s::date)
-        AND ((trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date <= %s::date)
-      ORDER BY trade_time
+      SELECT mb.trade_time,mb.high,mb.low,mb.close,mb.volume,mb.turnover,
+             ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date,
+             mb.source_id,mb.raw_json,mb.persisted_at,s.raw_hash AS source_raw_hash,
+             s.retrieved_at AS retrieved_at,s.metadata_json AS source_metadata_json
+      FROM market_bars mb
+      LEFT JOIN sources s ON s.id=mb.source_id
+      WHERE mb.provider='longbridge' AND mb.period='day' AND mb.symbol=%s
+        AND ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date >= %s::date)
+        AND ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date <= %s::date)
+      ORDER BY mb.trade_time
     """,(symbol,expected_dates[0],td))
     rows=cur.fetchall()
-    validate_feature_window_continuity(
-        symbol,expected_dates,[r["trade_date"] for r in rows]
-    )
+    window_attestation=validate_feature_window_provenance(symbol,expected_dates,rows,td)
     closes=[float(r["close"]) for r in rows]
     highs=[float(r["high"]) for r in rows]
     lows=[float(r["low"]) for r in rows]
@@ -113,9 +204,12 @@ def compute_features(cur, symbol: str, td: str, exchange_dates):
       "volume_ratio_5_20":(sum(vols[-5:])/5)/(sum(vols[-20:])/20),
       "amount_ratio_5_20":(sum(amts[-5:])/5)/(sum(amts[-20:])/20),
       "realized_vol_20d":statistics.stdev(logrets[-20:])*math.sqrt(252),
-    }
+    }, window_attestation
 
 def main():
+    import psycopg
+    from psycopg.rows import dict_row
+
     p=os.environ.get("PIT_MANIFEST_PATH","").strip()
     if not p:
         raise RuntimeError("PIT_MANIFEST_PATH missing")
@@ -180,7 +274,8 @@ def main():
             "feature_window_end":expected_feature_dates[-1],
             "expected_previous_trade_date":expected_previous_trade_date,
             "inserted":{"bars":0,"quotes":0,"flows":0,"features":0,"sources":0},
-            "protected_before":{},"protected_after":{},"prev_close_continuity":{},"verified_coverage":{}}
+            "protected_before":{},"protected_after":{},"prev_close_continuity":{},"verified_coverage":{},
+            "feature_window_attestations":{}}
     dsn=os.environ["NEON_DATABASE_URL"]
     now=datetime.now(timezone.utc).isoformat()
     with psycopg.connect(dsn,row_factory=dict_row,connect_timeout=15) as conn:
@@ -294,7 +389,8 @@ def main():
             raise RuntimeError("post-write Core13 daily bar coverage !=13/13")
 
         for s in CORE13:
-          f=compute_features(cur,s,td,exchange_dates)
+          f,window_attestation=compute_features(cur,s,td,exchange_dates)
+          report["feature_window_attestations"][s]=window_attestation
           cur.execute("""
             INSERT INTO stock_feature_snapshots(
               snapshot_date,symbol,sector,close,high_30d,low_30d,drawdown_from_30d_high,
