@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 try:
     from shadow_contract_gates import (
+        ContractGateError,
         load_exchange_trading_calendar,
         load_quarantine_registry,
         maturity_targets_from_exchange_calendar,
@@ -21,6 +22,7 @@ try:
     )
 except ModuleNotFoundError:
     from scripts.shadow_contract_gates import (
+        ContractGateError,
         load_exchange_trading_calendar,
         load_quarantine_registry,
         maturity_targets_from_exchange_calendar,
