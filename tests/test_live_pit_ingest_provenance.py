@@ -26,7 +26,8 @@ def sample_rows():
         rows.append({
             "trade_date": td, "source_id": f"source-{i}", "raw_json": raw_json,
             "source_raw_hash": hashlib.sha256(raw_json.encode()).hexdigest(),
-            "ingested_at": "2026-08-31T08:00:00+00:00",
+            "retrieved_at": "2026-08-31T08:00:00+00:00",
+            "persisted_at": "2026-08-31T08:00:00+00:00",
             "source_metadata_json": json.dumps(metadata),
         })
     return expected, rows
