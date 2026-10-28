@@ -179,5 +179,98 @@ class ShadowSettlementContractTests(unittest.TestCase):
         self.assertNotIn("psql", workflow.lower())
 
 
+
+    def test_settlement_consumes_reviewed_manifest_and_stores_only_symbol_prices_and_returns(self):
+        payload = {
+            "trade_date_cn": "2026-10-19",
+            "provider": "test-fixture",
+            "currency": "CNY",
+            "adjustment": "unadjusted",
+            "symbols": [{"symbol": "000636.SZ", "target_close": "11.00",
+                         "raw_response_sha256": "a" * 64}],
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        document = {
+            "schema": "agent-brain-reviewed-outcome-manifest/v1",
+            "status": "REVIEWED",
+            "review": {
+                "status": "APPROVED",
+                "pull_request_url": "https://github.com/pkwoksam4-web/dao-gp-agent/pull/99",
+                "approver": "owner",
+            },
+            "payload_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+            "payload": payload,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "manifest.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            manifest = settlement.load_reviewed_outcome_manifest(path, expected_trade_date="2026-10-19")
+        result = settlement.settle_horizon(
+            [{"symbol": "000636.SZ", "rank": 1, "anchor_close": 10.0}],
+            "2026-10-19", 5, manifest,
+        )
+        self.assertEqual(result["status"], "SETTLED")
+        self.assertEqual(result["outcomes"][0]["target_close"], "11.00")
+        self.assertEqual(result["outcomes"][0]["actual_return_5d"], 0.1)
+        self.assertNotIn("spearman_rank_ic", result)
+        self.assertNotIn("top_bottom_spread", result)
+        self.assertNotIn("top3_mean_return", result)
+
+    def test_unreviewed_or_hash_mismatched_price_manifest_is_rejected(self):
+        payload = {"trade_date_cn": "2026-10-19", "symbols": []}
+        document = {
+            "schema": "agent-brain-reviewed-outcome-manifest/v1",
+            "status": "PENDING_REVIEW",
+            "review": {"status": "PENDING", "pull_request_url": "", "approver": ""},
+            "payload_sha256": "0" * 64,
+            "payload": payload,
+        }
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "manifest.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaisesRegex(ContractGateError, "OUTCOME_MANIFEST_NOT_REVIEWED"):
+                settlement.load_reviewed_outcome_manifest(path, expected_trade_date="2026-10-19")
+            document["status"] = "REVIEWED"
+            document["review"] = {
+                "status": "APPROVED",
+                "pull_request_url": "https://github.com/pkwoksam4-web/dao-gp-agent/pull/99",
+                "approver": "owner",
+            }
+            path.write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaisesRegex(ContractGateError, "OUTCOME_MANIFEST_HASH_MISMATCH"):
+                settlement.load_reviewed_outcome_manifest(path, expected_trade_date="2026-10-19")
+
+    def test_settlement_path_has_no_database_target_price_query_or_rank_ic(self):
+        source = Path("scripts/ranking_shadow_settlement.py").read_text(encoding="utf-8")
+        start = source.index("def settle_horizon")
+        end = source.index("\ndef main():", start)
+        section = source[start:end]
+        self.assertNotIn("FROM market_bars", section)
+        self.assertNotIn("spearman_rank_ic", source)
+        self.assertIn("load_reviewed_outcome_manifest", section)
+
+    def test_evaluation_refuses_to_run_without_frozen_spec_hash(self):
+        from scripts import evaluate_settlement as evaluation
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "frozen_spec.json"
+            path.write_text(json.dumps({
+                "schema": "agent-brain-frozen-evaluation-spec/v1",
+                "status": "FROZEN",
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationGateError, "EVALUATION_SPEC_SHA256_REQUIRED"):
+                evaluation.load_frozen_evaluation_spec(path, None)
+
+    def test_evaluation_spec_hash_must_match_exact_frozen_file(self):
+        from scripts import evaluate_settlement as evaluation
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "frozen_spec.json"
+            path.write_text(json.dumps({
+                "schema": "agent-brain-frozen-evaluation-spec/v1",
+                "status": "FROZEN",
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(evaluation.EvaluationGateError, "EVALUATION_SPEC_SHA256_MISMATCH"):
+                evaluation.load_frozen_evaluation_spec(path, "0" * 64)
+
+
 if __name__=="__main__":
     unittest.main()
