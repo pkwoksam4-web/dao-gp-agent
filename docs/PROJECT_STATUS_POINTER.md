@@ -1,6 +1,6 @@
 # Agent Brain status pointer
 
-`status_checked_at: 2026-10-28 18:29 Asia/Shanghai`
+`status_checked_at: 2026-10-28 18:31 Asia/Shanghai`
 
 ## Live and observer status
 
@@ -8,7 +8,7 @@
 - 2026-10-26: [status issue #37](https://github.com/pkwoksam4-web/dao-gp-agent/issues/37), run [40347410059](https://github.com/pkwoksam4-web/dao-gp-agent/actions/runs/40347410059), main SHA `bb43e5e9cb7a3727c4a0bf56494d534c2b63aecf`. Result `NON_LIVE`; authorization `FAIL_NOT_AUTHORIZED`, manifest `MISSING`, database and ingest `NOT_CHECKED`. The run started at 23:14:46 Asia/Shanghai, about 6h59 after the 16:15 target.
 - 2026-10-27: [status issue #39](https://github.com/pkwoksam4-web/dao-gp-agent/issues/39), run [40522491522](https://github.com/pkwoksam4-web/dao-gp-agent/actions/runs/40522491522), same main SHA. Result `NON_LIVE`; authorization `FAIL_NOT_AUTHORIZED`, manifest `MISSING`, database and ingest `NOT_CHECKED`. The run started at 22:35:01 Asia/Shanghai, about 6h20 after target.
 - The schedule is `15 8 * * 1-5` UTC (target about 16:15 Asia/Shanghai); GitHub may delay it. For both delayed runs, `created_at` equals `run_started_at`; the observer job was created 5 seconds later and started 5 seconds after that. The delay occurred before the run record existed. **INFERRED:** there is no evidence of substantial runner queue time; available run metadata cannot distinguish GitHub schedule dispatch delay from another pre-run scheduling delay.
-- As of 2026-10-28 18:29 Asia/Shanghai, no 2026-10-28 observer run or status issue was visible. Keep today's status pending; this is not a final missed-day classification.
+- As of 2026-10-28 18:31 Asia/Shanghai, no 2026-10-28 observer run or status issue was visible. Keep today's status pending; this is not a final missed-day classification.
 - Owner confirmation in issue #29 that the 10/26 and 10/27 reports match the manual checks is **NOT_DONE**. The five-session acceptance count has not started.
 - Phase 1 uses `contents: read` and `issues: write`; weekday holidays are resolved against the frozen exchange calendar as `SKIPPED_NON_SESSION`. Database and authoritative ingest remain `NOT_CHECKED`, so Phase 1 cannot report overall `PASS`.
 
