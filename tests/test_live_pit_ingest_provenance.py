@@ -27,7 +27,7 @@ def sample_rows():
             "trade_date": td, "source_id": f"source-{i}", "raw_json": raw_json,
             "source_raw_hash": hashlib.sha256(raw_json.encode()).hexdigest(),
             "retrieved_at": "2026-08-31T08:00:00+00:00",
-            "persisted_at": "2026-08-31T08:00:00+00:00",
+            "persisted_at": f"{td}T08:00:00+00:00",
             "source_metadata_json": json.dumps(metadata),
         })
     return expected, rows
@@ -41,7 +41,8 @@ class LivePitProvenanceTests(unittest.TestCase):
         attestation = attester("000636.SZ", expected, rows, expected[-1])
         self.assertEqual(len(attestation["bars"]), 31)
         self.assertEqual(attestation["bars"][0]["lookback_tag"], "HISTORICAL_LOOKBACK")
-        self.assertEqual(attestation["bars"][0]["ingested_at"], "2026-08-31T08:00:00+00:00")
+        self.assertEqual(attestation["bars"][0]["retrieved_at"], "2026-08-31T08:00:00+00:00")
+        self.assertEqual(attestation["bars"][0]["persisted_at"], f"{expected[0]}T08:00:00+00:00")
         self.assertEqual(attestation["bars"][0]["bar_sha256"], rows[0]["source_raw_hash"])
         self.assertNotIn("lookback_tag", attestation["bars"][-1])
 
