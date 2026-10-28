@@ -5,7 +5,7 @@ on:
     paths:
       - "scripts/live_pit_ingest.py"
       - "tests/test_live_pit_ingest_provenance.py"
-      - "docs/PROJECT_STATUS_POINTER.md"
+      - "db/migrations/20261028_market_bars_persisted_at.sql"
       - ".github/workflows/live-pit-runtime-provenance-ci.yml"
 
 permissions:
