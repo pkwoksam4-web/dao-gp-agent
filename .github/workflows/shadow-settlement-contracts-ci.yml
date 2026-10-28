@@ -6,6 +6,7 @@ on:
       - "scripts/shadow_contract_gates.py"
       - "scripts/generate_shadow_request.py"
       - "scripts/ranking_shadow_settlement.py"
+      - "scripts/evaluate_settlement.py"
       - "tests/test_shadow_settlement_contracts.py"
       - "evidence/agent_brain/prospective_quarantine_registry_v1.json"
       - "db/migrations/20261026_agent_brain_settlement_events.sql"
@@ -25,4 +26,4 @@ jobs:
           python-version: "3.12"
       - run: python -m unittest -v tests.test_shadow_settlement_contracts
       - name: Compile settlement modules
-        run: python -m py_compile scripts/shadow_contract_gates.py scripts/generate_shadow_request.py scripts/ranking_shadow_settlement.py
+        run: python -m py_compile scripts/shadow_contract_gates.py scripts/generate_shadow_request.py scripts/ranking_shadow_settlement.py scripts/evaluate_settlement.py
