@@ -1,0 +1,29 @@
+name: Shadow Settlement Contracts CI
+
+on:
+  pull_request:
+    paths:
+      - "scripts/shadow_contract_gates.py"
+      - "scripts/generate_shadow_request.py"
+      - "scripts/ranking_shadow_settlement.py"
+      - "scripts/evaluate_settlement.py"
+      - "tests/test_shadow_settlement_contracts.py"
+      - "evidence/agent_brain/prospective_quarantine_registry_v1.json"
+      - "db/migrations/20261026_agent_brain_settlement_events.sql"
+      - ".github/workflows/shadow-settlement-contracts-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  settlement-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - run: python -m unittest -v tests.test_shadow_settlement_contracts
+      - name: Compile settlement modules
+        run: python -m py_compile scripts/shadow_contract_gates.py scripts/generate_shadow_request.py scripts/ranking_shadow_settlement.py scripts/evaluate_settlement.py
