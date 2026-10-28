@@ -16,19 +16,24 @@ import json
 import math
 import os
 import statistics
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, time, timezone, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 try:
     from pit_calendar_gate import (
+        ContractGateError,
         feature_window_dates,
+        historical_bar_available_by_cutoff,
         load_exchange_trading_calendar,
         validate_feature_window_continuity,
         validate_prev_close_continuity,
     )
 except ModuleNotFoundError:
     from scripts.pit_calendar_gate import (
+        ContractGateError,
         feature_window_dates,
+        historical_bar_available_by_cutoff,
         load_exchange_trading_calendar,
         validate_feature_window_continuity,
         validate_prev_close_continuity,
@@ -105,28 +110,44 @@ def validate_feature_window_provenance(symbol, expected_dates, rows, target_date
         raw_json=row.get("raw_json")
         claimed_hash=row.get("source_raw_hash")
         metadata=_source_metadata(row.get("source_metadata_json"))
-        retrieved=row.get("ingested_at")
-        if not source_id or raw_json is None or not metadata or not claimed_hash or retrieved is None:
+        retrieved=row.get("retrieved_at")
+        persisted=row.get("persisted_at")
+        if not source_id or raw_json is None or not metadata or not claimed_hash or retrieved is None or persisted is None:
             raise RuntimeError(f"{symbol} {expected_date}: BAR_PROVENANCE_MISSING")
         raw_text_value=raw_text(raw_json) if isinstance(raw_json,(dict,list)) else str(raw_json)
         actual_hash=hashlib.sha256(raw_text_value.encode("utf-8")).hexdigest()
         if actual_hash!=claimed_hash:
             raise RuntimeError(f"{symbol} {expected_date}: BAR_HASH_MISMATCH")
+        def parse_aware_timestamp(value, error_code):
+            try:
+                if isinstance(value,datetime):
+                    parsed=value
+                else:
+                    parsed=datetime.fromisoformat(str(value).replace("Z","+00:00"))
+                if parsed.tzinfo is None or parsed.utcoffset() is None:
+                    raise ValueError("timezone missing")
+                return parsed.astimezone(timezone.utc)
+            except (TypeError,ValueError) as exc:
+                raise RuntimeError(f"{symbol} {expected_date}: {error_code}") from exc
+        retrieved_dt=parse_aware_timestamp(retrieved,"BAR_RETRIEVED_AT_INVALID")
+        persisted_dt=parse_aware_timestamp(persisted,"BAR_PERSISTED_AT_INVALID")
+        decision_cutoff=datetime.combine(
+            date.fromisoformat(expected_date),time(16,10),tzinfo=ZoneInfo("Asia/Shanghai")
+        )
         try:
-            if isinstance(retrieved,datetime):
-                retrieved_dt=retrieved
-            else:
-                retrieved_dt=datetime.fromisoformat(str(retrieved).replace("Z","+00:00"))
-            if retrieved_dt.tzinfo is None:
-                raise ValueError("timezone missing")
-        except (TypeError,ValueError) as exc:
-            raise RuntimeError(f"{symbol} {expected_date}: BAR_INGEST_TIME_INVALID") from exc
+            available=historical_bar_available_by_cutoff(persisted_dt,decision_cutoff)
+        except ContractGateError as exc:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_PERSISTED_AT_INVALID") from exc
+        if not available:
+            raise RuntimeError(f"{symbol} {expected_date}: BAR_PERSISTED_AFTER_DECISION_CUTOFF")
         mode=metadata.get("mode")
         if not isinstance(mode,str) or not mode:
             raise RuntimeError(f"{symbol} {expected_date}: BAR_SOURCE_MODE_MISSING")
         record={
             "trade_date":expected_date,"source_id":source_id,
-            "bar_sha256":actual_hash,"ingested_at":retrieved_dt.astimezone(timezone.utc).isoformat(),
+            "bar_sha256":actual_hash,
+            "retrieved_at":retrieved_dt.isoformat(),
+            "persisted_at":persisted_dt.isoformat(),
             "source_mode":mode,
         }
         manifest_hash=metadata.get("manifest_sha256")
@@ -153,8 +174,8 @@ def compute_features(cur, symbol: str, td: str, exchange_dates):
     cur.execute("""
       SELECT mb.trade_time,mb.high,mb.low,mb.close,mb.volume,mb.turnover,
              ((mb.trade_time::timestamptz AT TIME ZONE 'Asia/Shanghai')::date)::text AS trade_date,
-             mb.source_id,mb.raw_json,s.raw_hash AS source_raw_hash,
-             s.retrieved_at AS ingested_at,s.metadata_json AS source_metadata_json
+             mb.source_id,mb.raw_json,mb.persisted_at,s.raw_hash AS source_raw_hash,
+             s.retrieved_at AS retrieved_at,s.metadata_json AS source_metadata_json
       FROM market_bars mb
       LEFT JOIN sources s ON s.id=mb.source_id
       WHERE mb.provider='longbridge' AND mb.period='day' AND mb.symbol=%s
