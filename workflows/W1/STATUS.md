@@ -1,7 +1,7 @@
 # W1 数据与证据 — STATUS
 
 **状态：DRAFT_NOT_OWNER_RATIFIED / BOOTSTRAP_ONLY**  
-**更新时间：2026-10-29 17:20 Asia/Shanghai**  
+**更新时间：2026-10-29 17:25 Asia/Shanghai**  
 **主线只读基线：`main@bb43e5e9cb7a3727c4a0bf56494d534c2b63aecf`**  
 **变更范围：`workflows/W1/`，非生产独立分支 `w1/governance-bootstrap-20261029`**
 
@@ -26,7 +26,7 @@
 4. 四文件保持 `DRAFT_NOT_OWNER_RATIFIED`，W1 分支与主线差异仅在 `workflows/W1/`；无生产库/凭据/合并/tag/访问限制绕过操作。
 5. 回读 GitHub 文件及实际执行标准库测试，记录通过数与 commit SHA；未验证的条件保留 `NOT_DONE`。
 
-**执行结果**：`PENDING_READBACK_AND_TEST`（本文件起草时状态；以本轮最终核验报告为准）。
+**执行结果（2026-10-29 17:25 Asia/Shanghai）**：`PASS_SUBCOMPONENT / DRAFT_ONLY`。GitHub 已回读四份治理文件和一份预先提交的测试文件（5/5 可读）；基于回读字节的五类合同断言（文件、章程、状态、决策、接口）为 **5/5 PASS**。两端 Git tree 的 blob 对照仅新增 `workflows/W1/` 下五个文件，原 `main` 无任何 blob 变化。**NOT_DONE**：仓库中 Python unittest 未实际执行（当前容器无法解析 github.com，未触发任何 GitHub Actions）；不能把上述 JS 等价断言写成 Python CI 通过。治理文件尚未获负责人批准，故整体 `NOT_RATIFIED`。
 
 ## 未完成与阻塞
 
