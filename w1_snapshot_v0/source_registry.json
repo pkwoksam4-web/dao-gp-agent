@@ -1,0 +1,50 @@
+{
+  "schema": "w1-source-registry/v0",
+  "updated_at": "2026-10-29",
+  "storage_adr": "ADR-004_PENDING",
+  "no_public_raw_data": true,
+  "sources": [
+    {
+      "id": "baostock_daily",
+      "provider": "BaoStock",
+      "role": "PRIMARY_OHLCV_AND_SUPPLEMENTAL_STATUS",
+      "api": "query_history_k_data_plus",
+      "frequency": "d",
+      "adjustflag": "3_UNADJUSTED",
+      "source_docs": "https://github.com/zxygithub/baostock/blob/master/docs/pythonAPI.md",
+      "free_access": "DOCUMENTED_FREE_ANONYMOUS_LOGIN",
+      "license_status": "SOFTWARE_MIT; MARKET_DATA_LICENSE_AND_REDISTRIBUTION_UNVERIFIED",
+      "public_raw_redistribution": "NOT_AUTHORIZED",
+      "observed_runtime": "BLOCKED_NO_BAOSTOCK_NETWORK_IN_CURRENT_EXECUTION_ENVIRONMENT",
+      "status_authority": "SUPPLEMENTARY_NOT_FORMAL_D_PITST"
+    },
+    {
+      "id": "longbridge_daily_latest",
+      "provider": "Longbridge",
+      "role": "SECONDARY_LATEST_DAILY_OHLC_CROSSCHECK_ONLY",
+      "api": "candlesticks(period=day,count=1,adjust=false)",
+      "source_docs": "https://open.longbridge.com/docs/quote/pull/candlestick",
+      "terms_url": "https://longbridge.com/us/en/support/articles/14864594652431",
+      "free_access": "ACCOUNT_ENTITLEMENT_DEPENDENT",
+      "license_status": "THIRD_PARTY_EXCHANGE_RESTRICTIONS; NO_PUBLIC_REDISTRIBUTION_WITHOUT_EXPRESS_AUTHORIZATION",
+      "public_raw_redistribution": "NOT_AUTHORIZED",
+      "observed_runtime": "CORE13_LATEST_BAR_READ_SUCCEEDED_2026_10_29",
+      "timestamp_semantics": "UTC_TIMESTAMP_CONVERT_TO_ASIA_SHANGHAI_FOR_DAILY_TRADE_DATE"
+    },
+    {
+      "id": "d_formal_status",
+      "provider": "DAO2 Module D frozen checkpoint",
+      "role": "STATUS_CONTRACT_AUTHORITY",
+      "source_docs": "https://github.com/pkwoksam4-web/dao-gp-agent/blob/gp/dao2-d-label-status/docs/dao2/modules/D_LABEL_STATUS.md",
+      "license_status": "CONTRACT_INTERNAL; UNDERLYING_PRICE_LIMIT_ACCESS_NOT_VERIFIED",
+      "public_raw_redistribution": "NOT_AUTHORIZED",
+      "observed_runtime": "CONTRACT_READ_ONLY; POST_2026_04_17_AUTHORITY_EXTENSION_NOT_VERIFIED",
+      "status_fields": [
+        "known_at",
+        "is_st",
+        "tradable",
+        "upper_limit"
+      ]
+    }
+  ]
+}
